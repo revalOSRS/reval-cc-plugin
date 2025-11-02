@@ -1,5 +1,6 @@
 .gradle
 build
+bin
 .idea/
 .project
 .settings/
@@ -7,3 +8,6 @@ build
 nbactions.xml
 nb-configuration.xml
 nbproject/
+
+# Reference data files (VarbitID.java, VarPlayerID.java, etc.)
+.data/
