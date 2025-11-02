@@ -3,7 +3,6 @@ package com.revalclan;
 import com.revalclan.collectionlog.CollectionLogManager;
 import com.revalclan.combatachievements.CombatAchievementManager;
 import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.Quest;
@@ -34,6 +33,9 @@ public class PlayerDataCollector
 
 	@Inject
 	private CollectionLogManager collectionLogManager;
+
+	@Inject
+	private Gson gson;
 
 	/**
 	 * Collects all player data and returns it as a map
@@ -287,8 +289,8 @@ public class PlayerDataCollector
 	{
 		Map<String, Object> data = collectAllData();
 		
-		Gson gson = new GsonBuilder().setPrettyPrinting().create();
-		String json = gson.toJson(data);
+		Gson prettyGson = gson.newBuilder().setPrettyPrinting().create();
+		String json = prettyGson.toJson(data);
 		
 		@SuppressWarnings("unchecked")
 		Map<String, Object> player = (Map<String, Object>) data.get("player");
