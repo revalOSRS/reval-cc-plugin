@@ -21,11 +21,10 @@ The plugin sends webhook notifications for the following events:
 - **Kill Counts**: Boss kill count milestones
 - **Clue Scrolls**: Clue completion with rewards
 - **Achievement Diaries**: Diary task completions with precise tracking
-- **Slayer Tasks**: Task completion notifications
 - **Combat Achievements**: CA task completions
 - **Collection Log**: New collection log item acquisitions
 - **Player Deaths**: Death tracking with killer information (NPC/Player)
-- **Detailed Kill Tracking**: Damage dealt, weapons used, special attacks (for Bingo events)
+- **Detailed Kill Tracking**: Damage dealt, weapons used, special attacks
 - **Area Entry**: Region/area entry notifications
 - **Emote Usage**: Emote performance tracking
 
@@ -59,7 +58,6 @@ Each event type can be individually enabled/disabled:
 - Kill Counts
 - Clue Scrolls
 - Achievement Diaries
-- Slayer Tasks
 - Combat Achievements
 - Collection Log
 - Player Deaths
