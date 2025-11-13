@@ -12,35 +12,32 @@ import java.util.regex.Pattern;
 
 @Slf4j
 @Singleton
-public class CombatAchievementNotifier extends BaseNotifier
-{
+public class CombatAchievementNotifier extends BaseNotifier {
 	private static final Pattern CA_PATTERN = Pattern.compile(
 		"Congratulations, you've completed an? (?<tier>\\w+) combat task: (?<task>.+)\\.",
 		Pattern.CASE_INSENSITIVE
 	);
 
-	@Inject
-	private RevalClanConfig config;
+	@Inject private RevalClanConfig config;
 
-	@Override
-	public boolean isEnabled()
-	{
-		return config.enableWebhook() && config.notifyCombatAchievement();
+	@Override 
+	public boolean isEnabled() {
+		return config.notifyCombatAchievement() && filterManager.getFilters().isCombatAchievementEnabled();
 	}
 
 	@Override
-	protected String getEventType()
-	{
+	protected String getEventType() {
 		return "COMBAT_ACHIEVEMENT";
 	}
 
-	public void onChatMessage(String message)
-	{
+	public void onChatMessage(String message) {
 		if (!isEnabled()) return;
 
-		Matcher matcher = CA_PATTERN.matcher(message);
-		if (matcher.find())
-		{
+		// Strip HTML color tags from the message
+		String cleanMessage = message.replaceAll("<col=[0-9a-fA-F]+>", "").replaceAll("</col>", "");
+
+		Matcher matcher = CA_PATTERN.matcher(cleanMessage);
+		if (matcher.find()) {
 			String tier = matcher.group("tier");
 			String task = matcher.group("task");
 
@@ -48,9 +45,7 @@ public class CombatAchievementNotifier extends BaseNotifier
 		}
 	}
 
-	private void handleCombatAchievement(String tier, String task)
-	{
-		// Remove points suffix if present
+	private void handleCombatAchievement(String tier, String task) {
 		task = task.replaceAll("\\s+\\(\\d+ points?\\)$", "");
 
 		Map<String, Object> caData = new HashMap<>();
@@ -58,7 +53,7 @@ public class CombatAchievementNotifier extends BaseNotifier
 		caData.put("tier", tier);
 		caData.put("task", task);
 
-		sendNotification(config.webhookUrl(), caData);
+		sendNotification(caData);
 	}
 }
 

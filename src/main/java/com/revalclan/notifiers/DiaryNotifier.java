@@ -1,3 +1,10 @@
+/*
+ * Portions of this file are derived from or inspired by the Dink plugin
+ * Copyright (c) 2022, Jake Barter
+ * Copyright (c) 2022, pajlads
+ * Licensed under the BSD 2-Clause License
+ * See LICENSES/dink-LICENSE.txt for full license text
+ */
 package com.revalclan.notifiers;
 
 import com.revalclan.RevalClanConfig;
@@ -15,8 +22,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Singleton
-public class DiaryNotifier extends BaseNotifier
-{
+public class DiaryNotifier extends BaseNotifier {
 	/**
 	 * CS2 Script IDs for diary completion tracking
 	 * @see <a href="https://github.com/Joshua-F/cs2-scripts">CS2 Reference</a>
@@ -30,55 +36,44 @@ public class DiaryNotifier extends BaseNotifier
 	 */
 	private static final Map<Integer, String> DIARY_VARBITS = createDiaryMap();
 
-	@Inject
-	private RevalClanConfig config;
+	@Inject private RevalClanConfig config;
 
-	@Inject
-	private ClientThread clientThread;
+	@Inject private ClientThread clientThread;
 
 	private final Map<Integer, Integer> diaryCompletionById = new ConcurrentHashMap<>();
 	private int initDelayTicks = 0;
 
 	@Override
-	public boolean isEnabled()
-	{
-		return config.enableWebhook() && config.notifyDiary();
+	public boolean isEnabled() {
+		return config.notifyDiary() && filterManager.getFilters().isDiaryEnabled();
 	}
 
 	@Override
-	protected String getEventType()
-	{
+	protected String getEventType() {
 		return "DIARY";
 	}
 
-	public void onGameStateChanged(GameStateChanged event)
-	{
-		if (event.getGameState() != GameState.LOGGED_IN)
-		{
+	public void onGameStateChanged(GameStateChanged event) {
+		if (event.getGameState() != GameState.LOGGED_IN) {
 			reset();
 		}
 	}
 
-	public void onGameTick()
-	{
+	public void onGameTick() {
 		if (client.getGameState() != GameState.LOGGED_IN) return;
 
-		if (initDelayTicks > 0)
-		{
+		if (initDelayTicks > 0) {
 			initDelayTicks--;
 			if (initDelayTicks == 0)
 			{
 				initializeDiaries();
 			}
-		}
-		else if (diaryCompletionById.isEmpty() && isEnabled())
-		{
+		} else if (diaryCompletionById.isEmpty() && isEnabled()) {
 			initDelayTicks = 4;
 		}
 	}
 
-	public void onVarbitChanged(VarbitChanged event)
-	{
+	public void onVarbitChanged(VarbitChanged event) {
 		int id = event.getVarbitId();
 		if (id < 0) return;
 		
@@ -86,36 +81,28 @@ public class DiaryNotifier extends BaseNotifier
 		if (diaryInfo == null) return;
 		if (!isEnabled()) return;
 
-		if (diaryCompletionById.isEmpty())
-		{
-			if (client.getGameState() == GameState.LOGGED_IN && isComplete(id, event.getValue()))
-			{
-				return;
-			}
-			return;
+		if (diaryCompletionById.isEmpty()) {
+			if (client.getGameState() == GameState.LOGGED_IN && isComplete(id, event.getValue())) return;
+			else return;
 		}
 
 		int value = event.getValue();
 		Integer previous = diaryCompletionById.get(id);
 
-		if (previous == null)
-		{
+		if (previous == null) {
 			reset();
 			return;
 		}
 
-		if (value < previous)
-		{
+		if (value < previous) {
 			reset();
 			return;
 		}
 
-		if (value > previous)
-		{
+		if (value > previous) {
 			diaryCompletionById.put(id, value);
 
-			if (isComplete(id, value))
-			{
+			if (isComplete(id, value)) {
 				clientThread.invokeLater(() -> {
 					handleDiaryCompletion(diaryInfo, id);
 					return true;
@@ -124,8 +111,7 @@ public class DiaryNotifier extends BaseNotifier
 		}
 	}
 
-	private void handleDiaryCompletion(String diaryInfo, int varbitId)
-	{
+	private void handleDiaryCompletion(String diaryInfo, int varbitId) {
 		client.runScript(COMPLETED_TASKS_SCRIPT_ID);
 		int completedTasks = client.getIntStack()[0];
 
@@ -147,55 +133,43 @@ public class DiaryNotifier extends BaseNotifier
 		diaryData.put("totalTasks", totalTasks);
 		diaryData.put("totalDiariesCompleted", totalDiariesCompleted);
 
-		sendNotification(config.webhookUrl(), diaryData);
+		sendNotification(diaryData);
 	}
 
-	private void initializeDiaries()
-	{
+	private void initializeDiaries() {
 		if (!isEnabled()) return;
 
 		diaryCompletionById.clear();
 
-		for (Integer varbitId : DIARY_VARBITS.keySet())
-		{
+		for (Integer varbitId : DIARY_VARBITS.keySet()) {
 			int value = client.getVarbitValue(varbitId);
-			if (value >= 0)
-			{
+			if (value >= 0) {
 				diaryCompletionById.put(varbitId, value);
 			}
 		}
 	}
 
-	private int getTotalCompleted()
-	{
+	private int getTotalCompleted() {
 		int count = 0;
-		for (Map.Entry<Integer, Integer> entry : diaryCompletionById.entrySet())
-		{
-			if (isComplete(entry.getKey(), entry.getValue()))
-			{
-				count++;
-			}
+		for (Map.Entry<Integer, Integer> entry : diaryCompletionById.entrySet()) {
+			if (isComplete(entry.getKey(), entry.getValue())) count++;
 		}
 		return count;
 	}
 
-	private static boolean isComplete(int varbitId, int value)
-	{
-		if (varbitId == 3578 || varbitId == 3599 || varbitId == 3611)
-		{
+	private static boolean isComplete(int varbitId, int value) {
+		if (varbitId == 3578 || varbitId == 3599 || varbitId == 3611) {
 			return value > 1;
 		}
 		return value > 0;
 	}
 
-	public void reset()
-	{
+	public void reset() {
 		diaryCompletionById.clear();
 		initDelayTicks = 0;
 	}
 
-	private static Map<Integer, String> createDiaryMap()
-	{
+	private static Map<Integer, String> createDiaryMap() {
 		Map<Integer, String> map = new HashMap<>();
 		
 		map.put(3577, "Ardougne_Easy");

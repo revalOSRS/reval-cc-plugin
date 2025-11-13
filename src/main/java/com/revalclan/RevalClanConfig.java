@@ -6,57 +6,13 @@ import net.runelite.client.config.ConfigItem;
 import net.runelite.client.config.ConfigSection;
 
 @ConfigGroup("revalclan")
-public interface RevalClanConfig extends Config
-{
-	@ConfigSection(
-		name = "Webhook Settings",
-		description = "Configuration for webhook endpoint",
-		position = 1
-	)
-	String webhookSection = "webhookSection";
-
+public interface RevalClanConfig extends Config {
 	@ConfigSection(
 		name = "Event Notifications",
 		description = "Toggle individual event types",
-		position = 2
-	)
-	String eventsSection = "eventsSection";
-
-	@ConfigItem(
-		keyName = "enableWebhook",
-		name = "Enable Webhook",
-		description = "Master toggle for all webhook notifications",
-		section = webhookSection,
 		position = 1
 	)
-	default boolean enableWebhook()
-	{
-		return false;
-	}
-
-	@ConfigItem(
-		keyName = "webhookUrl",
-		name = "Webhook URL",
-		description = "The URL to send all events to",
-		section = webhookSection,
-		position = 2
-	)
-	default String webhookUrl()
-	{
-		return "";
-	}
-
-	@ConfigItem(
-		keyName = "saveLocalJson",
-		name = "Save Local JSON (Logout Only)",
-		description = "Save full player data to local JSON file on logout",
-		section = webhookSection,
-		position = 3
-	)
-	default boolean saveLocalJson()
-	{
-		return true;
-	}
+	String eventsSection = "eventsSection";
 
 	// Event type toggles
 	@ConfigItem(
@@ -66,8 +22,7 @@ public interface RevalClanConfig extends Config
 		section = eventsSection,
 		position = 1
 	)
-	default boolean notifyLoot()
-	{
+	default boolean notifyLoot() {
 		return true;
 	}
 
@@ -78,8 +33,7 @@ public interface RevalClanConfig extends Config
 		section = eventsSection,
 		position = 2
 	)
-	default boolean notifyPet()
-	{
+	default boolean notifyPet() {
 		return true;
 	}
 
@@ -90,8 +44,7 @@ public interface RevalClanConfig extends Config
 		section = eventsSection,
 		position = 3
 	)
-	default boolean notifyQuest()
-	{
+	default boolean notifyQuest() {
 		return true;
 	}
 
@@ -102,8 +55,7 @@ public interface RevalClanConfig extends Config
 		section = eventsSection,
 		position = 4
 	)
-	default boolean notifyLevel()
-	{
+	default boolean notifyLevel() {
 		return true;
 	}
 
@@ -114,8 +66,7 @@ public interface RevalClanConfig extends Config
 		section = eventsSection,
 		position = 5
 	)
-	default boolean notifyKillCount()
-	{
+	default boolean notifyKillCount() {
 		return true;
 	}
 
@@ -126,8 +77,7 @@ public interface RevalClanConfig extends Config
 		section = eventsSection,
 		position = 6
 	)
-	default boolean notifyClue()
-	{
+	default boolean notifyClue() {
 		return true;
 	}
 
@@ -138,20 +88,7 @@ public interface RevalClanConfig extends Config
 		section = eventsSection,
 		position = 7
 	)
-	default boolean notifyDiary()
-	{
-		return true;
-	}
-
-	@ConfigItem(
-		keyName = "notifySlayer",
-		name = "Slayer Tasks",
-		description = "Send notifications when you complete a slayer task",
-		section = eventsSection,
-		position = 8
-	)
-	default boolean notifySlayer()
-	{
+	default boolean notifyDiary() {
 		return true;
 	}
 
@@ -162,8 +99,7 @@ public interface RevalClanConfig extends Config
 		section = eventsSection,
 		position = 9
 	)
-	default boolean notifyCombatAchievement()
-	{
+	default boolean notifyCombatAchievement() {
 		return true;
 	}
 
@@ -174,8 +110,7 @@ public interface RevalClanConfig extends Config
 		section = eventsSection,
 		position = 10
 	)
-	default boolean notifyCollection()
-	{
+	default boolean notifyCollection() {
 		return true;
 	}
 
@@ -186,8 +121,7 @@ public interface RevalClanConfig extends Config
 		section = eventsSection,
 		position = 11
 	)
-	default boolean notifyDeath()
-	{
+	default boolean notifyDeath() {
 		return true;
 	}
 
@@ -198,8 +132,7 @@ public interface RevalClanConfig extends Config
 		section = eventsSection,
 		position = 12
 	)
-	default boolean notifyDetailedKill()
-	{
+	default boolean notifyDetailedKill() {
 		return true;
 	}
 
@@ -210,8 +143,7 @@ public interface RevalClanConfig extends Config
 		section = eventsSection,
 		position = 13
 	)
-	default boolean notifyAreaEntry()
-	{
+	default boolean notifyAreaEntry() {
 		return true;
 	}
 
@@ -222,8 +154,7 @@ public interface RevalClanConfig extends Config
 		section = eventsSection,
 		position = 14
 	)
-	default boolean notifyEmote()
-	{
+	default boolean notifyEmote() {
 		return true;
 	}
 }

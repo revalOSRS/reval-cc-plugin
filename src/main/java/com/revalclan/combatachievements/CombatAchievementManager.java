@@ -14,10 +14,8 @@ import java.util.*;
  */
 @Slf4j
 @Singleton
-public class CombatAchievementManager
-{
-	@Inject
-	private Client client;
+public class CombatAchievementManager {
+	@Inject private Client client;
 
 	private static final Map<Integer, String> TIER_ENUMS = new LinkedHashMap<>();
 	static {
@@ -72,73 +70,44 @@ public class CombatAchievementManager
 
 	private final List<CombatAchievementTask> allTasks = new ArrayList<>();
 
-	public Map<String, Object> getData()
-	{
-		return getCombatAchievementData();
-	}
-
 	/**
-	 * Loads all Combat Achievement tasks from game cache
-	 * Should be called on login or when data is needed
+	 * Sync and get combat achievement data
 	 */
-	public void loadAllTasks()
-	{
+	public Map<String, Object> sync() {
 		allTasks.clear();
 		
-		int totalLoaded = 0;
-		int completedCount = 0;
-		
-		for (Map.Entry<Integer, String> tierEntry : TIER_ENUMS.entrySet())
-		{
-			int enumId = tierEntry.getKey();
-			String tierName = tierEntry.getValue();
-			
-			try
-			{
-				EnumComposition tierEnum = client.getEnum(enumId);
-				if (tierEnum == null)
-				{
-					continue;
-				}
+		for (Map.Entry<Integer, String> tierEntry : TIER_ENUMS.entrySet()) {
+			try {
+				EnumComposition tierEnum = client.getEnum(tierEntry.getKey());
+				if (tierEnum == null) continue;
 				
-				int[] structIds = tierEnum.getIntVals();
-				
-				for (int structId : structIds)
-				{
-					try
-					{
-						CombatAchievementTask task = loadTaskFromStruct(structId, tierName);
-						if (task != null)
-						{
-							allTasks.add(task);
-							totalLoaded++;
-							if (task.isCompleted())
-							{
-								completedCount++;
-							}
-						}
-					}
-					catch (Exception e) { }
+				for (int structId : tierEnum.getIntVals()) {
+					try {
+						CombatAchievementTask task = loadTaskFromStruct(structId, tierEntry.getValue());
+						if (task != null) allTasks.add(task);
+					} catch (Exception ignored) {}
 				}
-			}
-			catch (Exception e)
-			{
-				log.error("Failed to load tier {}: {}", tierName, e.getMessage());
-			}
+			} catch (Exception ignored) {}
 		}
 		
+		int totalPoints = calculateTotalPoints();
+		
+		Map<String, Object> data = new HashMap<>();
+		data.put("currentTier", calculateCurrentTier(totalPoints));
+		data.put("totalPoints", totalPoints);
+		data.put("tierProgress", getTierProgress());
+		data.put("allTasks", getAllTasksDetailed());
+		data.put("totalTasksLoaded", allTasks.size());
+		
+		return data;
 	}
 
 	/**
 	 * Loads a single task from a struct
 	 */
-	private CombatAchievementTask loadTaskFromStruct(int structId, String tierName)
-	{
+	private CombatAchievementTask loadTaskFromStruct(int structId, String tierName) {
 		StructComposition struct = client.getStructComposition(structId);
-		if (struct == null)
-		{
-			return null;
-		}
+		if (struct == null) return null;
 		
 		String name = struct.getStringValue(FIELD_NAME);
 		String description = struct.getStringValue(FIELD_DESCRIPTION);
@@ -166,47 +135,32 @@ public class CombatAchievementManager
 	/**
 	 * Gets boss name from boss enum
 	 */
-	private String getBossName(int bossId)
-	{
-		try
-		{
+	private String getBossName(int bossId) {
+		try {
 			EnumComposition bossEnum = client.getEnum(BOSS_ENUM_ID);
-			if (bossEnum != null)
-			{
+			if (bossEnum != null) {
 				String name = bossEnum.getStringValue(bossId);
-				return (name != null && !name.isEmpty()) ? name : "Unknown";
+				if (name != null && !name.isEmpty()) return name;
 			}
-		}
-		catch (Exception e) {	}
+		} catch (Exception ignored) {}
 		return "Unknown";
 	}
 
 	/**
 	 * Checks if a task is completed using VarPlayer
 	 */
-	private boolean isTaskCompleted(int taskId)
-	{
-		if (taskId < 0 || taskId >= COMPLETION_VARPS.length * 32)
-		{
-			return false;
-		}
-		
+	private boolean isTaskCompleted(int taskId) {
+		if (taskId < 0 || taskId >= COMPLETION_VARPS.length * 32) return false;
+
 		int varpIndex = taskId / 32;
 		int bitIndex = taskId % 32;
+
+		if (varpIndex >= COMPLETION_VARPS.length) return false;
 		
-		if (varpIndex >= COMPLETION_VARPS.length)
-		{
-			return false;
-		}
-		
-		try
-		{
-			int varpId = COMPLETION_VARPS[varpIndex];
-			int varpValue = client.getVarpValue(varpId);
+		try {
+			int varpValue = client.getVarpValue(COMPLETION_VARPS[varpIndex]);
 			return (varpValue & (1 << bitIndex)) != 0;
-		}
-		catch (Exception e)
-		{
+		} catch (Exception e) {
 			return false;
 		}
 	}
@@ -214,10 +168,8 @@ public class CombatAchievementManager
 	/**
 	 * Gets points for a tier
 	 */
-	private int getPointsForTier(String tier)
-	{
-		switch (tier.toLowerCase())
-		{
+	private int getPointsForTier(String tier) {
+		switch (tier.toLowerCase()) {
 			case "easy": return 1;
 			case "medium": return 2;
 			case "hard": return 3;
@@ -229,30 +181,9 @@ public class CombatAchievementManager
 	}
 
 	/**
-	 * Gets comprehensive Combat Achievement data
-	 */
-	private Map<String, Object> getCombatAchievementData()
-	{
-		Map<String, Object> data = new LinkedHashMap<>();
-		
-		int totalPoints = calculateTotalPoints();
-		String currentTier = calculateCurrentTier(totalPoints);
-		
-		data.put("currentTier", currentTier);
-		data.put("totalPoints", totalPoints);
-		data.put("tierProgress", getTierProgress());
-		data.put("allTasks", getAllTasksDetailed());
-		data.put("dataSource", "game_cache");
-		data.put("totalTasksLoaded", allTasks.size());
-		
-		return data;
-	}
-
-	/**
 	 * Calculate total points from completed tasks
 	 */
-	private int calculateTotalPoints()
-	{
+	private int calculateTotalPoints() {
 		return allTasks.stream()
 			.filter(CombatAchievementTask::isCompleted)
 			.mapToInt(CombatAchievementTask::getPoints)
@@ -262,8 +193,7 @@ public class CombatAchievementManager
 	/**
 	 * Calculate current tier based on total points
 	 */
-	private String calculateCurrentTier(int totalPoints)
-	{
+	private String calculateCurrentTier(int totalPoints) {
 		if (totalPoints >= 1550) return "Grandmaster";
 		if (totalPoints >= 1265) return "Master";
 		if (totalPoints >= 977) return "Elite";
@@ -276,24 +206,21 @@ public class CombatAchievementManager
 	/**
 	 * Get tier progress breakdown
 	 */
-	private Map<String, Map<String, Integer>> getTierProgress()
-	{
+	private Map<String, Map<String, Integer>> getTierProgress() {
 		Map<String, Map<String, Integer>> tierProgress = new LinkedHashMap<>();
 		
-		for (String tier : TIER_ENUMS.values())
-		{
-			long completed = allTasks.stream()
-				.filter(t -> t.getTier().equals(tier))
-				.filter(CombatAchievementTask::isCompleted)
+		for (String tier : TIER_ENUMS.values()) {
+			int completed = (int) allTasks.stream()
+				.filter(t -> t.getTier().equals(tier) && t.isCompleted())
 				.count();
 			
-			long total = allTasks.stream()
+			int total = (int) allTasks.stream()
 				.filter(t -> t.getTier().equals(tier))
 				.count();
 			
 			Map<String, Integer> tierData = new HashMap<>();
-			tierData.put("completed", (int) completed);
-			tierData.put("total", (int) total);
+			tierData.put("completed", completed);
+			tierData.put("total", total);
 			tierProgress.put(tier.toLowerCase(), tierData);
 		}
 		
@@ -303,25 +230,22 @@ public class CombatAchievementManager
 	/**
 	 * Get all tasks with full details
 	 */
-	private List<Map<String, Object>> getAllTasksDetailed()
-	{
+	private List<Map<String, Object>> getAllTasksDetailed() {
 		List<Map<String, Object>> tasksList = new ArrayList<>();
 		
-		for (CombatAchievementTask task : allTasks)
-		{
-			Map<String, Object> taskData = new LinkedHashMap<>();
-			taskData.put("id", task.getId());
-			taskData.put("name", task.getName());
-			taskData.put("description", task.getDescription());
-			taskData.put("tier", task.getTier());
-			taskData.put("type", task.getType());
-			taskData.put("boss", task.getBoss());
-			taskData.put("points", task.getPoints());
-			taskData.put("completed", task.isCompleted());
-			tasksList.add(taskData);
+		for (CombatAchievementTask task : allTasks) {
+			tasksList.add(Map.of(
+				"id", task.getId(),
+				"name", task.getName(),
+				"description", task.getDescription(),
+				"tier", task.getTier(),
+				"type", task.getType(),
+				"boss", task.getBoss(),
+				"points", task.getPoints(),
+				"completed", task.isCompleted()
+			));
 		}
 		
 		return tasksList;
 	}
 }
-

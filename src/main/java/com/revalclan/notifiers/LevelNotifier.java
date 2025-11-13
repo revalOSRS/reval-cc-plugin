@@ -16,28 +16,23 @@ import java.util.Map;
  */
 @Slf4j
 @Singleton
-public class LevelNotifier extends BaseNotifier
-{
-	@Inject
-	private RevalClanConfig config;
+public class LevelNotifier extends BaseNotifier {
+	@Inject private RevalClanConfig config;
 
 	private final Map<Skill, Integer> previousLevels = new EnumMap<>(Skill.class);
 	private final Map<Skill, Integer> previousXp = new EnumMap<>(Skill.class);
 
 	@Override
-	public boolean isEnabled()
-	{
-		return config.enableWebhook() && config.notifyLevel();
+	public boolean isEnabled() {
+		return config.notifyLevel() && filterManager.getFilters().isLevelEnabled();
 	}
 
 	@Override
-	protected String getEventType()
-	{
+	protected String getEventType() {
 		return "LEVEL";
 	}
 
-	public void onStatChanged(StatChanged event)
-	{
+	public void onStatChanged(StatChanged event) {
 		if (!isEnabled()) return;
 
 		Skill skill = event.getSkill();
@@ -45,8 +40,7 @@ public class LevelNotifier extends BaseNotifier
 		int newXp = event.getXp();
 
 		// Initialize if first time seeing this skill
-		if (!previousLevels.containsKey(skill))
-		{
+		if (!previousLevels.containsKey(skill)) {
 			previousLevels.put(skill, newLevel);
 			previousXp.put(skill, newXp);
 			return;
@@ -60,14 +54,12 @@ public class LevelNotifier extends BaseNotifier
 		previousXp.put(skill, newXp);
 
 		// Check for level up
-		if (newLevel > oldLevel && newXp > oldXp)
-		{
+		if (newLevel > oldLevel && newXp > oldXp) {
 			handleLevelUp(skill, newLevel, newXp);
 		}
 	}
 
-	private void handleLevelUp(Skill skill, int level, int xp)
-	{
+	private void handleLevelUp(Skill skill, int level, int xp) {
 		int totalLevel = client.getTotalLevel();
 		long totalXp = client.getOverallExperience();
 		int combatLevel = client.getLocalPlayer() != null ? client.getLocalPlayer().getCombatLevel() : 0;
@@ -83,11 +75,10 @@ public class LevelNotifier extends BaseNotifier
 
 		log.info("{} leveled {} to {}", getPlayerName(), skill.getName(), level);
 
-		sendNotification(config.webhookUrl(), levelData);
+		sendNotification(levelData);
 	}
 
-	public void reset()
-	{
+	public void reset() {
 		previousLevels.clear();
 		previousXp.clear();
 	}

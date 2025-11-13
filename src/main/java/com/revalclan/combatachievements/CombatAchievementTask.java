@@ -8,8 +8,7 @@ import lombok.NoArgsConstructor;
  */
 @Data
 @NoArgsConstructor
-public class CombatAchievementTask
-{
+public class CombatAchievementTask {
 	private int id;
 	private String name;
 	private String description;

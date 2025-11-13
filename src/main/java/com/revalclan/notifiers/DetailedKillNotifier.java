@@ -7,6 +7,7 @@ import net.runelite.api.NPC;
 import net.runelite.api.Player;
 import net.runelite.api.Hitsplat;
 import net.runelite.api.events.ActorDeath;
+import net.runelite.api.events.GameTick;
 import net.runelite.api.events.HitsplatApplied;
 import net.runelite.client.game.ItemManager;
 
@@ -17,13 +18,10 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Singleton
-public class DetailedKillNotifier extends BaseNotifier
-{
-	@Inject
-	private RevalClanConfig config;
+public class DetailedKillNotifier extends BaseNotifier {
+	@Inject private RevalClanConfig config;
 
-	@Inject
-	private ItemManager itemManager;
+	@Inject private ItemManager itemManager;
 
 	private final Map<NPC, KillData> activeKills = new ConcurrentHashMap<>();
 	
@@ -32,38 +30,30 @@ public class DetailedKillNotifier extends BaseNotifier
 	private String specWeaponName = null;
 
 	@Override
-	public boolean isEnabled()
-	{
-		return config.enableWebhook() && config.notifyDetailedKill();
+	public boolean isEnabled() {
+		return config.notifyDetailedKill() && filterManager.getFilters().isDetailedKillEnabled();
 	}
 
 	@Override
-	protected String getEventType()
-	{
+	protected String getEventType() {
 		return "DETAILED_KILL";
 	}
 
-	public void onGameTick(net.runelite.api.events.GameTick event)
-	{
+	public void onGameTick(GameTick event) {
 		if (!isEnabled()) return;
 
 		int currentSpecEnergy = client.getVarpValue(300);
 		
-		if (currentSpecEnergy < previousSpecEnergy)
-		{
+		if (currentSpecEnergy < previousSpecEnergy) {
 			Player localPlayer = client.getLocalPlayer();
-			if (localPlayer != null)
-			{
+			if (localPlayer != null) {
 				int weaponId = localPlayer.getPlayerComposition().getEquipmentId(net.runelite.api.kit.KitType.WEAPON);
 				specWeaponName = weaponId > 0 ? itemManager.getItemComposition(weaponId).getName() : "Unarmed";
 				specTicksRemaining = 3;
 			}
-		}
-		else if (specTicksRemaining > 0)
-		{
+		} else if (specTicksRemaining > 0) {
 			specTicksRemaining--;
-			if (specTicksRemaining == 0)
-			{
+			if (specTicksRemaining == 0) {
 				specWeaponName = null;
 			}
 		}
@@ -71,8 +61,7 @@ public class DetailedKillNotifier extends BaseNotifier
 		previousSpecEnergy = currentSpecEnergy;
 	}
 
-	public void onHitsplatApplied(HitsplatApplied event)
-	{
+	public void onHitsplatApplied(HitsplatApplied event) {
 		if (!isEnabled()) return;
 
 		Actor actor = event.getActor();
@@ -95,8 +84,7 @@ public class DetailedKillNotifier extends BaseNotifier
 		data.addHit(damage, weaponName, isSpec);
 	}
 
-	public void onActorDeath(ActorDeath event)
-	{
+	public void onActorDeath(ActorDeath event) {
 		if (!isEnabled()) return;
 
 		Actor actor = event.getActor();
@@ -105,14 +93,12 @@ public class DetailedKillNotifier extends BaseNotifier
 		NPC npc = (NPC) actor;
 		KillData data = activeKills.remove(npc);
 
-		if (data != null && data.totalDamage > 0)
-		{
+		if (data != null && data.totalDamage > 0) {
 			handleDetailedKill(data);
 		}
 	}
 
-	private void handleDetailedKill(KillData data)
-	{
+	private void handleDetailedKill(KillData data) {
 		Map<String, Object> killData = new HashMap<>();
 		killData.put("player", getPlayerName());
 		killData.put("npcName", data.npcName);
@@ -126,19 +112,17 @@ public class DetailedKillNotifier extends BaseNotifier
 		killData.put("weaponsUsed", new ArrayList<>(data.weaponsUsed.keySet()));
 		killData.put("damageByWeapon", data.weaponsUsed);
 
-		sendNotification(config.webhookUrl(), killData);
+		sendNotification(killData);
 	}
 
-	public void reset()
-	{
+	public void reset() {
 		activeKills.clear();
 		previousSpecEnergy = 100;
 		specTicksRemaining = 0;
 		specWeaponName = null;
 	}
 
-	private static class KillData
-	{
+	private static class KillData {
 		final String npcName;
 		final int npcId;
 		int totalDamage = 0;
@@ -149,22 +133,19 @@ public class DetailedKillNotifier extends BaseNotifier
 		boolean lastHitWasSpec = false;
 		final Map<String, Integer> weaponsUsed = new HashMap<>();
 
-		KillData(String npcName, int npcId)
-		{
+		KillData(String npcName, int npcId) {
 			this.npcName = npcName;
 			this.npcId = npcId;
 		}
 
-		void addHit(int damage, String weapon, boolean isSpec)
-		{
+		void addHit(int damage, String weapon, boolean isSpec) {
 			totalDamage += damage;
 			hitCount++;
 			lastHitWeapon = weapon;
 			lastHitDamage = damage;
 			lastHitWasSpec = isSpec;
 
-			if (isSpec)
-			{
+			if (isSpec) {
 				specialAttackCount++;
 			}
 

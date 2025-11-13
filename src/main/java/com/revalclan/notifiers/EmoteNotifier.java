@@ -12,32 +12,27 @@ import java.util.Map;
 
 @Slf4j
 @Singleton
-public class EmoteNotifier extends BaseNotifier
-{
+public class EmoteNotifier extends BaseNotifier {
 	@Inject
 	private RevalClanConfig config;
 
 	@Override
-	public boolean isEnabled()
-	{
-		return config.enableWebhook() && config.notifyEmote();
+	public boolean isEnabled() {
+		return config.notifyEmote() && filterManager.getFilters().isEmoteEnabled();
 	}
 
 	@Override
-	protected String getEventType()
-	{
+	protected String getEventType() {
 		return "EMOTE";
 	}
 
-	public void onMenuOptionClicked(MenuOptionClicked event)
-	{
+	public void onMenuOptionClicked(MenuOptionClicked event) {
 		if (!isEnabled()) return;
 
 		String menuOption = event.getMenuOption();
 		String menuTarget = event.getMenuTarget();
 
-		if (menuOption != null && menuOption.toLowerCase().contains("perform"))
-		{
+		if (menuOption != null && menuOption.toLowerCase().contains("perform")) {
 			Player localPlayer = client.getLocalPlayer();
 			if (localPlayer == null) return;
 
@@ -52,7 +47,7 @@ public class EmoteNotifier extends BaseNotifier
 			emoteData.put("x", x);
 			emoteData.put("y", y);
 
-			sendNotification(config.webhookUrl(), emoteData);
+			sendNotification(emoteData);
 		}
 	}
 }

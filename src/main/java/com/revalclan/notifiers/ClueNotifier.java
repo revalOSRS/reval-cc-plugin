@@ -1,3 +1,10 @@
+/*
+ * Portions of this file are derived from or inspired by the Dink plugin
+ * Copyright (c) 2022, Jake Barter
+ * Copyright (c) 2022, pajlads
+ * Licensed under the BSD 2-Clause License
+ * See LICENSES/dink-LICENSE.txt for full license text
+ */
 package com.revalclan.notifiers;
 
 import com.revalclan.RevalClanConfig;
@@ -18,69 +25,60 @@ import java.util.regex.Pattern;
 
 @Slf4j
 @Singleton
-public class ClueNotifier extends BaseNotifier
-{
+public class ClueNotifier extends BaseNotifier {
 	private static final Pattern CLUE_PATTERN = Pattern.compile(
 		"You have completed (?<count>\\d+) (?<tier>\\w+) Treasure Trails?\\.",
 		Pattern.CASE_INSENSITIVE
 	);
 
-	@Inject
-	private RevalClanConfig config;
+	@Inject private RevalClanConfig config;
 
-	@Inject
-	private ItemManager itemManager;
+	@Inject private ItemManager itemManager;
 
 	private int clueCount = -1;
 	private String clueTier = "";
 
 	@Override
-	public boolean isEnabled()
-	{
-		return config.enableWebhook() && config.notifyClue();
+	public boolean isEnabled() {
+		return config.notifyClue() && filterManager.getFilters().isClueEnabled();
 	}
 
 	@Override
-	protected String getEventType()
-	{
+	protected String getEventType() {
 		return "CLUE";
 	}
 
-	public void onChatMessage(String message)
-	{
+	public void onChatMessage(String message) {
 		if (!isEnabled()) return;
 
-		Matcher matcher = CLUE_PATTERN.matcher(message);
-		if (matcher.find())
-		{
+		// Strip HTML color tags from the message
+		String cleanMessage = message.replaceAll("<col=[0-9a-fA-F]+>", "").replaceAll("</col>", "");
+
+		Matcher matcher = CLUE_PATTERN.matcher(cleanMessage);
+		if (matcher.find()) {
 			clueCount = Integer.parseInt(matcher.group("count"));
 			clueTier = matcher.group("tier");
 		}
 	}
 
-	public void onWidgetLoaded(WidgetLoaded event)
-	{
+	public void onWidgetLoaded(WidgetLoaded event) {
 		if (!isEnabled()) return;
 
-		if (event.getGroupId() == InterfaceID.TRAIL_REWARDSCREEN && !clueTier.isEmpty())
-		{
+		if (event.getGroupId() == InterfaceID.TRAIL_REWARDSCREEN && !clueTier.isEmpty()) {
 			Widget clueWidget = client.getWidget(InterfaceID.TrailRewardscreen.ITEMS);
-			if (clueWidget != null)
-			{
+			if (clueWidget != null) {
 				Widget[] children = clueWidget.getChildren();
 				if (children == null) return;
 
 				List<Map<String, Object>> items = new ArrayList<>();
 				long totalValue = 0;
 
-				for (Widget child : children)
-				{
+				for (Widget child : children) {
 					if (child == null) continue;
 
 					int quantity = child.getItemQuantity();
 					int itemId = child.getItemId();
-					if (itemId > -1 && quantity > 0)
-					{
+					if (itemId > -1 && quantity > 0) {
 						int price = itemManager.getItemPrice(itemId);
 						String name = itemManager.getItemComposition(itemId).getName();
 
@@ -100,8 +98,7 @@ public class ClueNotifier extends BaseNotifier
 		}
 	}
 
-	private void handleClueCompletion(List<Map<String, Object>> items, long totalValue)
-	{
+	private void handleClueCompletion(List<Map<String, Object>> items, long totalValue) {
 		Map<String, Object> clueData = new HashMap<>();
 		clueData.put("player", getPlayerName());
 		clueData.put("tier", clueTier);
@@ -109,14 +106,13 @@ public class ClueNotifier extends BaseNotifier
 		clueData.put("totalValue", totalValue);
 		clueData.put("items", items);
 
-		sendNotification(config.webhookUrl(), clueData);
+		sendNotification(clueData);
 
 		clueCount = -1;
 		clueTier = "";
 	}
 
-	public void reset()
-	{
+	public void reset() {
 		clueCount = -1;
 		clueTier = "";
 	}

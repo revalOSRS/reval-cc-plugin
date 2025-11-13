@@ -15,40 +15,32 @@ import java.util.Map;
 
 @Slf4j
 @Singleton
-public class QuestNotifier extends BaseNotifier
-{
-	@Inject
-	private RevalClanConfig config;
+public class QuestNotifier extends BaseNotifier {
+	@Inject private RevalClanConfig config;
 
 	@Override
-	public boolean isEnabled()
-	{
-		return config.enableWebhook() && config.notifyQuest();
+	public boolean isEnabled() {
+		return config.notifyQuest() && filterManager.getFilters().isQuestEnabled();
 	}
 
 	@Override
-	protected String getEventType()
-	{
+	protected String getEventType() {
 		return "QUEST";
 	}
 
-	public void onWidgetLoaded(WidgetLoaded event)
-	{
+	public void onWidgetLoaded(WidgetLoaded event) {
 		if (!isEnabled()) return;
 
-		if (event.getGroupId() == InterfaceID.QUESTSCROLL)
-		{
+		if (event.getGroupId() == InterfaceID.QUESTSCROLL) {
 			Widget questTitle = client.getWidget(InterfaceID.Questscroll.QUEST_TITLE);
-			if (questTitle != null)
-			{
+			if (questTitle != null) {
 				String questText = questTitle.getText();
 				handleQuestCompletion(questText);
 			}
 		}
 	}
 
-	private void handleQuestCompletion(String questText)
-	{
+	private void handleQuestCompletion(String questText) {
 		// Parse quest name from the widget text
 		String questName = parseQuestName(questText);
 		if (questName == null) return;
@@ -64,18 +56,14 @@ public class QuestNotifier extends BaseNotifier
 		questData.put("completedQuests", completedQuests);
 		questData.put("totalQuests", totalQuests);
 
-		log.info("Quest completed: {} ({}/{})", questName, completedQuests, totalQuests);
-
-		sendNotification(config.webhookUrl(), questData);
+		sendNotification(questData);
 	}
 
-	private String parseQuestName(String questText)
-	{
+	private String parseQuestName(String questText) {
 		if (questText == null) return null;
 
 		String[] lines = questText.split("\n");
-		if (lines.length >= 3)
-		{
+		if (lines.length >= 3) {
 			String name = lines[2].replace("!", "").trim();
 			return name.isEmpty() ? null : name;
 		}

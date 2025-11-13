@@ -10,14 +10,12 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class ObtainedCollectionItem
-{
+public class ObtainedCollectionItem {
 	private int id;
 	private String name;
 	private int count;
 
-	public ObtainedCollectionItem(int id, int count)
-	{
+	public ObtainedCollectionItem(int id, int count) {
 		this.id = id;
 		this.count = count;
 	}

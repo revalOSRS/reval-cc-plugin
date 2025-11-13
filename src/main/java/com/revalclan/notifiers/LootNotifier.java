@@ -17,23 +17,6 @@ import java.util.*;
 @Singleton
 public class LootNotifier extends BaseNotifier
 {
-	// ========== INTERNAL FILTERS (Easy to modify) ==========
-	
-	/** Minimum total GE value to trigger notification (in gp) */
-	private static final long MIN_LOOT_VALUE = 1_000_000; // 1M
-	
-	/** Item IDs that should ALWAYS trigger notification (even if worthless) */
-	private static final Set<Integer> WHITELIST_ITEM_IDS = new HashSet<>();
-	
-	/** Item IDs that should NEVER trigger notification (even if valuable) */
-	private static final Set<Integer> BLACKLIST_ITEM_IDS = new HashSet<>(Arrays.asList(
-		// Common junk
-		526, // Bones
-		995 // Coins
-	));
-	
-	// ========================================================
-
 	@Inject
 	private RevalClanConfig config;
 
@@ -41,20 +24,17 @@ public class LootNotifier extends BaseNotifier
 	private ItemManager itemManager;
 
 	@Override
-	public boolean isEnabled()
-	{
-		return config.enableWebhook() && config.notifyLoot();
+	public boolean isEnabled() {
+		return config.notifyLoot() && filterManager.getFilters().isLootEnabled();
 	}
 
 	@Override
-	protected String getEventType()
-	{
+	protected String getEventType() {
 		return "LOOT";
 	}
 
 	@Subscribe
-	public void onNpcLootReceived(NpcLootReceived event)
-	{
+	public void onNpcLootReceived(NpcLootReceived event){
 		if (!isEnabled()) return;
 
 		NPC npc = event.getNpc();
@@ -64,8 +44,7 @@ public class LootNotifier extends BaseNotifier
 	}
 
 	@Subscribe
-	public void onPlayerLootReceived(PlayerLootReceived event)
-	{
+	public void onPlayerLootReceived(PlayerLootReceived event) {
 		if (!isEnabled()) return;
 
 		String playerName = event.getPlayer().getName();
@@ -74,23 +53,23 @@ public class LootNotifier extends BaseNotifier
 		handleLootDrop(items, playerName, "PLAYER", null);
 	}
 
-	private void handleLootDrop(Collection<ItemStack> items, String source, String sourceType, Integer sourceId)
-	{
+	private void handleLootDrop(Collection<ItemStack> items, String source, String sourceType, Integer sourceId) {
+		// Get dynamic filters
+		long minLootValue = filterManager.getFilters().getLootMinValue();
+		Set<Integer> whitelistItemIds = filterManager.getFilters().getLootWhitelist();
+		Set<Integer> blacklistItemIds = filterManager.getFilters().getLootBlacklist();
+		
 		List<Map<String, Object>> itemsList = new ArrayList<>();
 		long totalGEValue = 0;
 		long totalHAValue = 0;
 		boolean hasWhitelistedItem = false;
 		boolean hasUntradeable = false;
 
-		for (ItemStack item : items)
-		{
+		for (ItemStack item : items) {
 			int itemId = item.getId();
 			
 			// Skip blacklisted items
-			if (BLACKLIST_ITEM_IDS.contains(itemId))
-			{
-				continue;
-			}
+			if (blacklistItemIds.contains(itemId)) continue;
 
 			int gePrice = itemManager.getItemPrice(itemId);
 			int haValue = itemManager.getItemComposition(itemId).getPrice();
@@ -110,38 +89,28 @@ public class LootNotifier extends BaseNotifier
 			totalHAValue += (long) haValue * item.getQuantity();
 
 			// Check for special items
-			if (WHITELIST_ITEM_IDS.contains(itemId))
-			{
-				hasWhitelistedItem = true;
-			}
-			if (!isTradeable)
-			{
-				hasUntradeable = true;
-			}
+			if (whitelistItemIds.contains(itemId)) hasWhitelistedItem = true;
+			if (!isTradeable) hasUntradeable = true;
 		}
-		// 1. Total value >= MIN_LOOT_VALUE
-		// 2. Contains a whitelisted item
+		// 1. Total value >= minLootValue (from API)
+		// 2. Contains a whitelisted item (from API)
 		// 3. Contains an untradeable item
-		boolean shouldNotify = totalGEValue >= MIN_LOOT_VALUE || hasWhitelistedItem || hasUntradeable;
+		boolean shouldNotify = totalGEValue >= minLootValue || hasWhitelistedItem || hasUntradeable;
 
-		if (!shouldNotify)
-		{
-			return;
-		}
+		if (!shouldNotify) return;
 
 		Map<String, Object> lootData = new HashMap<>();
 		lootData.put("player", getPlayerName());
 		lootData.put("source", source);
 		lootData.put("sourceType", sourceType);
-		if (sourceId != null)
-		{
+		if (sourceId != null) {
 			lootData.put("sourceId", sourceId);
 		}
 		lootData.put("totalGEValue", totalGEValue);
 		lootData.put("totalHAValue", totalHAValue);
 		lootData.put("items", itemsList);
 
-		sendNotification(config.webhookUrl(), lootData);
+		sendNotification(lootData);
 	}
 }
 

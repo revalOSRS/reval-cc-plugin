@@ -12,47 +12,43 @@ import java.util.regex.Pattern;
 
 @Slf4j
 @Singleton
-public class PetNotifier extends BaseNotifier
-{
+public class PetNotifier extends BaseNotifier {
 	private static final Pattern PET_PATTERN = Pattern.compile(
 		"You (?:have a funny feeling like you're being followed|feel something weird sneaking into your backpack|have a funny feeling like you would have been followed)\\.?",
 		Pattern.CASE_INSENSITIVE
 	);
 
-	@Inject
-	private RevalClanConfig config;
+	@Inject private RevalClanConfig config;
 
 	@Override
-	public boolean isEnabled()
-	{
-		return config.enableWebhook() && config.notifyPet();
+	public boolean isEnabled() {
+		return config.notifyPet() && filterManager.getFilters().isPetEnabled();
 	}
 
 	@Override
-	protected String getEventType()
-	{
+	protected String getEventType() {
 		return "PET";
 	}
 
-	public void onChatMessage(String message)
-	{
+	public void onChatMessage(String message) {
 		if (!isEnabled()) return;
 
-		Matcher matcher = PET_PATTERN.matcher(message);
-		if (matcher.find())
-		{
-			handlePetDrop(message);
+		// Strip HTML color tags from the message
+		String cleanMessage = message.replaceAll("<col=[0-9a-fA-F]+>", "").replaceAll("</col>", "");
+
+		Matcher matcher = PET_PATTERN.matcher(cleanMessage);
+		if (matcher.find()) {
+			handlePetDrop(cleanMessage);
 		}
 	}
 
-	private void handlePetDrop(String originalMessage)
-	{
+	private void handlePetDrop(String originalMessage) {
 		Map<String, Object> petData = new HashMap<>();
 		petData.put("player", getPlayerName());
 		petData.put("message", originalMessage);
 		petData.put("obtained", !originalMessage.contains("would have been"));
 
-		sendNotification(config.webhookUrl(), petData);
+		sendNotification(petData);
 	}
 }
 

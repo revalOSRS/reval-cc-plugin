@@ -95,3 +95,12 @@ Created by **Lightroom** for the Reval clan community.
 ## Version
 
 Current Version: 1.0.0
+
+## Acknowledgments
+
+Portions of this plugin were inspired by or derived from:
+- [Dink](https://github.com/pajlads/DinkPlugin) - Licensed under BSD 2-Clause License
+
+## License
+
+This project uses code from third-party projects. See the LICENSES directory for details.

@@ -2,9 +2,9 @@ package com.revalclan;
 
 import com.revalclan.collectionlog.CollectionLogManager;
 import com.revalclan.collectionlog.CollectionLogSyncButton;
-import com.revalclan.combatachievements.CombatAchievementManager;
 import com.revalclan.notifiers.*;
 import com.revalclan.util.ClanValidator;
+import com.revalclan.util.EventFilterManager;
 import com.revalclan.util.WebhookService;
 import com.google.inject.Provides;
 import javax.inject.Inject;
@@ -13,11 +13,15 @@ import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
+import net.runelite.api.events.HitsplatApplied;
+import net.runelite.api.events.InteractingChanged;
+import net.runelite.api.events.MenuOptionClicked;
+import net.runelite.api.events.ActorDeath;
 import net.runelite.api.events.ChatMessage;
 import net.runelite.api.events.StatChanged;
+import net.runelite.api.events.VarbitChanged;
 import net.runelite.api.events.WidgetLoaded;
 import net.runelite.api.events.ScriptPreFired;
-import net.runelite.api.events.ScriptPostFired;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
@@ -26,99 +30,69 @@ import net.runelite.client.game.ItemManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 
+import java.lang.reflect.Array;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Slf4j
 @PluginDescriptor(
 	name = "Reval Clan"
 )
-public class RevalClanPlugin extends Plugin
-{
-	@Inject
-	private Client client;
+public class RevalClanPlugin extends Plugin {
+	@Inject private Client client;
 
-	@Inject
-	private RevalClanConfig config;
+	@Inject	private PlayerDataCollector dataCollector;
 
-	@Inject
-	private PlayerDataCollector dataCollector;
+	@Inject	private CollectionLogManager collectionLogManager;
 
-	@Inject
-	private CollectionLogManager collectionLogManager;
+	@Inject	private CollectionLogSyncButton syncButton;
 
-	@Inject
-	private CollectionLogSyncButton syncButton;
+	@Inject	private WebhookService webhookService;
 
-	@Inject
-	private CombatAchievementManager combatAchievementManager;
+	@Inject	private LootNotifier lootNotifier;
 
-	@Inject
-	private WebhookService webhookService;
+	@Inject	private PetNotifier petNotifier;
 
-	@Inject
-	private LootNotifier lootNotifier;
+	@Inject	private QuestNotifier questNotifier;
 
-	@Inject
-	private PetNotifier petNotifier;
+	@Inject	private LevelNotifier levelNotifier;
 
-	@Inject
-	private QuestNotifier questNotifier;
+	@Inject	private KillCountNotifier killCountNotifier;
 
-	@Inject
-	private LevelNotifier levelNotifier;
+	@Inject	private ClueNotifier clueNotifier;
 
-	@Inject
-	private KillCountNotifier killCountNotifier;
+	@Inject	private DiaryNotifier diaryNotifier;
 
-	@Inject
-	private ClueNotifier clueNotifier;
+	@Inject	private CombatAchievementNotifier combatAchievementNotifier;
 
-	@Inject
-	private DiaryNotifier diaryNotifier;
+	@Inject	private CollectionNotifier collectionNotifier;
 
-	@Inject
-	private SlayerNotifier slayerNotifier;
+	@Inject	private DeathNotifier deathNotifier;
 
-	@Inject
-	private CombatAchievementNotifier combatAchievementNotifier;
+	@Inject	private DetailedKillNotifier detailedKillNotifier;
 
-	@Inject
-	private CollectionNotifier collectionNotifier;
+	@Inject	private AreaEntryNotifier areaEntryNotifier;
 
-	@Inject
-	private DeathNotifier deathNotifier;
+	@Inject	private EmoteNotifier emoteNotifier;
 
-	@Inject
-	private DetailedKillNotifier detailedKillNotifier;
+	@Inject	private EventBus eventBus;
 
-	@Inject
-	private AreaEntryNotifier areaEntryNotifier;
+	@Inject	private ClientThread clientThread;
 
-	@Inject
-	private EmoteNotifier emoteNotifier;
+	@Inject	private ItemManager itemManager;
 
-	@Inject
-	private EventBus eventBus;
-
-	@Inject
-	private ClientThread clientThread;
-
-	@Inject
-	private ItemManager itemManager;
+	@Inject	private EventFilterManager eventFilterManager;
 
 	private boolean wasLoggedIn = false;
-	private int itemsBeforeOpen = 0;
-	private boolean needsCaLoad = false;
 
 	@Override
-	protected void startUp() throws Exception
-	{
+	protected void startUp() throws Exception {
 		log.info("Reval Clan plugin started!");
 		wasLoggedIn = false;
 
 		clientThread.invoke(() -> {
-			if (client.getIndexConfig() == null || client.getGameState().ordinal() < GameState.LOGIN_SCREEN.ordinal())
-			{
+			if (client.getIndexConfig() == null || client.getGameState().ordinal() < GameState.LOGIN_SCREEN.ordinal()) {
 				return false;
 			}
 
@@ -135,7 +109,6 @@ public class RevalClanPlugin extends Plugin
 		eventBus.register(killCountNotifier);
 		eventBus.register(clueNotifier);
 		eventBus.register(diaryNotifier);
-		eventBus.register(slayerNotifier);
 		eventBus.register(combatAchievementNotifier);
 		eventBus.register(collectionNotifier);
 		eventBus.register(deathNotifier);
@@ -145,8 +118,7 @@ public class RevalClanPlugin extends Plugin
 	}
 
 	@Override
-	protected void shutDown() throws Exception
-	{
+	protected void shutDown() throws Exception {
 		log.info("Reval Clan plugin stopped!");
 		collectionLogManager.clearObtainedItems();
 		syncButton.shutDown();
@@ -158,7 +130,6 @@ public class RevalClanPlugin extends Plugin
 		eventBus.unregister(killCountNotifier);
 		eventBus.unregister(clueNotifier);
 		eventBus.unregister(diaryNotifier);
-		eventBus.unregister(slayerNotifier);
 		eventBus.unregister(combatAchievementNotifier);
 		eventBus.unregister(collectionNotifier);
 		eventBus.unregister(deathNotifier);
@@ -168,28 +139,24 @@ public class RevalClanPlugin extends Plugin
 		
 		levelNotifier.reset();
 		clueNotifier.reset();
-		slayerNotifier.reset();
+		killCountNotifier.reset();
 		detailedKillNotifier.reset();
 		areaEntryNotifier.reset();
 	}
 
 	@Subscribe
-	public void onGameStateChanged(GameStateChanged gameStateChanged)
-	{
+	public void onGameStateChanged(GameStateChanged gameStateChanged) {
 		diaryNotifier.onGameStateChanged(gameStateChanged);
 
-		if (gameStateChanged.getGameState() == GameState.LOGGED_IN)
-		{
+		if (gameStateChanged.getGameState() == GameState.LOGGED_IN) {
 			wasLoggedIn = true;
 
 			collectionLogManager.clearObtainedItems();
 			
-			needsCaLoad = true;
-		}
-		else if (gameStateChanged.getGameState() == GameState.LOGIN_SCREEN)
-		{
-			if (wasLoggedIn)
-			{
+			// Fetch dynamic event filters from API on login
+			eventFilterManager.fetchFiltersAsync();
+		} else if (gameStateChanged.getGameState() == GameState.LOGIN_SCREEN) {
+			if (wasLoggedIn) {
 				log.info("Player logged out, collecting data...");
 				
 				Map<String, Object> data = dataCollector.collectAllData();
@@ -197,53 +164,39 @@ public class RevalClanPlugin extends Plugin
 				data.put("eventType", "SYNC");
 				data.put("eventTimestamp", System.currentTimeMillis());
 				
-				if (config.enableWebhook())
-				{
-					String webhookUrl = config.webhookUrl();
-					if (webhookUrl != null && !webhookUrl.trim().isEmpty())
-					{
-					if (ClanValidator.validateClan(client))
-					{
-						log.info("Sending data to webhook...");
-						webhookService.sendDataAsync(webhookUrl, data);
+			if (ClanValidator.validateClan(client)) {
+				log.info("Sending data to webhook...");
+				// Log only top-level keys and value types
+				Map<String, String> dataSummary = new HashMap<>();
+				data.forEach((key, value) -> {
+					if (value == null) {
+						dataSummary.put(key, "null");
+					} else if (value instanceof Map) {
+						dataSummary.put(key, "Map[" + ((Map<?, ?>) value).size() + " entries]");
+					} else if (value instanceof List) {
+						dataSummary.put(key, "List[" + ((List<?>) value).size() + " items]");
+					} else if (value.getClass().isArray()) {
+						dataSummary.put(key, "Array[" + Array.getLength(value) + " items]");
+					} else {
+						dataSummary.put(key, String.valueOf(value));
 					}
-					else
-					{
-						log.info("Clan validation failed - SYNC webhook blocked");
-					}
-					}
-					else
-					{
-						log.warn("Webhook is enabled but no URL is configured");
-					}
-				}
+				});
+				log.info("Data summary: {}", dataSummary);
+				webhookService.sendDataAsync(data);
+			}
 				
-				if (config.saveLocalJson())
-				{
-					dataCollector.writeDataToFile();
-				}
-				
-				wasLoggedIn = false;
+			wasLoggedIn = false;
 			}
 		}
 	}
 
 	@Subscribe
-	public void onGameTick(GameTick gameTick)
-	{
-		if (needsCaLoad && client.getGameState() == GameState.LOGGED_IN)
-		{
-			needsCaLoad = false;
-			
-			clientThread.invokeLater(() -> {
-				combatAchievementManager.loadAllTasks();
-				return true;
-			});
-		}
-
+	public void onGameTick(GameTick gameTick) {
 		areaEntryNotifier.onGameTick(gameTick);
 		
 		detailedKillNotifier.onGameTick(gameTick);
+		
+		killCountNotifier.onTick();
 		
 		diaryNotifier.onGameTick();
 	}
@@ -253,16 +206,12 @@ public class RevalClanPlugin extends Plugin
 	 * Script 4100 fires when collection log opens and for each item
 	 */
 	@Subscribe
-	public void onScriptPreFired(ScriptPreFired preFired)
-	{
-		if (preFired.getScriptId() == 4100)
-		{
-			try
-			{
+	public void onScriptPreFired(ScriptPreFired preFired) {
+		if (preFired.getScriptId() == 4100) {
+			try {
 				Object[] args = preFired.getScriptEvent().getArguments();
 				
-				if (args == null || args.length < 3)
-				{
+				if (args == null || args.length < 3) {
 					log.warn("Script 4100 fired with insufficient arguments: {}", args != null ? args.length : "null");
 					return;
 				}
@@ -272,85 +221,40 @@ public class RevalClanPlugin extends Plugin
 				String itemName = itemManager.getItemComposition(itemId).getName();
 
 				collectionLogManager.onCollectionLogItemObtained(itemId, itemCount, itemName);
-			}
-			catch (Exception e)
-			{
+			} catch (Exception e) {
 				log.error("Error capturing collection log item", e);
 			}
 		}
-		else if (preFired.getScriptId() == 2084)
-		{
-			itemsBeforeOpen = collectionLogManager.getObtainedItems().size();
-		}
-	}
-
-	/**
-	 * Detects when collection log closes to show summary
-	 */
-	@Subscribe
-	public void onScriptPostFired(ScriptPostFired postFired)
-	{
-		if (postFired.getScriptId() == 2083)
-		{
-			int itemsCaptured = collectionLogManager.getObtainedItems().size();
-			int totalItems = collectionLogManager.getAllCollectionLogItems().size();
-			
-			if (itemsCaptured > itemsBeforeOpen)
-			{
-				log.info("✓ Collection log closed - captured {} unique items out of {} total!", 
-					itemsCaptured, totalItems);
-			}
-			else
-			{
-				log.info("Collection log closed - {} items already captured", itemsCaptured);
-			}
-		}
 	}
 
 	@Subscribe
-	public void onChatMessage(ChatMessage event)
-	{
+	public void onChatMessage(ChatMessage event) {
 		String message = event.getMessage();
 		
-		if (message.toLowerCase().startsWith("::testreval"))
-		{
+		if (message.toLowerCase().startsWith("::testreval")) {
 			handleTestCommand();
 			return;
 		}
 		
-		petNotifier.onChatMessage(message);
-		killCountNotifier.onChatMessage(message);
-		clueNotifier.onChatMessage(message);
-		slayerNotifier.onChatMessage(message);
-		combatAchievementNotifier.onChatMessage(message);
-		collectionNotifier.onChatMessage(message);
+		// Only process game messages, not player chat
+		// This prevents fake notifications from players typing game messages
+		net.runelite.api.ChatMessageType type = event.getType();
+		if (type == net.runelite.api.ChatMessageType.GAMEMESSAGE || 
+		    type == net.runelite.api.ChatMessageType.SPAM ||
+		    type == net.runelite.api.ChatMessageType.ENGINE) {
+			petNotifier.onChatMessage(message);
+			killCountNotifier.onChatMessage(message);
+			clueNotifier.onChatMessage(message);
+			combatAchievementNotifier.onChatMessage(message);
+			collectionNotifier.onChatMessage(message);
+		}
 	}
 
 	/**
 	 * Handles the ::testreval command to test webhook functionality
 	 */
-	private void handleTestCommand()
-	{
-		if (!config.enableWebhook())
-		{
-			log.warn("Webhook is not enabled. Enable it in the plugin configuration.");
-			return;
-		}
-
-		String webhookUrl = config.webhookUrl();
-		if (webhookUrl == null || webhookUrl.trim().isEmpty())
-		{
-			log.warn("No webhook URL configured. Set it in the plugin configuration.");
-			return;
-		}
-
-		if (!ClanValidator.validateClan(client))
-		{
-			log.warn("Clan validation failed - test webhook blocked");
-			return;
-		}
-
-		log.info("Sending test webhook...");
+	private void handleTestCommand() {
+		if (!ClanValidator.validateClan(client)) return;
 
 		Map<String, Object> testData = new java.util.HashMap<>();
 		testData.put("eventType", "TEST");
@@ -359,58 +263,48 @@ public class RevalClanPlugin extends Plugin
 		testData.put("message", "Test webhook from Reval Clan plugin");
 		testData.put("command", "::testreval");
 
-		webhookService.sendDataAsync(webhookUrl, testData);
-
-		log.info("Test webhook sent to: {}", webhookUrl);
+		webhookService.sendDataAsync(testData);
 	}
 
 	@Subscribe
-	public void onStatChanged(StatChanged event)
-	{
+	public void onStatChanged(StatChanged event) {
 		levelNotifier.onStatChanged(event);
 	}
 
 	@Subscribe
-	public void onWidgetLoaded(WidgetLoaded event)
-	{
+	public void onWidgetLoaded(WidgetLoaded event) {
 		questNotifier.onWidgetLoaded(event);
 		clueNotifier.onWidgetLoaded(event);
 	}
 
 	@Subscribe
-	public void onActorDeath(net.runelite.api.events.ActorDeath event)
-	{
+	public void onActorDeath(ActorDeath event) {
 		deathNotifier.onActorDeath(event);
 		detailedKillNotifier.onActorDeath(event);
 	}
 
 	@Subscribe
-	public void onHitsplatApplied(net.runelite.api.events.HitsplatApplied event)
-	{
+	public void onHitsplatApplied(HitsplatApplied event) {
 		detailedKillNotifier.onHitsplatApplied(event);
 	}
 
 	@Subscribe
-	public void onMenuOptionClicked(net.runelite.api.events.MenuOptionClicked event)
-	{
+	public void onMenuOptionClicked(MenuOptionClicked event) {
 		emoteNotifier.onMenuOptionClicked(event);
 	}
 
 	@Subscribe
-	public void onInteractingChanged(net.runelite.api.events.InteractingChanged event)
-	{
+	public void onInteractingChanged(InteractingChanged event) {
 		deathNotifier.onInteractingChanged(event);
 	}
 
 	@Subscribe
-	public void onVarbitChanged(net.runelite.api.events.VarbitChanged event)
-	{
+	public void onVarbitChanged(VarbitChanged event) {
 		diaryNotifier.onVarbitChanged(event);
 	}
 
 	@Provides
-	RevalClanConfig provideConfig(ConfigManager configManager)
-	{
+	RevalClanConfig provideConfig(ConfigManager configManager) {
 		return configManager.getConfig(RevalClanConfig.class);
 	}
 }

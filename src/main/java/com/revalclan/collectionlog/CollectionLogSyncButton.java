@@ -29,9 +29,10 @@ import javax.inject.Singleton;
  */
 @Slf4j
 @Singleton
-public class CollectionLogSyncButton
-{
+public class CollectionLogSyncButton {
 	private static final int COLLECTION_LOG_SETUP = 7797;
+	
+	// Sprite IDs for button background (inactive state)
 	private static final int[] SPRITE_IDS_INACTIVE = {
 		SpriteID.DIALOG_BACKGROUND,
 		SpriteID.WORLD_MAP_BUTTON_METAL_CORNER_TOP_LEFT,
@@ -44,6 +45,7 @@ public class CollectionLogSyncButton
 		SpriteID.WORLD_MAP_BUTTON_EDGE_BOTTOM,
 	};
 
+	// Sprite IDs for button background (hovered/active state)
 	private static final int[] SPRITE_IDS_ACTIVE = {
 		SpriteID.RESIZEABLE_MODE_SIDE_PANEL_BACKGROUND,
 		SpriteID.EQUIPMENT_BUTTON_METAL_CORNER_TOP_LEFT_HOVERED,
@@ -74,38 +76,31 @@ public class CollectionLogSyncButton
 	@Inject
 	private CollectionLogManager collectionLogManager;
 
-	public void startUp()
-	{
+	public void startUp() {
 		eventBus.register(this);
 		clientThread.invokeLater(() -> tryAddButton(this::onButtonClick));
 	}
 
-	public void shutDown()
-	{
+	public void shutDown() {
 		eventBus.unregister(this);
 		clientThread.invokeLater(this::removeButton);
 	}
 
-	void tryAddButton(Runnable onClick)
-	{
-		for (Screen screen : Screen.values())
-		{
+	void tryAddButton(Runnable onClick) {
+		for (Screen screen : Screen.values()) {
 			addButton(screen, onClick);
 		}
 	}
 
 	@Subscribe
-	public void onScriptPostFired(ScriptPostFired scriptPostFired)
-	{
-		if (scriptPostFired.getScriptId() == COLLECTION_LOG_SETUP)
-		{
+	public void onScriptPostFired(ScriptPostFired scriptPostFired) {
+		if (scriptPostFired.getScriptId() == COLLECTION_LOG_SETUP) {
 			removeButton();
 			addButton(Screen.COLLECTION_LOG, this::onButtonClick);
 		}
 	}
 
-	void onButtonClick()
-	{
+	void onButtonClick() {
 		collectionLogManager.clearObtainedItems();
 
 		client.menuAction(-1, 40697932, MenuAction.CC_OP, 1, -1, "Search", null);
@@ -114,8 +109,7 @@ public class CollectionLogSyncButton
 		client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "Reval: Capturing collection log data...", "");
 	}
 
-	void addButton(Screen screen, Runnable onClick)
-	{
+	void addButton(Screen screen, Runnable onClick) {
 		Widget parent = client.getWidget(screen.getParentId());
 		Widget searchButton = client.getWidget(screen.getSearchButtonId());
 		Widget collectionLogContainer = client.getWidget(screen.getCollectionLogContainer());
@@ -124,8 +118,7 @@ public class CollectionLogSyncButton
 		
 		if (parent == null || searchButton == null || collectionLogContainer == null ||
 			(containerChildren = collectionLogContainer.getChildren()) == null ||
-			(draggableTopbar = containerChildren[0]) == null)
-		{
+			(draggableTopbar = containerChildren[0]) == null) {
 			return;
 		}
 
@@ -197,8 +190,7 @@ public class CollectionLogSyncButton
 			.setSize(13, 13)
 			.setPos(x + 6, y + 4);
 
-		for (int i = 0; i < 10; i++)
-		{
+		for (int i = 0; i < 10; i++) {
 			spriteWidgets[i].revalidate();
 		}
 
@@ -216,18 +208,14 @@ public class CollectionLogSyncButton
 		text.revalidate();
 
 		text.setHasListener(true);
-		text.setOnMouseOverListener((JavaScriptCallback) ev ->
-		{
-			for (int i = 0; i <= 8; i++)
-			{
+		text.setOnMouseOverListener((JavaScriptCallback) ev -> {
+			for (int i = 0; i <= 8; i++) {
 				spriteWidgets[i].setSpriteId(SPRITE_IDS_ACTIVE[i]);
 			}
 			text.setTextColor(FONT_COLOUR_ACTIVE);
 		});
-		text.setOnMouseLeaveListener((JavaScriptCallback) ev ->
-		{
-			for (int i = 0; i <= 8; i++)
-			{
+		text.setOnMouseLeaveListener((JavaScriptCallback) ev -> {
+			for (int i = 0; i <= 8; i++) {
 				spriteWidgets[i].setSpriteId(SPRITE_IDS_INACTIVE[i]);
 			}
 			text.setTextColor(FONT_COLOUR_INACTIVE);
@@ -242,13 +230,10 @@ public class CollectionLogSyncButton
 		parent.revalidate();
 	}
 
-	void removeButton()
-	{
-		for (Screen screen : Screen.values())
-		{
+	void removeButton() {
+		for (Screen screen : Screen.values()) {
 			Widget parent = client.getWidget(screen.getParentId());
-			if (parent != null)
-			{
+			if (parent != null) {
 				parent.deleteAllChildren();
 				parent.revalidate();
 			}
@@ -257,9 +242,8 @@ public class CollectionLogSyncButton
 
 	@Getter
 	@RequiredArgsConstructor
-	enum Screen
-	{
-		COLLECTION_LOG(40697944, 40697932, ComponentID.COLLECTION_LOG_CONTAINER);
+	enum Screen {
+		COLLECTION_LOG(40697944, 40697932, ComponentID.COLLECTION_LOG_CONTAINER); // parentId, searchButtonId, collectionLogContainer
 
 		@Getter(onMethod_ = @Component)
 		private final int parentId;
