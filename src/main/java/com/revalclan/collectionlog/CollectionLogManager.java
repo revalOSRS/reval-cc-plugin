@@ -1,3 +1,9 @@
+/*
+ * Portions of this file are derived from or inspired by the TempleOSRS plugin
+ * Copyright (c) 2022, SMaloney2017
+ * Licensed under the BSD 2-Clause License
+ * See LICENSES/templeOSRS-LICENSE.txt for full license text
+ */
 package com.revalclan.collectionlog;
 
 import lombok.Getter;

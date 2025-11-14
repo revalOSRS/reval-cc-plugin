@@ -97,7 +97,7 @@ public interface RevalClanConfig extends Config {
 		name = "Combat Achievements",
 		description = "Send notifications when you complete a combat achievement",
 		section = eventsSection,
-		position = 9
+		position = 8
 	)
 	default boolean notifyCombatAchievement() {
 		return true;
@@ -108,7 +108,7 @@ public interface RevalClanConfig extends Config {
 		name = "Collection Log",
 		description = "Send notifications when you add items to collection log",
 		section = eventsSection,
-		position = 10
+		position = 9
 	)
 	default boolean notifyCollection() {
 		return true;
@@ -119,7 +119,7 @@ public interface RevalClanConfig extends Config {
 		name = "Player Deaths",
 		description = "Send notifications when you die",
 		section = eventsSection,
-		position = 11
+		position = 10
 	)
 	default boolean notifyDeath() {
 		return true;
@@ -130,7 +130,7 @@ public interface RevalClanConfig extends Config {
 		name = "Detailed Kills",
 		description = "Send detailed kill tracking (damage, weapons, specs)",
 		section = eventsSection,
-		position = 12
+		position = 11
 	)
 	default boolean notifyDetailedKill() {
 		return true;
@@ -141,7 +141,7 @@ public interface RevalClanConfig extends Config {
 		name = "Area Entry",
 		description = "Send notifications when entering specific regions",
 		section = eventsSection,
-		position = 13
+		position = 12
 	)
 	default boolean notifyAreaEntry() {
 		return true;
@@ -152,7 +152,7 @@ public interface RevalClanConfig extends Config {
 		name = "Emotes",
 		description = "Send notifications when performing emotes",
 		section = eventsSection,
-		position = 14
+		position = 13
 	)
 	default boolean notifyEmote() {
 		return true;

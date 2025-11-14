@@ -98,6 +98,7 @@ Current Version: 1.0.0
 
 Portions of this plugin were inspired by or derived from:
 - [Dink](https://github.com/pajlads/DinkPlugin) - Licensed under BSD 2-Clause License
+- [TempleOSRS](https://github.com/SMaloney2017/Temple-OSRS-Plugin) - Licensed under BSD 2-Clause License
 
 ## License
 
