@@ -41,7 +41,6 @@ public class EmoteNotifier extends BaseNotifier {
 			int y = localPlayer.getWorldLocation().getY();
 
 			Map<String, Object> emoteData = new HashMap<>();
-			emoteData.put("player", getPlayerName());
 			emoteData.put("emote", menuTarget);
 			emoteData.put("regionId", regionId);
 			emoteData.put("x", x);

@@ -65,7 +65,6 @@ public class LevelNotifier extends BaseNotifier {
 		int combatLevel = client.getLocalPlayer() != null ? client.getLocalPlayer().getCombatLevel() : 0;
 
 		Map<String, Object> levelData = new HashMap<>();
-		levelData.put("player", getPlayerName());
 		levelData.put("skill", skill.getName());
 		levelData.put("level", level);
 		levelData.put("experience", xp);

@@ -51,7 +51,6 @@ public class AreaEntryNotifier extends BaseNotifier
 
 	private void handleAreaEntry(int regionId, WorldPoint location) {
 		Map<String, Object> areaData = new HashMap<>();
-		areaData.put("player", getPlayerName());
 		areaData.put("regionId", regionId);
 		areaData.put("x", location.getX());
 		areaData.put("y", location.getY());

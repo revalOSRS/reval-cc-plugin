@@ -51,10 +51,7 @@ public class ClueNotifier extends BaseNotifier {
 	public void onChatMessage(String message) {
 		if (!isEnabled()) return;
 
-		// Strip HTML color tags from the message
-		String cleanMessage = message.replaceAll("<col=[0-9a-fA-F]+>", "").replaceAll("</col>", "");
-
-		Matcher matcher = CLUE_PATTERN.matcher(cleanMessage);
+		Matcher matcher = CLUE_PATTERN.matcher(message);
 		if (matcher.find()) {
 			clueCount = Integer.parseInt(matcher.group("count"));
 			clueTier = matcher.group("tier");
@@ -100,7 +97,6 @@ public class ClueNotifier extends BaseNotifier {
 
 	private void handleClueCompletion(List<Map<String, Object>> items, long totalValue) {
 		Map<String, Object> clueData = new HashMap<>();
-		clueData.put("player", getPlayerName());
 		clueData.put("tier", clueTier);
 		clueData.put("count", clueCount);
 		clueData.put("totalValue", totalValue);

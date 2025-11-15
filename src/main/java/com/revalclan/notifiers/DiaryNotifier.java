@@ -125,7 +125,6 @@ public class DiaryNotifier extends BaseNotifier {
 		String difficulty = parts.length > 1 ? parts[1] : "Unknown";
 
 		Map<String, Object> diaryData = new HashMap<>();
-		diaryData.put("player", getPlayerName());
 		diaryData.put("area", area);
 		diaryData.put("difficulty", difficulty);
 		diaryData.put("varbitId", varbitId);

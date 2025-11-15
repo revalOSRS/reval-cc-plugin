@@ -33,18 +33,14 @@ public class PetNotifier extends BaseNotifier {
 	public void onChatMessage(String message) {
 		if (!isEnabled()) return;
 
-		// Strip HTML color tags from the message
-		String cleanMessage = message.replaceAll("<col=[0-9a-fA-F]+>", "").replaceAll("</col>", "");
-
-		Matcher matcher = PET_PATTERN.matcher(cleanMessage);
+		Matcher matcher = PET_PATTERN.matcher(message);
 		if (matcher.find()) {
-			handlePetDrop(cleanMessage);
+			handlePetDrop(message);
 		}
 	}
 
 	private void handlePetDrop(String originalMessage) {
 		Map<String, Object> petData = new HashMap<>();
-		petData.put("player", getPlayerName());
 		petData.put("message", originalMessage);
 		petData.put("obtained", !originalMessage.contains("would have been"));
 

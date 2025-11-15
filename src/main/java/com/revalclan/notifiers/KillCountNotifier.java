@@ -58,17 +58,14 @@ public class KillCountNotifier extends BaseNotifier {
 	public void onChatMessage(String message) {
 		if (!isEnabled()) return;
 		
-		// Strip HTML color tags from the message
-		String cleanMessage = message.replaceAll("<col=[0-9a-fA-F]+>", "").replaceAll("</col>", "");
-		
 		// Skip preparation messages
-		if (cleanMessage.startsWith("Preparation")) return;
+		if (message.startsWith("Preparation")) return;
 
 		// Try to parse boss kill count
-		parseBossKillCount(cleanMessage);
+		parseBossKillCount(message);
 		
 		// Try to parse time/duration
-		parseTime(cleanMessage);
+		parseTime(message);
 	}
 	
 	/**
@@ -251,7 +248,6 @@ public class KillCountNotifier extends BaseNotifier {
 			pendingBoss, pendingCount, pendingTime, pendingIsPb);
 		
 		Map<String, Object> kcData = new HashMap<>();
-		kcData.put("player", getPlayerName());
 		kcData.put("boss", pendingBoss);
 		kcData.put("killCount", pendingCount);
 		

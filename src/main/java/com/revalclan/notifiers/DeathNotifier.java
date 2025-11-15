@@ -90,7 +90,6 @@ public class DeathNotifier extends BaseNotifier {
 
 	private void handleDeath() {
 		Map<String, Object> deathData = new HashMap<>();
-		deathData.put("player", getPlayerName());
 		
 		// Add equipment worn at death
 		deathData.put("equipment", getEquippedItems());

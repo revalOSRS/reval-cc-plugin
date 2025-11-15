@@ -100,7 +100,6 @@ public class LootNotifier extends BaseNotifier
 		if (!shouldNotify) return;
 
 		Map<String, Object> lootData = new HashMap<>();
-		lootData.put("player", getPlayerName());
 		lootData.put("source", source);
 		lootData.put("sourceType", sourceType);
 		if (sourceId != null) {

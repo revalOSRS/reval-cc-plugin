@@ -33,10 +33,7 @@ public class CombatAchievementNotifier extends BaseNotifier {
 	public void onChatMessage(String message) {
 		if (!isEnabled()) return;
 
-		// Strip HTML color tags from the message
-		String cleanMessage = message.replaceAll("<col=[0-9a-fA-F]+>", "").replaceAll("</col>", "");
-
-		Matcher matcher = CA_PATTERN.matcher(cleanMessage);
+		Matcher matcher = CA_PATTERN.matcher(message);
 		if (matcher.find()) {
 			String tier = matcher.group("tier");
 			String task = matcher.group("task");
@@ -49,7 +46,6 @@ public class CombatAchievementNotifier extends BaseNotifier {
 		task = task.replaceAll("\\s+\\(\\d+ points?\\)$", "");
 
 		Map<String, Object> caData = new HashMap<>();
-		caData.put("player", getPlayerName());
 		caData.put("tier", tier);
 		caData.put("task", task);
 

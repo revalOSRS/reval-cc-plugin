@@ -126,11 +126,22 @@ public interface RevalClanConfig extends Config {
 	}
 
 	@ConfigItem(
+		keyName = "deathIncludeScreenshot",
+		name = "Death Screenshots",
+		description = "Include a screenshot with death notifications",
+		section = eventsSection,
+		position = 11
+	)
+	default boolean deathIncludeScreenshot() {
+		return true;
+	}
+
+	@ConfigItem(
 		keyName = "notifyDetailedKill",
 		name = "Detailed Kills",
 		description = "Send detailed kill tracking (damage, weapons, specs)",
 		section = eventsSection,
-		position = 11
+		position = 12
 	)
 	default boolean notifyDetailedKill() {
 		return true;
@@ -141,7 +152,7 @@ public interface RevalClanConfig extends Config {
 		name = "Area Entry",
 		description = "Send notifications when entering specific regions",
 		section = eventsSection,
-		position = 12
+		position = 13
 	)
 	default boolean notifyAreaEntry() {
 		return true;
@@ -152,7 +163,7 @@ public interface RevalClanConfig extends Config {
 		name = "Emotes",
 		description = "Send notifications when performing emotes",
 		section = eventsSection,
-		position = 13
+		position = 14
 	)
 	default boolean notifyEmote() {
 		return true;

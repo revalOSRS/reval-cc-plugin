@@ -40,10 +40,7 @@ public class CollectionNotifier extends BaseNotifier {
 	public void onChatMessage(String message) {
 		if (!isEnabled()) return;
 
-		// Strip HTML color tags from the message
-		String cleanMessage = message.replaceAll("<col=[0-9a-fA-F]+>", "").replaceAll("</col>", "");
-
-		Matcher matcher = COLLECTION_PATTERN.matcher(cleanMessage);
+		Matcher matcher = COLLECTION_PATTERN.matcher(message);
 		if (matcher.find()) {
 			String itemName = matcher.group("item");
 			handleCollectionItem(itemName);
@@ -52,7 +49,6 @@ public class CollectionNotifier extends BaseNotifier {
 
 	private void handleCollectionItem(String itemName) {
 		Map<String, Object> collectionData = new HashMap<>();
-		collectionData.put("player", getPlayerName());
 		collectionData.put("item", itemName);
 
 		sendNotification(collectionData);

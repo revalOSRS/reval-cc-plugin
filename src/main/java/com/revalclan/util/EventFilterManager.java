@@ -38,6 +38,10 @@ public class EventFilterManager{
 		// Area entry filter settings
 		@Getter private Set<Integer> areaEntryRegions = new HashSet<>(); // Empty by default = no regions trigger
 		
+		// Detailed kill filter settings
+		@Getter private Set<Integer> detailedKillNpcIdWhitelist = new HashSet<>();
+		@Getter private Set<Integer> detailedKillNpcIdBlacklist = new HashSet<>();
+		
 		// Event toggles
 		@Getter private boolean lootEnabled = true;
 		@Getter private boolean petEnabled = true;
@@ -145,6 +149,26 @@ public class EventFilterManager{
 				}
 			}
 			
+			// Parse detailed kill filters
+			if (json.has("detailedKill")) {
+				JsonObject detailedKill = json.getAsJsonObject("detailedKill");
+				
+				// Clear defaults and only use API values
+				newFilters.detailedKillNpcIdWhitelist.clear();
+				if (detailedKill.has("npcIdWhitelist") && detailedKill.get("npcIdWhitelist").isJsonArray()) {
+					detailedKill.getAsJsonArray("npcIdWhitelist").forEach(id -> 
+						newFilters.detailedKillNpcIdWhitelist.add(id.getAsInt())
+					);
+				}
+				
+				newFilters.detailedKillNpcIdBlacklist.clear();
+				if (detailedKill.has("npcIdBlacklist") && detailedKill.get("npcIdBlacklist").isJsonArray()) {
+					detailedKill.getAsJsonArray("npcIdBlacklist").forEach(id -> 
+						newFilters.detailedKillNpcIdBlacklist.add(id.getAsInt())
+					);
+				}
+			}
+			
 			// Parse event toggles
 			if (json.has("enabled")) {
 				JsonObject enabled = json.getAsJsonObject("enabled");
@@ -166,9 +190,6 @@ public class EventFilterManager{
 			
 			// Atomically replace filters
 			this.filters = newFilters;
-			log.debug("Filters updated - Loot min: {}, Whitelist: {}, Blacklist: {}, Regions: {}", 
-				newFilters.lootMinValue, newFilters.lootWhitelist.size(), 
-				newFilters.lootBlacklist.size(), newFilters.areaEntryRegions.size());
 		} catch (Exception e) {
 			log.error("Error parsing filters JSON", e);
 		}

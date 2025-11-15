@@ -50,7 +50,6 @@ public class QuestNotifier extends BaseNotifier {
 		int totalQuests = client.getVarbitValue(VarbitID.QUESTS_TOTAL_COUNT);
 
 		Map<String, Object> questData = new HashMap<>();
-		questData.put("player", getPlayerName());
 		questData.put("questName", questName);
 		questData.put("questPoints", questPoints);
 		questData.put("completedQuests", completedQuests);

@@ -54,7 +54,9 @@ public abstract class BaseNotifier {
 		// Add event metadata
 		data.put("eventType", getEventType());
 		data.put("eventTimestamp", System.currentTimeMillis());
-
+		data.put("accountHash", client.getAccountHash());
+		data.put("username", getPlayerName());
+		
 		// Send webhook
 		webhookService.sendDataAsync(data);
 	}

@@ -242,11 +242,15 @@ public class RevalClanPlugin extends Plugin {
 		if (type == net.runelite.api.ChatMessageType.GAMEMESSAGE || 
 		    type == net.runelite.api.ChatMessageType.SPAM ||
 		    type == net.runelite.api.ChatMessageType.ENGINE) {
-			petNotifier.onChatMessage(message);
-			killCountNotifier.onChatMessage(message);
-			clueNotifier.onChatMessage(message);
-			combatAchievementNotifier.onChatMessage(message);
-			collectionNotifier.onChatMessage(message);
+			
+			// Strip HTML color tags from the message before processing
+			String cleanMessage = message.replaceAll("<col=[0-9a-fA-F]+>", "").replaceAll("</col>", "");
+			
+			petNotifier.onChatMessage(cleanMessage);
+			killCountNotifier.onChatMessage(cleanMessage);
+			clueNotifier.onChatMessage(cleanMessage);
+			combatAchievementNotifier.onChatMessage(cleanMessage);
+			collectionNotifier.onChatMessage(cleanMessage);
 		}
 	}
 
