@@ -102,7 +102,41 @@ public class EventFilterManager{
 	 * Fetch filters asynchronously
 	 */
 	public void fetchFiltersAsync() {
-		new Thread(() -> fetchFilters(), "RevalClan-FiltersFetch").start();
+		Request request = new Request.Builder()
+			.url(FILTERS_URL)
+			.get()
+			.addHeader("User-Agent", "RuneLite-RevalClan-Plugin")
+			.build();
+		
+		httpClient.newCall(request).enqueue(new Callback() {
+			@Override
+			public void onFailure(Call call, IOException e) {
+				log.error("Failed to fetch event filters: {}", e.getMessage());
+			}
+
+			@Override
+			public void onResponse(Call call, Response response) {
+				try {
+					if (!response.isSuccessful()) {
+						log.warn("Failed to fetch event filters: HTTP {}", response.code());
+						return;
+					}
+					
+					String responseBody = response.body().string();
+					JsonObject json = gson.fromJson(responseBody, JsonObject.class);
+					
+					parseFilters(json);
+					
+					log.info("✓ Successfully fetched event filters from API");
+				} catch (IOException e) {
+					log.error("Failed to parse event filters response: {}", e.getMessage());
+				} catch (Exception e) {
+					log.error("Unexpected error parsing event filters", e);
+				} finally {
+					response.close();
+				}
+			}
+		});
 	}
 	
 	/**

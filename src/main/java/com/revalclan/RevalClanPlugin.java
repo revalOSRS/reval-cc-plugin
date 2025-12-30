@@ -103,18 +103,6 @@ public class RevalClanPlugin extends Plugin {
 		syncButton.startUp();
 		
 		eventBus.register(lootNotifier);
-		eventBus.register(petNotifier);
-		eventBus.register(questNotifier);
-		eventBus.register(levelNotifier);
-		eventBus.register(killCountNotifier);
-		eventBus.register(clueNotifier);
-		eventBus.register(diaryNotifier);
-		eventBus.register(combatAchievementNotifier);
-		eventBus.register(collectionNotifier);
-		eventBus.register(deathNotifier);
-		eventBus.register(detailedKillNotifier);
-		eventBus.register(areaEntryNotifier);
-		eventBus.register(emoteNotifier);
 	}
 
 	@Override
@@ -124,18 +112,6 @@ public class RevalClanPlugin extends Plugin {
 		syncButton.shutDown();
 		
 		eventBus.unregister(lootNotifier);
-		eventBus.unregister(petNotifier);
-		eventBus.unregister(questNotifier);
-		eventBus.unregister(levelNotifier);
-		eventBus.unregister(killCountNotifier);
-		eventBus.unregister(clueNotifier);
-		eventBus.unregister(diaryNotifier);
-		eventBus.unregister(combatAchievementNotifier);
-		eventBus.unregister(collectionNotifier);
-		eventBus.unregister(deathNotifier);
-		eventBus.unregister(detailedKillNotifier);
-		eventBus.unregister(areaEntryNotifier);
-		eventBus.unregister(emoteNotifier);
 		
 		levelNotifier.reset();
 		clueNotifier.reset();
