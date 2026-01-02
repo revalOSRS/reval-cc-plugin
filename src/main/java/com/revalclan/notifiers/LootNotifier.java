@@ -6,8 +6,11 @@ import net.runelite.api.NPC;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.NpcLootReceived;
 import net.runelite.client.events.PlayerLootReceived;
+import net.runelite.client.events.ServerNpcLoot;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.game.ItemStack;
+import net.runelite.client.plugins.loottracker.LootReceived;
+import net.runelite.http.api.loottracker.LootRecordType;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -15,8 +18,7 @@ import java.util.*;
 
 @Slf4j
 @Singleton
-public class LootNotifier extends BaseNotifier
-{
+public class LootNotifier extends BaseNotifier {
 	@Inject
 	private RevalClanConfig config;
 
@@ -31,6 +33,14 @@ public class LootNotifier extends BaseNotifier
 	@Override
 	protected String getEventType() {
 		return "LOOT";
+	}
+
+	@Subscribe
+	public void onServerNpcLoot(ServerNpcLoot event) {
+		if (!isEnabled()) return;
+
+		var comp = event.getComposition();
+		handleLootDrop(event.getItems(), comp.getName(), "NPC", comp.getId());
 	}
 
 	@Subscribe
@@ -51,6 +61,23 @@ public class LootNotifier extends BaseNotifier
 		Collection<ItemStack> items = event.getItems();
 
 		handleLootDrop(items, playerName, "PLAYER", null);
+	}
+
+	@Subscribe
+	public void onLootReceived(LootReceived event) {
+		if (!isEnabled()) return;
+
+		if (event.getType() == LootRecordType.EVENT || event.getType() == LootRecordType.PICKPOCKET) {
+			String source = event.getName();
+			handleLootDrop(event.getItems(), source, "EVENT", null);
+		} else if (event.getType() == LootRecordType.NPC) {
+			String source = event.getName();
+			if ("The Gauntlet".equals(source) || "Corrupted Gauntlet".equals(source)) {
+				handleLootDrop(event.getItems(), source, "EVENT", null);
+			} else {
+				handleLootDrop(event.getItems(), source, "NPC", null);
+			}
+		}
 	}
 
 	private void handleLootDrop(Collection<ItemStack> items, String source, String sourceType, Integer sourceId) {

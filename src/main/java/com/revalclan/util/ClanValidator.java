@@ -18,7 +18,7 @@ public class ClanValidator {
 	/** 
 	 * Minimum clan rank required (-1 to 127, where higher = more permissions)
 	 */
-	private static final ClanRank MINIMUM_CLAN_RANK = new ClanRank(10); // 10 = new member
+	private static final ClanRank MINIMUM_CLAN_RANK = new ClanRank(0); // 10 = new member
 	
 	// ===============================================
 

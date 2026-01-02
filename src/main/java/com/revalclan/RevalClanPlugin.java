@@ -175,6 +175,8 @@ public class RevalClanPlugin extends Plugin {
 		killCountNotifier.onTick();
 		
 		diaryNotifier.onGameTick();
+		
+		petNotifier.onGameTick();
 	}
 
 	/**
@@ -212,21 +214,30 @@ public class RevalClanPlugin extends Plugin {
 			return;
 		}
 		
-		// Only process game messages, not player chat
+		// Strip HTML color tags from the message before processing
+		String cleanMessage = message.replaceAll("<col=[0-9a-fA-F]+>", "").replaceAll("</col>", "");
+		
+		// Only process game messages and clan messages for notifiers, not player chat
 		// This prevents fake notifications from players typing game messages
 		net.runelite.api.ChatMessageType type = event.getType();
 		if (type == net.runelite.api.ChatMessageType.GAMEMESSAGE || 
 		    type == net.runelite.api.ChatMessageType.SPAM ||
-		    type == net.runelite.api.ChatMessageType.ENGINE) {
-			
-			// Strip HTML color tags from the message before processing
-			String cleanMessage = message.replaceAll("<col=[0-9a-fA-F]+>", "").replaceAll("</col>", "");
+		    type == net.runelite.api.ChatMessageType.ENGINE ||
+		    type == net.runelite.api.ChatMessageType.CLAN_MESSAGE ||
+		    type == net.runelite.api.ChatMessageType.CLAN_CHAT ||
+		    type == net.runelite.api.ChatMessageType.CLAN_GUEST_CHAT) {
 			
 			petNotifier.onChatMessage(cleanMessage);
-			killCountNotifier.onChatMessage(cleanMessage);
-			clueNotifier.onChatMessage(cleanMessage);
-			combatAchievementNotifier.onChatMessage(cleanMessage);
-			collectionNotifier.onChatMessage(cleanMessage);
+			
+			// Only process game messages for other notifiers (not clan messages)
+			if (type == net.runelite.api.ChatMessageType.GAMEMESSAGE || 
+			    type == net.runelite.api.ChatMessageType.SPAM ||
+			    type == net.runelite.api.ChatMessageType.ENGINE) {
+				killCountNotifier.onChatMessage(cleanMessage);
+				clueNotifier.onChatMessage(cleanMessage);
+				combatAchievementNotifier.onChatMessage(cleanMessage);
+				collectionNotifier.onChatMessage(cleanMessage);
+			}
 		}
 	}
 

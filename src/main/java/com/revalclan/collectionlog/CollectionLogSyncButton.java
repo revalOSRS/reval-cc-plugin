@@ -113,6 +113,7 @@ public class CollectionLogSyncButton {
 		client.runScript(2240);
 		
 		client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "Reval: Capturing collection log data...", "");
+		client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "Reval: Data will be sent when you log out.", "");
 	}
 
 	void addButton(Screen screen, Runnable onClick) {
