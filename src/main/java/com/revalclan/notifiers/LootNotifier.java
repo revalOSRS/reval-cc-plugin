@@ -3,6 +3,8 @@ package com.revalclan.notifiers;
 import com.revalclan.RevalClanConfig;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.NPC;
+import net.runelite.api.gameval.ItemID;
+import net.runelite.api.gameval.NpcID;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.NpcLootReceived;
 import net.runelite.client.events.PlayerLootReceived;
@@ -25,6 +27,27 @@ public class LootNotifier extends BaseNotifier {
 	@Inject
 	private ItemManager itemManager;
 
+	/**
+	 * NPC IDs that fire LootReceived instead of NpcLootReceived
+	 * These should be handled in onLootReceived, not onNpcLootReceived
+	 */
+	private static final Set<Integer> SPECIAL_LOOT_NPC_IDS = Set.of(
+		NpcID.WHISPERER, NpcID.WHISPERER_MELEE, NpcID.WHISPERER_QUEST, NpcID.WHISPERER_MELEE_QUEST,
+		NpcID.ARAXXOR, NpcID.ARAXXOR_DEAD, NpcID.RT_FIRE_QUEEN_INACTIVE, NpcID.RT_ICE_KING_INACTIVE,
+		NpcID.YAMA,
+		NpcID.HESPORI
+	);
+
+	/**
+	 * NPC names that fire LootReceived instead of NpcLootReceived
+	 */
+	private static final Set<String> SPECIAL_LOOT_NPC_NAMES = Set.of(
+		"The Whisperer", "Araxxor",
+		"Branda the Fire Queen", "Eldric the Ice King",
+		"Crystalline Hunllef", "Corrupted Hunllef",
+		"The Gauntlet", "Corrupted Gauntlet"
+	);
+
 	@Override
 	public boolean isEnabled() {
 		return config.notifyLoot() && filterManager.getFilters().isLootEnabled();
@@ -39,6 +62,15 @@ public class LootNotifier extends BaseNotifier {
 	public void onServerNpcLoot(ServerNpcLoot event) {
 		if (!isEnabled()) return;
 
+		// Most NPCs are handled by NpcLootReceived or LootReceived to avoid duplicates
+		int npcId = event.getComposition().getId();
+		var name = event.getComposition().getName();
+		
+		// Only handle Yama, Hespori, and Hallowed Sepulchre
+		if (npcId != NpcID.YAMA && npcId != NpcID.HESPORI && !name.startsWith("Hallowed Sepulchre")) {
+			return;
+		}
+
 		var comp = event.getComposition();
 		handleLootDrop(event.getItems(), comp.getName(), "NPC", comp.getId());
 	}
@@ -48,9 +80,13 @@ public class LootNotifier extends BaseNotifier {
 		if (!isEnabled()) return;
 
 		NPC npc = event.getNpc();
-		Collection<ItemStack> items = event.getItems();
+		int npcId = npc.getId();
 
-		handleLootDrop(items, npc.getName(), "NPC", npc.getId());
+		// Skip NPCs that fire LootReceived instead (to avoid duplicates)
+		if (SPECIAL_LOOT_NPC_IDS.contains(npcId)) return;
+
+		Collection<ItemStack> items = event.getItems();
+		handleLootDrop(items, npc.getName(), "NPC", npcId);
 	}
 
 	@Subscribe
@@ -67,16 +103,33 @@ public class LootNotifier extends BaseNotifier {
 	public void onLootReceived(LootReceived event) {
 		if (!isEnabled()) return;
 
+		// Handle EVENT and PICKPOCKET types
+		// EVENT type includes: raids (Chambers of Xeric, Theatre of Blood, Tombs of Amascut),
+		// moons (Moons of Peril), barrows chests, gauntlet chests, and other special content
 		if (event.getType() == LootRecordType.EVENT || event.getType() == LootRecordType.PICKPOCKET) {
 			String source = event.getName();
 			handleLootDrop(event.getItems(), source, "EVENT", null);
-		} else if (event.getType() == LootRecordType.NPC) {
+		} 
+		// Handle special NPCs that fire LootReceived instead of NpcLootReceived
+		else if (event.getType() == LootRecordType.NPC && SPECIAL_LOOT_NPC_NAMES.contains(event.getName())) {
 			String source = event.getName();
 			if ("The Gauntlet".equals(source) || "Corrupted Gauntlet".equals(source)) {
 				handleLootDrop(event.getItems(), source, "EVENT", null);
 			} else {
 				handleLootDrop(event.getItems(), source, "NPC", null);
 			}
+		}
+	}
+
+	/**
+	 * Handle game messages for special loot cases that don't fire normal loot events
+	 */
+	public void onGameMessage(String message) {
+		if (!isEnabled()) return;
+
+		// Pyramid Plunder: Pharaoh's sceptre doesn't fire a normal loot event
+		if ("You have found a Pharaoh's sceptre! It fell on the floor.".equals(message)) {
+			handleLootDrop(List.of(new ItemStack(ItemID.PHARAOHS_SCEPTRE, 1)), "Pyramid Plunder", "EVENT", null);
 		}
 	}
 
@@ -139,4 +192,3 @@ public class LootNotifier extends BaseNotifier {
 		sendNotification(lootData);
 	}
 }
-

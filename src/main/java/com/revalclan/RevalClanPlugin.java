@@ -233,6 +233,7 @@ public class RevalClanPlugin extends Plugin {
 			if (type == net.runelite.api.ChatMessageType.GAMEMESSAGE || 
 			    type == net.runelite.api.ChatMessageType.SPAM ||
 			    type == net.runelite.api.ChatMessageType.ENGINE) {
+				lootNotifier.onGameMessage(cleanMessage);
 				killCountNotifier.onChatMessage(cleanMessage);
 				clueNotifier.onChatMessage(cleanMessage);
 				combatAchievementNotifier.onChatMessage(cleanMessage);
