@@ -96,39 +96,7 @@ public class PetNotifier extends BaseNotifier {
 	public void onChatMessage(String message) {
 		if (!isEnabled()) return;
 
-		// First, check for clan messages (most reliable source of pet name and kill count)
-		Matcher clanMatcher = CLAN_REGEX.matcher(message);
-		if (clanMatcher.find()) {
-			String user = clanMatcher.group("user").trim();
-			String playerName = getPlayerName();
-			
-			// Only process if it's for the local player
-			if (user.equalsIgnoreCase(playerName)) {
-				String pet = clanMatcher.group("pet");
-				if (pet != null) {
-					// Pet with kill count
-					this.petName = pet.trim();
-					String killCountGroup = clanMatcher.group("milestone");
-					if (killCountGroup != null) {
-						this.killCount = killCountGroup.trim().replaceAll("\\.$", ""); // Remove trailing period
-					}
-					this.originalMessage = message;
-					log.debug("Pet name and kill count identified from clan message: {} at {}", pet, killCount);
-					return;
-				} else {
-					// Pet without kill count
-					String pet2 = clanMatcher.group("pet2");
-					if (pet2 != null) {
-						this.petName = pet2.trim();
-						this.originalMessage = message;
-						log.debug("Pet name identified from clan message: {}", pet2);
-						return;
-					}
-				}
-			}
-		}
-
-		// If we haven't seen a pet message yet, check for the initial pet drop message
+		// Only process initial pet message if we haven't seen one yet
 		if (petName == null) {
 			Matcher petMatcher = PET_PATTERN.matcher(message);
 			if (petMatcher.find()) {
@@ -161,6 +129,42 @@ public class PetNotifier extends BaseNotifier {
 					this.petName = itemName;
 					log.debug("Pet name identified from collection log: {}", itemName);
 					return;
+				}
+			}
+		}
+	}
+
+	/**
+	 * Handle clan notifications - only process if we've already seen an initial pet message
+	 * This prevents clan messages from triggering notifications on their own
+	 */
+	public void onClanNotification(String message) {
+		if (!isEnabled()) return;
+
+		if (petName == null) {
+			return;
+		}
+
+		Matcher clanMatcher = CLAN_REGEX.matcher(message);
+		if (clanMatcher.find()) {
+			String user = clanMatcher.group("user").trim();
+			String playerName = getPlayerName();
+			
+			if (user.equalsIgnoreCase(playerName)) {
+				String pet = clanMatcher.group("pet");
+				if (pet != null) {
+					this.petName = pet.trim();
+					String killCountGroup = clanMatcher.group("milestone");
+					if (killCountGroup != null) {
+						this.killCount = killCountGroup.trim().replaceAll("\\.$", ""); // Remove trailing period
+					}
+					this.originalMessage = message;
+				} else {
+					String pet2 = clanMatcher.group("pet2");
+					if (pet2 != null) {
+						this.petName = pet2.trim();
+						this.originalMessage = message;
+					}
 				}
 			}
 		}
