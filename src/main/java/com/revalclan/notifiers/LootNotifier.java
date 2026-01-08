@@ -1,7 +1,6 @@
 package com.revalclan.notifiers;
 
 import com.revalclan.RevalClanConfig;
-import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.NPC;
 import net.runelite.api.gameval.ItemID;
 import net.runelite.api.gameval.NpcID;
@@ -18,7 +17,6 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.*;
 
-@Slf4j
 @Singleton
 public class LootNotifier extends BaseNotifier {
 	@Inject
@@ -45,7 +43,8 @@ public class LootNotifier extends BaseNotifier {
 		"The Whisperer", "Araxxor",
 		"Branda the Fire Queen", "Eldric the Ice King",
 		"Crystalline Hunllef", "Corrupted Hunllef",
-		"The Gauntlet", "Corrupted Gauntlet"
+		"The Gauntlet", "Corrupted Gauntlet",
+		"Shellbane Gryphon"
 	);
 
 	@Override

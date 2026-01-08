@@ -42,9 +42,13 @@ public class PetNotifier extends BaseNotifier {
 
 	/**
 	 * Pattern matching clan pet notifications
+	 * Matches formats like:
+	 * - "Username has a funny feeling like she would have been followed: Pet name at 114 completions."
+	 * - "Username has a funny feeling like she's being followed: Pet name at 50 kills."
+	 * - "Username feels something weird sneaking into her backpack: Pet name at 100 kills."
 	 */
 	private static final Pattern CLAN_REGEX = Pattern.compile(
-		"\\b(?<user>[\\w\\s]+) (?:has a funny feeling like .+ followed|feels something weird sneaking into .+ backpack|feels like .+ acquired something special): (?:(?<pet>.+) at (?<milestone>.+)|(?<pet2>.+))",
+		"(?<user>[^:]+?) (?:has a funny feeling like .+? (?:followed|being followed)|feels something weird sneaking into .+? backpack|feels like .+? acquired something special): (?<pet>.+?)(?: at (?<milestone>[^.]+?))?(?:\\.|$)",
 		Pattern.CASE_INSENSITIVE
 	);
 
@@ -151,20 +155,22 @@ public class PetNotifier extends BaseNotifier {
 			String playerName = getPlayerName();
 			
 			if (user.equalsIgnoreCase(playerName)) {
-				String pet = clanMatcher.group("pet");
-				if (pet != null) {
+				String pet = null;
+				String milestone = null;
+				
+				try {
+					pet = clanMatcher.group("pet");
+					milestone = clanMatcher.group("milestone");
+				} catch (IllegalArgumentException e) {
+					log.warn("Error extracting groups from clan pet notification: {}", e.getMessage());
+				}
+				
+				if (pet != null && !pet.trim().isEmpty()) {
 					this.petName = pet.trim();
-					String killCountGroup = clanMatcher.group("milestone");
-					if (killCountGroup != null) {
-						this.killCount = killCountGroup.trim().replaceAll("\\.$", ""); // Remove trailing period
+					if (milestone != null && !milestone.trim().isEmpty()) {
+						this.killCount = milestone.trim().replaceAll("\\.$", "");
 					}
 					this.originalMessage = message;
-				} else {
-					String pet2 = clanMatcher.group("pet2");
-					if (pet2 != null) {
-						this.petName = pet2.trim();
-						this.originalMessage = message;
-					}
 				}
 			}
 		}

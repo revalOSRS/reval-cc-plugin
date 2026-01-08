@@ -538,8 +538,7 @@ public class CollectionLogManager {
 	/**
 	 * Clear obtained items (for re-syncing)
 	 */
-	public void clearObtainedItems()
-	{
+	public void clearObtainedItems() {
 		obtainedItems.clear();
 	}
 }

@@ -10,6 +10,7 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.io.IOException;
 import java.util.*;
+import java.util.List;
 
 /**
  * Manages dynamic event filters fetched from the backend API
@@ -35,12 +36,12 @@ public class EventFilterManager{
 		@Getter private Set<Integer> lootWhitelist = new HashSet<>();
 		@Getter private Set<Integer> lootBlacklist = new HashSet<>(Arrays.asList(526, 995)); // Bones, Coins
 		
-		// Area entry filter settings
-		@Getter private Set<Integer> areaEntryRegions = new HashSet<>(); // Empty by default = no regions trigger
-		
 		// Detailed kill filter settings
 		@Getter private Set<Integer> detailedKillNpcIdWhitelist = new HashSet<>();
 		@Getter private Set<Integer> detailedKillNpcIdBlacklist = new HashSet<>();
+		
+		// Chat filter settings
+		@Getter private List<String> chatPatterns = new ArrayList<>(); // Empty by default = no patterns, all messages pass
 		
 		// Event toggles
 		@Getter private boolean lootEnabled = true;
@@ -54,8 +55,9 @@ public class EventFilterManager{
 		@Getter private boolean collectionEnabled = true;
 		@Getter private boolean deathEnabled = true;
 		@Getter private boolean detailedKillEnabled = true;
-		@Getter private boolean areaEntryEnabled = true;
 		@Getter private boolean emoteEnabled = true;
+		@Getter private boolean chatEnabled = true;
+		@Getter private boolean musicEnabled = true;
 	}
 	
 	public EventFilterManager() {
@@ -170,19 +172,6 @@ public class EventFilterManager{
 				}
 			}
 			
-			// Parse area entry filters
-			if (json.has("areaEntry")) {
-				JsonObject areaEntry = json.getAsJsonObject("areaEntry");
-				
-				// Clear defaults and only use API values
-				newFilters.areaEntryRegions.clear();
-				if (areaEntry.has("regions") && areaEntry.get("regions").isJsonArray()) {
-					areaEntry.getAsJsonArray("regions").forEach(region -> 
-						newFilters.areaEntryRegions.add(region.getAsInt())
-					);
-				}
-			}
-			
 			// Parse detailed kill filters
 			if (json.has("detailedKill")) {
 				JsonObject detailedKill = json.getAsJsonObject("detailedKill");
@@ -203,6 +192,18 @@ public class EventFilterManager{
 				}
 			}
 			
+			// Parse chat filters
+			if (json.has("chat")) {
+				JsonObject chat = json.getAsJsonObject("chat");
+				
+				newFilters.chatPatterns.clear();
+				if (chat.has("patterns") && chat.get("patterns").isJsonArray()) {
+					chat.getAsJsonArray("patterns").forEach(pattern -> 
+						newFilters.chatPatterns.add(pattern.getAsString())
+					);
+				}
+			}
+			
 			// Parse event toggles
 			if (json.has("enabled")) {
 				JsonObject enabled = json.getAsJsonObject("enabled");
@@ -218,8 +219,9 @@ public class EventFilterManager{
 				if (enabled.has("collection")) newFilters.collectionEnabled = enabled.get("collection").getAsBoolean();
 				if (enabled.has("death")) newFilters.deathEnabled = enabled.get("death").getAsBoolean();
 				if (enabled.has("detailedKill")) newFilters.detailedKillEnabled = enabled.get("detailedKill").getAsBoolean();
-				if (enabled.has("areaEntry")) newFilters.areaEntryEnabled = enabled.get("areaEntry").getAsBoolean();
 				if (enabled.has("emote")) newFilters.emoteEnabled = enabled.get("emote").getAsBoolean();
+				if (enabled.has("chat")) newFilters.chatEnabled = enabled.get("chat").getAsBoolean();
+				if (enabled.has("music")) newFilters.musicEnabled = enabled.get("music").getAsBoolean();
 			}
 			
 			// Atomically replace filters

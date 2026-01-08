@@ -8,7 +8,6 @@
 package com.revalclan.notifiers;
 
 import com.revalclan.RevalClanConfig;
-import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.GameState;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.VarbitChanged;
@@ -20,7 +19,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-@Slf4j
 @Singleton
 public class DiaryNotifier extends BaseNotifier {
 	/**

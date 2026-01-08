@@ -126,17 +126,6 @@ public interface RevalClanConfig extends Config {
 	}
 
 	@ConfigItem(
-		keyName = "deathIncludeScreenshot",
-		name = "Death Screenshots",
-		description = "Include a screenshot with death notifications",
-		section = eventsSection,
-		position = 11
-	)
-	default boolean deathIncludeScreenshot() {
-		return true;
-	}
-
-	@ConfigItem(
 		keyName = "notifyDetailedKill",
 		name = "Detailed Kills",
 		description = "Send detailed kill tracking (damage, weapons, specs)",
@@ -148,17 +137,6 @@ public interface RevalClanConfig extends Config {
 	}
 
 	@ConfigItem(
-		keyName = "notifyAreaEntry",
-		name = "Area Entry",
-		description = "Send notifications when entering specific regions",
-		section = eventsSection,
-		position = 13
-	)
-	default boolean notifyAreaEntry() {
-		return true;
-	}
-
-	@ConfigItem(
 		keyName = "notifyEmote",
 		name = "Emotes",
 		description = "Send notifications when performing emotes",
@@ -166,6 +144,28 @@ public interface RevalClanConfig extends Config {
 		position = 14
 	)
 	default boolean notifyEmote() {
+		return true;
+	}
+
+	@ConfigItem(
+		keyName = "notifyChat",
+		name = "System Chat Messages",
+		description = "Send notifications for system chat messages (game events, broadcasts, etc.)",
+		section = eventsSection,
+		position = 15
+	)
+	default boolean notifyChat() {
+		return true;
+	}
+
+	@ConfigItem(
+		keyName = "notifyMusic",
+		name = "Music Played",
+		description = "Send notifications when you play a music track",
+		section = eventsSection,
+		position = 17
+	)
+	default boolean notifyMusic() {
 		return true;
 	}
 }

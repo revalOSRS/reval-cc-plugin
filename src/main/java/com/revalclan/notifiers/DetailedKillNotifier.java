@@ -1,7 +1,6 @@
 package com.revalclan.notifiers;
 
 import com.revalclan.RevalClanConfig;
-import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Actor;
 import net.runelite.api.NPC;
 import net.runelite.api.Player;
@@ -16,7 +15,6 @@ import javax.inject.Singleton;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-@Slf4j
 @Singleton
 public class DetailedKillNotifier extends BaseNotifier {
 	@Inject private RevalClanConfig config;

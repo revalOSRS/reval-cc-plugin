@@ -9,6 +9,7 @@ import com.revalclan.util.WebhookService;
 import com.google.inject.Provides;
 import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
+import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.events.GameStateChanged;
@@ -72,9 +73,11 @@ public class RevalClanPlugin extends Plugin {
 
 	@Inject	private DetailedKillNotifier detailedKillNotifier;
 
-	@Inject	private AreaEntryNotifier areaEntryNotifier;
-
 	@Inject	private EmoteNotifier emoteNotifier;
+
+	@Inject	private ChatNotifier chatNotifier;
+
+	@Inject	private MusicNotifier musicNotifier;
 
 	@Inject	private EventBus eventBus;
 
@@ -112,12 +115,11 @@ public class RevalClanPlugin extends Plugin {
 		syncButton.shutDown();
 		
 		eventBus.unregister(lootNotifier);
-		
+
 		levelNotifier.reset();
 		clueNotifier.reset();
 		killCountNotifier.reset();
 		detailedKillNotifier.reset();
-		areaEntryNotifier.reset();
 	}
 
 	@Subscribe
@@ -133,43 +135,38 @@ public class RevalClanPlugin extends Plugin {
 			eventFilterManager.fetchFiltersAsync();
 		} else if (gameStateChanged.getGameState() == GameState.LOGIN_SCREEN) {
 			if (wasLoggedIn) {
-				log.info("Player logged out, collecting data...");
-				
 				Map<String, Object> data = dataCollector.collectAllData();
 				
 				data.put("eventType", "SYNC");
 				data.put("eventTimestamp", System.currentTimeMillis());
 				
-			if (ClanValidator.validateClan(client)) {
-				log.info("Sending data to webhook...");
-				// Log only top-level keys and value types
-				Map<String, String> dataSummary = new HashMap<>();
-				data.forEach((key, value) -> {
-					if (value == null) {
-						dataSummary.put(key, "null");
-					} else if (value instanceof Map) {
-						dataSummary.put(key, "Map[" + ((Map<?, ?>) value).size() + " entries]");
-					} else if (value instanceof List) {
-						dataSummary.put(key, "List[" + ((List<?>) value).size() + " items]");
-					} else if (value.getClass().isArray()) {
-						dataSummary.put(key, "Array[" + Array.getLength(value) + " items]");
-					} else {
-						dataSummary.put(key, String.valueOf(value));
-					}
-				});
-				log.info("Data summary: {}", dataSummary);
-				webhookService.sendDataAsync(data);
-			}
-				
-			wasLoggedIn = false;
+				if (ClanValidator.validateClan(client)) {
+					// Log only top-level keys and value types
+					Map<String, String> dataSummary = new HashMap<>();
+					data.forEach((key, value) -> {
+						if (value == null) {
+							dataSummary.put(key, "null");
+						} else if (value instanceof Map) {
+							dataSummary.put(key, "Map[" + ((Map<?, ?>) value).size() + " entries]");
+						} else if (value instanceof List) {
+							dataSummary.put(key, "List[" + ((List<?>) value).size() + " items]");
+						} else if (value.getClass().isArray()) {
+							dataSummary.put(key, "Array[" + Array.getLength(value) + " items]");
+						} else {
+							dataSummary.put(key, String.valueOf(value));
+						}
+					});
+					log.info("Data summary: {}", dataSummary);
+					webhookService.sendDataAsync(data);
+				}
+					
+				wasLoggedIn = false;
 			}
 		}
 	}
 
 	@Subscribe
 	public void onGameTick(GameTick gameTick) {
-		areaEntryNotifier.onGameTick(gameTick);
-		
 		detailedKillNotifier.onGameTick(gameTick);
 		
 		killCountNotifier.onTick();
@@ -209,46 +206,27 @@ public class RevalClanPlugin extends Plugin {
 	public void onChatMessage(ChatMessage event) {
 		String message = event.getMessage();
 		
-		if (message.toLowerCase().startsWith("::testreval")) {
-			handleTestCommand();
-			return;
-		}
-		
 		// Strip HTML color tags from the message before processing
 		String cleanMessage = message.replaceAll("<col=[0-9a-fA-F]+>", "").replaceAll("</col>", "");
 		
-		// Only process game messages and clan messages for notifiers, not player chat
-		net.runelite.api.ChatMessageType type = event.getType();
-		if (type == net.runelite.api.ChatMessageType.GAMEMESSAGE || 
-		    type == net.runelite.api.ChatMessageType.SPAM ||
-		    type == net.runelite.api.ChatMessageType.ENGINE) {
+		ChatMessageType type = event.getType();
+		
+		chatNotifier.onChatMessage(type, event.getName(), cleanMessage);
+		
+		if (type == ChatMessageType.GAMEMESSAGE || 
+		    type == ChatMessageType.SPAM ||
+		    type == ChatMessageType.ENGINE) {
 			petNotifier.onChatMessage(cleanMessage);
 			lootNotifier.onGameMessage(cleanMessage);
 			killCountNotifier.onChatMessage(cleanMessage);
 			clueNotifier.onChatMessage(cleanMessage);
 			combatAchievementNotifier.onChatMessage(cleanMessage);
 			collectionNotifier.onChatMessage(cleanMessage);
-		} else if (type == net.runelite.api.ChatMessageType.CLAN_MESSAGE ||
-		           type == net.runelite.api.ChatMessageType.CLAN_CHAT ||
-		           type == net.runelite.api.ChatMessageType.CLAN_GUEST_CHAT) {
+		} else if (type == ChatMessageType.CLAN_MESSAGE ||
+		           type == ChatMessageType.CLAN_CHAT ||
+		           type == ChatMessageType.CLAN_GUEST_CHAT) {
 			petNotifier.onClanNotification(cleanMessage);
 		}
-	}
-
-	/**
-	 * Handles the ::testreval command to test webhook functionality
-	 */
-	private void handleTestCommand() {
-		if (!ClanValidator.validateClan(client)) return;
-
-		Map<String, Object> testData = new java.util.HashMap<>();
-		testData.put("eventType", "TEST");
-		testData.put("eventTimestamp", System.currentTimeMillis());
-		testData.put("player", client.getLocalPlayer() != null ? client.getLocalPlayer().getName() : "Unknown");
-		testData.put("message", "Test webhook from Reval Clan plugin");
-		testData.put("command", "::testreval");
-
-		webhookService.sendDataAsync(testData);
 	}
 
 	@Subscribe
@@ -276,6 +254,7 @@ public class RevalClanPlugin extends Plugin {
 	@Subscribe
 	public void onMenuOptionClicked(MenuOptionClicked event) {
 		emoteNotifier.onMenuOptionClicked(event);
+		musicNotifier.onMenuOptionClicked(event);
 	}
 
 	@Subscribe

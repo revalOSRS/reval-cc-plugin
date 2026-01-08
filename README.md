@@ -14,19 +14,20 @@ A comprehensive RuneLite plugin for the Reval clan in Old School RuneScape. Trac
 ### 🔔 Real-Time Event Notifications
 The plugin sends webhook notifications for the following events:
 
-- **Loot Drops**: Valuable loot (1M+ GP, whitelisted items, or untradeables) with GE/HA values
-- **Pet Drops**: All pet acquisitions
+- **Loot Drops**: Valuable loot (configurable min value, whitelisted items, or untradeables) with GE values
+- **Pet Drops**: All pet acquisitions with milestone tracking
 - **Level Ups**: Skill level achievements
 - **Quest Completions**: Quest finished notifications
 - **Kill Counts**: Boss kill count milestones
-- **Clue Scrolls**: Clue completion with rewards
+- **Clue Scrolls**: Clue completion with tier and rewards
 - **Achievement Diaries**: Diary task completions with precise tracking
 - **Combat Achievements**: CA task completions
 - **Collection Log**: New collection log item acquisitions
 - **Player Deaths**: Death tracking with killer information (NPC/Player)
 - **Detailed Kill Tracking**: Damage dealt, weapons used, special attacks
-- **Area Entry**: Region/area entry notifications
 - **Emote Usage**: Emote performance tracking
+- **Music Played**: Track when players play specific music tracks
+- **System Chat Messages**: Configurable pattern matching for game messages
 
 ### 🔐 Clan Validation
 All webhooks are protected by clan membership validation. Only members of the "Reval" clan with sufficient rank can send notifications.
@@ -46,7 +47,6 @@ Configure the plugin in the RuneLite settings panel:
 
 ### Main Settings
 - **Enable Webhook**: Master toggle for all webhook notifications
-- **Webhook URL**: Your webhook endpoint URL for receiving data
 - **Save Local JSON**: Save collected data to local JSON files on logout
 
 ### Event Notification Toggles
@@ -62,8 +62,9 @@ Each event type can be individually enabled/disabled:
 - Collection Log
 - Player Deaths
 - Detailed Kills
-- Area Entry
 - Emote Usage
+- Music Played
+- System Chat Messages
 
 ## Usage
 
@@ -71,9 +72,6 @@ Each event type can be individually enabled/disabled:
 1. Open your Collection Log in-game
 2. Click the "Sync Reval" button in the top-right corner
 3. The plugin will capture all obtained items and their quantities
-
-### Manual Test
-Type `::testreval` in the game chat to send a test webhook and verify your configuration.
 
 ### Automatic Sync on Logout
 When you log out, the plugin automatically collects and sends all player data to your configured webhook endpoint.

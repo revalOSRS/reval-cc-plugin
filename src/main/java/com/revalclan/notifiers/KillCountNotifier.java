@@ -145,9 +145,6 @@ public class KillCountNotifier extends BaseNotifier {
 		Matcher matcher = TIME_REGEX.matcher(msg);
 		if (matcher.find()) {
 			String timeStr = matcher.group("time");
-			String pbTimeStr = matcher.group("pbtime");
-			
-			log.debug("Time pattern matched - Time: {}, PB Time: {}", timeStr, pbTimeStr);
 			
 			Duration duration = parseTimeString(timeStr);
 			
@@ -156,7 +153,6 @@ public class KillCountNotifier extends BaseNotifier {
 				pendingIsPb = msg.toLowerCase().contains("(new personal best)") || 
 				              msg.toLowerCase().contains("new personal best");
 				badTicks = 0;
-				log.debug("Time parsed - Duration: {}, isPB: {}", duration, pendingIsPb);
 			} else {
 				log.debug("Failed to parse time string: {}", timeStr);
 			}
@@ -244,9 +240,6 @@ public class KillCountNotifier extends BaseNotifier {
 	}
 	
 	private void sendKillCountNotification() {
-		log.info("Sending KC notification - Boss: {}, Count: {}, Time: {}, isPB: {}", 
-			pendingBoss, pendingCount, pendingTime, pendingIsPb);
-		
 		Map<String, Object> kcData = new HashMap<>();
 		kcData.put("boss", pendingBoss);
 		kcData.put("killCount", pendingCount);
@@ -254,13 +247,10 @@ public class KillCountNotifier extends BaseNotifier {
 		if (pendingTime != null) {
 			kcData.put("time", formatDuration(pendingTime));
 			kcData.put("timeSeconds", pendingTime.getSeconds() + (pendingTime.getNano() / 1_000_000_000.0));
-			log.debug("Including time data - formatted: {}, seconds: {}", 
-				formatDuration(pendingTime), pendingTime.getSeconds() + (pendingTime.getNano() / 1_000_000_000.0));
 		}
 		
 		if (pendingIsPb) {
 			kcData.put("personalBest", true);
-			log.debug("Marking as personal best");
 		}
 
 		sendNotification(kcData);

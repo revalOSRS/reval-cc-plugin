@@ -1,7 +1,6 @@
 package com.revalclan.notifiers;
 
 import com.revalclan.RevalClanConfig;
-import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Skill;
 import net.runelite.api.events.StatChanged;
 
@@ -14,7 +13,6 @@ import java.util.Map;
 /**
  * Notifies on level ups
  */
-@Slf4j
 @Singleton
 public class LevelNotifier extends BaseNotifier {
 	@Inject private RevalClanConfig config;
@@ -71,8 +69,6 @@ public class LevelNotifier extends BaseNotifier {
 		levelData.put("totalLevel", totalLevel);
 		levelData.put("totalExperience", totalXp);
 		levelData.put("combatLevel", combatLevel);
-
-		log.info("{} leveled {} to {}", getPlayerName(), skill.getName(), level);
 
 		sendNotification(levelData);
 	}

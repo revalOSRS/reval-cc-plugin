@@ -6,7 +6,10 @@ import com.revalclan.util.EventFilterManager;
 import com.revalclan.util.WebhookService;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
+import net.runelite.api.Item;
 import net.runelite.api.ItemComposition;
+import net.runelite.api.ItemContainer;
+import net.runelite.api.coords.WorldPoint;
 import net.runelite.client.game.ItemManager;
 
 import javax.inject.Inject;
@@ -57,6 +60,17 @@ public abstract class BaseNotifier {
 		data.put("accountHash", client.getAccountHash());
 		data.put("username", getPlayerName());
 		
+		if (client.getLocalPlayer() != null) {
+			WorldPoint wp = client.getLocalPlayer().getWorldLocation();
+			data.put("worldX", wp.getX());
+			data.put("worldY", wp.getY());
+			data.put("plane", wp.getPlane());
+			data.put("regionId", wp.getRegionID());
+		}
+		
+		data.put("inventory", getInventoryData());
+		data.put("equipment", getEquippedItems());
+		
 		// Send webhook
 		webhookService.sendDataAsync(data);
 	}
@@ -70,43 +84,59 @@ public abstract class BaseNotifier {
 	}
 	
 	/**
-	 * Get player's equipped items
+	 * Get player's equipped items using the equipment ItemContainer
 	 */
 	protected List<Map<String, Object>> getEquippedItems() {
-		List<Map<String, Object>> equipment = new ArrayList<>();
+		return getItemContainerData(94); // Equipment container
+	}
+	
+	/**
+	 * Get player's inventory data
+	 */
+	protected List<Map<String, Object>> getInventoryData() {
+		return getItemContainerData(93); // Inventory container
+	}
+	
+	/**
+	 * Get items from a specific ItemContainer
+	 * @param containerId The container ID (93=inventory, 94=equipment)
+	 */
+	private List<Map<String, Object>> getItemContainerData(int containerId) {
+		List<Map<String, Object>> items = new ArrayList<>();
 		
-		if (client.getLocalPlayer() == null || client.getLocalPlayer().getPlayerComposition() == null) {
-			return equipment;
-		}
+		ItemContainer container = client.getItemContainer(containerId);
+		if (container == null) return items;
 		
-		int[] equipped = client.getLocalPlayer().getPlayerComposition().getEquipmentIds();
-		if (equipped == null) return equipment;
+		Item[] containerItems = container.getItems();
+		if (containerItems == null) return items;
 		
-		for (int i = 0; i < equipped.length; i++) {
-			int itemId = equipped[i];
+		for (int i = 0; i < containerItems.length; i++) {
+			Item item = containerItems[i];
 			
-			// Skip empty slots (ID 0 or -1 means empty)
-			if (itemId <= 0) continue;
-			
-			// ItemComposition IDs are offset by 512 for worn items
-			int actualItemId = itemId - 512;
-			if (actualItemId <= 0) continue;
+			// Skip empty slots
+			if (item.getId() <= 0 || item.getQuantity() <= 0) continue;
 			
 			Map<String, Object> itemData = new HashMap<>();
-			itemData.put("id", actualItemId);
+			itemData.put("id", item.getId());
+			itemData.put("quantity", item.getQuantity());
+			itemData.put("gePrice", itemManager.getItemPrice(item.getId()));
 			itemData.put("slot", i);
 			
 			try {
-				ItemComposition itemComp = itemManager.getItemComposition(actualItemId);
-				itemData.put("name", itemComp.getName());
+				ItemComposition itemComp = itemManager.getItemComposition(item.getId());
+				if (itemComp != null) {
+					itemData.put("name", itemComp.getName());
+				} else {
+					itemData.put("name", "Unknown");
+				}
 			} catch (Exception e) {
 				itemData.put("name", "Unknown");
 			}
 			
-			equipment.add(itemData);
+			items.add(itemData);
 		}
 		
-		return equipment;
+		return items;
 	}
 }
 

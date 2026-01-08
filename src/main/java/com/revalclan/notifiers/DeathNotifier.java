@@ -8,30 +8,24 @@
 package com.revalclan.notifiers;
 
 import com.revalclan.RevalClanConfig;
-import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Actor;
 import net.runelite.api.NPC;
 import net.runelite.api.NPCComposition;
 import net.runelite.api.Player;
 import net.runelite.api.events.ActorDeath;
 import net.runelite.api.events.InteractingChanged;
-import net.runelite.client.ui.DrawManager;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
-import java.awt.image.BufferedImage;
 import java.lang.ref.WeakReference;
 import java.util.HashMap;
 import java.util.Map;
 
-@Slf4j
 @Singleton
 public class DeathNotifier extends BaseNotifier {
 	private static final String ATTACK_OPTION = "Attack";
 	
 	@Inject private RevalClanConfig config;
-	
-	@Inject private DrawManager drawManager;
 
 	private Actor lastAttacker = null;
 	private long lastAttackTime = 0;
@@ -91,9 +85,6 @@ public class DeathNotifier extends BaseNotifier {
 	private void handleDeath() {
 		Map<String, Object> deathData = new HashMap<>();
 		
-		// Add equipment worn at death
-		deathData.put("equipment", getEquippedItems());
-		
 		// Identify killer using sophisticated algorithm
 		Actor killer = identifyKiller();
 		
@@ -114,11 +105,9 @@ public class DeathNotifier extends BaseNotifier {
 			deathData.put("killerType", "UNKNOWN");
 		}
 		
-		// Capture screenshot of death moment
-		captureDeathScreenshot(deathData);
+		sendNotification(deathData);
 		
-		lastAttacker = null;
-		lastTarget = new WeakReference<>(null);
+		reset();
 	}
 	
 	/**
@@ -188,60 +177,6 @@ public class DeathNotifier extends BaseNotifier {
 		}
 		
 		return false;
-	}
-	
-	/**
-	 * Capture a screenshot of the death moment and include it in the notification
-	 */
-	private void captureDeathScreenshot(Map<String, Object> deathData) {
-		try {
-			drawManager.requestNextFrameListener(image -> {
-				if (image != null) {
-					// Convert java.awt.Image to BufferedImage
-					BufferedImage bufferedImage;
-					if (image instanceof BufferedImage) {
-						bufferedImage = (BufferedImage) image;
-					} else {
-						bufferedImage = new BufferedImage(
-							image.getWidth(null),
-							image.getHeight(null),
-							BufferedImage.TYPE_INT_ARGB
-						);
-						java.awt.Graphics2D g = bufferedImage.createGraphics();
-						g.drawImage(image, 0, 0, null);
-						g.dispose();
-					}
-					
-					String base64Image = convertImageToBase64(bufferedImage);
-					if (base64Image != null) {
-						deathData.put("screenshot", base64Image);
-					}
-					sendNotification(deathData);
-				} else {
-					// If screenshot fails, still send notification without it
-					sendNotification(deathData);
-				}
-			});
-		} catch (Exception e) {
-			log.warn("Failed to capture death screenshot", e);
-			// Send notification without screenshot
-			sendNotification(deathData);
-		}
-	}
-	
-	/**
-	 * Convert BufferedImage to base64 string for transmission
-	 */
-	private String convertImageToBase64(BufferedImage image) {
-		try {
-			java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
-			javax.imageio.ImageIO.write(image, "png", baos);
-			byte[] imageBytes = baos.toByteArray();
-			return java.util.Base64.getEncoder().encodeToString(imageBytes);
-		} catch (Exception e) {
-			log.error("Failed to convert image to base64", e);
-			return null;
-		}
 	}
 
 	public void reset() {

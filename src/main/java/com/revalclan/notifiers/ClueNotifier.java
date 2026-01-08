@@ -8,7 +8,6 @@
 package com.revalclan.notifiers;
 
 import com.revalclan.RevalClanConfig;
-import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.events.WidgetLoaded;
 import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.widgets.Widget;
@@ -23,7 +22,6 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-@Slf4j
 @Singleton
 public class ClueNotifier extends BaseNotifier {
 	private static final Pattern CLUE_PATTERN = Pattern.compile(
