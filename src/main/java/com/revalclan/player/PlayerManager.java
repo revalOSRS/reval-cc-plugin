@@ -2,6 +2,7 @@ package com.revalclan.player;
 
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
+import net.runelite.api.Skill;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -34,8 +35,15 @@ public class PlayerManager {
 		metadata.put("totalLevel", client.getTotalLevel());
 		metadata.put("totalExperience", client.getOverallExperience());
 		
+		Map<String, Map<String, Integer>> skills = new HashMap<>();
+		for (Skill skill : Skill.values()) {
+			Map<String, Integer> skillData = new HashMap<>();
+			skillData.put("level", client.getRealSkillLevel(skill));
+			skillData.put("experience", client.getSkillExperience(skill));
+			skills.put(skill.getName().toLowerCase(), skillData);
+		}
+		metadata.put("skills", skills);
+		
 		return metadata;
 	}
 }
-
-

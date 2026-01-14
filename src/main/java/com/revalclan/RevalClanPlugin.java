@@ -3,9 +3,7 @@ package com.revalclan;
 import com.revalclan.collectionlog.CollectionLogManager;
 import com.revalclan.collectionlog.CollectionLogSyncButton;
 import com.revalclan.notifiers.*;
-import com.revalclan.util.ClanValidator;
 import com.revalclan.util.EventFilterManager;
-import com.revalclan.util.WebhookService;
 import com.google.inject.Provides;
 import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
@@ -31,11 +29,6 @@ import net.runelite.client.game.ItemManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 
-import java.lang.reflect.Array;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
 @Slf4j
 @PluginDescriptor(
 	name = "Reval Clan"
@@ -43,13 +36,9 @@ import java.util.Map;
 public class RevalClanPlugin extends Plugin {
 	@Inject private Client client;
 
-	@Inject	private PlayerDataCollector dataCollector;
-
 	@Inject	private CollectionLogManager collectionLogManager;
 
 	@Inject	private CollectionLogSyncButton syncButton;
-
-	@Inject	private WebhookService webhookService;
 
 	@Inject	private LootNotifier lootNotifier;
 
@@ -78,6 +67,10 @@ public class RevalClanPlugin extends Plugin {
 	@Inject	private ChatNotifier chatNotifier;
 
 	@Inject	private MusicNotifier musicNotifier;
+
+	@Inject	private LoginNotifier loginNotifier;
+
+	@Inject	private LogoutNotifier logoutNotifier;
 
 	@Inject	private EventBus eventBus;
 
@@ -133,33 +126,12 @@ public class RevalClanPlugin extends Plugin {
 			
 			// Fetch dynamic event filters from API on login
 			eventFilterManager.fetchFiltersAsync();
+
+			// Send login notification
+			loginNotifier.onLogin();
 		} else if (gameStateChanged.getGameState() == GameState.LOGIN_SCREEN) {
 			if (wasLoggedIn) {
-				Map<String, Object> data = dataCollector.collectAllData();
-				
-				data.put("eventType", "SYNC");
-				data.put("eventTimestamp", System.currentTimeMillis());
-				
-				if (ClanValidator.validateClan(client)) {
-					// Log only top-level keys and value types
-					Map<String, String> dataSummary = new HashMap<>();
-					data.forEach((key, value) -> {
-						if (value == null) {
-							dataSummary.put(key, "null");
-						} else if (value instanceof Map) {
-							dataSummary.put(key, "Map[" + ((Map<?, ?>) value).size() + " entries]");
-						} else if (value instanceof List) {
-							dataSummary.put(key, "List[" + ((List<?>) value).size() + " items]");
-						} else if (value.getClass().isArray()) {
-							dataSummary.put(key, "Array[" + Array.getLength(value) + " items]");
-						} else {
-							dataSummary.put(key, String.valueOf(value));
-						}
-					});
-					log.info("Data summary: {}", dataSummary);
-					webhookService.sendDataAsync(data);
-				}
-					
+				logoutNotifier.onLogout();
 				wasLoggedIn = false;
 			}
 		}

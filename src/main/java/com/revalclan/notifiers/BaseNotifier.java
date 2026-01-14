@@ -51,7 +51,6 @@ public abstract class BaseNotifier {
 	 * @param data The notification data
 	 */
 	protected void sendNotification(Map<String, Object> data) {
-		// Validate clan membership before sending
 		if (!ClanValidator.validateClan(client)) return;
 
 		// Add event metadata

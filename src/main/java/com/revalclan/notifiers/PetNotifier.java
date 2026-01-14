@@ -48,7 +48,7 @@ public class PetNotifier extends BaseNotifier {
 	 * - "Username feels something weird sneaking into her backpack: Pet name at 100 kills."
 	 */
 	private static final Pattern CLAN_REGEX = Pattern.compile(
-		"(?<user>[^:]+?) (?:has a funny feeling like .+? (?:followed|being followed)|feels something weird sneaking into .+? backpack|feels like .+? acquired something special): (?<pet>.+?)(?: at (?<milestone>[^.]+?))?(?:\\.|$)",
+		"(?<user>.+?) (?:has a funny feeling like .+? (?:would have been followed|being followed)|feels something weird sneaking into .+? backpack|feels like .+? acquired something special): (?<pet>.+?)(?: at (?<milestone>.+))?\\.$",
 		Pattern.CASE_INSENSITIVE
 	);
 
@@ -57,22 +57,22 @@ public class PetNotifier extends BaseNotifier {
 	 */
 	private static final int MAX_TICKS_WAIT = 5;
 
-	/**
-	 * Waiting state marker - indicates we've seen the initial pet message but not the name yet
-	 */
-	private static final String WAITING_FOR_NAME = "";
-
 	@Inject private RevalClanConfig config;
 
 	/**
-	 * Current pet name (null = no pet, WAITING_FOR_NAME = waiting for name, actual name = ready to notify)
+	 * Whether we've seen the personal "You have a funny feeling" game message
 	 */
-	private volatile String petName = null;
+	private volatile boolean seenGameMessage = false;
 
 	/**
-	 * Original pet message
+	 * The personal game message content
 	 */
-	private volatile String originalMessage = null;
+	private volatile String gameMessage = null;
+
+	/**
+	 * Pet name extracted from follow-up messages
+	 */
+	private volatile String petName = null;
 
 	/**
 	 * Kill count information (e.g., "50 kills")
@@ -100,38 +100,33 @@ public class PetNotifier extends BaseNotifier {
 	public void onChatMessage(String message) {
 		if (!isEnabled()) return;
 
-		// Only process initial pet message if we haven't seen one yet
-		if (petName == null) {
-			Matcher petMatcher = PET_PATTERN.matcher(message);
-			if (petMatcher.find()) {
-				// Mark as waiting - we've seen the initial message, now wait for pet name
-				this.petName = WAITING_FOR_NAME;
-				this.originalMessage = message;
-				this.ticksWaited.set(0);
-				log.debug("Pet drop detected, waiting for pet name...");
-				return;
-			}
-		} 
-		// If we're waiting for pet name, check for follow-up messages
-		else if (WAITING_FOR_NAME.equals(petName)) {
-			// Check for untradeable drop message
+		// Check for the personal pet drop message
+		Matcher petMatcher = PET_PATTERN.matcher(message);
+		if (petMatcher.find()) {
+			this.seenGameMessage = true;
+			this.gameMessage = message;
+			this.ticksWaited.set(0);
+			return;
+		}
+
+		// If we've seen a pet message, look for follow-up messages with pet name
+		if (this.seenGameMessage && this.petName == null) {
+			// Check for untradeable drop message (new pets only, not duplicates)
 			Matcher untradeableMatcher = UNTRADEABLE_PATTERN.matcher(message);
 			if (untradeableMatcher.find()) {
 				String itemName = untradeableMatcher.group(1).trim();
 				if (isPetItem(itemName)) {
 					this.petName = itemName;
-					log.debug("Pet name identified from untradeable drop: {}", itemName);
 					return;
 				}
 			}
 
-			// Check for collection log message as a backup
+			// Check for collection log message (new pets only, not duplicates)
 			Matcher collectionMatcher = COLLECTION_LOG_PATTERN.matcher(message);
 			if (collectionMatcher.find()) {
 				String itemName = collectionMatcher.group(1).trim();
 				if (isPetItem(itemName)) {
 					this.petName = itemName;
-					log.debug("Pet name identified from collection log: {}", itemName);
 					return;
 				}
 			}
@@ -139,15 +134,11 @@ public class PetNotifier extends BaseNotifier {
 	}
 
 	/**
-	 * Handle clan notifications - only process if we've already seen an initial pet message
-	 * This prevents clan messages from triggering notifications on their own
+	 * Handle clan notifications - extracts pet name and kill count for the current player
+	 * This is especially important for duplicate pets where there's no "Untradeable drop:" message
 	 */
 	public void onClanNotification(String message) {
 		if (!isEnabled()) return;
-
-		if (petName == null) {
-			return;
-		}
 
 		Matcher clanMatcher = CLAN_REGEX.matcher(message);
 		if (clanMatcher.find()) {
@@ -162,15 +153,20 @@ public class PetNotifier extends BaseNotifier {
 					pet = clanMatcher.group("pet");
 					milestone = clanMatcher.group("milestone");
 				} catch (IllegalArgumentException e) {
-					log.warn("Error extracting groups from clan pet notification: {}", e.getMessage());
+					return;
 				}
-				
+
 				if (pet != null && !pet.trim().isEmpty()) {
 					this.petName = pet.trim();
-					if (milestone != null && !milestone.trim().isEmpty()) {
-						this.killCount = milestone.trim().replaceAll("\\.$", "");
-					}
-					this.originalMessage = message;
+				}
+				if (milestone != null && !milestone.trim().isEmpty()) {
+					this.killCount = milestone.trim();
+				}
+
+				// If we haven't seen the game message yet, mark that we've seen clan info
+				// The game message should arrive soon (or may have already arrived)
+				if (!seenGameMessage) {
+					this.ticksWaited.set(0);
 				}
 			}
 		}
@@ -180,20 +176,32 @@ public class PetNotifier extends BaseNotifier {
 	 * Called on each game tick - checks if we should send notification
 	 */
 	public void onGameTick() {
-		if (petName == null) return;
+		if (!this.seenGameMessage && this.petName == null) {
+			return;
+		}
 
-		// If we have a pet name (not waiting), send notification immediately
-		if (!WAITING_FOR_NAME.equals(petName)) {
+		// We need the personal game message to confirm it's actually a pet drop
+		// But we may have gotten clan info first, so wait for game message
+		if (!this.seenGameMessage) {
+			int ticks = this.ticksWaited.incrementAndGet();
+			if (ticks > MAX_TICKS_WAIT) {
+				// Clan info arrived but no game message - this wasn't our pet
+				reset();
+			}
+			return;
+		}
+
+		// We have the game message - check if we have complete info or should wait
+		if (this.petName != null) {
 			handleNotify();
 			reset();
 			return;
 		}
 
-		// If we're still waiting, increment wait counter
-		int ticks = ticksWaited.incrementAndGet();
+		// Still waiting for pet name
+		int ticks = this.ticksWaited.incrementAndGet();
 		if (ticks > MAX_TICKS_WAIT) {
 			// Timeout - send notification without pet name
-			log.warn("Pet drop detected but pet name not found in follow-up messages");
 			handleNotify();
 			reset();
 		}
@@ -205,20 +213,21 @@ public class PetNotifier extends BaseNotifier {
 	private void handleNotify() {
 		if (!isEnabled()) return;
 
-		boolean obtained = originalMessage != null && !originalMessage.contains("would have been");
+		// Determine if pet was obtained or duplicate based on game message
+		boolean obtained = this.gameMessage != null && !this.gameMessage.contains("would have been");
 
 		Map<String, Object> petData = new HashMap<>();
-		petData.put("message", originalMessage);
+		petData.put("message", this.gameMessage);
 		petData.put("obtained", obtained);
 
 		// Add pet name if we have it
-		if (petName != null && !WAITING_FOR_NAME.equals(petName)) {
-			petData.put("petName", petName);
+		if (this.petName != null && !this.petName.isEmpty()) {
+			petData.put("petName", this.petName);
 		}
 
 		// Add kill count if available
-		if (killCount != null && !killCount.isEmpty()) {
-			petData.put("killCount", killCount);
+		if (this.killCount != null && !this.killCount.isEmpty()) {
+			petData.put("killCount", this.killCount);
 		}
 
 		sendNotification(petData);
@@ -228,8 +237,9 @@ public class PetNotifier extends BaseNotifier {
 	 * Reset the notifier state
 	 */
 	public void reset() {
+		this.seenGameMessage = false;
+		this.gameMessage = null;
 		this.petName = null;
-		this.originalMessage = null;
 		this.killCount = null;
 		this.ticksWaited.set(0);
 	}
@@ -238,7 +248,7 @@ public class PetNotifier extends BaseNotifier {
 	 * Set of all known pet names (case-insensitive matching)
 	 */
 	private static final Set<String> PET_NAMES = new HashSet<>();
-	
+
 	static {
 		// Boss pets
 		PET_NAMES.add("abyssal orphan");
@@ -292,7 +302,7 @@ public class PetNotifier extends BaseNotifier {
 		PET_NAMES.add("wisp");
 		PET_NAMES.add("yami");
 		PET_NAMES.add("youngllef");
-		
+
 		// Skill pets
 		PET_NAMES.add("baby chinchompa");
 		PET_NAMES.add("beaver");
@@ -303,7 +313,7 @@ public class PetNotifier extends BaseNotifier {
 		PET_NAMES.add("rocky");
 		PET_NAMES.add("soup");
 		PET_NAMES.add("tangleroot");
-		
+
 		// Other pets
 		PET_NAMES.add("abyssal protector");
 		PET_NAMES.add("bloodhound");
@@ -319,23 +329,21 @@ public class PetNotifier extends BaseNotifier {
 	 */
 	private boolean isPetItem(String itemName) {
 		if (itemName == null || itemName.isEmpty()) return false;
-		
+
 		// Normalize the item name (lowercase, trim)
 		String normalized = itemName.toLowerCase().trim();
-		
+
 		// Direct match
 		if (PET_NAMES.contains(normalized)) {
 			return true;
 		}
-		
+
 		// Check if it starts with "pet " and the rest matches
 		if (normalized.startsWith("pet ")) {
 			String withoutPrefix = normalized.substring(4).trim();
 			return PET_NAMES.contains(withoutPrefix) || PET_NAMES.contains(normalized);
 		}
-		
+
 		return false;
 	}
-
 }
-
