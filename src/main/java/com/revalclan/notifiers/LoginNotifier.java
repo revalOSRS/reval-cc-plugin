@@ -31,8 +31,6 @@ public class LoginNotifier extends BaseNotifier {
 	 */
 	public void onLogin() {
 		Map<String, Object> data = dataCollector.collectAllData();
-		data.put("world", client.getWorld());
-
 		sendNotification(data);
 	}
 }

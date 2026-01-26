@@ -58,6 +58,7 @@ public abstract class BaseNotifier {
 		data.put("eventTimestamp", System.currentTimeMillis());
 		data.put("accountHash", client.getAccountHash());
 		data.put("username", getPlayerName());
+		data.put("world", client.getWorld());
 		
 		if (client.getLocalPlayer() != null) {
 			WorldPoint wp = client.getLocalPlayer().getWorldLocation();
