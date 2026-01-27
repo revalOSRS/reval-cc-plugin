@@ -1,7 +1,6 @@
 package com.revalclan.api;
 
 import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import com.revalclan.api.account.AccountResponse;
 import com.revalclan.api.achievements.AchievementsResponse;
 import com.revalclan.api.admin.ActualizeRankChangeResponse;
@@ -64,9 +63,9 @@ public class RevalApiService {
     private long lastChallengesFetch = 0;
 
     @Inject
-    public RevalApiService(OkHttpClient httpClient) {
+    public RevalApiService(OkHttpClient httpClient, Gson gson) {
         this.httpClient = httpClient;
-        this.gson = new GsonBuilder().create();
+        this.gson = gson;
     }
 
     // ==================== POINTS API ====================
