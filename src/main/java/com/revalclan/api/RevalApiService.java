@@ -17,17 +17,12 @@ import com.revalclan.api.events.RegistrationResponse;
 import com.revalclan.api.events.RegistrationStatusResponse;
 import com.revalclan.api.points.PointsResponse;
 import lombok.extern.slf4j.Slf4j;
+import okhttp3.*;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URI;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
 /**
@@ -37,10 +32,11 @@ import java.util.function.Consumer;
 @Slf4j
 @Singleton
 public class RevalApiService {
-    private static final int TIMEOUT_MS = 10000;
     private static final String USER_AGENT = "RuneLite-RevalClan-Plugin";
+    private static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
 
     private final Gson gson;
+    private final OkHttpClient httpClient;
 
     // Cache durations
     private static final long CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes
@@ -68,7 +64,8 @@ public class RevalApiService {
     private long lastChallengesFetch = 0;
 
     @Inject
-    public RevalApiService() {
+    public RevalApiService(OkHttpClient httpClient) {
+        this.httpClient = httpClient;
         this.gson = new GsonBuilder().create();
     }
 
@@ -80,14 +77,12 @@ public class RevalApiService {
      */
     public void fetchPoints(Consumer<PointsResponse> onSuccess, Consumer<Exception> onError) {
         if (cachedPoints != null && System.currentTimeMillis() - lastPointsFetch < CACHE_DURATION_MS) {
-            CompletableFuture.runAsync(() -> onSuccess.accept(cachedPoints));
+            onSuccess.accept(cachedPoints);
             return;
         }
 
-        CompletableFuture.runAsync(() -> {
-            try {
-                PointsResponse response = request(ApiEndpoints.POINTS, "GET", null, null, PointsResponse.class);
-                
+        requestAsync(ApiEndpoints.POINTS, "GET", null, null, PointsResponse.class,
+            response -> {
                 if (response != null && response.isSuccess()) {
                     cachedPoints = response;
                     lastPointsFetch = System.currentTimeMillis();
@@ -95,11 +90,12 @@ public class RevalApiService {
                 } else {
                     onError.accept(new Exception(response != null ? response.getMessage() : "Unknown error"));
                 }
-            } catch (Exception e) {
-                log.error("Failed to fetch points", e);
-                onError.accept(e);
+            },
+            error -> {
+                log.error("Failed to fetch points", error);
+                onError.accept(error);
             }
-        });
+        );
     }
 
     // ==================== ACCOUNT API ====================
@@ -113,15 +109,13 @@ public class RevalApiService {
 
         if (cachedAccount != null && identifier.equals(cachedAccountIdentifier)
             && System.currentTimeMillis() - lastAccountFetch < ACCOUNT_CACHE_DURATION_MS) {
-            CompletableFuture.runAsync(() -> onSuccess.accept(cachedAccount));
+            onSuccess.accept(cachedAccount);
             return;
         }
 
-        CompletableFuture.runAsync(() -> {
-            try {
-                String endpoint = ApiEndpoints.ACCOUNT + "?accountHash=" + accountHash;
-                AccountResponse response = request(endpoint, "GET", null, null, AccountResponse.class);
-                
+        String endpoint = ApiEndpoints.ACCOUNT + "?accountHash=" + accountHash;
+        requestAsync(endpoint, "GET", null, null, AccountResponse.class,
+            response -> {
                 if (response != null && response.isSuccess()) {
                     cachedAccount = response;
                     cachedAccountIdentifier = identifier;
@@ -130,11 +124,12 @@ public class RevalApiService {
                 } else {
                     handleError(response, "Account not found", onError);
                 }
-            } catch (Exception e) {
-                log.error("Failed to fetch account", e);
-                onError.accept(e);
+            },
+            error -> {
+                log.error("Failed to fetch account", error);
+                onError.accept(error);
             }
-        });
+        );
     }
 
     /**
@@ -153,13 +148,12 @@ public class RevalApiService {
      */
     public void fetchEvents(Consumer<EventsResponse> onSuccess, Consumer<Exception> onError) {
         if (cachedEvents != null && System.currentTimeMillis() - lastEventsFetch < EVENTS_CACHE_DURATION_MS) {
-            CompletableFuture.runAsync(() -> onSuccess.accept(cachedEvents));
+            onSuccess.accept(cachedEvents);
             return;
         }
 
-        CompletableFuture.runAsync(() -> {
-            try {
-                EventsResponse response = request(ApiEndpoints.EVENTS, "GET", null, null, EventsResponse.class);
+        requestAsync(ApiEndpoints.EVENTS, "GET", null, null, EventsResponse.class,
+            response -> {
                 if (response != null && response.isSuccess()) {
                     cachedEvents = response;
                     lastEventsFetch = System.currentTimeMillis();
@@ -167,11 +161,12 @@ public class RevalApiService {
                 } else {
                     handleError(response, "Failed to fetch events", onError);
                 }
-            } catch (Exception e) {
-                log.error("Failed to fetch events", e);
-                onError.accept(e);
+            },
+            error -> {
+                log.error("Failed to fetch events", error);
+                onError.accept(error);
             }
-        });
+        );
     }
 
     /**
@@ -190,23 +185,22 @@ public class RevalApiService {
     public void registerForEvent(String eventId, long accountHash,
                                  Consumer<RegistrationResponse> onSuccess,
                                  Consumer<Exception> onError) {
-        CompletableFuture.runAsync(() -> {
-            try {
-                String endpoint = ApiEndpoints.eventRegister(eventId);
-                String body = "{\"accountHash\":\"" + accountHash + "\"}";
-                RegistrationResponse response = request(endpoint, "POST", body, null, RegistrationResponse.class);
-
+        String endpoint = ApiEndpoints.eventRegister(eventId);
+        String body = "{\"accountHash\":\"" + accountHash + "\"}";
+        requestAsync(endpoint, "POST", body, null, RegistrationResponse.class,
+            response -> {
                 if (response != null && response.isSuccess()) {
                     cachedEvents = null; // Invalidate cache
                     onSuccess.accept(response);
                 } else {
                     handleError(response, "Registration failed", onError, "Failed to register for event " + eventId);
                 }
-            } catch (Exception e) {
-                log.error("Failed to register for event: {}", eventId, e);
-                onError.accept(e);
+            },
+            error -> {
+                log.error("Failed to register for event: {}", eventId, error);
+                onError.accept(error);
             }
-        });
+        );
     }
 
     /**
@@ -216,23 +210,22 @@ public class RevalApiService {
     public void cancelEventRegistration(String eventId, long accountHash,
                                         Consumer<RegistrationResponse> onSuccess,
                                         Consumer<Exception> onError) {
-        CompletableFuture.runAsync(() -> {
-            try {
-                String endpoint = ApiEndpoints.eventRegister(eventId);
-                String body = "{\"accountHash\":\"" + accountHash + "\"}";
-                RegistrationResponse response = request(endpoint, "DELETE", body, null, RegistrationResponse.class);
-
+        String endpoint = ApiEndpoints.eventRegister(eventId);
+        String body = "{\"accountHash\":\"" + accountHash + "\"}";
+        requestAsync(endpoint, "DELETE", body, null, RegistrationResponse.class,
+            response -> {
                 if (response != null && response.isSuccess()) {
                     cachedEvents = null; // Invalidate cache
                     onSuccess.accept(response);
                 } else {
                     handleError(response, "Cancellation failed", onError, "Failed to cancel registration for event " + eventId);
                 }
-            } catch (Exception e) {
-                log.error("Failed to cancel registration for event: {}", eventId, e);
-                onError.accept(e);
+            },
+            error -> {
+                log.error("Failed to cancel registration for event: {}", eventId, error);
+                onError.accept(error);
             }
-        });
+        );
     }
 
     /**
@@ -242,21 +235,20 @@ public class RevalApiService {
     public void checkRegistrationStatus(String eventId, long accountHash,
                                         Consumer<RegistrationStatusResponse> onSuccess,
                                         Consumer<Exception> onError) {
-        CompletableFuture.runAsync(() -> {
-            try {
-                String endpoint = ApiEndpoints.eventRegistrationStatus(eventId) + "?accountHash=" + accountHash;
-                RegistrationStatusResponse response = request(endpoint, "GET", null, null, RegistrationStatusResponse.class);
-
+        String endpoint = ApiEndpoints.eventRegistrationStatus(eventId) + "?accountHash=" + accountHash;
+        requestAsync(endpoint, "GET", null, null, RegistrationStatusResponse.class,
+            response -> {
                 if (response != null && response.isSuccess()) {
                     onSuccess.accept(response);
                 } else {
                     handleError(response, "Status check failed", onError, "Failed to check registration status for event " + eventId);
                 }
-            } catch (Exception e) {
-                log.error("Failed to check registration status for event: {}", eventId, e);
-                onError.accept(e);
+            },
+            error -> {
+                log.error("Failed to check registration status for event: {}", eventId, error);
+                onError.accept(error);
             }
-        });
+        );
     }
 
     /**
@@ -292,14 +284,12 @@ public class RevalApiService {
     public void fetchAchievementDefinitions(Long accountHash,
                                            Consumer<AchievementsResponse> onSuccess,
                                            Consumer<Exception> onError) {
-        CompletableFuture.runAsync(() -> {
-            try {
-                String endpoint = accountHash != null 
-                    ? ApiEndpoints.ACHIEVEMENTS + "?accountHash=" + accountHash
-                    : ApiEndpoints.ACHIEVEMENTS;
-                
-                AchievementsResponse response = request(endpoint, "GET", null, null, AchievementsResponse.class);
-
+        String endpoint = accountHash != null 
+            ? ApiEndpoints.ACHIEVEMENTS + "?accountHash=" + accountHash
+            : ApiEndpoints.ACHIEVEMENTS;
+        
+        requestAsync(endpoint, "GET", null, null, AchievementsResponse.class,
+            response -> {
                 if (response != null && response.isSuccess()) {
                     if (accountHash == null) {
                         cachedAchievements = response;
@@ -309,11 +299,12 @@ public class RevalApiService {
                 } else {
                     handleError(response, "Failed to fetch achievement definitions", onError);
                 }
-            } catch (Exception e) {
-                log.error("Failed to fetch achievement definitions", e);
-                onError.accept(e);
+            },
+            error -> {
+                log.error("Failed to fetch achievement definitions", error);
+                onError.accept(error);
             }
-        });
+        );
     }
 
     /**
@@ -336,18 +327,16 @@ public class RevalApiService {
                             Consumer<DiariesResponse> onSuccess, Consumer<Exception> onError) {
         if (cachedDiaries != null && accountHash == null 
             && System.currentTimeMillis() - lastDiariesFetch < CACHE_DURATION_MS) {
-            CompletableFuture.runAsync(() -> onSuccess.accept(cachedDiaries));
+            onSuccess.accept(cachedDiaries);
             return;
         }
 
-        CompletableFuture.runAsync(() -> {
-            try {
-                String endpoint = accountHash != null 
-                    ? ApiEndpoints.DIARIES + "?accountHash=" + accountHash
-                    : ApiEndpoints.DIARIES;
-                
-                DiariesResponse response = request(endpoint, "GET", null, null, DiariesResponse.class);
-
+        String endpoint = accountHash != null 
+            ? ApiEndpoints.DIARIES + "?accountHash=" + accountHash
+            : ApiEndpoints.DIARIES;
+        
+        requestAsync(endpoint, "GET", null, null, DiariesResponse.class,
+            response -> {
                 if (response != null && response.isSuccess()) {
                     if (accountHash == null) {
                         cachedDiaries = response;
@@ -357,11 +346,12 @@ public class RevalApiService {
                 } else {
                     handleError(response, "Failed to fetch diaries", onError);
                 }
-            } catch (Exception e) {
-                log.error("Failed to fetch diaries", e);
-                onError.accept(e);
+            },
+            error -> {
+                log.error("Failed to fetch diaries", error);
+                onError.accept(error);
             }
-        });
+        );
     }
 
     /**
@@ -382,18 +372,16 @@ public class RevalApiService {
     public void fetchChallenges(Long accountHash, Consumer<ChallengesResponse> onSuccess, Consumer<Exception> onError) {
         // Don't cache if accountHash is provided (progress is account-specific)
         if (accountHash == null && cachedChallenges != null && System.currentTimeMillis() - lastChallengesFetch < CACHE_DURATION_MS) {
-            CompletableFuture.runAsync(() -> onSuccess.accept(cachedChallenges));
+            onSuccess.accept(cachedChallenges);
             return;
         }
 
-        CompletableFuture.runAsync(() -> {
-            try {
-                String endpoint = accountHash != null 
-                    ? ApiEndpoints.CHALLENGES + "?accountHash=" + accountHash
-                    : ApiEndpoints.CHALLENGES;
-                
-                ChallengesResponse response = request(endpoint, "GET", null, null, ChallengesResponse.class);
-
+        String endpoint = accountHash != null 
+            ? ApiEndpoints.CHALLENGES + "?accountHash=" + accountHash
+            : ApiEndpoints.CHALLENGES;
+        
+        requestAsync(endpoint, "GET", null, null, ChallengesResponse.class,
+            response -> {
                 if (response != null && response.isSuccess()) {
                     // Only cache if no accountHash (general challenge list)
                     if (accountHash == null) {
@@ -404,11 +392,12 @@ public class RevalApiService {
                 } else {
                     handleError(response, "Failed to fetch challenges", onError);
                 }
-            } catch (Exception e) {
-                log.error("Failed to fetch challenges", e);
-                onError.accept(e);
+            },
+            error -> {
+                log.error("Failed to fetch challenges", error);
+                onError.accept(error);
             }
-        });
+        );
     }
     
     /**
@@ -431,26 +420,25 @@ public class RevalApiService {
     public void adminLogin(String memberCode, Long accountHash, String osrsNickname,
                            Consumer<AdminAuthResponse> onSuccess,
                            Consumer<Exception> onError) {
-        CompletableFuture.runAsync(() -> {
-            try {
-                AdminLoginRequest requestBody = new AdminLoginRequest(
-                    accountHash != null ? String.valueOf(accountHash) : null,
-                    osrsNickname
-                );
-                String body = gson.toJson(requestBody);
+        AdminLoginRequest requestBody = new AdminLoginRequest(
+            accountHash != null ? String.valueOf(accountHash) : null,
+            osrsNickname
+        );
+        String body = gson.toJson(requestBody);
 
-                AdminAuthResponse response = request(ApiEndpoints.ADMIN_AUTH_LOGIN, "POST", body, memberCode, AdminAuthResponse.class);
-
+        requestAsync(ApiEndpoints.ADMIN_AUTH_LOGIN, "POST", body, memberCode, AdminAuthResponse.class,
+            response -> {
                 if (response != null && response.isSuccess()) {
                     onSuccess.accept(response);
                 } else {
                     handleError(response, "Admin login failed", onError);
                 }
-            } catch (Exception e) {
-                log.error("Failed to perform admin login", e);
-                onError.accept(e);
+            },
+            error -> {
+                log.error("Failed to perform admin login", error);
+                onError.accept(error);
             }
-        });
+        );
     }
 
     /**
@@ -463,21 +451,20 @@ public class RevalApiService {
     public void fetchPendingRankChanges(String memberCode, int limit,
                                         Consumer<PendingRankChangesResponse> onSuccess,
                                         Consumer<Exception> onError) {
-        CompletableFuture.runAsync(() -> {
-            try {
-                String endpoint = ApiEndpoints.ADMIN_RANK_CHANGES_PENDING + "?limit=" + limit;
-                PendingRankChangesResponse response = request(endpoint, "GET", null, memberCode, PendingRankChangesResponse.class);
-
+        String endpoint = ApiEndpoints.ADMIN_RANK_CHANGES_PENDING + "?limit=" + limit;
+        requestAsync(endpoint, "GET", null, memberCode, PendingRankChangesResponse.class,
+            response -> {
                 if (response != null && response.isSuccess()) {
                     onSuccess.accept(response);
                 } else {
                     handleError(response, "Failed to fetch pending rank changes", onError);
                 }
-            } catch (Exception e) {
-                log.error("Failed to fetch pending rank changes", e);
-                onError.accept(e);
+            },
+            error -> {
+                log.error("Failed to fetch pending rank changes", error);
+                onError.accept(error);
             }
-        });
+        );
     }
 
     /**
@@ -499,21 +486,20 @@ public class RevalApiService {
     public void actualizeRankChange(String memberCode, int rankChangeId,
                                     Consumer<ActualizeRankChangeResponse> onSuccess,
                                     Consumer<Exception> onError) {
-        CompletableFuture.runAsync(() -> {
-            try {
-                String endpoint = ApiEndpoints.rankChangeActualize(rankChangeId);
-                ActualizeRankChangeResponse response = request(endpoint, "POST", null, memberCode, ActualizeRankChangeResponse.class);
-
+        String endpoint = ApiEndpoints.rankChangeActualize(rankChangeId);
+        requestAsync(endpoint, "POST", null, memberCode, ActualizeRankChangeResponse.class,
+            response -> {
                 if (response != null && response.isSuccess()) {
                     onSuccess.accept(response);
                 } else {
                     handleError(response, "Failed to actualize rank change", onError, "Failed to actualize rank change " + rankChangeId);
                 }
-            } catch (Exception e) {
-                log.error("Failed to actualize rank change: {}", rankChangeId, e);
-                onError.accept(e);
+            },
+            error -> {
+                log.error("Failed to actualize rank change: {}", rankChangeId, error);
+                onError.accept(error);
             }
-        });
+        );
     }
 
     // ==================== CACHE MANAGEMENT ====================
@@ -551,80 +537,98 @@ public class RevalApiService {
     // ==================== HTTP REQUEST HELPERS ====================
 
     /**
-     * Makes an HTTP request to the plugin API.
+     * Makes an HTTP request to the plugin API asynchronously using OkHttp.
      *
      * @param endpoint The API endpoint (relative to base URL)
      * @param method HTTP method (GET, POST, DELETE)
      * @param body Request body for POST/DELETE requests (can be null)
      * @param memberCode Admin member code for admin endpoints (can be null)
      * @param responseClass The class to deserialize the response to
-     * @return The deserialized response
+     * @param onSuccess Success callback
+     * @param onError Error callback
      */
-    private <T extends ApiResponse> T request(String endpoint, String method, String body,
-                                               String memberCode, Class<T> responseClass) throws IOException {
+    private <T extends ApiResponse> void requestAsync(String endpoint, String method, String body,
+                                                       String memberCode, Class<T> responseClass,
+                                                       Consumer<T> onSuccess, Consumer<Exception> onError) {
         String fullUrl = ApiEndpoints.BASE_URL + endpoint;
-        URL url = URI.create(fullUrl).toURL();
-        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+        
+        Request.Builder requestBuilder = new Request.Builder()
+            .url(fullUrl)
+            .addHeader("Accept", "application/json")
+            .addHeader("User-Agent", USER_AGENT)
+            .addHeader("Content-Type", "application/json");
 
-        try {
-            conn.setRequestMethod(method);
-            conn.setConnectTimeout(TIMEOUT_MS);
-            conn.setReadTimeout(TIMEOUT_MS);
-            conn.setRequestProperty("Accept", "application/json");
-            conn.setRequestProperty("User-Agent", USER_AGENT);
-            conn.setRequestProperty("Content-Type", "application/json");
-
-            if (memberCode != null && !memberCode.isEmpty()) {
-                conn.setRequestProperty("X-Member-Code", memberCode);
-            }
-
-            if (body != null && !body.isEmpty()) {
-                conn.setDoOutput(true);
-                try (OutputStream os = conn.getOutputStream()) {
-                    os.write(body.getBytes(StandardCharsets.UTF_8));
-                }
-            }
-
-            int responseCode = conn.getResponseCode();
-
-            if (responseCode >= 400) {
-                try (InputStreamReader reader = new InputStreamReader(
-                    conn.getErrorStream() != null ? conn.getErrorStream() : conn.getInputStream(),
-                    StandardCharsets.UTF_8)
-                ) {
-                    String errorResponse = readStream(reader);
-                    try {
-                        return gson.fromJson(errorResponse, responseClass);
-                    } catch (Exception e) {
-                        return null;
-                    }
-                }
-            }
-
-            if (responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_CREATED) {
-                try (InputStreamReader reader = new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8)) {
-                    String jsonResponse = readStream(reader);
-                    try {
-                        return gson.fromJson(jsonResponse, responseClass);
-                    } catch (Exception e) {
-                        throw new IOException("Failed to parse JSON response", e);
-                    }
-                }
-            }
-            return null;
-        } finally {
-            conn.disconnect();
+        if (memberCode != null && !memberCode.isEmpty()) {
+            requestBuilder.addHeader("X-Member-Code", memberCode);
         }
-    }
 
-    private String readStream(InputStreamReader reader) throws IOException {
-        StringBuilder sb = new StringBuilder();
-        char[] buffer = new char[1024];
-        int charsRead;
-        while ((charsRead = reader.read(buffer)) != -1) {
-            sb.append(buffer, 0, charsRead);
+        if (body != null && !body.isEmpty()) {
+            RequestBody requestBody = RequestBody.create(JSON, body.getBytes(StandardCharsets.UTF_8));
+            if ("POST".equals(method)) {
+                requestBuilder.post(requestBody);
+            } else if ("DELETE".equals(method)) {
+                requestBuilder.delete(requestBody);
+            }
+        } else {
+            if ("POST".equals(method)) {
+                requestBuilder.post(RequestBody.create(JSON, new byte[0]));
+            } else if ("DELETE".equals(method)) {
+                requestBuilder.delete();
+            } else {
+                requestBuilder.get();
+            }
         }
-        return sb.toString();
+
+        Request request = requestBuilder.build();
+
+        httpClient.newCall(request).enqueue(new Callback() {
+            @Override
+            public void onFailure(Call call, IOException e) {
+                onError.accept(e);
+            }
+
+            @Override
+            public void onResponse(Call call, Response response) {
+                try {
+                    if (!response.isSuccessful()) {
+                        String errorBody = response.body() != null ? response.body().string() : null;
+                        T errorResponse = null;
+                        if (errorBody != null && !errorBody.isEmpty()) {
+                            try {
+                                errorResponse = gson.fromJson(errorBody, responseClass);
+                            } catch (Exception e) {
+                                // Ignore parsing errors for error responses
+                            }
+                        }
+                        onError.accept(new Exception(errorResponse != null && errorResponse.getMessage() != null 
+                            ? errorResponse.getMessage() 
+                            : "HTTP " + response.code()));
+                        return;
+                    }
+
+                    if (response.body() == null) {
+                        onError.accept(new Exception("Empty response body"));
+                        return;
+                    }
+
+                    String jsonResponse = response.body().string();
+                    try {
+                        T parsedResponse = gson.fromJson(jsonResponse, responseClass);
+                        if (parsedResponse != null) {
+                            onSuccess.accept(parsedResponse);
+                        } else {
+                            onError.accept(new Exception("Failed to parse JSON response"));
+                        }
+                    } catch (Exception e) {
+                        onError.accept(new IOException("Failed to parse JSON response", e));
+                    }
+                } catch (IOException e) {
+                    onError.accept(e);
+                } finally {
+                    response.close();
+                }
+            }
+        });
     }
 
     /**
