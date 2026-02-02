@@ -19,7 +19,7 @@ public class AccountResponse extends ApiResponse {
         private PointsBreakdown pointsBreakdown;
         private Integer questPoints;
         private Integer diariesTotalCompleted;
-        private Integer combatAchievementsTotalCompleted;
+        private Integer combatAchievementPoints;
         private Integer collectionLogUniqueObtained;
         private Integer totalKills;
         private List<Milestone> milestones;

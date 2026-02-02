@@ -3,11 +3,13 @@ package com.revalclan.api;
 import com.google.gson.Gson;
 import com.revalclan.api.account.AccountResponse;
 import com.revalclan.api.achievements.AchievementsResponse;
+import com.revalclan.api.leaderboard.LeaderboardResponse;
 import com.revalclan.api.admin.ActualizeRankChangeResponse;
 import com.revalclan.api.admin.AdminAuthResponse;
 import com.revalclan.api.admin.AdminLoginRequest;
 import com.revalclan.api.admin.PendingRankChangesResponse;
 import com.revalclan.api.challenges.ChallengesResponse;
+import com.revalclan.api.competitions.*;
 import com.revalclan.api.common.ApiEndpoints;
 import com.revalclan.api.common.ApiResponse;
 import com.revalclan.api.diaries.DiariesResponse;
@@ -15,7 +17,6 @@ import com.revalclan.api.events.EventsResponse;
 import com.revalclan.api.events.RegistrationResponse;
 import com.revalclan.api.events.RegistrationStatusResponse;
 import com.revalclan.api.points.PointsResponse;
-import lombok.extern.slf4j.Slf4j;
 import okhttp3.*;
 
 import javax.inject.Inject;
@@ -28,7 +29,6 @@ import java.util.function.Consumer;
  * Service for fetching data from the Reval Plugin API.
  * All plugin endpoints require the RuneLite-RevalClan-Plugin User-Agent header.
  */
-@Slf4j
 @Singleton
 public class RevalApiService {
     private static final String USER_AGENT = "RuneLite-RevalClan-Plugin";
@@ -90,10 +90,7 @@ public class RevalApiService {
                     onError.accept(new Exception(response != null ? response.getMessage() : "Unknown error"));
                 }
             },
-            error -> {
-                log.error("Failed to fetch points", error);
-                onError.accept(error);
-            }
+            error -> onError.accept(error)
         );
     }
 
@@ -124,10 +121,7 @@ public class RevalApiService {
                     handleError(response, "Account not found", onError);
                 }
             },
-            error -> {
-                log.error("Failed to fetch account", error);
-                onError.accept(error);
-            }
+            error -> onError.accept(error)
         );
     }
 
@@ -137,6 +131,44 @@ public class RevalApiService {
     public void refreshAccount(long accountHash, Consumer<AccountResponse> onSuccess, Consumer<Exception> onError) {
         clearAccountCache();
         fetchAccount(accountHash, onSuccess, onError);
+    }
+
+    /**
+     * Fetches account data by OSRS account ID.
+     * GET /plugin/account/:osrsAccountId
+     * Used for viewing other players' profiles from the leaderboard.
+     */
+    public void fetchAccountById(int osrsAccountId, Consumer<AccountResponse> onSuccess, Consumer<Exception> onError) {
+        String endpoint = ApiEndpoints.accountById(osrsAccountId);
+        requestAsync(endpoint, "GET", null, null, AccountResponse.class,
+            response -> {
+                if (response != null && response.isSuccess()) {
+                    onSuccess.accept(response);
+                } else {
+                    handleError(response, "Account not found", onError);
+                }
+            },
+            error -> onError.accept(error)
+        );
+    }
+
+    // ==================== LEADERBOARD API ====================
+
+    /**
+     * Fetches the complete leaderboard.
+     * GET /plugin/leaderboard
+     */
+    public void fetchLeaderboard(Consumer<LeaderboardResponse> onSuccess, Consumer<Exception> onError) {
+        requestAsync(ApiEndpoints.LEADERBOARD, "GET", null, null, LeaderboardResponse.class,
+            response -> {
+                if (response != null && response.isSuccess()) {
+                    onSuccess.accept(response);
+                } else {
+                    onError.accept(new Exception(response != null ? response.getMessage() : "Unknown error"));
+                }
+            },
+            error -> onError.accept(error)
+        );
     }
 
     // ==================== EVENTS API ====================
@@ -161,10 +193,7 @@ public class RevalApiService {
                     handleError(response, "Failed to fetch events", onError);
                 }
             },
-            error -> {
-                log.error("Failed to fetch events", error);
-                onError.accept(error);
-            }
+            error -> onError.accept(error)
         );
     }
 
@@ -195,10 +224,7 @@ public class RevalApiService {
                     handleError(response, "Registration failed", onError, "Failed to register for event " + eventId);
                 }
             },
-            error -> {
-                log.error("Failed to register for event: {}", eventId, error);
-                onError.accept(error);
-            }
+            error -> onError.accept(error)
         );
     }
 
@@ -220,10 +246,7 @@ public class RevalApiService {
                     handleError(response, "Cancellation failed", onError, "Failed to cancel registration for event " + eventId);
                 }
             },
-            error -> {
-                log.error("Failed to cancel registration for event: {}", eventId, error);
-                onError.accept(error);
-            }
+            error -> onError.accept(error)
         );
     }
 
@@ -243,10 +266,7 @@ public class RevalApiService {
                     handleError(response, "Status check failed", onError, "Failed to check registration status for event " + eventId);
                 }
             },
-            error -> {
-                log.error("Failed to check registration status for event: {}", eventId, error);
-                onError.accept(error);
-            }
+            error -> onError.accept(error)
         );
     }
 
@@ -265,10 +285,7 @@ public class RevalApiService {
                     onResult.accept(false);
                 }
             },
-            error -> {
-                log.warn("Could not check for active events: {}", error.getMessage());
-                onResult.accept(false);
-            }
+            error -> onResult.accept(false)
         );
     }
 
@@ -299,10 +316,7 @@ public class RevalApiService {
                     handleError(response, "Failed to fetch achievement definitions", onError);
                 }
             },
-            error -> {
-                log.error("Failed to fetch achievement definitions", error);
-                onError.accept(error);
-            }
+            error -> onError.accept(error)
         );
     }
 
@@ -346,10 +360,7 @@ public class RevalApiService {
                     handleError(response, "Failed to fetch diaries", onError);
                 }
             },
-            error -> {
-                log.error("Failed to fetch diaries", error);
-                onError.accept(error);
-            }
+            error -> onError.accept(error)
         );
     }
 
@@ -392,10 +403,7 @@ public class RevalApiService {
                     handleError(response, "Failed to fetch challenges", onError);
                 }
             },
-            error -> {
-                log.error("Failed to fetch challenges", error);
-                onError.accept(error);
-            }
+            error -> onError.accept(error)
         );
     }
     
@@ -404,6 +412,255 @@ public class RevalApiService {
      */
     public void fetchChallenges(Consumer<ChallengesResponse> onSuccess, Consumer<Exception> onError) {
         fetchChallenges(null, onSuccess, onError);
+    }
+
+    // ==================== COMPETITIONS API ====================
+
+    /**
+     * Fetches all competitions with optional status filter.
+     * GET /plugin/competitions?status={status}
+     */
+    public void fetchCompetitions(String status, Consumer<CompetitionsResponse> onSuccess, Consumer<Exception> onError) {
+        String endpoint = status != null 
+            ? ApiEndpoints.COMPETITIONS + "?status=" + status
+            : ApiEndpoints.COMPETITIONS;
+        
+        requestAsync(endpoint, "GET", null, null, CompetitionsResponse.class,
+            response -> {
+                if (response != null && response.isSuccess()) {
+                    onSuccess.accept(response);
+                } else {
+                    handleError(response, "Failed to fetch competitions", onError);
+                }
+            },
+            error -> onError.accept(error)
+        );
+    }
+
+    /**
+     * Fetches all competitions without filter.
+     */
+    public void fetchCompetitions(Consumer<CompetitionsResponse> onSuccess, Consumer<Exception> onError) {
+        fetchCompetitions(null, onSuccess, onError);
+    }
+
+    /**
+     * Fetches scheduled (upcoming) competitions.
+     * GET /plugin/competitions/scheduled
+     */
+    public void fetchScheduledCompetitions(Consumer<CompetitionsResponse> onSuccess, Consumer<Exception> onError) {
+        requestAsync(ApiEndpoints.COMPETITIONS_SCHEDULED, "GET", null, null, CompetitionsResponse.class,
+            response -> {
+                if (response != null && response.isSuccess()) {
+                    onSuccess.accept(response);
+                } else {
+                    handleError(response, "Failed to fetch scheduled competitions", onError);
+                }
+            },
+            error -> onError.accept(error)
+        );
+    }
+
+    /**
+     * Fetches active competitions with leaderboards.
+     * GET /plugin/competitions/active
+     */
+    public void fetchActiveCompetitions(Consumer<CompetitionsResponse> onSuccess, Consumer<Exception> onError) {
+        requestAsync(ApiEndpoints.COMPETITIONS_ACTIVE, "GET", null, null, CompetitionsResponse.class,
+            response -> {
+                if (response != null && response.isSuccess()) {
+                    onSuccess.accept(response);
+                } else {
+                    handleError(response, "Failed to fetch active competitions", onError);
+                }
+            },
+            error -> onError.accept(error)
+        );
+    }
+
+    /**
+     * Fetches completed competitions with final results.
+     * GET /plugin/competitions/completed
+     */
+    public void fetchCompletedCompetitions(Consumer<CompetitionsResponse> onSuccess, Consumer<Exception> onError) {
+        requestAsync(ApiEndpoints.COMPETITIONS_COMPLETED, "GET", null, null, CompetitionsResponse.class,
+            response -> {
+                if (response != null && response.isSuccess()) {
+                    onSuccess.accept(response);
+                } else {
+                    handleError(response, "Failed to fetch completed competitions", onError);
+                }
+            },
+            error -> onError.accept(error)
+        );
+    }
+
+    /**
+     * Fetches details for a single competition.
+     * GET /plugin/competitions/:id
+     */
+    public void fetchCompetitionDetails(String competitionId, Consumer<CompetitionDetailsResponse> onSuccess, Consumer<Exception> onError) {
+        String endpoint = ApiEndpoints.competitionById(competitionId);
+        requestAsync(endpoint, "GET", null, null, CompetitionDetailsResponse.class,
+            response -> {
+                if (response != null && response.isSuccess()) {
+                    onSuccess.accept(response);
+                } else {
+                    handleError(response, "Failed to fetch competition details", onError);
+                }
+            },
+            error -> onError.accept(error)
+        );
+    }
+
+    /**
+     * Fetches leaderboard for a competition.
+     * GET /plugin/competitions/:id/leaderboard
+     */
+    public void fetchCompetitionLeaderboard(String competitionId, Consumer<CompetitionLeaderboardResponse> onSuccess, Consumer<Exception> onError) {
+        String endpoint = ApiEndpoints.competitionLeaderboard(competitionId);
+        requestAsync(endpoint, "GET", null, null, CompetitionLeaderboardResponse.class,
+            response -> {
+                if (response != null && response.isSuccess()) {
+                    onSuccess.accept(response);
+                } else {
+                    handleError(response, "Failed to fetch competition leaderboard", onError);
+                }
+            },
+            error -> onError.accept(error)
+        );
+    }
+
+    /**
+     * Fetches recent activity for a competition.
+     * GET /plugin/competitions/:id/activity
+     */
+    public void fetchCompetitionActivity(String competitionId, Consumer<CompetitionActivityResponse> onSuccess, Consumer<Exception> onError) {
+        String endpoint = ApiEndpoints.competitionActivity(competitionId);
+        requestAsync(endpoint, "GET", null, null, CompetitionActivityResponse.class,
+            response -> {
+                if (response != null && response.isSuccess()) {
+                    onSuccess.accept(response);
+                } else {
+                    handleError(response, "Failed to fetch competition activity", onError);
+                }
+            },
+            error -> onError.accept(error)
+        );
+    }
+
+    /**
+     * Fetches your progress in a specific competition.
+     * GET /plugin/competitions/:id/my-progress?accountHash={accountHash}
+     */
+    public void fetchMyCompetitionProgress(String competitionId, long accountHash, 
+                                           Consumer<MyProgressResponse> onSuccess, Consumer<Exception> onError) {
+        String endpoint = ApiEndpoints.competitionMyProgress(competitionId) + "?accountHash=" + accountHash;
+        requestAsync(endpoint, "GET", null, null, MyProgressResponse.class,
+            response -> {
+                if (response != null && response.isSuccess()) {
+                    onSuccess.accept(response);
+                } else {
+                    handleError(response, "Failed to fetch competition progress", onError);
+                }
+            },
+            error -> onError.accept(error)
+        );
+    }
+
+    /**
+     * Fetches your progress across all active competitions.
+     * GET /plugin/competitions/my-progress/all?accountHash={accountHash}
+     */
+    public void fetchMyAllCompetitionsProgress(long accountHash, 
+                                               Consumer<MyProgressAllResponse> onSuccess, Consumer<Exception> onError) {
+        String endpoint = ApiEndpoints.COMPETITIONS_MY_PROGRESS_ALL + "?accountHash=" + accountHash;
+        requestAsync(endpoint, "GET", null, null, MyProgressAllResponse.class,
+            response -> {
+                if (response != null && response.isSuccess()) {
+                    onSuccess.accept(response);
+                } else {
+                    handleError(response, "Failed to fetch all competition progress", onError);
+                }
+            },
+            error -> onError.accept(error)
+        );
+    }
+
+    // ==================== COMPETITION VOTES API ====================
+
+    /**
+     * Fetches all active votes.
+     * GET /plugin/competitions/votes
+     */
+    public void fetchVotes(Consumer<VotesResponse> onSuccess, Consumer<Exception> onError) {
+        requestAsync(ApiEndpoints.COMPETITION_VOTES, "GET", null, null, VotesResponse.class,
+            response -> {
+                if (response != null && response.isSuccess()) {
+                    onSuccess.accept(response);
+                } else {
+                    handleError(response, "Failed to fetch votes", onError);
+                }
+            },
+            error -> onError.accept(error)
+        );
+    }
+
+    /**
+     * Fetches details for a single vote.
+     * GET /plugin/competitions/votes/:id
+     */
+    public void fetchVoteDetails(String voteId, Consumer<VoteDetailsResponse> onSuccess, Consumer<Exception> onError) {
+        String endpoint = ApiEndpoints.voteById(voteId);
+        requestAsync(endpoint, "GET", null, null, VoteDetailsResponse.class,
+            response -> {
+                if (response != null && response.isSuccess()) {
+                    onSuccess.accept(response);
+                } else {
+                    handleError(response, "Failed to fetch vote details", onError);
+                }
+            },
+            error -> onError.accept(error)
+        );
+    }
+
+    /**
+     * Cast a vote.
+     * POST /plugin/competitions/votes/:id/cast?accountHash={accountHash}
+     */
+    public void castVote(String voteId, String optionId, long accountHash,
+                         Consumer<CastVoteResponse> onSuccess, Consumer<Exception> onError) {
+        String endpoint = ApiEndpoints.voteCast(voteId) + "?accountHash=" + accountHash;
+        String body = "{\"optionId\":\"" + optionId + "\"}";
+        requestAsync(endpoint, "POST", body, null, CastVoteResponse.class,
+            response -> {
+                if (response != null && response.isSuccess()) {
+                    onSuccess.accept(response);
+                } else {
+                    handleError(response, "Failed to cast vote", onError);
+                }
+            },
+            error -> onError.accept(error)
+        );
+    }
+
+    /**
+     * Get your current vote in a poll.
+     * GET /plugin/competitions/votes/:id/my-vote?accountHash={accountHash}
+     */
+    public void fetchMyVote(String voteId, long accountHash,
+                            Consumer<MyVoteResponse> onSuccess, Consumer<Exception> onError) {
+        String endpoint = ApiEndpoints.voteMyVote(voteId) + "?accountHash=" + accountHash;
+        requestAsync(endpoint, "GET", null, null, MyVoteResponse.class,
+            response -> {
+                if (response != null && response.isSuccess()) {
+                    onSuccess.accept(response);
+                } else {
+                    handleError(response, "Failed to fetch your vote", onError);
+                }
+            },
+            error -> onError.accept(error)
+        );
     }
 
     // ==================== ADMIN API ====================
@@ -433,10 +690,7 @@ public class RevalApiService {
                     handleError(response, "Admin login failed", onError);
                 }
             },
-            error -> {
-                log.error("Failed to perform admin login", error);
-                onError.accept(error);
-            }
+            error -> onError.accept(error)
         );
     }
 
@@ -459,10 +713,7 @@ public class RevalApiService {
                     handleError(response, "Failed to fetch pending rank changes", onError);
                 }
             },
-            error -> {
-                log.error("Failed to fetch pending rank changes", error);
-                onError.accept(error);
-            }
+            error -> onError.accept(error)
         );
     }
 
@@ -494,10 +745,7 @@ public class RevalApiService {
                     handleError(response, "Failed to actualize rank change", onError, "Failed to actualize rank change " + rankChangeId);
                 }
             },
-            error -> {
-                log.error("Failed to actualize rank change: {}", rankChangeId, error);
-                onError.accept(error);
-            }
+            error -> onError.accept(error)
         );
     }
 
@@ -642,9 +890,6 @@ public class RevalApiService {
      */
     private <T extends ApiResponse> void handleError(T response, String defaultMessage, Consumer<Exception> onError, String warningMessage) {
         String errorMsg = response != null ? response.getMessage() : defaultMessage;
-        if (warningMessage != null) {
-            log.warn("{}: {}", warningMessage, errorMsg);
-        }
         onError.accept(new Exception(errorMsg));
     }
 }

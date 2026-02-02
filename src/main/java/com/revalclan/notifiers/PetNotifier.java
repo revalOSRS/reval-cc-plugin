@@ -46,9 +46,10 @@ public class PetNotifier extends BaseNotifier {
 	 * - "Username has a funny feeling like she would have been followed: Pet name at 114 completions."
 	 * - "Username has a funny feeling like she's being followed: Pet name at 50 kills."
 	 * - "Username feels something weird sneaking into her backpack: Pet name at 100 kills."
+	 * Note: Handles icons/special characters before username (e.g., Ironman helmet icons)
 	 */
 	private static final Pattern CLAN_REGEX = Pattern.compile(
-		"(?<user>.+?) (?:has a funny feeling like .+? (?:would have been followed|being followed)|feels something weird sneaking into .+? backpack|feels like .+? acquired something special): (?<pet>.+?)(?: at (?<milestone>.+))?\\.$",
+		"(?:[^\\w\\s]*)?(?<user>[\\w\\s]+?) (?:has a funny feeling like .+? (?:would have been followed|being followed)|feels something weird sneaking into .+? backpack|feels like .+? acquired something special): (?<pet>.+?)(?: at (?<milestone>.+))?\\.$",
 		Pattern.CASE_INSENSITIVE
 	);
 
@@ -142,7 +143,7 @@ public class PetNotifier extends BaseNotifier {
 
 		Matcher clanMatcher = CLAN_REGEX.matcher(message);
 		if (clanMatcher.find()) {
-			String user = clanMatcher.group("user").trim();
+			String user = cleanUsername(clanMatcher.group("user"));
 			String playerName = getPlayerName();
 			
 			if (user.equalsIgnoreCase(playerName)) {
@@ -345,5 +346,27 @@ public class PetNotifier extends BaseNotifier {
 		}
 
 		return false;
+	}
+
+	/**
+	 * Clean username by removing icons, special characters, and extra whitespace
+	 * This handles cases where Ironman icons or other special characters appear before the username
+	 */
+	private String cleanUsername(String username) {
+		if (username == null) return "";
+		
+		// Remove common icon/special characters that might appear before usernames
+		// This includes various Unicode symbols, emojis, and control characters
+		String cleaned = username
+			.replaceAll("^[^\\w\\s]+", "") // Remove leading non-word/non-space characters
+			.replaceAll("[\\u0000-\\u001F\\u007F-\\u009F]", "") // Remove control characters
+			.replaceAll("[\\u2000-\\u206F]", "") // Remove general punctuation
+			.replaceAll("[\\u20A0-\\u20CF]", "") // Remove currency symbols
+			.replaceAll("[\\u2190-\\u21FF]", "") // Remove arrows
+			.replaceAll("[\\u2600-\\u26FF]", "") // Remove miscellaneous symbols (includes some icons)
+			.replaceAll("[\\u2700-\\u27BF]", "") // Remove dingbats
+			.trim();
+		
+		return cleaned;
 	}
 }

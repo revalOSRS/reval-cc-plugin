@@ -9,6 +9,7 @@ import java.util.Map;
 
 /**
  * Response wrapper for GET /plugin/points endpoint
+ * Returns both point sources and ranks information
  */
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -19,6 +20,23 @@ public class PointsResponse extends ApiResponse {
     public static class PointsData {
         private Map<String, List<PointSource>> pointSources;
         private List<Rank> ranks;
+    }
+
+    @Data
+    public static class Rank {
+        private String name;
+        private String displayName;
+        private List<String> ingameRank;
+        private int pointsRequired;
+        private int maintenancePerMonth;
+        private int prestigeRequired;
+        private List<AdditionalRequirement> additionalRequirements;
+
+        @Data
+        public static class AdditionalRequirement {
+            private String description;
+            private List<String> anyOf;
+        }
     }
 
     @Data
@@ -45,23 +63,6 @@ public class PointsResponse extends ApiResponse {
         public static class PointSourceMetadata {
             private String category;
             private String source;
-        }
-    }
-
-    @Data
-    public static class Rank {
-        private String name;
-        private String displayName;
-        private List<String> ingameRank;
-        private int pointsRequired;
-        private int maintenancePerMonth;
-        private int prestigeRequired;
-        private List<AdditionalRequirement> additionalRequirements;
-
-        @Data
-        public static class AdditionalRequirement {
-            private String description;
-            private List<String> anyOf;
         }
     }
 

@@ -1,8 +1,19 @@
 # Reval Clan Plugin
 
-A comprehensive RuneLite plugin for the Reval clan in Old School RuneScape. Tracks player progress, sends real-time event notifications, and provides detailed data collection for Combat Achievements, Collection Log, Achievement Diaries, and more.
+A comprehensive RuneLite plugin for the Reval clan in Old School RuneScape. Features a full-featured sidepanel UI for clan members, tracks player progress, sends real-time event notifications, and provides detailed data collection for Combat Achievements, Collection Log, Achievement Diaries, and more.
 
 ## Features
+
+### 🖥️ Sidepanel UI
+A dedicated panel for Reval clan members with:
+- **Profile**: View your clan rank, points progress, milestones, and achievements
+- **Ranks & Points**: Browse all clan ranks, requirements, and point sources
+- **Competitions**: Track active and upcoming clan competitions with leaderboards
+- **Events**: View and register for clan events
+- **Clan Tasks**: Weekly and monthly task challenges
+- **Clan Diaries**: Custom achievement diaries with tiered rewards
+- **Achievements**: Combat achievements and collection log progress
+- **Leaderboard**: Clan-wide rankings and statistics
 
 ### 📊 Player Data Sync
 - **Combat Achievements**: Full tracking of all 625 tasks with completion status, points, and tier progress
@@ -90,7 +101,7 @@ Created by **Lightroom** for the Reval clan community.
 
 ## Version
 
-Current Version: 1.0.0
+Current Version: 2.0.0
 
 ## Acknowledgments
 
@@ -98,6 +109,4 @@ Portions of this plugin were inspired by or derived from:
 - [Dink](https://github.com/pajlads/DinkPlugin) - Licensed under BSD 2-Clause License
 - [TempleOSRS](https://github.com/SMaloney2017/Temple-OSRS-Plugin) - Licensed under BSD 2-Clause License
 
-## License
-
-This project uses code from third-party projects. See the LICENSES directory for details.
+See the LICENSES directory for third-party license details.
