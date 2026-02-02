@@ -1,17 +1,10 @@
 package com.revalclan;
 
-import com.revalclan.api.RevalApiService;
 import com.revalclan.collectionlog.CollectionLogManager;
 import com.revalclan.collectionlog.CollectionLogSyncButton;
 import com.revalclan.notifiers.*;
-import com.revalclan.ui.RevalIcons;
-import com.revalclan.ui.RevalPanel;
 import com.revalclan.util.EventFilterManager;
-import com.revalclan.util.UIAssetLoader;
-import com.revalclan.util.WikiIconLoader;
 import com.google.inject.Provides;
-
-import java.awt.image.BufferedImage;
 
 import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
@@ -29,17 +22,13 @@ import net.runelite.api.events.StatChanged;
 import net.runelite.api.events.VarbitChanged;
 import net.runelite.api.events.WidgetLoaded;
 import net.runelite.api.events.ScriptPreFired;
-import net.runelite.api.events.ClanChannelChanged;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.game.ItemManager;
-import net.runelite.client.game.SkillIconManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
-import net.runelite.client.ui.ClientToolbar;
-import net.runelite.client.ui.NavigationButton;
 
 @Slf4j
 @PluginDescriptor(
@@ -92,19 +81,6 @@ public class RevalClanPlugin extends Plugin {
 
 	@Inject	private EventFilterManager eventFilterManager;
 
-	@Inject	private ClientToolbar clientToolbar;
-
-	@Inject	private RevalApiService revalApiService;
-
-	@Inject	private SkillIconManager skillIconManager;
-
-	@Inject	private WikiIconLoader wikiIconLoader;
-
-	@Inject	private UIAssetLoader uiAssetLoader;
-
-	private RevalPanel revalPanel;
-	private NavigationButton navButton;
-
 	private boolean wasLoggedIn = false;
 
 	@Override
@@ -124,28 +100,6 @@ public class RevalClanPlugin extends Plugin {
 		syncButton.startUp();
 		
 		eventBus.register(lootNotifier);
-
-		// Initialize and add the side panel
-		try {
-			revalPanel = new RevalPanel();
-			revalPanel.init(revalApiService, itemManager, skillIconManager, client, wikiIconLoader, uiAssetLoader);
-			
-			BufferedImage icon = RevalIcons.createPanelIcon();
-			if (icon == null) {
-				log.error("Failed to create panel icon");
-			}
-			
-			navButton = NavigationButton.builder()
-				.tooltip("Reval Clan")
-				.icon(icon)
-				.priority(1)
-				.panel(revalPanel)
-				.build();
-			
-			clientToolbar.addNavigation(navButton);
-		} catch (Exception e) {
-			log.error("Failed to initialize Reval Clan panel", e);
-		}
 	}
 
 	@Override
@@ -160,11 +114,6 @@ public class RevalClanPlugin extends Plugin {
 		clueNotifier.reset();
 		killCountNotifier.reset();
 		detailedKillNotifier.reset();
-
-		// Remove the side panel
-		if (navButton != null) {
-			clientToolbar.removeNavigation(navButton);
-		}
 	}
 
 	@Subscribe
@@ -178,11 +127,6 @@ public class RevalClanPlugin extends Plugin {
 			
 			// Fetch dynamic event filters from API on login
 			eventFilterManager.fetchFiltersAsync();
-			
-			// Load profile data for the side panel
-			if (revalPanel != null) {
-				revalPanel.onLoggedIn();
-			}
 
 			// Send login notification
 			loginNotifier.onLogin();
@@ -190,11 +134,6 @@ public class RevalClanPlugin extends Plugin {
 			if (wasLoggedIn) {
 				logoutNotifier.onLogout();
 				wasLoggedIn = false;
-				
-				// Show login messages on all panels
-				if (revalPanel != null) {
-					revalPanel.onLoggedOut();
-				}
 			}
 		}
 	}
@@ -299,15 +238,6 @@ public class RevalClanPlugin extends Plugin {
 	@Subscribe
 	public void onVarbitChanged(VarbitChanged event) {
 		diaryNotifier.onVarbitChanged(event);
-	}
-
-	@Subscribe
-	public void onClanChannelChanged(ClanChannelChanged event) {
-		// When clan channel becomes available (after login), retry loading panels
-		// This acts as a fallback if the initial login check failed due to timing
-		if (client.getGameState() == GameState.LOGGED_IN && revalPanel != null) {
-			revalPanel.onClanChannelReady();
-		}
 	}
 
 	@Provides
