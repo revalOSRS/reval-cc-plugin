@@ -2,15 +2,11 @@ package com.revalclan.notifiers;
 
 import com.revalclan.RevalClanConfig;
 import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.Actor;
-import net.runelite.api.NPC;
-import net.runelite.api.events.ActorDeath;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.time.Duration;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -43,22 +39,11 @@ public class KillCountNotifier extends BaseNotifier {
 	@Inject private RevalClanConfig config;
 	
 	private String pendingBoss = null;
-	private Integer pendingNpcId = null;
 	private Integer pendingCount = null;
 	private Duration pendingTime = null;
 	private boolean pendingIsPb = false;
 	private int badTicks = 0;
 	private static final int MAX_BAD_TICKS = 10;
-	
-	// Track recent NPC deaths to correlate with kill count messages
-	// Maps normalized NPC name -> NPC ID (keeps most recent 20 entries)
-	private static final int MAX_RECENT_KILLS = 20;
-	private final Map<String, Integer> recentNpcDeaths = new LinkedHashMap<String, Integer>(MAX_RECENT_KILLS, 0.75f, true) {
-		@Override
-		protected boolean removeEldestEntry(Map.Entry<String, Integer> eldest) {
-			return size() > MAX_RECENT_KILLS;
-		}
-	};
 
 	@Override
 	public boolean isEnabled() {
@@ -68,21 +53,6 @@ public class KillCountNotifier extends BaseNotifier {
 	@Override
 	protected String getEventType() {
 		return "KILL_COUNT";
-	}
-
-	/**
-	 * Track NPC deaths to correlate with kill count messages
-	 */
-	public void onActorDeath(ActorDeath event) {
-		Actor actor = event.getActor();
-		if (!(actor instanceof NPC)) return;
-		
-		NPC npc = (NPC) actor;
-		String npcName = npc.getName();
-		if (npcName != null && !npcName.isEmpty()) {
-			// Store with normalized name for matching
-			recentNpcDeaths.put(npcName.toLowerCase(), npc.getId());
-		}
 	}
 
 	public void onChatMessage(String message) {
@@ -130,7 +100,6 @@ public class KillCountNotifier extends BaseNotifier {
 					int count = Integer.parseInt(countStr);
 					pendingBoss = boss;
 					pendingCount = count;
-					pendingNpcId = lookupNpcId(rawBoss);
 					badTicks = 0; // Reset bad tick counter
 				} catch (NumberFormatException e) {
 					log.debug("Failed to parse kill count: {}", countStr);
@@ -151,36 +120,12 @@ public class KillCountNotifier extends BaseNotifier {
 					int count = Integer.parseInt(countStr);
 					pendingBoss = boss;
 					pendingCount = count;
-					pendingNpcId = lookupNpcId(rawBoss);
 					badTicks = 0;
 				} catch (NumberFormatException e) {
 					log.debug("Failed to parse kill count: {}", countStr);
 				}
 			}
 		}
-	}
-	
-	/**
-	 * Look up the NPC ID from recent deaths based on boss name
-	 */
-	private Integer lookupNpcId(String bossName) {
-		if (bossName == null) return null;
-		
-		String normalizedName = bossName.toLowerCase();
-		
-		// Direct match
-		if (recentNpcDeaths.containsKey(normalizedName)) {
-			return recentNpcDeaths.get(normalizedName);
-		}
-		
-		// Try partial matching for cases where the chat message name differs slightly
-		for (Map.Entry<String, Integer> entry : recentNpcDeaths.entrySet()) {
-			if (entry.getKey().contains(normalizedName) || normalizedName.contains(entry.getKey())) {
-				return entry.getValue();
-			}
-		}
-		
-		return null;
 	}
 	
 	private void parseTime(String message) {
@@ -296,13 +241,7 @@ public class KillCountNotifier extends BaseNotifier {
 	
 	private void sendKillCountNotification() {
 		Map<String, Object> kcData = new HashMap<>();
-		// Keep "boss" for backwards compatibility
 		kcData.put("boss", pendingBoss);
-		// Add new fields
-		kcData.put("npcName", pendingBoss);
-		if (pendingNpcId != null) {
-			kcData.put("npcId", pendingNpcId);
-		}
 		kcData.put("killCount", pendingCount);
 		
 		if (pendingTime != null) {
@@ -336,19 +275,10 @@ public class KillCountNotifier extends BaseNotifier {
 
 	public void reset() {
 		pendingBoss = null;
-		pendingNpcId = null;
 		pendingCount = null;
 		pendingTime = null;
 		pendingIsPb = false;
 		badTicks = 0;
-	}
-	
-	/**
-	 * Full reset including recent NPC deaths cache (called on logout/shutdown)
-	 */
-	public void fullReset() {
-		reset();
-		recentNpcDeaths.clear();
 	}
 }
 
