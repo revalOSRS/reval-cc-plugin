@@ -158,7 +158,7 @@ public class RevalClanPlugin extends Plugin {
 
 		levelNotifier.reset();
 		clueNotifier.reset();
-		killCountNotifier.fullReset();
+		killCountNotifier.reset();
 		detailedKillNotifier.reset();
 
 		// Remove the side panel
@@ -278,7 +278,6 @@ public class RevalClanPlugin extends Plugin {
 	public void onActorDeath(ActorDeath event) {
 		deathNotifier.onActorDeath(event);
 		detailedKillNotifier.onActorDeath(event);
-		killCountNotifier.onActorDeath(event);
 	}
 
 	@Subscribe
@@ -307,7 +306,6 @@ public class RevalClanPlugin extends Plugin {
 		// When clan channel becomes available (after login), retry loading panels
 		// This acts as a fallback if the initial login check failed due to timing
 		if (client.getGameState() == GameState.LOGGED_IN && revalPanel != null) {
-			log.debug("Clan channel changed while logged in, triggering panel refresh fallback");
 			revalPanel.onClanChannelReady();
 		}
 	}
