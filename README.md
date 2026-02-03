@@ -4,7 +4,7 @@ A comprehensive RuneLite plugin for the Reval clan in Old School RuneScape. Feat
 
 ## Features
 
-### 🖥️ Sidepanel UI
+### 🖥️ Sidepanel UI (Planned)
 A dedicated panel for Reval clan members with:
 - **Profile**: View your clan rank, points progress, milestones, and achievements
 - **Ranks & Points**: Browse all clan ranks, requirements, and point sources
@@ -101,7 +101,7 @@ Created by **Lightroom** for the Reval clan community.
 
 ## Version
 
-Current Version: 2.0.0
+Current Version: 1.5.1
 
 ## Acknowledgments
 
