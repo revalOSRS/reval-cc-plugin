@@ -27,7 +27,6 @@ import java.util.function.Consumer;
 
 /**
  * Service for fetching data from the Reval Plugin API.
- * All plugin endpoints require the RuneLite-RevalClan-Plugin User-Agent header.
  */
 @Singleton
 public class RevalApiService {
@@ -38,27 +37,22 @@ public class RevalApiService {
     private final OkHttpClient httpClient;
 
     // Cache durations
-    private static final long CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes
-    private static final long ACCOUNT_CACHE_DURATION_MS = 2 * 60 * 1000; // 2 minutes
-    private static final long EVENTS_CACHE_DURATION_MS = 60 * 1000; // 1 minute
+    private static final long CACHE_DURATION_MS = 5 * 60 * 1000;
+    private static final long ACCOUNT_CACHE_DURATION_MS = 2 * 60 * 1000;
+    private static final long EVENTS_CACHE_DURATION_MS = 60 * 1000;
 
     // Cached responses
     private PointsResponse cachedPoints;
     private long lastPointsFetch = 0;
-
     private AccountResponse cachedAccount;
     private String cachedAccountIdentifier;
     private long lastAccountFetch = 0;
-
     private EventsResponse cachedEvents;
     private long lastEventsFetch = 0;
-
     private AchievementsResponse cachedAchievements;
     private long lastAchievementsFetch = 0;
-
     private DiariesResponse cachedDiaries;
     private long lastDiariesFetch = 0;
-
     private ChallengesResponse cachedChallenges;
     private long lastChallengesFetch = 0;
 
@@ -70,215 +64,99 @@ public class RevalApiService {
 
     // ==================== POINTS API ====================
 
-    /**
-     * Fetches points configuration from the API.
-     * GET /plugin/points
-     */
     public void fetchPoints(Consumer<PointsResponse> onSuccess, Consumer<Exception> onError) {
         if (cachedPoints != null && System.currentTimeMillis() - lastPointsFetch < CACHE_DURATION_MS) {
             onSuccess.accept(cachedPoints);
             return;
         }
-
-        requestAsync(ApiEndpoints.POINTS, "GET", null, null, PointsResponse.class,
-            response -> {
-                if (response != null && response.isSuccess()) {
-                    cachedPoints = response;
-                    lastPointsFetch = System.currentTimeMillis();
-                    onSuccess.accept(response);
-                } else {
-                    onError.accept(new Exception(response != null ? response.getMessage() : "Unknown error"));
-                }
-            },
-            error -> onError.accept(error)
-        );
+        get(ApiEndpoints.POINTS, PointsResponse.class, response -> {
+            cachedPoints = response;
+            lastPointsFetch = System.currentTimeMillis();
+            onSuccess.accept(response);
+        }, onError);
     }
 
     // ==================== ACCOUNT API ====================
 
-    /**
-     * Fetches account data by account hash.
-     * GET /plugin/account?accountHash={accountHash}
-     */
     public void fetchAccount(long accountHash, Consumer<AccountResponse> onSuccess, Consumer<Exception> onError) {
         String identifier = String.valueOf(accountHash);
-
         if (cachedAccount != null && identifier.equals(cachedAccountIdentifier)
             && System.currentTimeMillis() - lastAccountFetch < ACCOUNT_CACHE_DURATION_MS) {
             onSuccess.accept(cachedAccount);
             return;
         }
-
-        String endpoint = ApiEndpoints.ACCOUNT + "?accountHash=" + accountHash;
-        requestAsync(endpoint, "GET", null, null, AccountResponse.class,
-            response -> {
-                if (response != null && response.isSuccess()) {
-                    cachedAccount = response;
-                    cachedAccountIdentifier = identifier;
-                    lastAccountFetch = System.currentTimeMillis();
-                    onSuccess.accept(response);
-                } else {
-                    handleError(response, "Account not found", onError);
-                }
-            },
-            error -> onError.accept(error)
-        );
+        get(ApiEndpoints.ACCOUNT + "?accountHash=" + accountHash, AccountResponse.class, response -> {
+            cachedAccount = response;
+            cachedAccountIdentifier = identifier;
+            lastAccountFetch = System.currentTimeMillis();
+            onSuccess.accept(response);
+        }, onError);
     }
 
-    /**
-     * Force refresh account data (bypasses cache).
-     */
     public void refreshAccount(long accountHash, Consumer<AccountResponse> onSuccess, Consumer<Exception> onError) {
         clearAccountCache();
         fetchAccount(accountHash, onSuccess, onError);
     }
 
-    /**
-     * Fetches account data by OSRS account ID.
-     * GET /plugin/account/:osrsAccountId
-     * Used for viewing other players' profiles from the leaderboard.
-     */
     public void fetchAccountById(int osrsAccountId, Consumer<AccountResponse> onSuccess, Consumer<Exception> onError) {
-        String endpoint = ApiEndpoints.accountById(osrsAccountId);
-        requestAsync(endpoint, "GET", null, null, AccountResponse.class,
-            response -> {
-                if (response != null && response.isSuccess()) {
-                    onSuccess.accept(response);
-                } else {
-                    handleError(response, "Account not found", onError);
-                }
-            },
-            error -> onError.accept(error)
-        );
+        get(ApiEndpoints.accountById(osrsAccountId), AccountResponse.class, onSuccess, onError);
     }
 
     // ==================== LEADERBOARD API ====================
 
-    /**
-     * Fetches the complete leaderboard.
-     * GET /plugin/leaderboard
-     */
     public void fetchLeaderboard(Consumer<LeaderboardResponse> onSuccess, Consumer<Exception> onError) {
-        requestAsync(ApiEndpoints.LEADERBOARD, "GET", null, null, LeaderboardResponse.class,
-            response -> {
-                if (response != null && response.isSuccess()) {
-                    onSuccess.accept(response);
-                } else {
-                    onError.accept(new Exception(response != null ? response.getMessage() : "Unknown error"));
-                }
-            },
-            error -> onError.accept(error)
-        );
+        get(ApiEndpoints.LEADERBOARD, LeaderboardResponse.class, onSuccess, onError);
     }
 
     // ==================== EVENTS API ====================
 
-    /**
-     * Fetches all events.
-     * GET /plugin/events
-     */
     public void fetchEvents(Consumer<EventsResponse> onSuccess, Consumer<Exception> onError) {
         if (cachedEvents != null && System.currentTimeMillis() - lastEventsFetch < EVENTS_CACHE_DURATION_MS) {
             onSuccess.accept(cachedEvents);
             return;
         }
-
-        requestAsync(ApiEndpoints.EVENTS, "GET", null, null, EventsResponse.class,
-            response -> {
-                if (response != null && response.isSuccess()) {
-                    cachedEvents = response;
-                    lastEventsFetch = System.currentTimeMillis();
-                    onSuccess.accept(response);
-                } else {
-                    handleError(response, "Failed to fetch events", onError);
-                }
-            },
-            error -> onError.accept(error)
-        );
+        get(ApiEndpoints.EVENTS, EventsResponse.class, response -> {
+            cachedEvents = response;
+            lastEventsFetch = System.currentTimeMillis();
+            onSuccess.accept(response);
+        }, onError);
     }
 
-    /**
-     * Force refresh events (bypasses cache).
-     */
     public void refreshEvents(Consumer<EventsResponse> onSuccess, Consumer<Exception> onError) {
         cachedEvents = null;
         lastEventsFetch = 0;
         fetchEvents(onSuccess, onError);
     }
 
-    /**
-     * Register for an event.
-     * POST /plugin/events/:eventId/register
-     */
     public void registerForEvent(String eventId, long accountHash,
-                                 Consumer<RegistrationResponse> onSuccess,
-                                 Consumer<Exception> onError) {
-        String endpoint = ApiEndpoints.eventRegister(eventId);
-        String body = "{\"accountHash\":\"" + accountHash + "\"}";
-        requestAsync(endpoint, "POST", body, null, RegistrationResponse.class,
-            response -> {
-                if (response != null && response.isSuccess()) {
-                    cachedEvents = null; // Invalidate cache
-                    onSuccess.accept(response);
-                } else {
-                    handleError(response, "Registration failed", onError, "Failed to register for event " + eventId);
-                }
-            },
-            error -> onError.accept(error)
-        );
+                                 Consumer<RegistrationResponse> onSuccess, Consumer<Exception> onError) {
+        post(ApiEndpoints.eventRegister(eventId), "{\"accountHash\":\"" + accountHash + "\"}", 
+            RegistrationResponse.class, response -> {
+                cachedEvents = null;
+                onSuccess.accept(response);
+            }, onError);
     }
 
-    /**
-     * Cancel/withdraw event registration.
-     * DELETE /plugin/events/:eventId/register
-     */
     public void cancelEventRegistration(String eventId, long accountHash,
-                                        Consumer<RegistrationResponse> onSuccess,
-                                        Consumer<Exception> onError) {
-        String endpoint = ApiEndpoints.eventRegister(eventId);
-        String body = "{\"accountHash\":\"" + accountHash + "\"}";
-        requestAsync(endpoint, "DELETE", body, null, RegistrationResponse.class,
-            response -> {
-                if (response != null && response.isSuccess()) {
-                    cachedEvents = null; // Invalidate cache
-                    onSuccess.accept(response);
-                } else {
-                    handleError(response, "Cancellation failed", onError, "Failed to cancel registration for event " + eventId);
-                }
-            },
-            error -> onError.accept(error)
-        );
+                                        Consumer<RegistrationResponse> onSuccess, Consumer<Exception> onError) {
+        delete(ApiEndpoints.eventRegister(eventId), "{\"accountHash\":\"" + accountHash + "\"}",
+            RegistrationResponse.class, response -> {
+                cachedEvents = null;
+                onSuccess.accept(response);
+            }, onError);
     }
 
-    /**
-     * Check registration status for an event.
-     * GET /plugin/events/:eventId/registration-status?accountHash={accountHash}
-     */
     public void checkRegistrationStatus(String eventId, long accountHash,
-                                        Consumer<RegistrationStatusResponse> onSuccess,
-                                        Consumer<Exception> onError) {
-        String endpoint = ApiEndpoints.eventRegistrationStatus(eventId) + "?accountHash=" + accountHash;
-        requestAsync(endpoint, "GET", null, null, RegistrationStatusResponse.class,
-            response -> {
-                if (response != null && response.isSuccess()) {
-                    onSuccess.accept(response);
-                } else {
-                    handleError(response, "Status check failed", onError, "Failed to check registration status for event " + eventId);
-                }
-            },
-            error -> onError.accept(error)
-        );
+                                        Consumer<RegistrationStatusResponse> onSuccess, Consumer<Exception> onError) {
+        get(ApiEndpoints.eventRegistrationStatus(eventId) + "?accountHash=" + accountHash,
+            RegistrationStatusResponse.class, onSuccess, onError);
     }
 
-    /**
-     * Check if there are active events.
-     */
     public void checkActiveEvents(Consumer<Boolean> onResult) {
         fetchEvents(
             response -> {
                 if (response.getData() != null && response.getData().getEvents() != null) {
-                    var events = response.getData().getEvents();
-                    boolean hasActive = events.stream()
+                    boolean hasActive = response.getData().getEvents().stream()
                         .anyMatch(e -> e.isCurrentlyActive() || e.isUpcoming());
                     onResult.accept(hasActive);
                 } else {
@@ -291,469 +169,179 @@ public class RevalApiService {
 
     // ==================== ACHIEVEMENTS API ====================
 
-    /**
-     * Fetches achievement definitions (templates) with optional progress.
-     * GET /plugin/achievements?accountHash={accountHash}
-     * 
-     * @param accountHash Optional account hash to include progress data. If null, returns definitions only.
-     */
     public void fetchAchievementDefinitions(Long accountHash,
-                                           Consumer<AchievementsResponse> onSuccess,
-                                           Consumer<Exception> onError) {
+                                           Consumer<AchievementsResponse> onSuccess, Consumer<Exception> onError) {
+        if (accountHash == null && cachedAchievements != null 
+            && System.currentTimeMillis() - lastAchievementsFetch < CACHE_DURATION_MS) {
+            onSuccess.accept(cachedAchievements);
+            return;
+        }
         String endpoint = accountHash != null 
             ? ApiEndpoints.ACHIEVEMENTS + "?accountHash=" + accountHash
             : ApiEndpoints.ACHIEVEMENTS;
-        
-        requestAsync(endpoint, "GET", null, null, AchievementsResponse.class,
-            response -> {
-                if (response != null && response.isSuccess()) {
-                    if (accountHash == null) {
-                        cachedAchievements = response;
-                        lastAchievementsFetch = System.currentTimeMillis();
-                    }
-                    onSuccess.accept(response);
-                } else {
-                    handleError(response, "Failed to fetch achievement definitions", onError);
-                }
-            },
-            error -> onError.accept(error)
-        );
+        get(endpoint, AchievementsResponse.class, response -> {
+            if (accountHash == null) {
+                cachedAchievements = response;
+                lastAchievementsFetch = System.currentTimeMillis();
+            }
+            onSuccess.accept(response);
+        }, onError);
     }
 
-    /**
-     * Fetches achievement definitions without progress.
-     */
-    public void fetchAchievementDefinitions(Consumer<AchievementsResponse> onSuccess,
-                                            Consumer<Exception> onError) {
+    public void fetchAchievementDefinitions(Consumer<AchievementsResponse> onSuccess, Consumer<Exception> onError) {
         fetchAchievementDefinitions(null, onSuccess, onError);
     }
 
     // ==================== DIARIES API ====================
 
-    /**
-     * Fetches all active diaries with optional account progress.
-     * GET /plugin/diaries?accountHash={accountHash}
-     * 
-     * @param accountHash Optional account hash to include progress
-     */
-    public void fetchDiaries(Long accountHash,
-                            Consumer<DiariesResponse> onSuccess, Consumer<Exception> onError) {
+    public void fetchDiaries(Long accountHash, Consumer<DiariesResponse> onSuccess, Consumer<Exception> onError) {
         if (cachedDiaries != null && accountHash == null 
             && System.currentTimeMillis() - lastDiariesFetch < CACHE_DURATION_MS) {
             onSuccess.accept(cachedDiaries);
             return;
         }
-
         String endpoint = accountHash != null 
             ? ApiEndpoints.DIARIES + "?accountHash=" + accountHash
             : ApiEndpoints.DIARIES;
-        
-        requestAsync(endpoint, "GET", null, null, DiariesResponse.class,
-            response -> {
-                if (response != null && response.isSuccess()) {
-                    if (accountHash == null) {
-                        cachedDiaries = response;
-                        lastDiariesFetch = System.currentTimeMillis();
-                    }
-                    onSuccess.accept(response);
-                } else {
-                    handleError(response, "Failed to fetch diaries", onError);
-                }
-            },
-            error -> onError.accept(error)
-        );
+        get(endpoint, DiariesResponse.class, response -> {
+            if (accountHash == null) {
+                cachedDiaries = response;
+                lastDiariesFetch = System.currentTimeMillis();
+            }
+            onSuccess.accept(response);
+        }, onError);
     }
 
-    /**
-     * Fetches all diaries without progress (definitions only).
-     */
     public void fetchDiaries(Consumer<DiariesResponse> onSuccess, Consumer<Exception> onError) {
         fetchDiaries(null, onSuccess, onError);
     }
 
     // ==================== CHALLENGES API ====================
 
-    /**
-     * Fetches all active weekly and monthly challenges with optional progress tracking.
-     * GET /plugin/challenges?accountHash={accountHash}
-     * 
-     * @param accountHash Optional account hash to include progress data. If null, challenges are returned without progress.
-     */
     public void fetchChallenges(Long accountHash, Consumer<ChallengesResponse> onSuccess, Consumer<Exception> onError) {
-        // Don't cache if accountHash is provided (progress is account-specific)
-        if (accountHash == null && cachedChallenges != null && System.currentTimeMillis() - lastChallengesFetch < CACHE_DURATION_MS) {
+        if (accountHash == null && cachedChallenges != null 
+            && System.currentTimeMillis() - lastChallengesFetch < CACHE_DURATION_MS) {
             onSuccess.accept(cachedChallenges);
             return;
         }
-
         String endpoint = accountHash != null 
             ? ApiEndpoints.CHALLENGES + "?accountHash=" + accountHash
             : ApiEndpoints.CHALLENGES;
-        
-        requestAsync(endpoint, "GET", null, null, ChallengesResponse.class,
-            response -> {
-                if (response != null && response.isSuccess()) {
-                    // Only cache if no accountHash (general challenge list)
-                    if (accountHash == null) {
-                        cachedChallenges = response;
-                        lastChallengesFetch = System.currentTimeMillis();
-                    }
-                    onSuccess.accept(response);
-                } else {
-                    handleError(response, "Failed to fetch challenges", onError);
-                }
-            },
-            error -> onError.accept(error)
-        );
+        get(endpoint, ChallengesResponse.class, response -> {
+            if (accountHash == null) {
+                cachedChallenges = response;
+                lastChallengesFetch = System.currentTimeMillis();
+            }
+            onSuccess.accept(response);
+        }, onError);
     }
     
-    /**
-     * Fetches all active weekly and monthly challenges without progress data.
-     */
     public void fetchChallenges(Consumer<ChallengesResponse> onSuccess, Consumer<Exception> onError) {
         fetchChallenges(null, onSuccess, onError);
     }
 
     // ==================== COMPETITIONS API ====================
 
-    /**
-     * Fetches all competitions with optional status filter.
-     * GET /plugin/competitions?status={status}
-     */
     public void fetchCompetitions(String status, Consumer<CompetitionsResponse> onSuccess, Consumer<Exception> onError) {
         String endpoint = status != null 
             ? ApiEndpoints.COMPETITIONS + "?status=" + status
             : ApiEndpoints.COMPETITIONS;
-        
-        requestAsync(endpoint, "GET", null, null, CompetitionsResponse.class,
-            response -> {
-                if (response != null && response.isSuccess()) {
-                    onSuccess.accept(response);
-                } else {
-                    handleError(response, "Failed to fetch competitions", onError);
-                }
-            },
-            error -> onError.accept(error)
-        );
+        get(endpoint, CompetitionsResponse.class, onSuccess, onError);
     }
 
-    /**
-     * Fetches all competitions without filter.
-     */
     public void fetchCompetitions(Consumer<CompetitionsResponse> onSuccess, Consumer<Exception> onError) {
         fetchCompetitions(null, onSuccess, onError);
     }
 
-    /**
-     * Fetches scheduled (upcoming) competitions.
-     * GET /plugin/competitions/scheduled
-     */
     public void fetchScheduledCompetitions(Consumer<CompetitionsResponse> onSuccess, Consumer<Exception> onError) {
-        requestAsync(ApiEndpoints.COMPETITIONS_SCHEDULED, "GET", null, null, CompetitionsResponse.class,
-            response -> {
-                if (response != null && response.isSuccess()) {
-                    onSuccess.accept(response);
-                } else {
-                    handleError(response, "Failed to fetch scheduled competitions", onError);
-                }
-            },
-            error -> onError.accept(error)
-        );
+        get(ApiEndpoints.COMPETITIONS_SCHEDULED, CompetitionsResponse.class, onSuccess, onError);
     }
 
-    /**
-     * Fetches active competitions with leaderboards.
-     * GET /plugin/competitions/active
-     */
     public void fetchActiveCompetitions(Consumer<CompetitionsResponse> onSuccess, Consumer<Exception> onError) {
-        requestAsync(ApiEndpoints.COMPETITIONS_ACTIVE, "GET", null, null, CompetitionsResponse.class,
-            response -> {
-                if (response != null && response.isSuccess()) {
-                    onSuccess.accept(response);
-                } else {
-                    handleError(response, "Failed to fetch active competitions", onError);
-                }
-            },
-            error -> onError.accept(error)
-        );
+        get(ApiEndpoints.COMPETITIONS_ACTIVE, CompetitionsResponse.class, onSuccess, onError);
     }
 
-    /**
-     * Fetches completed competitions with final results.
-     * GET /plugin/competitions/completed
-     */
     public void fetchCompletedCompetitions(Consumer<CompetitionsResponse> onSuccess, Consumer<Exception> onError) {
-        requestAsync(ApiEndpoints.COMPETITIONS_COMPLETED, "GET", null, null, CompetitionsResponse.class,
-            response -> {
-                if (response != null && response.isSuccess()) {
-                    onSuccess.accept(response);
-                } else {
-                    handleError(response, "Failed to fetch completed competitions", onError);
-                }
-            },
-            error -> onError.accept(error)
-        );
+        get(ApiEndpoints.COMPETITIONS_COMPLETED, CompetitionsResponse.class, onSuccess, onError);
     }
 
-    /**
-     * Fetches details for a single competition.
-     * GET /plugin/competitions/:id
-     */
     public void fetchCompetitionDetails(String competitionId, Consumer<CompetitionDetailsResponse> onSuccess, Consumer<Exception> onError) {
-        String endpoint = ApiEndpoints.competitionById(competitionId);
-        requestAsync(endpoint, "GET", null, null, CompetitionDetailsResponse.class,
-            response -> {
-                if (response != null && response.isSuccess()) {
-                    onSuccess.accept(response);
-                } else {
-                    handleError(response, "Failed to fetch competition details", onError);
-                }
-            },
-            error -> onError.accept(error)
-        );
+        get(ApiEndpoints.competitionById(competitionId), CompetitionDetailsResponse.class, onSuccess, onError);
     }
 
-    /**
-     * Fetches leaderboard for a competition.
-     * GET /plugin/competitions/:id/leaderboard
-     */
     public void fetchCompetitionLeaderboard(String competitionId, Consumer<CompetitionLeaderboardResponse> onSuccess, Consumer<Exception> onError) {
-        String endpoint = ApiEndpoints.competitionLeaderboard(competitionId);
-        requestAsync(endpoint, "GET", null, null, CompetitionLeaderboardResponse.class,
-            response -> {
-                if (response != null && response.isSuccess()) {
-                    onSuccess.accept(response);
-                } else {
-                    handleError(response, "Failed to fetch competition leaderboard", onError);
-                }
-            },
-            error -> onError.accept(error)
-        );
+        get(ApiEndpoints.competitionLeaderboard(competitionId), CompetitionLeaderboardResponse.class, onSuccess, onError);
     }
 
-    /**
-     * Fetches recent activity for a competition.
-     * GET /plugin/competitions/:id/activity
-     */
     public void fetchCompetitionActivity(String competitionId, Consumer<CompetitionActivityResponse> onSuccess, Consumer<Exception> onError) {
-        String endpoint = ApiEndpoints.competitionActivity(competitionId);
-        requestAsync(endpoint, "GET", null, null, CompetitionActivityResponse.class,
-            response -> {
-                if (response != null && response.isSuccess()) {
-                    onSuccess.accept(response);
-                } else {
-                    handleError(response, "Failed to fetch competition activity", onError);
-                }
-            },
-            error -> onError.accept(error)
-        );
+        get(ApiEndpoints.competitionActivity(competitionId), CompetitionActivityResponse.class, onSuccess, onError);
     }
 
-    /**
-     * Fetches your progress in a specific competition.
-     * GET /plugin/competitions/:id/my-progress?accountHash={accountHash}
-     */
     public void fetchMyCompetitionProgress(String competitionId, long accountHash, 
                                            Consumer<MyProgressResponse> onSuccess, Consumer<Exception> onError) {
-        String endpoint = ApiEndpoints.competitionMyProgress(competitionId) + "?accountHash=" + accountHash;
-        requestAsync(endpoint, "GET", null, null, MyProgressResponse.class,
-            response -> {
-                if (response != null && response.isSuccess()) {
-                    onSuccess.accept(response);
-                } else {
-                    handleError(response, "Failed to fetch competition progress", onError);
-                }
-            },
-            error -> onError.accept(error)
-        );
+        get(ApiEndpoints.competitionMyProgress(competitionId) + "?accountHash=" + accountHash,
+            MyProgressResponse.class, onSuccess, onError);
     }
 
-    /**
-     * Fetches your progress across all active competitions.
-     * GET /plugin/competitions/my-progress/all?accountHash={accountHash}
-     */
     public void fetchMyAllCompetitionsProgress(long accountHash, 
                                                Consumer<MyProgressAllResponse> onSuccess, Consumer<Exception> onError) {
-        String endpoint = ApiEndpoints.COMPETITIONS_MY_PROGRESS_ALL + "?accountHash=" + accountHash;
-        requestAsync(endpoint, "GET", null, null, MyProgressAllResponse.class,
-            response -> {
-                if (response != null && response.isSuccess()) {
-                    onSuccess.accept(response);
-                } else {
-                    handleError(response, "Failed to fetch all competition progress", onError);
-                }
-            },
-            error -> onError.accept(error)
-        );
+        get(ApiEndpoints.COMPETITIONS_MY_PROGRESS_ALL + "?accountHash=" + accountHash,
+            MyProgressAllResponse.class, onSuccess, onError);
     }
 
     // ==================== COMPETITION VOTES API ====================
 
-    /**
-     * Fetches all active votes.
-     * GET /plugin/competitions/votes
-     */
     public void fetchVotes(Consumer<VotesResponse> onSuccess, Consumer<Exception> onError) {
-        requestAsync(ApiEndpoints.COMPETITION_VOTES, "GET", null, null, VotesResponse.class,
-            response -> {
-                if (response != null && response.isSuccess()) {
-                    onSuccess.accept(response);
-                } else {
-                    handleError(response, "Failed to fetch votes", onError);
-                }
-            },
-            error -> onError.accept(error)
-        );
+        get(ApiEndpoints.COMPETITION_VOTES, VotesResponse.class, onSuccess, onError);
     }
 
-    /**
-     * Fetches details for a single vote.
-     * GET /plugin/competitions/votes/:id
-     */
     public void fetchVoteDetails(String voteId, Consumer<VoteDetailsResponse> onSuccess, Consumer<Exception> onError) {
-        String endpoint = ApiEndpoints.voteById(voteId);
-        requestAsync(endpoint, "GET", null, null, VoteDetailsResponse.class,
-            response -> {
-                if (response != null && response.isSuccess()) {
-                    onSuccess.accept(response);
-                } else {
-                    handleError(response, "Failed to fetch vote details", onError);
-                }
-            },
-            error -> onError.accept(error)
-        );
+        get(ApiEndpoints.voteById(voteId), VoteDetailsResponse.class, onSuccess, onError);
     }
 
-    /**
-     * Cast a vote.
-     * POST /plugin/competitions/votes/:id/cast?accountHash={accountHash}
-     */
     public void castVote(String voteId, String optionId, long accountHash,
                          Consumer<CastVoteResponse> onSuccess, Consumer<Exception> onError) {
-        String endpoint = ApiEndpoints.voteCast(voteId) + "?accountHash=" + accountHash;
-        String body = "{\"optionId\":\"" + optionId + "\"}";
-        requestAsync(endpoint, "POST", body, null, CastVoteResponse.class,
-            response -> {
-                if (response != null && response.isSuccess()) {
-                    onSuccess.accept(response);
-                } else {
-                    handleError(response, "Failed to cast vote", onError);
-                }
-            },
-            error -> onError.accept(error)
-        );
+        post(ApiEndpoints.voteCast(voteId) + "?accountHash=" + accountHash,
+            "{\"optionId\":\"" + optionId + "\"}", CastVoteResponse.class, onSuccess, onError);
     }
 
-    /**
-     * Get your current vote in a poll.
-     * GET /plugin/competitions/votes/:id/my-vote?accountHash={accountHash}
-     */
     public void fetchMyVote(String voteId, long accountHash,
                             Consumer<MyVoteResponse> onSuccess, Consumer<Exception> onError) {
-        String endpoint = ApiEndpoints.voteMyVote(voteId) + "?accountHash=" + accountHash;
-        requestAsync(endpoint, "GET", null, null, MyVoteResponse.class,
-            response -> {
-                if (response != null && response.isSuccess()) {
-                    onSuccess.accept(response);
-                } else {
-                    handleError(response, "Failed to fetch your vote", onError);
-                }
-            },
-            error -> onError.accept(error)
-        );
+        get(ApiEndpoints.voteMyVote(voteId) + "?accountHash=" + accountHash,
+            MyVoteResponse.class, onSuccess, onError);
     }
 
     // ==================== ADMIN API ====================
 
-    /**
-     * Authenticate admin and retrieve permissions.
-     * POST /plugin/admin/auth/login
-     *
-     * @param memberCode Admin member code for authentication
-     * @param accountHash OSRS account hash for verification (optional)
-     * @param osrsNickname OSRS nickname for fallback (optional)
-     */
     public void adminLogin(String memberCode, Long accountHash, String osrsNickname,
-                           Consumer<AdminAuthResponse> onSuccess,
-                           Consumer<Exception> onError) {
+                           Consumer<AdminAuthResponse> onSuccess, Consumer<Exception> onError) {
         AdminLoginRequest requestBody = new AdminLoginRequest(
             accountHash != null ? String.valueOf(accountHash) : null,
             osrsNickname
         );
-        String body = gson.toJson(requestBody);
-
-        requestAsync(ApiEndpoints.ADMIN_AUTH_LOGIN, "POST", body, memberCode, AdminAuthResponse.class,
-            response -> {
-                if (response != null && response.isSuccess()) {
-                    onSuccess.accept(response);
-                } else {
-                    handleError(response, "Admin login failed", onError);
-                }
-            },
-            error -> onError.accept(error)
-        );
+        postAdmin(ApiEndpoints.ADMIN_AUTH_LOGIN, gson.toJson(requestBody), memberCode,
+            AdminAuthResponse.class, onSuccess, onError);
     }
 
-    /**
-     * Fetches pending rank changes (admin only).
-     * GET /plugin/admin/rank-changes/pending
-     *
-     * @param memberCode Admin member code for authentication
-     * @param limit Maximum number of pending rank changes to return (default 100)
-     */
     public void fetchPendingRankChanges(String memberCode, int limit,
-                                        Consumer<PendingRankChangesResponse> onSuccess,
-                                        Consumer<Exception> onError) {
-        String endpoint = ApiEndpoints.ADMIN_RANK_CHANGES_PENDING + "?limit=" + limit;
-        requestAsync(endpoint, "GET", null, memberCode, PendingRankChangesResponse.class,
-            response -> {
-                if (response != null && response.isSuccess()) {
-                    onSuccess.accept(response);
-                } else {
-                    handleError(response, "Failed to fetch pending rank changes", onError);
-                }
-            },
-            error -> onError.accept(error)
-        );
+                                        Consumer<PendingRankChangesResponse> onSuccess, Consumer<Exception> onError) {
+        getAdmin(ApiEndpoints.ADMIN_RANK_CHANGES_PENDING + "?limit=" + limit, memberCode,
+            PendingRankChangesResponse.class, onSuccess, onError);
     }
 
-    /**
-     * Fetches pending rank changes with default limit of 100.
-     */
     public void fetchPendingRankChanges(String memberCode,
-                                        Consumer<PendingRankChangesResponse> onSuccess,
-                                        Consumer<Exception> onError) {
+                                        Consumer<PendingRankChangesResponse> onSuccess, Consumer<Exception> onError) {
         fetchPendingRankChanges(memberCode, 100, onSuccess, onError);
     }
 
-    /**
-     * Mark a rank change as actualized (admin only).
-     * POST /plugin/admin/rank-changes/:id/actualize
-     *
-     * @param memberCode Admin member code for authentication
-     * @param rankChangeId The ID of the rank change to actualize
-     */
     public void actualizeRankChange(String memberCode, int rankChangeId,
-                                    Consumer<ActualizeRankChangeResponse> onSuccess,
-                                    Consumer<Exception> onError) {
-        String endpoint = ApiEndpoints.rankChangeActualize(rankChangeId);
-        requestAsync(endpoint, "POST", null, memberCode, ActualizeRankChangeResponse.class,
-            response -> {
-                if (response != null && response.isSuccess()) {
-                    onSuccess.accept(response);
-                } else {
-                    handleError(response, "Failed to actualize rank change", onError, "Failed to actualize rank change " + rankChangeId);
-                }
-            },
-            error -> onError.accept(error)
-        );
+                                    Consumer<ActualizeRankChangeResponse> onSuccess, Consumer<Exception> onError) {
+        postAdmin(ApiEndpoints.rankChangeActualize(rankChangeId), null, memberCode,
+            ActualizeRankChangeResponse.class, onSuccess, onError);
     }
 
     // ==================== CACHE MANAGEMENT ====================
 
-    /**
-     * Clears all caches, forcing fresh fetches on next request.
-     */
     public void clearCache() {
         cachedPoints = null;
         lastPointsFetch = 0;
@@ -770,9 +358,6 @@ public class RevalApiService {
         lastChallengesFetch = 0;
     }
 
-    /**
-     * Clears only the account cache.
-     */
     public void clearAccountCache() {
         cachedAccount = null;
         cachedAccountIdentifier = null;
@@ -781,26 +366,38 @@ public class RevalApiService {
         lastAchievementsFetch = 0;
     }
 
-    // ==================== HTTP REQUEST HELPERS ====================
+    // ==================== HTTP HELPERS ====================
 
-    /**
-     * Makes an HTTP request to the plugin API asynchronously using OkHttp.
-     *
-     * @param endpoint The API endpoint (relative to base URL)
-     * @param method HTTP method (GET, POST, DELETE)
-     * @param body Request body for POST/DELETE requests (can be null)
-     * @param memberCode Admin member code for admin endpoints (can be null)
-     * @param responseClass The class to deserialize the response to
-     * @param onSuccess Success callback
-     * @param onError Error callback
-     */
-    private <T extends ApiResponse> void requestAsync(String endpoint, String method, String body,
-                                                       String memberCode, Class<T> responseClass,
-                                                       Consumer<T> onSuccess, Consumer<Exception> onError) {
-        String fullUrl = ApiEndpoints.BASE_URL + endpoint;
-        
+    private <T extends ApiResponse> void get(String endpoint, Class<T> responseClass,
+                                             Consumer<T> onSuccess, Consumer<Exception> onError) {
+        request(endpoint, "GET", null, null, responseClass, onSuccess, onError);
+    }
+
+    private <T extends ApiResponse> void getAdmin(String endpoint, String memberCode, Class<T> responseClass,
+                                                  Consumer<T> onSuccess, Consumer<Exception> onError) {
+        request(endpoint, "GET", null, memberCode, responseClass, onSuccess, onError);
+    }
+
+    private <T extends ApiResponse> void post(String endpoint, String body, Class<T> responseClass,
+                                              Consumer<T> onSuccess, Consumer<Exception> onError) {
+        request(endpoint, "POST", body, null, responseClass, onSuccess, onError);
+    }
+
+    private <T extends ApiResponse> void postAdmin(String endpoint, String body, String memberCode,
+                                                   Class<T> responseClass, Consumer<T> onSuccess, Consumer<Exception> onError) {
+        request(endpoint, "POST", body, memberCode, responseClass, onSuccess, onError);
+    }
+
+    private <T extends ApiResponse> void delete(String endpoint, String body, Class<T> responseClass,
+                                                Consumer<T> onSuccess, Consumer<Exception> onError) {
+        request(endpoint, "DELETE", body, null, responseClass, onSuccess, onError);
+    }
+
+    private <T extends ApiResponse> void request(String endpoint, String method, String body,
+                                                 String memberCode, Class<T> responseClass,
+                                                 Consumer<T> onSuccess, Consumer<Exception> onError) {
         Request.Builder requestBuilder = new Request.Builder()
-            .url(fullUrl)
+            .url(ApiEndpoints.BASE_URL + endpoint)
             .addHeader("Accept", "application/json")
             .addHeader("User-Agent", USER_AGENT)
             .addHeader("Content-Type", "application/json");
@@ -826,9 +423,7 @@ public class RevalApiService {
             }
         }
 
-        Request request = requestBuilder.build();
-
-        httpClient.newCall(request).enqueue(new Callback() {
+        httpClient.newCall(requestBuilder.build()).enqueue(new Callback() {
             @Override
             public void onFailure(Call call, IOException e) {
                 onError.accept(e);
@@ -843,13 +438,10 @@ public class RevalApiService {
                         if (errorBody != null && !errorBody.isEmpty()) {
                             try {
                                 errorResponse = gson.fromJson(errorBody, responseClass);
-                            } catch (Exception e) {
-                                // Ignore parsing errors for error responses
-                            }
+                            } catch (Exception ignored) {}
                         }
                         onError.accept(new Exception(errorResponse != null && errorResponse.getMessage() != null 
-                            ? errorResponse.getMessage() 
-                            : "HTTP " + response.code()));
+                            ? errorResponse.getMessage() : "HTTP " + response.code()));
                         return;
                     }
 
@@ -859,37 +451,22 @@ public class RevalApiService {
                     }
 
                     String jsonResponse = response.body().string();
-                    try {
-                        T parsedResponse = gson.fromJson(jsonResponse, responseClass);
-                        if (parsedResponse != null) {
-                            onSuccess.accept(parsedResponse);
-                        } else {
-                            onError.accept(new Exception("Failed to parse JSON response"));
-                        }
-                    } catch (Exception e) {
-                        onError.accept(new IOException("Failed to parse JSON response", e));
+                    T parsedResponse = gson.fromJson(jsonResponse, responseClass);
+                    
+                    if (parsedResponse == null) {
+                        onError.accept(new Exception("Failed to parse response"));
+                    } else if (!parsedResponse.isSuccess()) {
+                        onError.accept(new Exception(parsedResponse.getMessage() != null 
+                            ? parsedResponse.getMessage() : "Request failed"));
+                    } else {
+                        onSuccess.accept(parsedResponse);
                     }
-                } catch (IOException e) {
+                } catch (Exception e) {
                     onError.accept(e);
                 } finally {
                     response.close();
                 }
             }
         });
-    }
-
-    /**
-     * Helper method to handle API response errors consistently.
-     */
-    private <T extends ApiResponse> void handleError(T response, String defaultMessage, Consumer<Exception> onError) {
-        handleError(response, defaultMessage, onError, null);
-    }
-
-    /**
-     * Helper method to handle API response errors with optional warning log.
-     */
-    private <T extends ApiResponse> void handleError(T response, String defaultMessage, Consumer<Exception> onError, String warningMessage) {
-        String errorMsg = response != null ? response.getMessage() : defaultMessage;
-        onError.accept(new Exception(errorMsg));
     }
 }
