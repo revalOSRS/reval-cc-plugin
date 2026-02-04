@@ -61,6 +61,7 @@ public class PointsResponse extends ApiResponse {
 
         @Data
         public static class PointSourceMetadata {
+            private Integer itemId;
             private String category;
             private String source;
         }

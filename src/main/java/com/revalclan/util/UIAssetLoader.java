@@ -22,6 +22,43 @@ public class UIAssetLoader {
     public UIAssetLoader() {}
     
     /**
+     * Load a BufferedImage from assets directory.
+     * Results are cached for efficiency.
+     * 
+     * @param filename The filename (e.g., "reval.png")
+     * @return The BufferedImage, or null if not found
+     */
+    public BufferedImage getImage(String filename) {
+      if (filename == null || filename.isEmpty()) {
+        return null;
+      }
+      
+      String normalizedFilename = normalizeFilename(filename);
+      
+      BufferedImage cached = imageCache.get(normalizedFilename);
+      if (cached != null) {
+        return cached;
+      }
+      
+      String resourcePath = ASSETS_BASE_PATH + normalizedFilename;
+      URL imageUrl = getClass().getResource(resourcePath);
+      
+      if (imageUrl == null) {
+        return null;
+      }
+      
+      try {
+        BufferedImage image = ImageIO.read(imageUrl);
+        if (image != null) {
+          imageCache.put(normalizedFilename, image);
+        }
+        return image;
+      } catch (IOException e) {
+        return null;
+      }
+    }
+    
+    /**
      * Load an icon from assets directory and scale it to the specified size.
      * Results are cached for efficiency.
      * 

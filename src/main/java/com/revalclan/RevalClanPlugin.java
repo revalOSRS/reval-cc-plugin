@@ -1,10 +1,15 @@
 package com.revalclan;
 
+import com.revalclan.api.RevalApiService;
 import com.revalclan.collectionlog.CollectionLogManager;
 import com.revalclan.collectionlog.CollectionLogSyncButton;
 import com.revalclan.notifiers.*;
+import com.revalclan.ui.RevalPanel;
 import com.revalclan.util.EventFilterManager;
+import com.revalclan.util.UIAssetLoader;
 import com.google.inject.Provides;
+
+import java.awt.image.BufferedImage;
 
 import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
@@ -27,8 +32,11 @@ import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.game.ItemManager;
+import net.runelite.client.game.SpriteManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
+import net.runelite.client.ui.ClientToolbar;
+import net.runelite.client.ui.NavigationButton;
 
 @Slf4j
 @PluginDescriptor(
@@ -79,7 +87,19 @@ public class RevalClanPlugin extends Plugin {
 
 	@Inject	private ItemManager itemManager;
 
+	@Inject	private SpriteManager spriteManager;
+
 	@Inject	private EventFilterManager eventFilterManager;
+
+	@Inject	private ClientToolbar clientToolbar;
+
+	@Inject	private RevalApiService revalApiService;
+
+
+	@Inject	private UIAssetLoader uiAssetLoader;
+
+	private RevalPanel revalPanel;
+	private NavigationButton navButton;
 
 	private boolean wasLoggedIn = false;
 
@@ -100,6 +120,25 @@ public class RevalClanPlugin extends Plugin {
 		syncButton.startUp();
 		
 		eventBus.register(lootNotifier);
+
+		// Initialize and add the side panel
+		try {
+			revalPanel = new RevalPanel();
+			revalPanel.init(revalApiService, client, uiAssetLoader, itemManager, spriteManager);
+			
+			BufferedImage icon = uiAssetLoader.getImage("reval.png");
+			
+			navButton = NavigationButton.builder()
+				.tooltip("Reval Clan")
+				.icon(icon)
+				.priority(1)
+				.panel(revalPanel)
+				.build();
+			
+			clientToolbar.addNavigation(navButton);
+		} catch (Exception e) {
+			log.error("Failed to initialize Reval Clan panel", e);
+		}
 	}
 
 	@Override
@@ -114,6 +153,11 @@ public class RevalClanPlugin extends Plugin {
 		clueNotifier.reset();
 		killCountNotifier.reset();
 		detailedKillNotifier.reset();
+
+		// Remove the side panel
+		if (navButton != null) {
+			clientToolbar.removeNavigation(navButton);
+		}
 	}
 
 	@Subscribe
@@ -127,6 +171,11 @@ public class RevalClanPlugin extends Plugin {
 			
 			// Fetch dynamic event filters from API on login
 			eventFilterManager.fetchFiltersAsync();
+			
+			// Load profile data for the side panel
+			if (revalPanel != null) {
+				revalPanel.onLoggedIn();
+			}
 
 			// Send login notification
 			loginNotifier.onLogin();
@@ -134,6 +183,11 @@ public class RevalClanPlugin extends Plugin {
 			if (wasLoggedIn) {
 				logoutNotifier.onLogout();
 				wasLoggedIn = false;
+				
+				// Show login messages on all panels
+				if (revalPanel != null) {
+					revalPanel.onLoggedOut();
+				}
 			}
 		}
 	}
