@@ -27,12 +27,14 @@ public class RevalPanel extends PluginPanel {
 
 	@Getter private final ProfilePanel profilePanel;
 	@Getter private final RankingPanel rankingPanel;
+	@Getter private final LeaderboardPanel leaderboardPanel;
 
 	private JLabel infoButton;
 	private JLabel discordIcon;
 	private JLabel websiteIcon;
 
 	private JButton profileTab;
+	private JButton leaderboardTab;
 	private String selectedTab = "PROFILE";
 
 	public RevalPanel() {
@@ -43,6 +45,7 @@ public class RevalPanel extends PluginPanel {
 
 		profilePanel = new ProfilePanel();
 		rankingPanel = new RankingPanel();
+		leaderboardPanel = new LeaderboardPanel();
 
 		cardLayout = new CardLayout();
 		contentPanel = new JPanel(cardLayout);
@@ -50,6 +53,7 @@ public class RevalPanel extends PluginPanel {
 
 		contentPanel.add(profilePanel, "PROFILE");
 		contentPanel.add(rankingPanel, "RANKING");
+		contentPanel.add(leaderboardPanel, "LEADERBOARD");
 
 		JPanel header = createHeader();
 		JPanel navBar = createNavBar();
@@ -66,23 +70,30 @@ public class RevalPanel extends PluginPanel {
 	}
 
 	private JPanel createNavBar() {
-		JPanel navBar = new JPanel(new BorderLayout());
+		JPanel navBar = new JPanel(new GridLayout(1, 2, 4, 0));
 		navBar.setBackground(UIConstants.BACKGROUND);
 		navBar.setBorder(new EmptyBorder(0, 6, 6, 6));
 
-		profileTab = new JButton("Profile");
-		profileTab.setFont(new Font("SansSerif", Font.BOLD, 11));
-		profileTab.setFocusPainted(false);
-		profileTab.setBorderPainted(false);
-		profileTab.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-		profileTab.setPreferredSize(new Dimension(0, 28));
-		profileTab.setBackground(UIConstants.ACCENT_BLUE);
-		profileTab.setForeground(Color.WHITE);
+		profileTab = createTabButton("Profile");
 		profileTab.addActionListener(e -> selectTab("PROFILE"));
 
-		navBar.add(profileTab, BorderLayout.CENTER);
+		leaderboardTab = createTabButton("Leaderboard");
+		leaderboardTab.addActionListener(e -> selectTab("LEADERBOARD"));
+
+		navBar.add(profileTab);
+		navBar.add(leaderboardTab);
 
 		return navBar;
+	}
+
+	private JButton createTabButton(String text) {
+		JButton btn = new JButton(text);
+		btn.setFont(new Font("SansSerif", Font.BOLD, 11));
+		btn.setFocusPainted(false);
+		btn.setBorderPainted(false);
+		btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+		btn.setPreferredSize(new Dimension(0, 28));
+		return btn;
 	}
 
 	private JPanel createHeader() {
@@ -159,10 +170,16 @@ public class RevalPanel extends PluginPanel {
 	}
 
 	private void updateNavStyles() {
+		boolean isProfile = "PROFILE".equals(selectedTab);
+		boolean isLeaderboard = "LEADERBOARD".equals(selectedTab);
+
 		if (profileTab != null) {
-			boolean isProfile = "PROFILE".equals(selectedTab);
 			profileTab.setBackground(isProfile ? UIConstants.ACCENT_BLUE : UIConstants.CARD_BG);
 			profileTab.setForeground(isProfile ? Color.WHITE : UIConstants.TEXT_SECONDARY);
+		}
+		if (leaderboardTab != null) {
+			leaderboardTab.setBackground(isLeaderboard ? UIConstants.ACCENT_BLUE : UIConstants.CARD_BG);
+			leaderboardTab.setForeground(isLeaderboard ? Color.WHITE : UIConstants.TEXT_SECONDARY);
 		}
 	}
 
@@ -210,6 +227,7 @@ public class RevalPanel extends PluginPanel {
 
 		rankingPanel.init(apiService, itemManager, spriteManager);
 		profilePanel.init(apiService, client, assetLoader);
+		leaderboardPanel.init(apiService, assetLoader);
 	}
 
 	public void onLoggedIn() {
