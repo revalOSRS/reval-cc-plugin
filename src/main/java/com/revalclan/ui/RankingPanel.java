@@ -9,6 +9,8 @@ import net.runelite.client.game.SpriteManager;
 import net.runelite.client.util.AsyncBufferedImage;
 import net.runelite.client.util.ImageUtil;
 
+import net.runelite.client.ui.FontManager;
+
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
@@ -68,7 +70,7 @@ public class RankingPanel extends JPanel {
 		scrollPane.getViewport().setBackground(UIConstants.BACKGROUND);
 
 		loadingLabel = new JLabel("Loading...");
-		loadingLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+		loadingLabel.setFont(FontManager.getRunescapeSmallFont());
 		loadingLabel.setForeground(UIConstants.TEXT_SECONDARY);
 		loadingLabel.setHorizontalAlignment(SwingConstants.CENTER);
 
@@ -112,17 +114,17 @@ public class RankingPanel extends JPanel {
 		panel.setBorder(new EmptyBorder(30, 10, 10, 10));
 
 		JLabel title = new JLabel("RANKING");
-		title.setFont(new Font("Segoe UI", Font.BOLD, 20));
+		title.setFont(FontManager.getRunescapeBoldFont());
 		title.setForeground(UIConstants.ACCENT_GOLD);
 		title.setAlignmentX(Component.CENTER_ALIGNMENT);
 
 		JLabel subtitle = new JLabel("Ranks & Points");
-		subtitle.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+		subtitle.setFont(FontManager.getRunescapeSmallFont());
 		subtitle.setForeground(UIConstants.TEXT_SECONDARY);
 		subtitle.setAlignmentX(Component.CENTER_ALIGNMENT);
 
 		JLabel hint = new JLabel("Loading data...");
-		hint.setFont(new Font("Segoe UI", Font.ITALIC, 9));
+		hint.setFont(FontManager.getRunescapeSmallFont());
 		hint.setForeground(UIConstants.TEXT_SECONDARY);
 		hint.setAlignmentX(Component.CENTER_ALIGNMENT);
 
@@ -157,7 +159,7 @@ public class RankingPanel extends JPanel {
 
 		JLabel label = new JLabel("Something went wrong");
 		label.setForeground(UIConstants.TEXT_SECONDARY);
-		label.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+		label.setFont(FontManager.getRunescapeSmallFont());
 		label.setHorizontalAlignment(SwingConstants.CENTER);
 		label.setBorder(new EmptyBorder(30, 0, 0, 0));
 		addComponent(label);
@@ -271,12 +273,12 @@ public class RankingPanel extends JPanel {
 		textPanel.setOpaque(false);
 
 		JLabel titleLabel = new JLabel(title);
-		titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 12));
+		titleLabel.setFont(FontManager.getRunescapeBoldFont());
 		titleLabel.setForeground(UIConstants.ACCENT_GOLD);
 		textPanel.add(titleLabel);
 
 		JLabel subtitleLabel = new JLabel(subtitle);
-		subtitleLabel.setFont(new Font("Segoe UI", Font.PLAIN, 9));
+		subtitleLabel.setFont(FontManager.getRunescapeSmallFont());
 		subtitleLabel.setForeground(UIConstants.TEXT_SECONDARY);
 		textPanel.add(subtitleLabel);
 
@@ -338,7 +340,7 @@ public class RankingPanel extends JPanel {
 
 			// Category header
 			JLabel header = new JLabel(entry.getKey());
-			header.setFont(new Font("Segoe UI", Font.BOLD, 10));
+			header.setFont(FontManager.getRunescapeBoldFont());
 			header.setForeground(UIConstants.ACCENT_GOLD);
 			header.setBorder(new EmptyBorder(4, 0, 2, 0));
 			header.setAlignmentX(Component.LEFT_ALIGNMENT);

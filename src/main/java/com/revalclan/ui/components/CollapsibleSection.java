@@ -1,6 +1,7 @@
 package com.revalclan.ui.components;
 
 import com.revalclan.ui.constants.UIConstants;
+import net.runelite.client.ui.FontManager;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -8,9 +9,6 @@ import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 
-/**
- * A collapsible/expandable section with a header and content area
- */
 public class CollapsibleSection extends JPanel {
 	private final JPanel contentPanel;
 	private final JLabel arrowLabel;
@@ -27,7 +25,6 @@ public class CollapsibleSection extends JPanel {
 		this.contentPanel = content;
 		contentPanel.setVisible(expanded);
 
-		// Header
 		headerPanel = new JPanel(new BorderLayout(2, 0)) {
 			@Override
 			protected void paintComponent(Graphics g) {
@@ -43,12 +40,11 @@ public class CollapsibleSection extends JPanel {
 		headerPanel.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 		headerPanel.setOpaque(false);
 
-		// Left: arrow + icon
 		JPanel leftPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
 		leftPanel.setOpaque(false);
 
 		arrowLabel = new JLabel(expanded ? "▼" : "▲");
-		arrowLabel.setFont(new Font("Segoe UI", Font.PLAIN, 10));
+		arrowLabel.setFont(FontManager.getRunescapeSmallFont());
 		arrowLabel.setForeground(UIConstants.ACCENT_GOLD);
 		leftPanel.add(arrowLabel);
 
@@ -56,12 +52,11 @@ public class CollapsibleSection extends JPanel {
 		iconLabel.setPreferredSize(new Dimension(24, 24));
 		leftPanel.add(iconLabel);
 
-		// Title (+ optional subtitle)
 		JPanel titlePanel = new JPanel();
 		titlePanel.setOpaque(false);
 
 		JLabel titleLabel = new JLabel(title);
-		titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 11));
+		titleLabel.setFont(FontManager.getRunescapeBoldFont());
 		titleLabel.setForeground(UIConstants.TEXT_PRIMARY);
 
 		if (subtitle != null && !subtitle.isEmpty()) {
@@ -70,7 +65,7 @@ public class CollapsibleSection extends JPanel {
 			titlePanel.add(titleLabel);
 
 			JLabel subtitleLabel = new JLabel(subtitle);
-			subtitleLabel.setFont(new Font("Segoe UI", Font.PLAIN, 9));
+			subtitleLabel.setFont(FontManager.getRunescapeSmallFont());
 			subtitleLabel.setForeground(UIConstants.TEXT_SECONDARY);
 			subtitleLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
 			titlePanel.add(subtitleLabel);
@@ -82,7 +77,6 @@ public class CollapsibleSection extends JPanel {
 		headerPanel.add(leftPanel, BorderLayout.WEST);
 		headerPanel.add(titlePanel, BorderLayout.CENTER);
 
-		// Click to toggle
 		headerPanel.addMouseListener(new MouseAdapter() {
 			@Override
 			public void mousePressed(MouseEvent e) {

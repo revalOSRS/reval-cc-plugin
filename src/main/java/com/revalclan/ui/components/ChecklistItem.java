@@ -2,6 +2,7 @@ package com.revalclan.ui.components;
 
 import com.revalclan.ui.constants.UIConstants;
 import com.revalclan.util.UIAssetLoader;
+import net.runelite.client.ui.FontManager;
 
 import javax.swing.*;
 import java.awt.*;
@@ -13,7 +14,6 @@ public class ChecklistItem extends JPanel {
 
 		ImageIcon checkIcon = assetLoader != null ? assetLoader.getIcon("checkmark", 10) : null;
 
-		// Status checkbox
 		JPanel statusBox = new JPanel() {
 			@Override
 			protected void paintComponent(Graphics g) {
@@ -35,9 +35,8 @@ public class ChecklistItem extends JPanel {
 		statusBox.setPreferredSize(new Dimension(14, 14));
 		statusBox.setOpaque(false);
 
-		// Description
 		JLabel descLabel = new JLabel(description);
-		descLabel.setFont(new Font("Segoe UI", Font.PLAIN, 10));
+		descLabel.setFont(FontManager.getRunescapeSmallFont());
 		descLabel.setForeground(completed ? UIConstants.TEXT_PRIMARY : UIConstants.TEXT_SECONDARY);
 		descLabel.setToolTipText(description);
 
@@ -47,10 +46,9 @@ public class ChecklistItem extends JPanel {
 		leftPanel.add(descLabel, BorderLayout.CENTER);
 		add(leftPanel, BorderLayout.CENTER);
 
-		// Points
 		if (points != null && points > 0) {
 			JLabel pointsLabel = new JLabel("+" + points + " pts");
-			pointsLabel.setFont(new Font("Segoe UI", Font.PLAIN, 9));
+			pointsLabel.setFont(FontManager.getRunescapeSmallFont());
 			pointsLabel.setForeground(UIConstants.ACCENT_GOLD);
 			pointsLabel.setVerticalAlignment(SwingConstants.TOP);
 			add(pointsLabel, BorderLayout.EAST);

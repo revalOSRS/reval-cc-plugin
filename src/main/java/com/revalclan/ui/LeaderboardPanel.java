@@ -6,6 +6,8 @@ import com.revalclan.ui.components.BackButton;
 import com.revalclan.ui.constants.UIConstants;
 import com.revalclan.util.UIAssetLoader;
 
+import net.runelite.client.ui.FontManager;
+
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.event.DocumentEvent;
@@ -84,7 +86,7 @@ public class LeaderboardPanel extends JPanel {
 			BorderFactory.createLineBorder(UIConstants.CARD_HOVER, 1),
 			new EmptyBorder(6, 10, 6, 10)
 		));
-		searchField.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+		searchField.setFont(FontManager.getRunescapeSmallFont());
 		searchField.putClientProperty("JTextField.placeholderText", "Search player...");
 
 		searchField.getDocument().addDocumentListener(new DocumentListener() {
@@ -102,10 +104,10 @@ public class LeaderboardPanel extends JPanel {
 		header.setBackground(UIConstants.CARD_BG);
 		header.setBorder(new EmptyBorder(8, 10, 8, 10));
 
-		BackButton backButton = new BackButton("← Back", this::showListView);
+		BackButton backButton = new BackButton("< Back", this::showListView);
 
 		JLabel nameLabel = new JLabel(playerName);
-		nameLabel.setFont(new Font("Segoe UI", Font.BOLD, 12));
+		nameLabel.setFont(FontManager.getRunescapeBoldFont());
 		nameLabel.setForeground(UIConstants.ACCENT_GOLD);
 
 		header.add(backButton, BorderLayout.WEST);
@@ -174,7 +176,7 @@ public class LeaderboardPanel extends JPanel {
 		contentPanel.removeAll();
 		contentPanel.add(Box.createVerticalStrut(20));
 		JLabel label = new JLabel("Loading...");
-		label.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+		label.setFont(FontManager.getRunescapeSmallFont());
 		label.setForeground(UIConstants.TEXT_SECONDARY);
 		label.setAlignmentX(Component.CENTER_ALIGNMENT);
 		contentPanel.add(label);
@@ -186,7 +188,7 @@ public class LeaderboardPanel extends JPanel {
 		contentPanel.removeAll();
 		contentPanel.add(Box.createVerticalStrut(20));
 		JLabel label = new JLabel(message);
-		label.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+		label.setFont(FontManager.getRunescapeSmallFont());
 		label.setForeground(UIConstants.TEXT_SECONDARY);
 		label.setAlignmentX(Component.CENTER_ALIGNMENT);
 		contentPanel.add(label);
@@ -207,7 +209,7 @@ public class LeaderboardPanel extends JPanel {
 			: filteredEntries.size() + " of " + allEntries.size() + " players";
 
 		JLabel countLabel = new JLabel(countText);
-		countLabel.setFont(new Font("Segoe UI", Font.PLAIN, 10));
+		countLabel.setFont(FontManager.getRunescapeSmallFont());
 		countLabel.setForeground(UIConstants.TEXT_MUTED);
 		countLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
 		contentPanel.add(countLabel);
@@ -262,12 +264,12 @@ public class LeaderboardPanel extends JPanel {
 		leftPanel.setOpaque(false);
 
 		JLabel rankLabel = new JLabel("#" + entry.getRank());
-		rankLabel.setFont(new Font("Segoe UI", Font.BOLD, 11));
+		rankLabel.setFont(FontManager.getRunescapeBoldFont());
 		rankLabel.setForeground(getRankColor(entry.getRank()));
 		rankLabel.setPreferredSize(new Dimension(32, 20));
 
 		JLabel nameLabel = new JLabel(entry.getOsrsNickname());
-		nameLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+		nameLabel.setFont(FontManager.getRunescapeSmallFont());
 		nameLabel.setForeground(UIConstants.TEXT_PRIMARY);
 
 		leftPanel.add(rankLabel);
@@ -276,7 +278,7 @@ public class LeaderboardPanel extends JPanel {
 
 		if (entry.getPrestigeLevel() > 0) {
 			JLabel prestigeLabel = new JLabel(" ★" + entry.getPrestigeLevel());
-			prestigeLabel.setFont(new Font("Segoe UI", Font.BOLD, 10));
+			prestigeLabel.setFont(FontManager.getRunescapeBoldFont());
 			prestigeLabel.setForeground(UIConstants.ACCENT_PURPLE);
 			leftPanel.add(prestigeLabel);
 		}
@@ -287,12 +289,12 @@ public class LeaderboardPanel extends JPanel {
 		rightPanel.setOpaque(false);
 
 		JLabel pointsLabel = new JLabel(formatPoints(entry.getActivityPoints()) + " pts");
-		pointsLabel.setFont(new Font("Segoe UI", Font.BOLD, 11));
+		pointsLabel.setFont(FontManager.getRunescapeBoldFont());
 		pointsLabel.setForeground(UIConstants.ACCENT_GOLD);
 		pointsLabel.setAlignmentX(Component.RIGHT_ALIGNMENT);
 
 		JLabel clanRankLabel = new JLabel(capitalize(entry.getClanRank()));
-		clanRankLabel.setFont(new Font("Segoe UI", Font.PLAIN, 9));
+		clanRankLabel.setFont(FontManager.getRunescapeSmallFont());
 		clanRankLabel.setForeground(UIConstants.TEXT_MUTED);
 		clanRankLabel.setAlignmentX(Component.RIGHT_ALIGNMENT);
 

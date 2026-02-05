@@ -3,6 +3,8 @@ package com.revalclan.ui;
 import com.revalclan.api.account.AccountResponse;
 import com.revalclan.ui.constants.UIConstants;
 
+import net.runelite.client.ui.FontManager;
+
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
@@ -25,11 +27,11 @@ public class PointsBreakdownPanel extends JDialog {
 		header.setBorder(new EmptyBorder(12, 16, 12, 16));
 
 		JLabel titleLabel = new JLabel(title + " Points Breakdown");
-		titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 16));
+		titleLabel.setFont(FontManager.getRunescapeBoldFont());
 		titleLabel.setForeground(UIConstants.ACCENT_GOLD);
 
 		JButton closeButton = new JButton("Close");
-		closeButton.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+		closeButton.setFont(FontManager.getRunescapeSmallFont());
 		closeButton.setForeground(UIConstants.TEXT_PRIMARY);
 		closeButton.setBackground(UIConstants.CARD_BG);
 		closeButton.setBorder(new EmptyBorder(6, 12, 6, 12));
@@ -47,7 +49,7 @@ public class PointsBreakdownPanel extends JDialog {
 
 		if (entries.isEmpty()) {
 			JLabel emptyLabel = new JLabel("No points entries found for this category.");
-			emptyLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+			emptyLabel.setFont(FontManager.getRunescapeSmallFont());
 			emptyLabel.setForeground(UIConstants.TEXT_SECONDARY);
 			emptyLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
 			emptyLabel.setBorder(new EmptyBorder(40, 0, 0, 0));
@@ -85,11 +87,11 @@ public class PointsBreakdownPanel extends JDialog {
 		card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
 
 		JLabel label = new JLabel("Total Points");
-		label.setFont(new Font("Segoe UI", Font.PLAIN, 10));
+		label.setFont(FontManager.getRunescapeSmallFont());
 		label.setForeground(UIConstants.TEXT_SECONDARY);
 
 		JLabel value = new JLabel(String.valueOf(totalPoints));
-		value.setFont(new Font("Segoe UI", Font.BOLD, 14));
+		value.setFont(FontManager.getRunescapeBoldFont());
 		value.setForeground(UIConstants.ACCENT_GOLD);
 
 		card.add(label, BorderLayout.WEST);
@@ -113,12 +115,12 @@ public class PointsBreakdownPanel extends JDialog {
 		if (desc.length() > 55) desc = desc.substring(0, 52) + "...";
 
 		JLabel descLabel = new JLabel(desc);
-		descLabel.setFont(new Font("Segoe UI", Font.PLAIN, 10));
+		descLabel.setFont(FontManager.getRunescapeSmallFont());
 		descLabel.setForeground(UIConstants.TEXT_PRIMARY);
 		descLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
 		JLabel dateLabel = new JLabel(formatDate(entry.getCreatedAt()));
-		dateLabel.setFont(new Font("Segoe UI", Font.PLAIN, 8));
+		dateLabel.setFont(FontManager.getRunescapeSmallFont());
 		dateLabel.setForeground(UIConstants.TEXT_MUTED);
 		dateLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
@@ -126,7 +128,7 @@ public class PointsBreakdownPanel extends JDialog {
 		leftPanel.add(dateLabel);
 
 		JLabel pointsLabel = new JLabel("+" + entry.getPointsChange());
-		pointsLabel.setFont(new Font("Segoe UI", Font.BOLD, 11));
+		pointsLabel.setFont(FontManager.getRunescapeBoldFont());
 		pointsLabel.setForeground(UIConstants.ACCENT_GREEN);
 
 		card.add(leftPanel, BorderLayout.CENTER);

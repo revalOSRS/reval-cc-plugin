@@ -1,6 +1,7 @@
 package com.revalclan.ui.components;
 
 import com.revalclan.ui.constants.UIConstants;
+import net.runelite.client.ui.FontManager;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -9,12 +10,14 @@ import java.awt.*;
 public class BackButton extends JButton {
 	public BackButton(String text, Runnable onBack) {
 		super(text);
-		setFont(new Font("Segoe UI", Font.PLAIN, 11));
+		setFont(FontManager.getRunescapeSmallFont());
 		setForeground(UIConstants.TEXT_PRIMARY);
-		setBorder(new EmptyBorder(4, 8, 4, 8));
+		setBorder(new EmptyBorder(6, 8, 2, 8));
 		setContentAreaFilled(false);
 		setBorderPainted(false);
 		setFocusPainted(false);
+		setVerticalAlignment(SwingConstants.CENTER);
+		setVerticalTextPosition(SwingConstants.CENTER);
 		setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 		addActionListener(e -> onBack.run());
 	}

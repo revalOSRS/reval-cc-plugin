@@ -3,6 +3,7 @@ package com.revalclan.ui.components;
 import com.revalclan.api.points.PointsResponse;
 import com.revalclan.ui.constants.UIConstants;
 import net.runelite.client.game.ItemManager;
+import net.runelite.client.ui.FontManager;
 import net.runelite.client.util.AsyncBufferedImage;
 import net.runelite.client.util.ImageUtil;
 
@@ -10,9 +11,6 @@ import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
 
-/**
- * A card displaying a single point source
- */
 public class PointSourceCard extends JPanel {
 	private final JLabel iconLabel = new JLabel();
 	private Color pointsColor = UIConstants.ACCENT_GREEN;
@@ -58,14 +56,14 @@ public class PointSourceCard extends JPanel {
 		textPanel.setOpaque(false);
 
 		JLabel nameLabel = new JLabel(name);
-		nameLabel.setFont(new Font("Segoe UI", Font.BOLD, 10));
+		nameLabel.setFont(FontManager.getRunescapeBoldFont());
 		nameLabel.setForeground(UIConstants.TEXT_PRIMARY);
 		nameLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
 		textPanel.add(nameLabel);
 
 		if (description != null && !description.isEmpty()) {
 			JTextArea descArea = new JTextArea(description);
-			descArea.setFont(new Font("Segoe UI", Font.PLAIN, 9));
+			descArea.setFont(FontManager.getRunescapeSmallFont());
 			descArea.setForeground(UIConstants.TEXT_SECONDARY);
 			descArea.setEditable(false);
 			descArea.setFocusable(false);
@@ -80,7 +78,7 @@ public class PointSourceCard extends JPanel {
 		leftPanel.add(textPanel, BorderLayout.CENTER);
 
 		JLabel pointsLabel = new JLabel(points);
-		pointsLabel.setFont(new Font("Segoe UI", Font.BOLD, 10));
+		pointsLabel.setFont(FontManager.getRunescapeSmallFont());
 		pointsLabel.setForeground(pointsColor);
 		pointsLabel.setVerticalAlignment(SwingConstants.TOP);
 

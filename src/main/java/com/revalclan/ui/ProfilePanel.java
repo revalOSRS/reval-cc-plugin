@@ -4,9 +4,11 @@ import com.revalclan.api.RevalApiService;
 import com.revalclan.api.account.AccountResponse;
 import com.revalclan.api.points.PointsResponse;
 import com.revalclan.ui.components.ChecklistItem;
+import com.revalclan.ui.components.LoginPrompt;
 import com.revalclan.ui.constants.UIConstants;
 import com.revalclan.util.UIAssetLoader;
 import net.runelite.api.Client;
+import net.runelite.client.ui.FontManager;
 
 import javax.swing.*;
 import javax.swing.Timer;
@@ -197,25 +199,7 @@ public class ProfilePanel extends JPanel {
 	private void showNotLoggedIn() {
 		contentPanel.removeAll();
 		gridY = 0;
-
-		JPanel placeholder = createCenteredPanel();
-		placeholder.setBorder(new EmptyBorder(30, 20, 20, 20));
-
-		JLabel title = new JLabel("PROFILE");
-		title.setFont(new Font("Segoe UI", Font.BOLD, 18));
-		title.setForeground(UIConstants.ACCENT_GOLD);
-		title.setAlignmentX(Component.CENTER_ALIGNMENT);
-
-		JLabel hint = new JLabel("Log in to view your profile");
-		hint.setFont(new Font("Segoe UI", Font.PLAIN, 11));
-		hint.setForeground(UIConstants.TEXT_SECONDARY);
-		hint.setAlignmentX(Component.CENTER_ALIGNMENT);
-
-		placeholder.add(title);
-		placeholder.add(Box.createRigidArea(new Dimension(0, 6)));
-		placeholder.add(hint);
-
-		addComponent(placeholder);
+		addComponent(new LoginPrompt("Profile"));
 		revalidateAndRepaint();
 	}
 
@@ -227,7 +211,7 @@ public class ProfilePanel extends JPanel {
 		placeholder.setBorder(new EmptyBorder(50, 20, 20, 20));
 
 		JLabel loading = new JLabel("Loading profile...");
-		loading.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+		loading.setFont(FontManager.getRunescapeSmallFont());
 		loading.setForeground(UIConstants.TEXT_SECONDARY);
 		loading.setAlignmentX(Component.CENTER_ALIGNMENT);
 
@@ -244,16 +228,16 @@ public class ProfilePanel extends JPanel {
 		placeholder.setBorder(new EmptyBorder(30, 20, 20, 20));
 
 		JLabel errorIcon = new JLabel("⚠");
-		errorIcon.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 28));
+		errorIcon.setFont(FontManager.getRunescapeBoldFont());
 		errorIcon.setAlignmentX(Component.CENTER_ALIGNMENT);
 
 		JLabel errorLabel = new JLabel("<html><center>" + message + "</center></html>");
-		errorLabel.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+		errorLabel.setFont(FontManager.getRunescapeSmallFont());
 		errorLabel.setForeground(UIConstants.ERROR_COLOR);
 		errorLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
 
 		JLabel hint = new JLabel("Make sure you're in the Reval clan");
-		hint.setFont(new Font("Segoe UI", Font.ITALIC, 10));
+		hint.setFont(FontManager.getRunescapeSmallFont());
 		hint.setForeground(UIConstants.TEXT_SECONDARY);
 		hint.setAlignmentX(Component.CENTER_ALIGNMENT);
 
@@ -315,12 +299,12 @@ public class ProfilePanel extends JPanel {
 		nameRow.setAlignmentX(Component.LEFT_ALIGNMENT);
 
 		JLabel nameLabel = new JLabel(account.getOsrsNickname());
-		nameLabel.setFont(new Font("Segoe UI", Font.BOLD, 16));
+		nameLabel.setFont(FontManager.getRunescapeBoldFont());
 		nameLabel.setForeground(UIConstants.TEXT_PRIMARY);
 		nameRow.add(nameLabel);
 
 		JLabel rankLabel = new JLabel(getRankDisplayName(account.getClanRank()));
-		rankLabel.setFont(new Font("Segoe UI", Font.BOLD, 10));
+		rankLabel.setFont(FontManager.getRunescapeBoldFont());
 		rankLabel.setForeground(UIConstants.ACCENT_GOLD);
 		rankLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
@@ -338,15 +322,14 @@ public class ProfilePanel extends JPanel {
 		pointsPanel.setLayout(new BoxLayout(pointsPanel, BoxLayout.Y_AXIS));
 		pointsPanel.setOpaque(false);
 
-		int exactPoints = account.getActivityPoints() != null ? account.getActivityPoints() : 0;
-		JLabel pointsValue = new JLabel(formatNumber(exactPoints));
-		pointsValue.setFont(new Font("Segoe UI", Font.BOLD, 20));
+		int points = account.getActivityPoints() != null ? account.getActivityPoints() : 0;
+		JLabel pointsValue = new JLabel(String.format("%,d", points).replace(",", " "));
+		pointsValue.setFont(FontManager.getRunescapeBoldFont());
 		pointsValue.setForeground(UIConstants.ACCENT_GOLD);
 		pointsValue.setAlignmentX(Component.RIGHT_ALIGNMENT);
-		pointsValue.setToolTipText(String.valueOf(exactPoints));
 
 		JLabel pointsLabel = new JLabel("Reval Points");
-		pointsLabel.setFont(new Font("Segoe UI", Font.PLAIN, 9));
+		pointsLabel.setFont(FontManager.getRunescapeSmallFont());
 		pointsLabel.setForeground(UIConstants.TEXT_SECONDARY);
 		pointsLabel.setAlignmentX(Component.RIGHT_ALIGNMENT);
 
@@ -395,7 +378,7 @@ public class ProfilePanel extends JPanel {
 			JPanel maxRank = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
 			maxRank.setOpaque(false);
 			JLabel maxLabel = new JLabel("Max Rank!");
-			maxLabel.setFont(new Font("Segoe UI", Font.ITALIC, 9));
+			maxLabel.setFont(FontManager.getRunescapeSmallFont());
 			maxLabel.setForeground(UIConstants.ACCENT_GOLD);
 			maxRank.add(maxLabel);
 			return maxRank;
@@ -417,7 +400,7 @@ public class ProfilePanel extends JPanel {
 
 		String nextRankName = nextRank.getDisplayName() != null ? nextRank.getDisplayName() : nextRank.getName();
 		JLabel progressLabel = new JLabel(pointsRemaining + " pts to " + nextRankName);
-		progressLabel.setFont(new Font("Segoe UI", Font.PLAIN, 9));
+		progressLabel.setFont(FontManager.getRunescapeSmallFont());
 		progressLabel.setForeground(UIConstants.TEXT_SECONDARY);
 		labelRow.add(progressLabel);
 
@@ -425,7 +408,7 @@ public class ProfilePanel extends JPanel {
 			ImageIcon infoIcon = assetLoader != null ? assetLoader.getIcon("info.png", 12) : null;
 			JLabel infoIconLabel = infoIcon != null ? new JLabel(infoIcon) : new JLabel("ℹ");
 			if (infoIcon == null) {
-				infoIconLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+				infoIconLabel.setFont(FontManager.getRunescapeSmallFont());
 				infoIconLabel.setForeground(UIConstants.TEXT_SECONDARY);
 			}
 			infoIconLabel.setToolTipText("Waiting for a staff member to give you the correct rank");
@@ -460,7 +443,7 @@ public class ProfilePanel extends JPanel {
 		labelHeader.setMaximumSize(new Dimension(Integer.MAX_VALUE, 20));
 
 		JLabel pointsFromLabel = new JLabel("Points from:");
-		pointsFromLabel.setFont(new Font("Segoe UI", Font.BOLD, 13));
+		pointsFromLabel.setFont(FontManager.getRunescapeBoldFont());
 		pointsFromLabel.setForeground(UIConstants.ACCENT_GOLD);
 		labelHeader.add(pointsFromLabel, BorderLayout.WEST);
 
@@ -500,7 +483,7 @@ public class ProfilePanel extends JPanel {
 		wrapper.setBorder(new EmptyBorder(10, 12, 10, 12));
 
 		JLabel title = new JLabel("Milestones");
-		title.setFont(new Font("Segoe UI", Font.BOLD, 11));
+		title.setFont(FontManager.getRunescapeBoldFont());
 		title.setForeground(UIConstants.TEXT_PRIMARY);
 		title.setBorder(new EmptyBorder(0, 0, 8, 0));
 
@@ -558,7 +541,7 @@ public class ProfilePanel extends JPanel {
 		wrapper.setBorder(new EmptyBorder(10, 12, 10, 12));
 
 		JLabel title = new JLabel(titleText);
-		title.setFont(new Font("Segoe UI", Font.BOLD, 11));
+		title.setFont(FontManager.getRunescapeBoldFont());
 		title.setForeground(UIConstants.TEXT_PRIMARY);
 		title.setBorder(new EmptyBorder(0, 0, 8, 0));
 
@@ -579,7 +562,7 @@ public class ProfilePanel extends JPanel {
 
 		if (tiers.isEmpty()) {
 			JLabel empty = new JLabel("No tiers available");
-			empty.setFont(new Font("Segoe UI", Font.PLAIN, 10));
+			empty.setFont(FontManager.getRunescapeSmallFont());
 			empty.setForeground(UIConstants.TEXT_SECONDARY);
 			list.add(empty);
 		} else {
@@ -627,12 +610,12 @@ public class ProfilePanel extends JPanel {
 		};
 
 		JLabel valueLabel = new JLabel(value);
-		valueLabel.setFont(new Font("Segoe UI", Font.BOLD, 14));
+		valueLabel.setFont(FontManager.getRunescapeBoldFont());
 		valueLabel.setForeground(accentColor != null ? accentColor : UIConstants.TEXT_PRIMARY);
 		valueLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
 
 		JLabel nameLabel = new JLabel(label);
-		nameLabel.setFont(new Font("Segoe UI", Font.PLAIN, 9));
+		nameLabel.setFont(FontManager.getRunescapeSmallFont());
 		nameLabel.setForeground(UIConstants.TEXT_SECONDARY);
 		nameLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
 

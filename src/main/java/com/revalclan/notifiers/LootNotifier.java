@@ -127,7 +127,7 @@ public class LootNotifier extends BaseNotifier {
 		if (!isEnabled()) return;
 
 		// Pyramid Plunder: Pharaoh's sceptre doesn't fire a normal loot event
-		if ("You have found a Pharaoh's sceptre! It fell on the floor.".equals(message)) {
+		if ("You have found the Pharaoh's sceptre!".equals(message) || "You have found a Pharaoh's sceptre!".equals(message)) {
 			handleLootDrop(List.of(new ItemStack(ItemID.PHARAOHS_SCEPTRE, 1)), "Pyramid Plunder", "EVENT", null);
 		}
 	}

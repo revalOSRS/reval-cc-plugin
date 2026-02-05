@@ -9,6 +9,7 @@ import lombok.Getter;
 import net.runelite.api.Client;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.game.SpriteManager;
+import net.runelite.client.ui.FontManager;
 import net.runelite.client.ui.PluginPanel;
 import net.runelite.client.util.LinkBrowser;
 
@@ -28,6 +29,7 @@ public class RevalPanel extends PluginPanel {
 	@Getter private final ProfilePanel profilePanel;
 	@Getter private final RankingPanel rankingPanel;
 	@Getter private final LeaderboardPanel leaderboardPanel;
+	@Getter private final AchievementsPanel achievementsPanel;
 
 	private JLabel infoButton;
 	private JLabel discordIcon;
@@ -35,6 +37,7 @@ public class RevalPanel extends PluginPanel {
 
 	private JButton profileTab;
 	private JButton leaderboardTab;
+	private JButton achievementsTab;
 	private String selectedTab = "PROFILE";
 
 	public RevalPanel() {
@@ -46,6 +49,7 @@ public class RevalPanel extends PluginPanel {
 		profilePanel = new ProfilePanel();
 		rankingPanel = new RankingPanel();
 		leaderboardPanel = new LeaderboardPanel();
+		achievementsPanel = new AchievementsPanel();
 
 		cardLayout = new CardLayout();
 		contentPanel = new JPanel(cardLayout);
@@ -54,6 +58,7 @@ public class RevalPanel extends PluginPanel {
 		contentPanel.add(profilePanel, "PROFILE");
 		contentPanel.add(rankingPanel, "RANKING");
 		contentPanel.add(leaderboardPanel, "LEADERBOARD");
+		contentPanel.add(achievementsPanel, "ACHIEVEMENTS");
 
 		JPanel header = createHeader();
 		JPanel navBar = createNavBar();
@@ -70,25 +75,45 @@ public class RevalPanel extends PluginPanel {
 	}
 
 	private JPanel createNavBar() {
-		JPanel navBar = new JPanel(new GridLayout(1, 2, 4, 0));
+		JPanel navBar = new JPanel();
+		navBar.setLayout(new BoxLayout(navBar, BoxLayout.Y_AXIS));
 		navBar.setBackground(UIConstants.BACKGROUND);
 		navBar.setBorder(new EmptyBorder(0, 6, 6, 6));
+
+		// First row: Profile, Achievements
+		JPanel row1 = new JPanel(new GridLayout(1, 2, 4, 0));
+		row1.setOpaque(false);
+		row1.setMaximumSize(new Dimension(Integer.MAX_VALUE, 28));
 
 		profileTab = createTabButton("Profile");
 		profileTab.addActionListener(e -> selectTab("PROFILE"));
 
+		achievementsTab = createTabButton("Achievements");
+		achievementsTab.addActionListener(e -> selectTab("ACHIEVEMENTS"));
+
+		row1.add(profileTab);
+		row1.add(achievementsTab);
+
+		// Second row: Leaderboard
+		JPanel row2 = new JPanel(new GridLayout(1, 1, 0, 0));
+		row2.setOpaque(false);
+		row2.setMaximumSize(new Dimension(Integer.MAX_VALUE, 28));
+
 		leaderboardTab = createTabButton("Leaderboard");
 		leaderboardTab.addActionListener(e -> selectTab("LEADERBOARD"));
 
-		navBar.add(profileTab);
-		navBar.add(leaderboardTab);
+		row2.add(leaderboardTab);
+
+		navBar.add(row1);
+		navBar.add(Box.createRigidArea(new Dimension(0, 4)));
+		navBar.add(row2);
 
 		return navBar;
 	}
 
 	private JButton createTabButton(String text) {
 		JButton btn = new JButton(text);
-		btn.setFont(new Font("SansSerif", Font.BOLD, 11));
+		btn.setFont(FontManager.getRunescapeBoldFont());
 		btn.setFocusPainted(false);
 		btn.setBorderPainted(false);
 		btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
@@ -172,6 +197,7 @@ public class RevalPanel extends PluginPanel {
 	private void updateNavStyles() {
 		boolean isProfile = "PROFILE".equals(selectedTab);
 		boolean isLeaderboard = "LEADERBOARD".equals(selectedTab);
+		boolean isAchievements = "ACHIEVEMENTS".equals(selectedTab);
 
 		if (profileTab != null) {
 			profileTab.setBackground(isProfile ? UIConstants.ACCENT_BLUE : UIConstants.CARD_BG);
@@ -180,6 +206,10 @@ public class RevalPanel extends PluginPanel {
 		if (leaderboardTab != null) {
 			leaderboardTab.setBackground(isLeaderboard ? UIConstants.ACCENT_BLUE : UIConstants.CARD_BG);
 			leaderboardTab.setForeground(isLeaderboard ? Color.WHITE : UIConstants.TEXT_SECONDARY);
+		}
+		if (achievementsTab != null) {
+			achievementsTab.setBackground(isAchievements ? UIConstants.ACCENT_BLUE : UIConstants.CARD_BG);
+			achievementsTab.setForeground(isAchievements ? Color.WHITE : UIConstants.TEXT_SECONDARY);
 		}
 	}
 
@@ -228,13 +258,16 @@ public class RevalPanel extends PluginPanel {
 		rankingPanel.init(apiService, itemManager, spriteManager);
 		profilePanel.init(apiService, client, assetLoader);
 		leaderboardPanel.init(apiService, assetLoader);
+		achievementsPanel.init(apiService, client);
 	}
 
 	public void onLoggedIn() {
 		profilePanel.refresh();
+		achievementsPanel.onLoggedIn();
 	}
 
 	public void onLoggedOut() {
 		profilePanel.onLoggedOut();
+		achievementsPanel.onLoggedOut();
 	}
 }
