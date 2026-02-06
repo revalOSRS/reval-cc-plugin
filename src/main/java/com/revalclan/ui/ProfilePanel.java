@@ -282,6 +282,11 @@ public class ProfilePanel extends JPanel {
 		addComponent(buildCollectionLogSection());
 		addSpacing(16);
 
+		// Add filler to absorb extra space and keep content at top
+		gbc.gridy = gridY;
+		gbc.weighty = 1.0;
+		contentPanel.add(Box.createGlue(), gbc);
+
 		revalidateAndRepaint();
 	}
 
