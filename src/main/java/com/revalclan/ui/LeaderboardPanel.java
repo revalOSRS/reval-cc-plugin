@@ -266,7 +266,7 @@ public class LeaderboardPanel extends JPanel {
 		JLabel rankLabel = new JLabel("#" + entry.getRank());
 		rankLabel.setFont(FontManager.getRunescapeBoldFont());
 		rankLabel.setForeground(getRankColor(entry.getRank()));
-		rankLabel.setPreferredSize(new Dimension(32, 20));
+		rankLabel.setPreferredSize(new Dimension(42, 20));
 
 		JLabel nameLabel = new JLabel(entry.getOsrsNickname());
 		nameLabel.setFont(FontManager.getRunescapeSmallFont());

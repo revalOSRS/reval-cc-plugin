@@ -113,7 +113,7 @@ public class RevalPanel extends PluginPanel {
 
 	private JButton createTabButton(String text) {
 		JButton btn = new JButton(text);
-		btn.setFont(FontManager.getRunescapeBoldFont());
+		btn.setFont(FontManager.getRunescapeSmallFont());
 		btn.setFocusPainted(false);
 		btn.setBorderPainted(false);
 		btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
