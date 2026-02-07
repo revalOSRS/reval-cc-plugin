@@ -106,7 +106,6 @@ public class DeathNotifier extends BaseNotifier {
 			deathData.put("killerType", "UNKNOWN");
 		}
 		
-		// World context — useful for backend to know if death was in PvP/dangerous world
 		EnumSet<WorldType> worldTypes = client.getWorldType();
 		deathData.put("isPvpWorld", worldTypes.contains(WorldType.PVP));
 		deathData.put("isHighRiskWorld", worldTypes.contains(WorldType.HIGH_RISK));
