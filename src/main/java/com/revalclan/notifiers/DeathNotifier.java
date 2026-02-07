@@ -78,8 +78,8 @@ public class DeathNotifier extends BaseNotifier {
 			handleDeath();
 		}
 		
-		// Clear target reference if our target died
-		if (actor == lastTarget.get()) {
+		// Clear target reference if our target or we died
+		if (actor == client.getLocalPlayer() || actor == lastTarget.get()) {
 			lastTarget = new WeakReference<>(null);
 		}
 	}
