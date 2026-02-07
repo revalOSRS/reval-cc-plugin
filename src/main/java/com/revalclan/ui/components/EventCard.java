@@ -165,17 +165,20 @@ public class EventCard extends JPanel {
 		if (registrationStatus == null) {
 			btn = createButton("Register", UIConstants.ACCENT_BLUE);
 			btn.addActionListener(e -> { if (onRegisterAction != null) onRegisterAction.accept(event.getId(), true); });
-		} else if ("pending".equals(registrationStatus)) {
+		} else if ("pending".equalsIgnoreCase(registrationStatus)) {
 			btn = createButton("Pending", UIConstants.ACCENT_GOLD);
 			btn.setToolTipText("Click to withdraw. Awaiting approval.");
 			btn.addActionListener(e -> { if (onRegisterAction != null) onRegisterAction.accept(event.getId(), false); });
-		} else if ("registered".equals(registrationStatus)) {
+		} else if ("registered".equalsIgnoreCase(registrationStatus)) {
 			btn = createButton("Registered", UIConstants.ACCENT_GREEN);
 			btn.setToolTipText("Click to withdraw registration.");
 			btn.addActionListener(e -> { if (onRegisterAction != null) onRegisterAction.accept(event.getId(), false); });
-		} else {
-			btn = createButton("Unknown", UIConstants.TEXT_MUTED);
+		} else if ("withdrawn".equalsIgnoreCase(registrationStatus)) {
+			btn = createButton("Withdrawn", UIConstants.TEXT_MUTED);
 			btn.setEnabled(false);
+		} else {
+			btn = createButton("Register", UIConstants.ACCENT_BLUE);
+			btn.addActionListener(e -> { if (onRegisterAction != null) onRegisterAction.accept(event.getId(), true); });
 		}
 
 		footer.add(btn);

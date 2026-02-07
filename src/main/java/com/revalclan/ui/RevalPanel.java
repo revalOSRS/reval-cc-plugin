@@ -1,5 +1,6 @@
 package com.revalclan.ui;
 
+import com.revalclan.RevalClanConfig;
 import com.revalclan.api.RevalApiService;
 import com.revalclan.ui.components.GradientSeparator;
 import com.revalclan.ui.components.PanelTitle;
@@ -30,14 +31,18 @@ public class RevalPanel extends PluginPanel {
 	@Getter private final RankingPanel rankingPanel;
 	@Getter private final LeaderboardPanel leaderboardPanel;
 	@Getter private final AchievementsPanel achievementsPanel;
+	@Getter private final CompetitionsPanel competitionsPanel;
+	@Getter private final EventsPanel eventsPanel;
 
 	private JLabel infoButton;
 	private JLabel discordIcon;
 	private JLabel websiteIcon;
 
 	private JButton profileTab;
+	private JButton eventsTab;
 	private JButton leaderboardTab;
 	private JButton achievementsTab;
+	private JButton competitionsTab;
 	private String selectedTab = "PROFILE";
 
 	public RevalPanel() {
@@ -50,6 +55,8 @@ public class RevalPanel extends PluginPanel {
 		rankingPanel = new RankingPanel();
 		leaderboardPanel = new LeaderboardPanel();
 		achievementsPanel = new AchievementsPanel();
+		competitionsPanel = new CompetitionsPanel();
+		eventsPanel = new EventsPanel();
 
 		cardLayout = new CardLayout();
 		contentPanel = new JPanel(cardLayout);
@@ -59,6 +66,8 @@ public class RevalPanel extends PluginPanel {
 		contentPanel.add(rankingPanel, "RANKING");
 		contentPanel.add(leaderboardPanel, "LEADERBOARD");
 		contentPanel.add(achievementsPanel, "ACHIEVEMENTS");
+		contentPanel.add(competitionsPanel, "COMPETITIONS");
+		contentPanel.add(eventsPanel, "EVENTS");
 
 		JPanel header = createHeader();
 		JPanel navBar = createNavBar();
@@ -94,15 +103,32 @@ public class RevalPanel extends PluginPanel {
 		row1.add(profileTab);
 		row1.add(achievementsTab);
 
-		// Second row: Leaderboard
-		JPanel row2 = new JPanel(new GridLayout(1, 1, 0, 0));
+		// Second row: Events, 🏆 (small), Competitions
+		JPanel row2 = new JPanel();
+		row2.setLayout(new BoxLayout(row2, BoxLayout.X_AXIS));
 		row2.setOpaque(false);
 		row2.setMaximumSize(new Dimension(Integer.MAX_VALUE, 28));
 
-		leaderboardTab = createTabButton("Leaderboard");
+		eventsTab = createTabButton("Events");
+		eventsTab.setMaximumSize(new Dimension(Integer.MAX_VALUE, 28));
+		eventsTab.addActionListener(e -> selectTab("EVENTS"));
+
+		leaderboardTab = createTabButton("🏆");
+		leaderboardTab.setPreferredSize(new Dimension(36, 28));
+		leaderboardTab.setMinimumSize(new Dimension(36, 28));
+		leaderboardTab.setMaximumSize(new Dimension(36, 28));
+		leaderboardTab.setToolTipText("Leaderboard");
 		leaderboardTab.addActionListener(e -> selectTab("LEADERBOARD"));
 
+		competitionsTab = createTabButton("Competitions");
+		competitionsTab.setMaximumSize(new Dimension(Integer.MAX_VALUE, 28));
+		competitionsTab.addActionListener(e -> selectTab("COMPETITIONS"));
+
+		row2.add(eventsTab);
+		row2.add(Box.createRigidArea(new Dimension(4, 0)));
 		row2.add(leaderboardTab);
+		row2.add(Box.createRigidArea(new Dimension(4, 0)));
+		row2.add(competitionsTab);
 
 		navBar.add(row1);
 		navBar.add(Box.createRigidArea(new Dimension(0, 4)));
@@ -196,12 +222,18 @@ public class RevalPanel extends PluginPanel {
 
 	private void updateNavStyles() {
 		boolean isProfile = "PROFILE".equals(selectedTab);
+		boolean isEvents = "EVENTS".equals(selectedTab);
 		boolean isLeaderboard = "LEADERBOARD".equals(selectedTab);
 		boolean isAchievements = "ACHIEVEMENTS".equals(selectedTab);
+		boolean isCompetitions = "COMPETITIONS".equals(selectedTab);
 
 		if (profileTab != null) {
 			profileTab.setBackground(isProfile ? UIConstants.ACCENT_BLUE : UIConstants.CARD_BG);
 			profileTab.setForeground(isProfile ? Color.WHITE : UIConstants.TEXT_SECONDARY);
+		}
+		if (eventsTab != null) {
+			eventsTab.setBackground(isEvents ? UIConstants.ACCENT_BLUE : UIConstants.CARD_BG);
+			eventsTab.setForeground(isEvents ? Color.WHITE : UIConstants.TEXT_SECONDARY);
 		}
 		if (leaderboardTab != null) {
 			leaderboardTab.setBackground(isLeaderboard ? UIConstants.ACCENT_BLUE : UIConstants.CARD_BG);
@@ -210,6 +242,10 @@ public class RevalPanel extends PluginPanel {
 		if (achievementsTab != null) {
 			achievementsTab.setBackground(isAchievements ? UIConstants.ACCENT_BLUE : UIConstants.CARD_BG);
 			achievementsTab.setForeground(isAchievements ? Color.WHITE : UIConstants.TEXT_SECONDARY);
+		}
+		if (competitionsTab != null) {
+			competitionsTab.setBackground(isCompetitions ? UIConstants.ACCENT_BLUE : UIConstants.CARD_BG);
+			competitionsTab.setForeground(isCompetitions ? Color.WHITE : UIConstants.TEXT_SECONDARY);
 		}
 	}
 
@@ -237,7 +273,8 @@ public class RevalPanel extends PluginPanel {
 	}
 
 	public void init(RevalApiService apiService, Client client,
-					 UIAssetLoader assetLoader, ItemManager itemManager, SpriteManager spriteManager) {
+					 UIAssetLoader assetLoader, ItemManager itemManager, SpriteManager spriteManager,
+					 RevalClanConfig config) {
 		if (assetLoader != null) {
 			ImageIcon infoIcon = assetLoader.getIcon("info.png", 16);
 			if (infoIcon != null && infoButton != null) {
@@ -256,18 +293,23 @@ public class RevalPanel extends PluginPanel {
 		}
 
 		rankingPanel.init(apiService, itemManager, spriteManager);
-		profilePanel.init(apiService, client, assetLoader);
+		profilePanel.init(apiService, client, assetLoader, config);
 		leaderboardPanel.init(apiService, assetLoader);
 		achievementsPanel.init(apiService, client);
+		competitionsPanel.init(apiService, client);
+		eventsPanel.init(apiService, client);
 	}
 
 	public void onLoggedIn() {
 		profilePanel.refresh();
 		achievementsPanel.onLoggedIn();
+		competitionsPanel.refresh();
+		eventsPanel.onLoggedIn();
 	}
 
 	public void onLoggedOut() {
 		profilePanel.onLoggedOut();
 		achievementsPanel.onLoggedOut();
+		eventsPanel.onLoggedOut();
 	}
 }

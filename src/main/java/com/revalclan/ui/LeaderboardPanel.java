@@ -135,7 +135,7 @@ public class LeaderboardPanel extends JPanel {
 		profileViewPanel.add(createBackHeader(playerName), BorderLayout.NORTH);
 
 		ProfilePanel profile = new ProfilePanel();
-		profile.init(apiService, null, assetLoader);
+		profile.init(apiService, null, assetLoader, null);
 		profile.loadAccountById(osrsAccountId);
 
 		profileViewPanel.add(profile, BorderLayout.CENTER);
