@@ -1,5 +1,6 @@
 package com.revalclan.ui;
 
+import com.revalclan.RevalClanConfig;
 import com.revalclan.api.RevalApiService;
 import com.revalclan.api.account.AccountResponse;
 import com.revalclan.api.points.PointsResponse;
@@ -28,6 +29,7 @@ public class ProfilePanel extends JPanel {
 	private RevalApiService apiService;
 	private Client client;
 	private UIAssetLoader assetLoader;
+	private RevalClanConfig config;
 
 	private AccountResponse.AccountData currentAccount;
 	private List<PointsResponse.Rank> ranks;
@@ -82,10 +84,11 @@ public class ProfilePanel extends JPanel {
 		contentPanel.add(Box.createVerticalStrut(height), gbc);
 	}
 
-	public void init(RevalApiService apiService, Client client, UIAssetLoader assetLoader) {
+	public void init(RevalApiService apiService, Client client, UIAssetLoader assetLoader, RevalClanConfig config) {
 		this.apiService = apiService;
 		this.client = client;
 		this.assetLoader = assetLoader;
+		this.config = config;
 		fetchRanks();
 	}
 
@@ -187,6 +190,16 @@ public class ProfilePanel extends JPanel {
 		}
 	}
 
+	/**
+	 * Rebuilds the profile UI from cached data without re-fetching from the API.
+	 * Used when config changes (e.g. hide completed items toggle).
+	 */
+	public void rebuild() {
+		if (currentAccount != null && pointsData != null) {
+			SwingUtilities.invokeLater(this::buildProfile);
+		}
+	}
+
 	public String getClanRank() {
 		return (currentAccount != null && currentAccount.getOsrsAccount() != null) 
 			? currentAccount.getOsrsAccount().getClanRank() : null;
@@ -231,7 +244,7 @@ public class ProfilePanel extends JPanel {
 		errorIcon.setFont(FontManager.getRunescapeBoldFont());
 		errorIcon.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-		JLabel errorLabel = new JLabel("<html><center>" + message + "</center></html>");
+		JLabel errorLabel = new JLabel(message);
 		errorLabel.setFont(FontManager.getRunescapeSmallFont());
 		errorLabel.setForeground(UIConstants.ERROR_COLOR);
 		errorLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
@@ -483,6 +496,8 @@ public class ProfilePanel extends JPanel {
 	}
 
 	private JPanel buildMilestonesSection(List<AccountResponse.Milestone> completedMilestones) {
+		boolean hideCompleted = config != null && config.hideCompletedItems();
+
 		JPanel wrapper = new JPanel(new BorderLayout());
 		wrapper.setBackground(UIConstants.CARD_BG);
 		wrapper.setBorder(new EmptyBorder(10, 12, 10, 12));
@@ -509,20 +524,33 @@ public class ProfilePanel extends JPanel {
 			}
 		}
 
+		int itemCount = 0;
 		if (definitions.isEmpty() && completedMilestones != null) {
-			for (AccountResponse.Milestone m : completedMilestones) {
-				list.add(new ChecklistItem(m.getDescription(), true, m.getPointsAwarded(), assetLoader));
-				list.add(Box.createRigidArea(new Dimension(0, 4)));
+			if (!hideCompleted) {
+				for (AccountResponse.Milestone m : completedMilestones) {
+					list.add(new ChecklistItem(m.getDescription(), true, m.getPointsAwarded(), assetLoader));
+					list.add(Box.createRigidArea(new Dimension(0, 4)));
+					itemCount++;
+				}
 			}
 		} else {
 			for (PointsResponse.PointSource def : definitions) {
 				AccountResponse.Milestone completed = completedMap.get(def.getId());
 				boolean isCompleted = completed != null && completed.getAchievedAt() != null && !completed.getAchievedAt().isEmpty();
+				if (hideCompleted && isCompleted) continue;
 				String desc = def.getDescription() != null ? def.getDescription() : def.getName();
 				Integer pts = isCompleted && completed.getPointsAwarded() != null ? completed.getPointsAwarded() : def.getPointsValue();
 				list.add(new ChecklistItem(desc, isCompleted, pts, assetLoader));
 				list.add(Box.createRigidArea(new Dimension(0, 4)));
+				itemCount++;
 			}
+		}
+
+		if (itemCount == 0) {
+			JLabel allDone = new JLabel("All milestones completed!");
+			allDone.setFont(FontManager.getRunescapeSmallFont());
+			allDone.setForeground(UIConstants.ACCENT_GREEN);
+			list.add(allDone);
 		}
 
 		wrapper.add(title, BorderLayout.NORTH);
@@ -541,6 +569,8 @@ public class ProfilePanel extends JPanel {
 	}
 
 	private JPanel buildTierSection(String titleText, String sourceKey, Integer currentProgress) {
+		boolean hideCompleted = config != null && config.hideCompletedItems();
+
 		JPanel wrapper = new JPanel(new BorderLayout());
 		wrapper.setBackground(UIConstants.CARD_BG);
 		wrapper.setBorder(new EmptyBorder(10, 12, 10, 12));
@@ -571,11 +601,21 @@ public class ProfilePanel extends JPanel {
 			empty.setForeground(UIConstants.TEXT_SECONDARY);
 			list.add(empty);
 		} else {
+			int itemCount = 0;
 			for (PointsResponse.PointSource tier : tiers) {
 				boolean completed = tier.getThreshold() != null && progress >= tier.getThreshold();
+				if (hideCompleted && completed) continue;
 				String desc = tier.getDescription() != null ? tier.getDescription() : tier.getName();
 				list.add(new ChecklistItem(desc, completed, tier.getPointsValue(), assetLoader));
 				list.add(Box.createRigidArea(new Dimension(0, 4)));
+				itemCount++;
+			}
+
+			if (itemCount == 0) {
+				JLabel allDone = new JLabel("All " + titleText.toLowerCase() + " completed!");
+				allDone.setFont(FontManager.getRunescapeSmallFont());
+				allDone.setForeground(UIConstants.ACCENT_GREEN);
+				list.add(allDone);
 			}
 		}
 

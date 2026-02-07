@@ -29,6 +29,7 @@ import net.runelite.api.events.WidgetLoaded;
 import net.runelite.api.events.ScriptPreFired;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
+import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.game.ItemManager;
@@ -98,6 +99,8 @@ public class RevalClanPlugin extends Plugin {
 
 	@Inject	private UIAssetLoader uiAssetLoader;
 
+	@Inject	private RevalClanConfig config;
+
 	private RevalPanel revalPanel;
 	private NavigationButton navButton;
 
@@ -124,7 +127,7 @@ public class RevalClanPlugin extends Plugin {
 		// Initialize and add the side panel
 		try {
 			revalPanel = new RevalPanel();
-			revalPanel.init(revalApiService, client, uiAssetLoader, itemManager, spriteManager);
+			revalPanel.init(revalApiService, client, uiAssetLoader, itemManager, spriteManager, config);
 			
 			BufferedImage icon = uiAssetLoader.getImage("reval.png");
 			
@@ -165,20 +168,24 @@ public class RevalClanPlugin extends Plugin {
 		diaryNotifier.onGameStateChanged(gameStateChanged);
 
 		if (gameStateChanged.getGameState() == GameState.LOGGED_IN) {
-			wasLoggedIn = true;
+			// Only trigger login events on actual login, not world hops
+			// wasLoggedIn is false only when coming from LOGIN_SCREEN
+			if (!wasLoggedIn) {
+				wasLoggedIn = true;
 
-			collectionLogManager.clearObtainedItems();
-			
-			// Fetch dynamic event filters from API on login
-			eventFilterManager.fetchFiltersAsync();
-			
-			// Load profile data for the side panel
-			if (revalPanel != null) {
-				revalPanel.onLoggedIn();
+				collectionLogManager.clearObtainedItems();
+				
+				// Fetch dynamic event filters from API on login
+				eventFilterManager.fetchFiltersAsync();
+				
+				// Load profile data for the side panel
+				if (revalPanel != null) {
+					revalPanel.onLoggedIn();
+				}
+
+				// Send login notification
+				loginNotifier.onLogin();
 			}
-
-			// Send login notification
-			loginNotifier.onLogin();
 		} else if (gameStateChanged.getGameState() == GameState.LOGIN_SCREEN) {
 			if (wasLoggedIn) {
 				logoutNotifier.onLogout();
@@ -292,6 +299,15 @@ public class RevalClanPlugin extends Plugin {
 	@Subscribe
 	public void onVarbitChanged(VarbitChanged event) {
 		diaryNotifier.onVarbitChanged(event);
+	}
+
+	@Subscribe
+	public void onConfigChanged(ConfigChanged event) {
+		if (!"revalclan".equals(event.getGroup())) return;
+
+		if ("hideCompletedItems".equals(event.getKey()) && revalPanel != null) {
+			revalPanel.getProfilePanel().rebuild();
+		}
 	}
 
 	@Provides

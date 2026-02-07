@@ -3,6 +3,7 @@ package com.revalclan.notifiers;
 import com.revalclan.RevalClanConfig;
 import com.revalclan.util.ClanValidator;
 import com.revalclan.util.EventFilterManager;
+import com.revalclan.util.ScreenshotService;
 import com.revalclan.util.WebhookService;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
@@ -33,6 +34,8 @@ public abstract class BaseNotifier {
 	
 	@Inject protected ItemManager itemManager;
 
+	@Inject protected ScreenshotService screenshotService;
+
 	/**
 	 * Check if this notifier should be active
 	 * @return true if the notifier is enabled and conditions are met
@@ -46,14 +49,41 @@ public abstract class BaseNotifier {
 	protected abstract String getEventType();
 
 	/**
-	 * Send a notification with the given data
+	 * Send a notification with the given data (no screenshot).
 	 * 
 	 * @param data The notification data
 	 */
 	protected void sendNotification(Map<String, Object> data) {
 		if (!ClanValidator.validateClan(client)) return;
 
-		// Add event metadata
+		addEventMetadata(data);
+		webhookService.sendDataAsync(data);
+	}
+
+	/**
+	 * Captures a screenshot of the current game frame, attaches it to the data,
+	 * then sends the notification asynchronously.
+	 * @param data The notification data
+	 */
+	protected void sendNotificationWithScreenshot(Map<String, Object> data) {
+		if (!ClanValidator.validateClan(client)) return;
+
+		addEventMetadata(data);
+
+		screenshotService.captureScreenshot()
+			.thenAccept(base64Screenshot -> {
+				if (base64Screenshot != null) {
+					data.put("screenshot", base64Screenshot);
+				}
+				webhookService.sendDataAsync(data);
+			});
+	}
+
+	/**
+	 * Adds standard event metadata (type, timestamp, location, inventory, etc.) to the data map.
+	 * Must be called on the game thread where client access is safe.
+	 */
+	private void addEventMetadata(Map<String, Object> data) {
 		data.put("eventType", getEventType());
 		data.put("eventTimestamp", System.currentTimeMillis());
 		data.put("accountHash", client.getAccountHash());
@@ -70,9 +100,6 @@ public abstract class BaseNotifier {
 		
 		data.put("inventory", getInventoryData());
 		data.put("equipment", getEquippedItems());
-		
-		// Send webhook
-		webhookService.sendDataAsync(data);
 	}
 
 	/**
@@ -139,4 +166,3 @@ public abstract class BaseNotifier {
 		return items;
 	}
 }
-

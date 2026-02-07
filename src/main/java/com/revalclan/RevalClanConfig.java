@@ -7,20 +7,42 @@ import net.runelite.client.config.ConfigSection;
 
 @ConfigGroup("revalclan")
 public interface RevalClanConfig extends Config {
+
+	// ── Panel Settings ─────────────────────────────────────────────────
+	@ConfigSection(
+		name = "Panel Settings",
+		description = "Customize the Reval side panel appearance",
+		position = 0
+	)
+	String panelSection = "panelSection";
+
+	@ConfigItem(
+		keyName = "hideCompletedItems",
+		name = "Hide completed items",
+		description = "Only show incomplete milestones, combat achievements and collection log tiers on the profile",
+		section = panelSection,
+		position = 0
+	)
+	default boolean hideCompletedItems() {
+		return false;
+	}
+
+	// ── Event Notifications ────────────────────────────────────────────
 	@ConfigSection(
 		name = "Event Notifications",
-		description = "Toggle individual event types",
-		position = 1
+		description = "Disabling notifiers will stop the plugin from tracking and sending the corresponding events to Reval. Some features will not work as expected. Disable at your own discretion.",
+		position = 1,
+		closedByDefault = true
 	)
 	String eventsSection = "eventsSection";
 
-	// Event type toggles
 	@ConfigItem(
 		keyName = "notifyLoot",
 		name = "Loot Drops",
-		description = "Send notifications for valuable loot drops",
+		description = "Track valuable loot drops",
 		section = eventsSection,
-		position = 1
+		position = 1,
+		warning = "Disabling this will stop loot tracking. Your drop points and loot history will not update."
 	)
 	default boolean notifyLoot() {
 		return true;
@@ -29,9 +51,10 @@ public interface RevalClanConfig extends Config {
 	@ConfigItem(
 		keyName = "notifyPet",
 		name = "Pet Drops",
-		description = "Send notifications when you receive a pet",
+		description = "Track pet drops",
 		section = eventsSection,
-		position = 2
+		position = 2,
+		warning = "Disabling this will stop pet tracking. Pet points will not update."
 	)
 	default boolean notifyPet() {
 		return true;
@@ -40,9 +63,10 @@ public interface RevalClanConfig extends Config {
 	@ConfigItem(
 		keyName = "notifyQuest",
 		name = "Quest Completions",
-		description = "Send notifications when you complete a quest",
+		description = "Track quest completions",
 		section = eventsSection,
-		position = 3
+		position = 3,
+		warning = "Disabling this will stop quest tracking."
 	)
 	default boolean notifyQuest() {
 		return true;
@@ -51,9 +75,10 @@ public interface RevalClanConfig extends Config {
 	@ConfigItem(
 		keyName = "notifyLevel",
 		name = "Level Ups",
-		description = "Send notifications when you level up",
+		description = "Track level ups",
 		section = eventsSection,
-		position = 4
+		position = 4,
+		warning = "Disabling this will stop level-up tracking. Milestone points tied to levels will not update."
 	)
 	default boolean notifyLevel() {
 		return true;
@@ -62,9 +87,10 @@ public interface RevalClanConfig extends Config {
 	@ConfigItem(
 		keyName = "notifyKillCount",
 		name = "Kill Counts",
-		description = "Send notifications for boss kill counts",
+		description = "Track boss kill counts",
 		section = eventsSection,
-		position = 5
+		position = 5,
+		warning = "Disabling this will stop kill count tracking."
 	)
 	default boolean notifyKillCount() {
 		return true;
@@ -73,9 +99,10 @@ public interface RevalClanConfig extends Config {
 	@ConfigItem(
 		keyName = "notifyClue",
 		name = "Clue Scrolls",
-		description = "Send notifications when you complete a clue scroll",
+		description = "Track clue scroll completions",
 		section = eventsSection,
-		position = 6
+		position = 6,
+		warning = "Disabling this will stop clue scroll tracking."
 	)
 	default boolean notifyClue() {
 		return true;
@@ -84,9 +111,10 @@ public interface RevalClanConfig extends Config {
 	@ConfigItem(
 		keyName = "notifyDiary",
 		name = "Achievement Diaries",
-		description = "Send notifications when you complete an achievement diary",
+		description = "Track achievement diary completions",
 		section = eventsSection,
-		position = 7
+		position = 7,
+		warning = "Disabling this will stop diary tracking."
 	)
 	default boolean notifyDiary() {
 		return true;
@@ -95,9 +123,10 @@ public interface RevalClanConfig extends Config {
 	@ConfigItem(
 		keyName = "notifyCombatAchievement",
 		name = "Combat Achievements",
-		description = "Send notifications when you complete a combat achievement",
+		description = "Track combat achievement completions",
 		section = eventsSection,
-		position = 8
+		position = 8,
+		warning = "Disabling this will stop combat achievement tracking. CA points will not update."
 	)
 	default boolean notifyCombatAchievement() {
 		return true;
@@ -106,9 +135,10 @@ public interface RevalClanConfig extends Config {
 	@ConfigItem(
 		keyName = "notifyCollection",
 		name = "Collection Log",
-		description = "Send notifications when you add items to collection log",
+		description = "Track collection log additions",
 		section = eventsSection,
-		position = 9
+		position = 9,
+		warning = "Disabling this will stop collection log tracking. Collection log points will not update."
 	)
 	default boolean notifyCollection() {
 		return true;
@@ -117,9 +147,10 @@ public interface RevalClanConfig extends Config {
 	@ConfigItem(
 		keyName = "notifyDeath",
 		name = "Player Deaths",
-		description = "Send notifications when you die",
+		description = "Track player deaths",
 		section = eventsSection,
-		position = 10
+		position = 10,
+		warning = "Disabling this will stop death tracking."
 	)
 	default boolean notifyDeath() {
 		return true;
@@ -128,9 +159,10 @@ public interface RevalClanConfig extends Config {
 	@ConfigItem(
 		keyName = "notifyDetailedKill",
 		name = "Detailed Kills",
-		description = "Send detailed kill tracking (damage, weapons, specs)",
+		description = "Track detailed kill data (damage, weapons, specs)",
 		section = eventsSection,
-		position = 12
+		position = 12,
+		warning = "Disabling this will stop detailed kill tracking."
 	)
 	default boolean notifyDetailedKill() {
 		return true;
@@ -139,7 +171,7 @@ public interface RevalClanConfig extends Config {
 	@ConfigItem(
 		keyName = "notifyEmote",
 		name = "Emotes",
-		description = "Send notifications when performing emotes",
+		description = "Track emote usage",
 		section = eventsSection,
 		position = 14
 	)
@@ -150,7 +182,7 @@ public interface RevalClanConfig extends Config {
 	@ConfigItem(
 		keyName = "notifyChat",
 		name = "System Chat Messages",
-		description = "Send notifications for system chat messages (game events, broadcasts, etc.)",
+		description = "Track system chat messages (game events, broadcasts, etc.)",
 		section = eventsSection,
 		position = 15
 	)
@@ -161,7 +193,7 @@ public interface RevalClanConfig extends Config {
 	@ConfigItem(
 		keyName = "notifyMusic",
 		name = "Music Played",
-		description = "Send notifications when you play a music track",
+		description = "Track music tracks played",
 		section = eventsSection,
 		position = 17
 	)

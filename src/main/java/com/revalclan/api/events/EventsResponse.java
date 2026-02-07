@@ -65,7 +65,7 @@ public class EventsResponse extends ApiResponse {
         public String getFormattedStartDate() {
             try {
                 ZonedDateTime zdt = ZonedDateTime.parse(startDate);
-                return zdt.format(DateTimeFormatter.ofPattern("MMM d, yyyy HH:mm"));
+                return zdt.format(DateTimeFormatter.ofPattern("MMM d HH:mm"));
             } catch (Exception e) {
                 return startDate;
             }
@@ -74,7 +74,7 @@ public class EventsResponse extends ApiResponse {
         public String getFormattedEndDate() {
             try {
                 ZonedDateTime zdt = ZonedDateTime.parse(endDate);
-                return zdt.format(DateTimeFormatter.ofPattern("MMM d, yyyy HH:mm"));
+                return zdt.format(DateTimeFormatter.ofPattern("MMM d HH:mm"));
             } catch (Exception e) {
                 return endDate;
             }

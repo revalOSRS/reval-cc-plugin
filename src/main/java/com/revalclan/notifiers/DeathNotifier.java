@@ -12,12 +12,14 @@ import net.runelite.api.Actor;
 import net.runelite.api.NPC;
 import net.runelite.api.NPCComposition;
 import net.runelite.api.Player;
+import net.runelite.api.WorldType;
 import net.runelite.api.events.ActorDeath;
 import net.runelite.api.events.InteractingChanged;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.lang.ref.WeakReference;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -76,8 +78,8 @@ public class DeathNotifier extends BaseNotifier {
 			handleDeath();
 		}
 		
-		// Clear target reference if our target or we died
-		if (actor == client.getLocalPlayer() || actor == lastTarget.get()) {
+		// Clear target reference if our target died
+		if (actor == lastTarget.get()) {
 			lastTarget = new WeakReference<>(null);
 		}
 	}
@@ -88,24 +90,28 @@ public class DeathNotifier extends BaseNotifier {
 		// Identify killer using sophisticated algorithm
 		Actor killer = identifyKiller();
 		
-		if (killer != null) {
-			if (killer instanceof NPC) {
-				NPC npc = (NPC) killer;
-				deathData.put("killedBy", npc.getName());
-				deathData.put("killerType", "NPC");
-				deathData.put("killerId", npc.getId());
-			} else if (killer instanceof Player) {
-				Player player = (Player) killer;
-				deathData.put("killedBy", player.getName());
-				deathData.put("killerType", "PLAYER");
-				deathData.put("killerCombatLevel", player.getCombatLevel());
-			}
+		if (killer instanceof NPC) {
+			NPC npc = (NPC) killer;
+			deathData.put("killedBy", npc.getName());
+			deathData.put("killerType", "NPC");
+			deathData.put("killerId", npc.getId());
+			deathData.put("killerCombatLevel", npc.getCombatLevel());
+		} else if (killer instanceof Player) {
+			Player player = (Player) killer;
+			deathData.put("killedBy", player.getName());
+			deathData.put("killerType", "PLAYER");
+			deathData.put("killerCombatLevel", player.getCombatLevel());
 		} else {
 			deathData.put("killedBy", "Unknown");
 			deathData.put("killerType", "UNKNOWN");
 		}
 		
-		sendNotification(deathData);
+		// World context — useful for backend to know if death was in PvP/dangerous world
+		EnumSet<WorldType> worldTypes = client.getWorldType();
+		deathData.put("isPvpWorld", worldTypes.contains(WorldType.PVP));
+		deathData.put("isHighRiskWorld", worldTypes.contains(WorldType.HIGH_RISK));
+		
+		sendNotificationWithScreenshot(deathData);
 		
 		reset();
 	}
@@ -170,13 +176,7 @@ public class DeathNotifier extends BaseNotifier {
 			return false;
 		}
 		
-		if (actor instanceof Player) {
-			// For now, we'll accept any player
-			// In the future, could add wilderness/PvP world checks
-			return true;
-		}
-		
-		return false;
+		return actor instanceof Player;
 	}
 
 	public void reset() {

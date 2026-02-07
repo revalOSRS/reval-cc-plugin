@@ -12,7 +12,7 @@ public class BackButton extends JButton {
 		super(text);
 		setFont(FontManager.getRunescapeSmallFont());
 		setForeground(UIConstants.TEXT_PRIMARY);
-		setBorder(new EmptyBorder(6, 8, 2, 8));
+		setBorder(new EmptyBorder(4, 8, 4, 8));
 		setContentAreaFilled(false);
 		setBorderPainted(false);
 		setFocusPainted(false);
