@@ -30,6 +30,7 @@ public class ProfilePanel extends JPanel {
 	private Client client;
 	private UIAssetLoader assetLoader;
 	private RevalClanConfig config;
+	private java.util.function.Consumer<AccountResponse.AccountData> onAccountLoaded;
 
 	private AccountResponse.AccountData currentAccount;
 	private List<PointsResponse.Rank> ranks;
@@ -92,6 +93,10 @@ public class ProfilePanel extends JPanel {
 		fetchRanks();
 	}
 
+	public void setOnAccountLoaded(java.util.function.Consumer<AccountResponse.AccountData> callback) {
+		this.onAccountLoaded = callback;
+	}
+
 	private void fetchRanks() {
 		if (apiService == null) return;
 		apiService.fetchPoints(
@@ -149,7 +154,10 @@ public class ProfilePanel extends JPanel {
 				isLoading = false;
 				SwingUtilities.invokeLater(() -> {
 					currentAccount = response.getData();
-					if (currentAccount != null) pointsLog = currentAccount.getPointsLog();
+					if (currentAccount != null) {
+						pointsLog = currentAccount.getPointsLog();
+						if (onAccountLoaded != null) onAccountLoaded.accept(currentAccount);
+					}
 					if (pointsData != null) buildProfile();
 					if (ranks == null || ranks.isEmpty() || pointsData == null) fetchRanks();
 				});
@@ -279,10 +287,7 @@ public class ProfilePanel extends JPanel {
 		addSpacing(6);
 
 		if (currentAccount.getPointsBreakdown() != null) {
-			gbc.gridy = gridY++;
-			gbc.anchor = GridBagConstraints.NORTHWEST;
-			contentPanel.add(buildPointsSection(currentAccount.getPointsBreakdown()), gbc);
-			gbc.anchor = GridBagConstraints.NORTH;
+			addComponent(buildPointsSection(currentAccount.getPointsBreakdown()));
 			addSpacing(6);
 		}
 
@@ -454,10 +459,10 @@ public class ProfilePanel extends JPanel {
 		JPanel section = new JPanel();
 		section.setLayout(new BoxLayout(section, BoxLayout.Y_AXIS));
 		section.setOpaque(false);
-		section.setAlignmentX(Component.LEFT_ALIGNMENT);
 
 		JPanel labelHeader = new JPanel(new BorderLayout());
 		labelHeader.setOpaque(false);
+		labelHeader.setAlignmentX(Component.LEFT_ALIGNMENT);
 		labelHeader.setMaximumSize(new Dimension(Integer.MAX_VALUE, 20));
 
 		JLabel pointsFromLabel = new JLabel("Points from:");
@@ -470,12 +475,14 @@ public class ProfilePanel extends JPanel {
 
 		JPanel topRow = new JPanel(new GridLayout(1, 3, 4, 0));
 		topRow.setOpaque(false);
+		topRow.setAlignmentX(Component.LEFT_ALIGNMENT);
 		topRow.add(createStatCard(formatNumber(breakdown.getDrops()), "Drops", UIConstants.ACCENT_GREEN, "drop"));
 		topRow.add(createStatCard(formatNumber(breakdown.getPets()), "Pets", UIConstants.ACCENT_PURPLE, "pet"));
 		topRow.add(createStatCard(formatNumber(breakdown.getMilestones()), "Milestones", UIConstants.ACCENT_BLUE, "milestone"));
 
 		JPanel bottomRow = new JPanel(new GridLayout(1, 3, 4, 0));
 		bottomRow.setOpaque(false);
+		bottomRow.setAlignmentX(Component.LEFT_ALIGNMENT);
 		bottomRow.add(createStatCard(formatNumber(breakdown.getRevalDiaries()), "Diaries", UIConstants.ACCENT_GOLD, "revalDiaries"));
 		bottomRow.add(createStatCard(formatNumber(breakdown.getRevalChallenges()), "Challenges", UIConstants.ACCENT_GREEN, "revalChallenges"));
 		bottomRow.add(createStatCard(formatNumber(breakdown.getEvents()), "Events", UIConstants.ACCENT_BLUE, "event"));

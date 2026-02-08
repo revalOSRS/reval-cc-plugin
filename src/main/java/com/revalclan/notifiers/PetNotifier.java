@@ -56,7 +56,7 @@ public class PetNotifier extends BaseNotifier {
 	/**
 	 * Maximum number of ticks to wait for pet name before sending notification without it
 	 */
-	private static final int MAX_TICKS_WAIT = 5;
+	private static final int MAX_TICKS_WAIT = 10;
 
 	@Inject private RevalClanConfig config;
 
