@@ -20,6 +20,7 @@ import java.awt.event.MouseEvent;
 import java.text.DecimalFormat;
 import java.util.*;
 import java.util.List;
+import java.util.function.Consumer;
 
 public class ProfilePanel extends JPanel {
 	private final JPanel contentPanel;
@@ -30,7 +31,7 @@ public class ProfilePanel extends JPanel {
 	private Client client;
 	private UIAssetLoader assetLoader;
 	private RevalClanConfig config;
-	private java.util.function.Consumer<AccountResponse.AccountData> onAccountLoaded;
+	private Consumer<AccountResponse.AccountData> onAccountLoaded;
 
 	private AccountResponse.AccountData currentAccount;
 	private List<PointsResponse.Rank> ranks;
@@ -93,7 +94,7 @@ public class ProfilePanel extends JPanel {
 		fetchRanks();
 	}
 
-	public void setOnAccountLoaded(java.util.function.Consumer<AccountResponse.AccountData> callback) {
+	public void setOnAccountLoaded(Consumer<AccountResponse.AccountData> callback) {
 		this.onAccountLoaded = callback;
 	}
 
