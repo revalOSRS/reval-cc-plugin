@@ -1,9 +1,7 @@
 package com.revalclan.notifiers;
 
-import com.revalclan.RevalClanConfig;
 import lombok.extern.slf4j.Slf4j;
 
-import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -57,8 +55,6 @@ public class PetNotifier extends BaseNotifier {
 	 * Maximum number of ticks to wait for pet name before sending notification without it
 	 */
 	private static final int MAX_TICKS_WAIT = 10;
-
-	@Inject private RevalClanConfig config;
 
 	/**
 	 * Whether we've seen the personal "You have a funny feeling" game message
@@ -348,25 +344,29 @@ public class PetNotifier extends BaseNotifier {
 		return false;
 	}
 
+	/** Pre-compiled patterns for cleaning usernames (avoids recompiling on every call). */
+	private static final Pattern LEADING_NON_WORD = Pattern.compile("^[^\\w\\s]+");
+	private static final Pattern CONTROL_CHARS = Pattern.compile("[\\u0000-\\u001F\\u007F-\\u009F]");
+	private static final Pattern GENERAL_PUNCTUATION = Pattern.compile("[\\u2000-\\u206F]");
+	private static final Pattern CURRENCY_SYMBOLS = Pattern.compile("[\\u20A0-\\u20CF]");
+	private static final Pattern ARROWS = Pattern.compile("[\\u2190-\\u21FF]");
+	private static final Pattern MISC_SYMBOLS = Pattern.compile("[\\u2600-\\u26FF]");
+	private static final Pattern DINGBATS = Pattern.compile("[\\u2700-\\u27BF]");
+
 	/**
-	 * Clean username by removing icons, special characters, and extra whitespace
-	 * This handles cases where Ironman icons or other special characters appear before the username
+	 * Clean username by removing icons, special characters, and extra whitespace.
+	 * Handles Ironman icons and other special characters that appear before usernames.
 	 */
 	private String cleanUsername(String username) {
 		if (username == null) return "";
-		
-		// Remove common icon/special characters that might appear before usernames
-		// This includes various Unicode symbols, emojis, and control characters
-		String cleaned = username
-			.replaceAll("^[^\\w\\s]+", "") // Remove leading non-word/non-space characters
-			.replaceAll("[\\u0000-\\u001F\\u007F-\\u009F]", "") // Remove control characters
-			.replaceAll("[\\u2000-\\u206F]", "") // Remove general punctuation
-			.replaceAll("[\\u20A0-\\u20CF]", "") // Remove currency symbols
-			.replaceAll("[\\u2190-\\u21FF]", "") // Remove arrows
-			.replaceAll("[\\u2600-\\u26FF]", "") // Remove miscellaneous symbols (includes some icons)
-			.replaceAll("[\\u2700-\\u27BF]", "") // Remove dingbats
-			.trim();
-		
-		return cleaned;
+
+		String cleaned = LEADING_NON_WORD.matcher(username).replaceAll("");
+		cleaned = CONTROL_CHARS.matcher(cleaned).replaceAll("");
+		cleaned = GENERAL_PUNCTUATION.matcher(cleaned).replaceAll("");
+		cleaned = CURRENCY_SYMBOLS.matcher(cleaned).replaceAll("");
+		cleaned = ARROWS.matcher(cleaned).replaceAll("");
+		cleaned = MISC_SYMBOLS.matcher(cleaned).replaceAll("");
+		cleaned = DINGBATS.matcher(cleaned).replaceAll("");
+		return cleaned.trim();
 	}
 }

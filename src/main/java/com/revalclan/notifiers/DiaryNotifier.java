@@ -7,7 +7,6 @@
  */
 package com.revalclan.notifiers;
 
-import com.revalclan.RevalClanConfig;
 import net.runelite.api.GameState;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.VarbitChanged;
@@ -33,8 +32,6 @@ public class DiaryNotifier extends BaseNotifier {
 	 * Key: varbit ID, Value: completion value (0 = not started, 1 = completed, 2 = completed for Karamja special case)
 	 */
 	private static final Map<Integer, String> DIARY_VARBITS = createDiaryMap();
-
-	@Inject private RevalClanConfig config;
 
 	@Inject private ClientThread clientThread;
 

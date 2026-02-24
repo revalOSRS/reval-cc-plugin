@@ -1,8 +1,5 @@
 package com.revalclan.notifiers;
 
-import com.revalclan.RevalClanConfig;
-
-import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.HashMap;
 import java.util.Map;
@@ -15,8 +12,7 @@ public class CombatAchievementNotifier extends BaseNotifier {
 		"Congratulations, you've completed an? (?<tier>\\w+) combat task: (?<task>.+)\\.",
 		Pattern.CASE_INSENSITIVE
 	);
-
-	@Inject private RevalClanConfig config;
+	private static final Pattern POINTS_SUFFIX = Pattern.compile("\\s+\\(\\d+ points?\\)$");
 
 	@Override 
 	public boolean isEnabled() {
@@ -41,7 +37,7 @@ public class CombatAchievementNotifier extends BaseNotifier {
 	}
 
 	private void handleCombatAchievement(String tier, String task) {
-		task = task.replaceAll("\\s+\\(\\d+ points?\\)$", "");
+		task = POINTS_SUFFIX.matcher(task).replaceAll("");
 
 		Map<String, Object> caData = new HashMap<>();
 		caData.put("tier", tier);

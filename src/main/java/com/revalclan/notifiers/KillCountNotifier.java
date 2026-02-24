@@ -1,9 +1,7 @@
 package com.revalclan.notifiers;
 
-import com.revalclan.RevalClanConfig;
 import lombok.extern.slf4j.Slf4j;
 
-import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.time.Duration;
 import java.util.HashMap;
@@ -36,8 +34,6 @@ public class KillCountNotifier extends BaseNotifier {
 		Pattern.CASE_INSENSITIVE
 	);
 
-	@Inject private RevalClanConfig config;
-	
 	private String pendingBoss = null;
 	private Integer pendingCount = null;
 	private Duration pendingTime = null;

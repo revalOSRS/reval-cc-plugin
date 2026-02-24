@@ -1,20 +1,17 @@
 package com.revalclan.notifiers;
 
-import com.revalclan.RevalClanConfig;
 import net.runelite.api.events.MenuOptionClicked;
 import net.runelite.api.gameval.InterfaceID;
 
-import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 @Singleton
 public class MusicNotifier extends BaseNotifier {
 	private static final int MUSIC_INTERFACE = InterfaceID.MUSIC;
-
-	@Inject
-	private RevalClanConfig config;
+	private static final Pattern HTML_TAGS = Pattern.compile("<[^>]+>");
 
 	@Override
 	public boolean isEnabled() {
@@ -35,7 +32,7 @@ public class MusicNotifier extends BaseNotifier {
 		int widgetGroup = widgetId >> 16;
 		
 		if ("Play".equals(menuOption) && widgetGroup == MUSIC_INTERFACE) {
-			String trackName = menuTarget.replaceAll("<[^>]+>", "").trim();
+			String trackName = HTML_TAGS.matcher(menuTarget).replaceAll("").trim();
 			
 			if (!trackName.isEmpty()) {
 				Map<String, Object> musicData = new HashMap<>();

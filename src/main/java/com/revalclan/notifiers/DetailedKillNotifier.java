@@ -1,6 +1,5 @@
 package com.revalclan.notifiers;
 
-import com.revalclan.RevalClanConfig;
 import net.runelite.api.Actor;
 import net.runelite.api.NPC;
 import net.runelite.api.Player;
@@ -8,19 +7,12 @@ import net.runelite.api.Hitsplat;
 import net.runelite.api.events.ActorDeath;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.HitsplatApplied;
-import net.runelite.client.game.ItemManager;
-
-import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Singleton
 public class DetailedKillNotifier extends BaseNotifier {
-	@Inject private RevalClanConfig config;
-
-	@Inject private ItemManager itemManager;
-
 	private final Map<NPC, KillData> activeKills = new ConcurrentHashMap<>();
 	
 	private int previousSpecEnergy = 100;

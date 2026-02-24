@@ -7,7 +7,6 @@
  */
 package com.revalclan.notifiers;
 
-import com.revalclan.RevalClanConfig;
 import net.runelite.api.Actor;
 import net.runelite.api.NPC;
 import net.runelite.api.NPCComposition;
@@ -16,7 +15,6 @@ import net.runelite.api.WorldType;
 import net.runelite.api.events.ActorDeath;
 import net.runelite.api.events.InteractingChanged;
 
-import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.lang.ref.WeakReference;
 import java.util.EnumSet;
@@ -26,8 +24,6 @@ import java.util.Map;
 @Singleton
 public class DeathNotifier extends BaseNotifier {
 	private static final String ATTACK_OPTION = "Attack";
-	
-	@Inject private RevalClanConfig config;
 
 	private Actor lastAttacker = null;
 	private long lastAttackTime = 0;

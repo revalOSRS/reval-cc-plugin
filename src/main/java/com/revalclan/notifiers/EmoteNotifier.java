@@ -1,18 +1,13 @@
 package com.revalclan.notifiers;
 
-import com.revalclan.RevalClanConfig;
 import net.runelite.api.events.MenuOptionClicked;
 
-import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.HashMap;
 import java.util.Map;
 
 @Singleton
 public class EmoteNotifier extends BaseNotifier {
-	@Inject
-	private RevalClanConfig config;
-
 	@Override
 	public boolean isEnabled() {
 		return config.notifyEmote() && filterManager.getFilters().isEmoteEnabled();

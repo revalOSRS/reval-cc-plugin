@@ -1,7 +1,6 @@
 package com.revalclan.notifiers;
 
 import com.revalclan.RevalClanConfig;
-import com.revalclan.util.ClanValidator;
 import com.revalclan.util.EventFilterManager;
 import com.revalclan.util.ScreenshotService;
 import com.revalclan.util.WebhookService;
@@ -14,6 +13,7 @@ import net.runelite.api.coords.WorldPoint;
 import net.runelite.client.game.ItemManager;
 
 import javax.inject.Inject;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -54,8 +54,6 @@ public abstract class BaseNotifier {
 	 * @param data The notification data
 	 */
 	protected void sendNotification(Map<String, Object> data) {
-		if (!ClanValidator.validateClan(client)) return;
-
 		addEventMetadata(data);
 		webhookService.sendDataAsync(data);
 	}
@@ -66,8 +64,6 @@ public abstract class BaseNotifier {
 	 * @param data The notification data
 	 */
 	protected void sendNotificationWithScreenshot(Map<String, Object> data) {
-		if (!ClanValidator.validateClan(client)) return;
-
 		addEventMetadata(data);
 
 		screenshotService.captureScreenshot()

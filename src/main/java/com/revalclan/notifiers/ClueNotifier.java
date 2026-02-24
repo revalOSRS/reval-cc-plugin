@@ -7,13 +7,10 @@
  */
 package com.revalclan.notifiers;
 
-import com.revalclan.RevalClanConfig;
 import net.runelite.api.events.WidgetLoaded;
 import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.widgets.Widget;
-import net.runelite.client.game.ItemManager;
 
-import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -29,9 +26,6 @@ public class ClueNotifier extends BaseNotifier {
 		Pattern.CASE_INSENSITIVE
 	);
 
-	@Inject private RevalClanConfig config;
-
-	@Inject private ItemManager itemManager;
 
 	private int clueCount = -1;
 	private String clueTier = "";

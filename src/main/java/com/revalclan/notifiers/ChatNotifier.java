@@ -1,11 +1,10 @@
 package com.revalclan.notifiers;
 
-import com.revalclan.RevalClanConfig;
-import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ChatMessageType;
 
-import javax.inject.Inject;
 import javax.inject.Singleton;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
@@ -17,26 +16,30 @@ import java.util.regex.Pattern;
  * Notifier for system chat messages - excludes player chats, private messages, clan chats, etc.
  * Useful for tracking game events, broadcasts, and system notifications for bingo/challenges.
  */
-@Slf4j
 @Singleton
 public class ChatNotifier extends BaseNotifier {
-	@Inject private RevalClanConfig config;
 	
 	/**
 	 * Chat message types that are considered "system" messages.
 	 * These are game-generated messages, not player-typed chats.
 	 */
 	private static final Set<ChatMessageType> SYSTEM_MESSAGE_TYPES = EnumSet.of(
-		ChatMessageType.GAMEMESSAGE,      // General game messages (most common)
-		ChatMessageType.SPAM,             // Spam filter messages (loot, drops, etc.)
-		ChatMessageType.ENGINE,           // Engine messages
-		ChatMessageType.CONSOLE,          // Console messages
-		ChatMessageType.MESBOX,           // Message boxes (NPC dialog, etc.)
-		ChatMessageType.DIALOG,           // Dialog messages
-    ChatMessageType.OBJECT_EXAMINE,   // Object examine messages
-    ChatMessageType.NPC_SAY,          // NPC say messages
-    ChatMessageType.NPC_EXAMINE       // NPC examine messages
+		ChatMessageType.GAMEMESSAGE,
+		ChatMessageType.SPAM,
+		ChatMessageType.ENGINE,
+		ChatMessageType.CONSOLE,
+		ChatMessageType.MESBOX,
+		ChatMessageType.DIALOG,
+		ChatMessageType.OBJECT_EXAMINE,
+		ChatMessageType.NPC_SAY,
+		ChatMessageType.NPC_EXAMINE
 	);
+
+	private static final Pattern HTML_BR = Pattern.compile("<br>");
+	private static final Pattern HTML_TAGS = Pattern.compile("<[^>]+>");
+
+	private List<String> cachedPatternStrings = Collections.emptyList();
+	private List<Pattern> cachedPatterns = Collections.emptyList();
 	
 	@Override
 	public boolean isEnabled() {
@@ -75,28 +78,30 @@ public class ChatNotifier extends BaseNotifier {
 	 */
 	private String cleanMessage(String message) {
 		if (message == null) return "";
-		return message
-			.replaceAll("<col=[0-9a-fA-F]+>", "")
-			.replaceAll("</col>", "")
-			.replaceAll("<br>", " ")
-			.replaceAll("<[^>]+>", "")
-			.trim();
+		String cleaned = HTML_BR.matcher(message).replaceAll(" ");
+		return HTML_TAGS.matcher(cleaned).replaceAll("").trim();
 	}
-	
+
 	/**
 	 * Check if the message matches any configured patterns
 	 * @param message The message to check
 	 * @param patterns List of regex pattern strings from the API
 	 */
 	private boolean hasMatch(String message, List<String> patterns) {
-		for (String patternStr : patterns) {
-			try {
-				Pattern pattern = Pattern.compile(patternStr, Pattern.CASE_INSENSITIVE);
-				if (pattern.matcher(message).find()) {
-					return true;
-				}
-			} catch (Exception e) {
-				log.warn("Invalid chat pattern from API: {}", patternStr);
+		if (!patterns.equals(cachedPatternStrings)) {
+			List<Pattern> compiled = new ArrayList<>(patterns.size());
+			for (String patternStr : patterns) {
+				try {
+					compiled.add(Pattern.compile(patternStr, Pattern.CASE_INSENSITIVE));
+				} catch (Exception e) {}
+			}
+			cachedPatterns = compiled;
+			cachedPatternStrings = new ArrayList<>(patterns);
+		}
+
+		for (Pattern pattern : cachedPatterns) {
+			if (pattern.matcher(message).find()) {
+				return true;
 			}
 		}
 		return false;

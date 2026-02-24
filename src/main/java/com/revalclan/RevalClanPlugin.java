@@ -5,11 +5,13 @@ import com.revalclan.collectionlog.CollectionLogManager;
 import com.revalclan.collectionlog.CollectionLogSyncButton;
 import com.revalclan.notifiers.*;
 import com.revalclan.ui.RevalPanel;
+import com.revalclan.util.ClanValidator;
 import com.revalclan.util.EventFilterManager;
 import com.revalclan.util.UIAssetLoader;
 import com.google.inject.Provides;
 
 import java.awt.image.BufferedImage;
+import java.util.regex.Pattern;
 
 import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
@@ -105,11 +107,23 @@ public class RevalClanPlugin extends Plugin {
 	private NavigationButton navButton;
 
 	private boolean wasLoggedIn = false;
+	private boolean pendingLoginNotification = false;
+
+	private volatile boolean inRequiredClan = false;
+	private int clanValidationAttempt = -1;
+
+	private static final int MAX_CLAN_VALIDATION_TICKS = 25;
+
+	private static final Pattern COL_OPEN = Pattern.compile("<col=[0-9a-fA-F]+>");
+	private static final Pattern COL_CLOSE = Pattern.compile("</col>");
 
 	@Override
 	protected void startUp() throws Exception {
 		log.info("Reval Clan plugin started!");
 		wasLoggedIn = false;
+		pendingLoginNotification = false;
+		inRequiredClan = false;
+		clanValidationAttempt = -1;
 
 		clientThread.invoke(() -> {
 			if (client.getIndexConfig() == null || client.getGameState().ordinal() < GameState.LOGIN_SCREEN.ordinal()) {
@@ -147,6 +161,10 @@ public class RevalClanPlugin extends Plugin {
 	@Override
 	protected void shutDown() throws Exception {
 		log.info("Reval Clan plugin stopped!");
+		inRequiredClan = false;
+		clanValidationAttempt = -1;
+		wasLoggedIn = false;
+
 		collectionLogManager.clearObtainedItems();
 		syncButton.shutDown();
 		
@@ -172,26 +190,20 @@ public class RevalClanPlugin extends Plugin {
 			// wasLoggedIn is false only when coming from LOGIN_SCREEN
 			if (!wasLoggedIn) {
 				wasLoggedIn = true;
-
 				collectionLogManager.clearObtainedItems();
-				
-				// Fetch dynamic event filters from API on login
-				eventFilterManager.fetchFiltersAsync();
-				
-				// Load profile data for the side panel
-				if (revalPanel != null) {
-					revalPanel.onLoggedIn();
-				}
 
-				// Send login notification
-				loginNotifier.onLogin();
+				pendingLoginNotification = true;
+
+				clanValidationAttempt = 0;
 			}
 		} else if (gameStateChanged.getGameState() == GameState.LOGIN_SCREEN) {
+			inRequiredClan = false;
+			clanValidationAttempt = -1;
+
 			if (wasLoggedIn) {
 				logoutNotifier.onLogout();
 				wasLoggedIn = false;
-				
-				// Show login messages on all panels
+
 				if (revalPanel != null) {
 					revalPanel.onLoggedOut();
 				}
@@ -199,14 +211,36 @@ public class RevalClanPlugin extends Plugin {
 		}
 	}
 
+	private void onClanValidated() {
+		eventFilterManager.fetchFiltersAsync();
+
+		if (revalPanel != null) {
+			revalPanel.onLoggedIn();
+		}
+	}
+
 	@Subscribe
 	public void onGameTick(GameTick gameTick) {
+		if (pendingLoginNotification) {
+			pendingLoginNotification = false;
+			loginNotifier.onLogin();
+		}
+
+		if (clanValidationAttempt >= 0) {
+			if (ClanValidator.validateClan(client)) {
+				inRequiredClan = true;
+				clanValidationAttempt = -1;
+				onClanValidated();
+			} else if (++clanValidationAttempt > MAX_CLAN_VALIDATION_TICKS) {
+				clanValidationAttempt = -1;
+			}
+		}
+
+		if (!inRequiredClan) return;
+
 		detailedKillNotifier.onGameTick(gameTick);
-		
 		killCountNotifier.onTick();
-		
 		diaryNotifier.onGameTick();
-		
 		petNotifier.onGameTick();
 	}
 
@@ -216,19 +250,16 @@ public class RevalClanPlugin extends Plugin {
 	 */
 	@Subscribe
 	public void onScriptPreFired(ScriptPreFired preFired) {
+		if (!inRequiredClan) return;
+
 		if (preFired.getScriptId() == 4100) {
 			try {
 				Object[] args = preFired.getScriptEvent().getArguments();
-				
-				if (args == null || args.length < 3) {
-					log.warn("Script 4100 fired with insufficient arguments: {}", args != null ? args.length : "null");
-					return;
-				}
-				
+				if (args == null || args.length < 3) return;
+
 				int itemId = (int) args[1];
 				int itemCount = (int) args[2];
 				String itemName = itemManager.getItemComposition(itemId).getName();
-
 				collectionLogManager.onCollectionLogItemObtained(itemId, itemCount, itemName);
 			} catch (Exception e) {
 				log.error("Error capturing collection log item", e);
@@ -238,18 +269,18 @@ public class RevalClanPlugin extends Plugin {
 
 	@Subscribe
 	public void onChatMessage(ChatMessage event) {
+		if (!inRequiredClan) return;
+
 		String message = event.getMessage();
-		
-		// Strip HTML color tags from the message before processing
-		String cleanMessage = message.replaceAll("<col=[0-9a-fA-F]+>", "").replaceAll("</col>", "");
-		
+		String cleanMessage = COL_CLOSE.matcher(COL_OPEN.matcher(message).replaceAll("")).replaceAll("");
+
 		ChatMessageType type = event.getType();
-		
+
 		chatNotifier.onChatMessage(type, event.getName(), cleanMessage);
-		
-		if (type == ChatMessageType.GAMEMESSAGE || 
-		    type == ChatMessageType.SPAM ||
-		    type == ChatMessageType.ENGINE) {
+
+		if (type == ChatMessageType.GAMEMESSAGE ||
+			type == ChatMessageType.SPAM ||
+			type == ChatMessageType.ENGINE) {
 			petNotifier.onChatMessage(cleanMessage);
 			lootNotifier.onGameMessage(cleanMessage);
 			killCountNotifier.onChatMessage(cleanMessage);
@@ -257,47 +288,54 @@ public class RevalClanPlugin extends Plugin {
 			combatAchievementNotifier.onChatMessage(cleanMessage);
 			collectionNotifier.onChatMessage(cleanMessage);
 		} else if (type == ChatMessageType.CLAN_MESSAGE ||
-		           type == ChatMessageType.CLAN_CHAT ||
-		           type == ChatMessageType.CLAN_GUEST_CHAT) {
+			type == ChatMessageType.CLAN_CHAT ||
+			type == ChatMessageType.CLAN_GUEST_CHAT) {
 			petNotifier.onClanNotification(cleanMessage);
 		}
 	}
 
 	@Subscribe
 	public void onStatChanged(StatChanged event) {
+		if (!inRequiredClan) return;
 		levelNotifier.onStatChanged(event);
 	}
 
 	@Subscribe
 	public void onWidgetLoaded(WidgetLoaded event) {
+		if (!inRequiredClan) return;
 		questNotifier.onWidgetLoaded(event);
 		clueNotifier.onWidgetLoaded(event);
 	}
 
 	@Subscribe
 	public void onActorDeath(ActorDeath event) {
+		if (!inRequiredClan) return;
 		deathNotifier.onActorDeath(event);
 		detailedKillNotifier.onActorDeath(event);
 	}
 
 	@Subscribe
 	public void onHitsplatApplied(HitsplatApplied event) {
+		if (!inRequiredClan) return;
 		detailedKillNotifier.onHitsplatApplied(event);
 	}
 
 	@Subscribe
 	public void onMenuOptionClicked(MenuOptionClicked event) {
+		if (!inRequiredClan) return;
 		emoteNotifier.onMenuOptionClicked(event);
 		musicNotifier.onMenuOptionClicked(event);
 	}
 
 	@Subscribe
 	public void onInteractingChanged(InteractingChanged event) {
+		if (!inRequiredClan) return;
 		deathNotifier.onInteractingChanged(event);
 	}
 
 	@Subscribe
 	public void onVarbitChanged(VarbitChanged event) {
+		if (!inRequiredClan) return;
 		diaryNotifier.onVarbitChanged(event);
 	}
 

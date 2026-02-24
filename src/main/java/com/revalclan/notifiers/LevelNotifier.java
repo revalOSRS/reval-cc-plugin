@@ -1,10 +1,8 @@
 package com.revalclan.notifiers;
 
-import com.revalclan.RevalClanConfig;
 import net.runelite.api.Skill;
 import net.runelite.api.events.StatChanged;
 
-import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.EnumMap;
 import java.util.HashMap;
@@ -15,8 +13,6 @@ import java.util.Map;
  */
 @Singleton
 public class LevelNotifier extends BaseNotifier {
-	@Inject private RevalClanConfig config;
-
 	private final Map<Skill, Integer> previousLevels = new EnumMap<>(Skill.class);
 	private final Map<Skill, Integer> previousXp = new EnumMap<>(Skill.class);
 

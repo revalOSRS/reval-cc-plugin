@@ -1,6 +1,5 @@
 package com.revalclan.notifiers;
 
-import com.revalclan.RevalClanConfig;
 import net.runelite.api.NPC;
 import net.runelite.api.gameval.ItemID;
 import net.runelite.api.gameval.NpcID;
@@ -8,23 +7,15 @@ import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.NpcLootReceived;
 import net.runelite.client.events.PlayerLootReceived;
 import net.runelite.client.events.ServerNpcLoot;
-import net.runelite.client.game.ItemManager;
 import net.runelite.client.game.ItemStack;
 import net.runelite.client.plugins.loottracker.LootReceived;
 import net.runelite.http.api.loottracker.LootRecordType;
 
-import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.*;
 
 @Singleton
 public class LootNotifier extends BaseNotifier {
-	@Inject
-	private RevalClanConfig config;
-
-	@Inject
-	private ItemManager itemManager;
-
 	/**
 	 * NPC IDs that fire LootReceived instead of NpcLootReceived
 	 * These should be handled in onLootReceived, not onNpcLootReceived

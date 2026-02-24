@@ -78,7 +78,6 @@ public class CompetitionsPanel extends JPanel {
 	public void init(RevalApiService apiService, Client client) {
 		this.apiService = apiService;
 		this.client = client;
-		loadData(true);
 	}
 
 	public void refresh() {

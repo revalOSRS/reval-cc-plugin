@@ -7,9 +7,6 @@
  */
 package com.revalclan.notifiers;
 
-import com.revalclan.RevalClanConfig;
-
-import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.HashMap;
 import java.util.Map;
@@ -22,8 +19,6 @@ public class CollectionNotifier extends BaseNotifier {
 		"New item added to your collection log: (?<item>.+)",
 		Pattern.CASE_INSENSITIVE
 	);
-
-	@Inject private RevalClanConfig config;
 
 	@Override
 	public boolean isEnabled() {
