@@ -43,23 +43,11 @@ public class EventsResponse extends ApiResponse {
         }
         
         public boolean isCurrentlyActive() {
-            if (!"active".equals(status)) return false;
-            try {
-                Instant start = Instant.parse(startDate);
-                return Instant.now().isAfter(start);
-            } catch (Exception e) {
-                return false;
-            }
+            return "active".equals(status) || "planning".equals(status);
         }
-        
+
         public boolean isUpcoming() {
-            if (!"active".equals(status)) return false;
-            try {
-                Instant start = Instant.parse(startDate);
-                return Instant.now().isBefore(start);
-            } catch (Exception e) {
-                return false;
-            }
+            return "scheduled".equals(status);
         }
         
         public String getFormattedStartDate() {
