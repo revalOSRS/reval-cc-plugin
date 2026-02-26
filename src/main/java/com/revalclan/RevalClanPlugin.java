@@ -131,6 +131,12 @@ public class RevalClanPlugin extends Plugin {
 			}
 
 			collectionLogManager.parseCacheForCollectionLog();
+
+			if (client.getGameState() == GameState.LOGGED_IN) {
+				wasLoggedIn = true;
+				clanValidationAttempt = 0;
+			}
+
 			return true;
 		});
 
