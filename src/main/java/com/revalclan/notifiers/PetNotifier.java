@@ -137,10 +137,11 @@ public class PetNotifier extends BaseNotifier {
 	public void onClanNotification(String message) {
 		if (!isEnabled()) return;
 
-		Matcher clanMatcher = CLAN_REGEX.matcher(message);
+		String normalized = message.replace('\u00A0', ' ');
+		Matcher clanMatcher = CLAN_REGEX.matcher(normalized);
 		if (clanMatcher.find()) {
 			String user = cleanUsername(clanMatcher.group("user"));
-			String playerName = getPlayerName();
+			String playerName = cleanUsername(getPlayerName());
 			
 			if (user.equalsIgnoreCase(playerName)) {
 				String pet = null;
