@@ -3,6 +3,7 @@ package com.revalclan.ui;
 import com.revalclan.api.RevalApiService;
 import com.revalclan.api.leaderboard.LeaderboardResponse;
 import com.revalclan.ui.components.BackButton;
+import com.revalclan.ui.components.RefreshButton;
 import com.revalclan.ui.constants.UIConstants;
 import com.revalclan.util.UIAssetLoader;
 
@@ -28,6 +29,7 @@ public class LeaderboardPanel extends JPanel {
 	private final JPanel contentPanel;
 	private final JPanel profileViewPanel;
 	private JTextField searchField;
+	private RefreshButton refreshButton;
 
 	private List<LeaderboardResponse.LeaderboardEntry> allEntries = new ArrayList<>();
 	private List<LeaderboardResponse.LeaderboardEntry> filteredEntries = new ArrayList<>();
@@ -35,6 +37,7 @@ public class LeaderboardPanel extends JPanel {
 	public LeaderboardPanel() {
 		setLayout(new BorderLayout());
 		setBackground(UIConstants.BACKGROUND);
+		refreshButton = new RefreshButton(this::refresh);
 
 		cardLayout = new CardLayout();
 		cardContainer = new JPanel(cardLayout);
@@ -148,18 +151,19 @@ public class LeaderboardPanel extends JPanel {
 	private void loadLeaderboard() {
 		if (apiService == null) return;
 
+		refreshButton.setLoading(true);
 		showLoading();
 		apiService.fetchLeaderboard(
 			response -> {
 				if (response.getData() != null && response.getData().getLeaderboard() != null) {
 					allEntries = response.getData().getLeaderboard();
 					filteredEntries = new ArrayList<>(allEntries);
-					SwingUtilities.invokeLater(this::buildLeaderboard);
+					SwingUtilities.invokeLater(() -> { refreshButton.setLoading(false); buildLeaderboard(); });
 				} else {
-					SwingUtilities.invokeLater(() -> showMessage("No leaderboard data"));
+					SwingUtilities.invokeLater(() -> { refreshButton.setLoading(false); showMessage("No leaderboard data"); });
 				}
 			},
-			error -> SwingUtilities.invokeLater(() -> showMessage("Failed to load leaderboard"))
+			error -> SwingUtilities.invokeLater(() -> { refreshButton.setLoading(false); showMessage("Failed to load leaderboard"); })
 		);
 	}
 
@@ -211,9 +215,15 @@ public class LeaderboardPanel extends JPanel {
 		JLabel countLabel = new JLabel(countText);
 		countLabel.setFont(FontManager.getRunescapeSmallFont());
 		countLabel.setForeground(UIConstants.TEXT_MUTED);
-		countLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-		contentPanel.add(countLabel);
-		contentPanel.add(Box.createVerticalStrut(6));
+
+		JPanel countRow = new JPanel(new BorderLayout());
+		countRow.setOpaque(false);
+		countRow.setAlignmentX(Component.LEFT_ALIGNMENT);
+		countRow.add(countLabel, BorderLayout.WEST);
+		countRow.add(refreshButton, BorderLayout.EAST);
+
+		contentPanel.add(countRow);
+		contentPanel.add(Box.createVerticalStrut(4));
 
 		for (LeaderboardResponse.LeaderboardEntry entry : filteredEntries) {
 			contentPanel.add(createPlayerRow(entry));

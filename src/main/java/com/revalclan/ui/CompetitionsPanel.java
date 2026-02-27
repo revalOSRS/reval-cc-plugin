@@ -434,7 +434,7 @@ public class CompetitionsPanel extends JPanel {
 			: UIConstants.TEXT_SECONDARY;
 
 		JLabel rankLabel = label("#" + rank, FontManager.getRunescapeBoldFont(), rankColor, -1);
-		rankLabel.setPreferredSize(new Dimension(28, 20));
+		rankLabel.setPreferredSize(new Dimension(42, 20));
 
 		Integer value = entry.getCurrentValue() != null ? entry.getCurrentValue() : entry.getFinalValue();
 

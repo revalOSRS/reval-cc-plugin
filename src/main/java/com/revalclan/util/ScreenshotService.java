@@ -1,6 +1,10 @@
 package com.revalclan.util;
 
 import lombok.extern.slf4j.Slf4j;
+import net.runelite.api.Client;
+import net.runelite.api.gameval.InterfaceID;
+import net.runelite.api.widgets.Widget;
+import net.runelite.client.callback.ClientThread;
 import net.runelite.client.ui.DrawManager;
 
 import javax.imageio.IIOImage;
@@ -21,45 +25,70 @@ import java.util.concurrent.ScheduledExecutorService;
 @Singleton
 public class ScreenshotService {
 	private static final float JPEG_QUALITY = 0.92f;
-	private static final int MAX_WIDTH = 1200;
+	private static final int MAX_WIDTH = 1600;
 
-	private final DrawManager drawManager;
-	private final ScheduledExecutorService executor;
+	@Inject private DrawManager drawManager;
+	@Inject private Client client;
+	@Inject private ClientThread clientThread;
+	@Inject private ScheduledExecutorService executor;
 
-	@Inject
-	public ScreenshotService(DrawManager drawManager, ScheduledExecutorService executor) {
-		this.drawManager = drawManager;
-		this.executor = executor;
+	public CompletableFuture<String> captureScreenshot() {
+		CompletableFuture<String> result = new CompletableFuture<>();
+
+		clientThread.invoke(() -> {
+			boolean chatHidden = hideWidget(InterfaceID.Chatbox.CHATAREA);
+			boolean pmHidden = hideWidget(InterfaceID.PmChat.CONTAINER);
+
+			try {
+				drawManager.requestNextFrameListener(image -> {
+					restoreWidget(chatHidden, InterfaceID.Chatbox.CHATAREA);
+					restoreWidget(pmHidden, InterfaceID.PmChat.CONTAINER);
+
+					executor.submit(() -> {
+						if (image == null) {
+							result.complete(null);
+							return;
+						}
+						try {
+							BufferedImage screenshot = toBufferedImage(image);
+							screenshot = resizeIfNeeded(screenshot);
+							result.complete(compressAndEncode(screenshot));
+						} catch (Exception e) {
+							log.error("Error processing screenshot", e);
+							result.complete(null);
+						}
+					});
+				});
+			} catch (Exception e) {
+				restoreWidget(chatHidden, InterfaceID.Chatbox.CHATAREA);
+				restoreWidget(pmHidden, InterfaceID.PmChat.CONTAINER);
+				result.complete(null);
+			}
+
+			return true;
+		});
+
+		return result;
 	}
 
-	/**
-	 * Captures the next game frame, compresses it as JPEG, and returns
-	 * a CompletableFuture containing the base64-encoded string.
-	 *
-	 * @return CompletableFuture that resolves to a base64 JPEG string, or null on failure
-	 */
-	public CompletableFuture<String> captureScreenshot() {
-		CompletableFuture<Image> frameFuture = new CompletableFuture<>();
-
-		try {
-			drawManager.requestNextFrameListener(frameFuture::complete);
-		} catch (Exception e) {
-			frameFuture.complete(null);
+	private boolean hideWidget(int componentId) {
+		Widget widget = client.getWidget(componentId);
+		if (widget == null || widget.isHidden()) {
+			return false;
 		}
+		widget.setHidden(true);
+		return true;
+	}
 
-		return frameFuture
-			.thenApplyAsync(image -> {
-				if (image == null) {
-					return null;
-				}
-				try {
-					BufferedImage screenshot = toBufferedImage(image);
-					screenshot = resizeIfNeeded(screenshot);
-					return compressAndEncode(screenshot);
-				} catch (Exception e) {
-					return null;
-				}
-			}, executor);
+	private void restoreWidget(boolean wasHidden, int componentId) {
+		if (!wasHidden) return;
+		clientThread.invoke(() -> {
+			Widget widget = client.getWidget(componentId);
+			if (widget != null) {
+				widget.setHidden(false);
+			}
+			return true;
+		});
 	}
 
 	/**
@@ -91,7 +120,7 @@ public class ScreenshotService {
 
 		BufferedImage resized = new BufferedImage(MAX_WIDTH, newHeight, BufferedImage.TYPE_INT_RGB);
 		Graphics2D g = resized.createGraphics();
-		g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+		g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
 		g.drawImage(image, 0, 0, MAX_WIDTH, newHeight, null);
 		g.dispose();
 		return resized;

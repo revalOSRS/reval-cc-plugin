@@ -16,7 +16,7 @@ import java.util.zip.GZIPOutputStream;
 public class WebhookService {
 	private static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
 	private static final String WEBHOOK_URL = "https://api.revalosrs.ee/reval-webhook";
-	private static final String PLUGIN_VERSION = "2.6";
+	private static final String PLUGIN_VERSION = "2.7";
 	
 	@Inject
 	private OkHttpClient httpClient;

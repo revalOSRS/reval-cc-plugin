@@ -6,6 +6,7 @@ import com.revalclan.api.account.AccountResponse;
 import com.revalclan.api.points.PointsResponse;
 import com.revalclan.ui.components.ChecklistItem;
 import com.revalclan.ui.components.LoginPrompt;
+import com.revalclan.ui.components.RefreshButton;
 import com.revalclan.ui.constants.UIConstants;
 import com.revalclan.util.UIAssetLoader;
 import net.runelite.api.Client;
@@ -342,9 +343,9 @@ public class ProfilePanel extends JPanel {
 			leftPanel.add(rankProgress);
 		}
 
-		JPanel pointsPanel = new JPanel();
-		pointsPanel.setLayout(new BoxLayout(pointsPanel, BoxLayout.Y_AXIS));
-		pointsPanel.setOpaque(false);
+		JPanel pointsDisplay = new JPanel();
+		pointsDisplay.setLayout(new BoxLayout(pointsDisplay, BoxLayout.Y_AXIS));
+		pointsDisplay.setOpaque(false);
 
 		int points = account.getActivityPoints() != null ? account.getActivityPoints() : 0;
 		JLabel pointsValue = new JLabel(String.format("%,d", points).replace(",", " "));
@@ -357,11 +358,20 @@ public class ProfilePanel extends JPanel {
 		pointsLabel.setForeground(UIConstants.TEXT_SECONDARY);
 		pointsLabel.setAlignmentX(Component.RIGHT_ALIGNMENT);
 
-		pointsPanel.add(pointsValue);
-		pointsPanel.add(pointsLabel);
+		pointsDisplay.add(pointsValue);
+		pointsDisplay.add(pointsLabel);
+
+		JPanel refreshRow = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
+		refreshRow.setOpaque(false);
+		refreshRow.add(new RefreshButton(this::refresh));
+
+		JPanel rightPanel = new JPanel(new BorderLayout(0, 4));
+		rightPanel.setOpaque(false);
+		rightPanel.add(pointsDisplay, BorderLayout.NORTH);
+		rightPanel.add(refreshRow, BorderLayout.SOUTH);
 
 		header.add(leftPanel, BorderLayout.CENTER);
-		header.add(pointsPanel, BorderLayout.EAST);
+		header.add(rightPanel, BorderLayout.EAST);
 
 		return wrapInRoundedPanel(header);
 	}
