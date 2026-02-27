@@ -36,59 +36,44 @@ public class ScreenshotService {
 		CompletableFuture<String> result = new CompletableFuture<>();
 
 		clientThread.invoke(() -> {
-			boolean chatHidden = hideWidget(InterfaceID.Chatbox.CHATAREA);
-			boolean pmHidden = hideWidget(InterfaceID.PmChat.CONTAINER);
+			Widget chat = client.getWidget(InterfaceID.Chatbox.CHATAREA);
+			Widget pm = client.getWidget(InterfaceID.PmChat.CONTAINER);
 
-			try {
-				drawManager.requestNextFrameListener(image -> {
-					restoreWidget(chatHidden, InterfaceID.Chatbox.CHATAREA);
-					restoreWidget(pmHidden, InterfaceID.PmChat.CONTAINER);
+			boolean chatWasVisible = chat != null && !chat.isHidden();
+			boolean pmWasVisible = pm != null && !pm.isHidden();
 
-					executor.submit(() -> {
-						if (image == null) {
-							result.complete(null);
-							return;
-						}
-						try {
-							BufferedImage screenshot = toBufferedImage(image);
-							screenshot = resizeIfNeeded(screenshot);
-							result.complete(compressAndEncode(screenshot));
-						} catch (Exception e) {
-							log.error("Error processing screenshot", e);
-							result.complete(null);
-						}
+			if (chatWasVisible) chat.setHidden(true);
+			if (pmWasVisible) pm.setHidden(true);
+
+			drawManager.requestNextFrameListener(image -> {
+				if (chatWasVisible || pmWasVisible) {
+					clientThread.invoke(() -> {
+						if (chatWasVisible && chat != null) chat.setHidden(false);
+						if (pmWasVisible && pm != null) pm.setHidden(false);
+						return true;
 					});
+				}
+
+				executor.submit(() -> {
+					if (image == null) {
+						result.complete(null);
+						return;
+					}
+					try {
+						BufferedImage screenshot = toBufferedImage(image);
+						screenshot = resizeIfNeeded(screenshot);
+						result.complete(compressAndEncode(screenshot));
+					} catch (Exception e) {
+						log.error("Error processing screenshot", e);
+						result.complete(null);
+					}
 				});
-			} catch (Exception e) {
-				restoreWidget(chatHidden, InterfaceID.Chatbox.CHATAREA);
-				restoreWidget(pmHidden, InterfaceID.PmChat.CONTAINER);
-				result.complete(null);
-			}
+			});
 
 			return true;
 		});
 
 		return result;
-	}
-
-	private boolean hideWidget(int componentId) {
-		Widget widget = client.getWidget(componentId);
-		if (widget == null || widget.isHidden()) {
-			return false;
-		}
-		widget.setHidden(true);
-		return true;
-	}
-
-	private void restoreWidget(boolean wasHidden, int componentId) {
-		if (!wasHidden) return;
-		clientThread.invoke(() -> {
-			Widget widget = client.getWidget(componentId);
-			if (widget != null) {
-				widget.setHidden(false);
-			}
-			return true;
-		});
 	}
 
 	/**
