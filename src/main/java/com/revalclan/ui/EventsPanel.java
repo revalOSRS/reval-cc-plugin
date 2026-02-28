@@ -7,9 +7,7 @@ import com.revalclan.ui.components.LoginPrompt;
 import com.revalclan.ui.components.PanelTitle;
 import com.revalclan.ui.components.RefreshButton;
 import com.revalclan.ui.constants.UIConstants;
-import com.revalclan.util.ClanValidator;
 import net.runelite.api.Client;
-import net.runelite.api.GameState;
 import net.runelite.client.ui.FontManager;
 
 import javax.swing.*;
@@ -57,7 +55,7 @@ public class EventsPanel extends JPanel {
 
 	public void onLoggedIn() {
 		if (allEvents.isEmpty() || isShowingLoginPrompt()) {
-			checkAuthorizationAndLoad();
+			loadAuthorized();
 		}
 	}
 
@@ -77,40 +75,16 @@ public class EventsPanel extends JPanel {
 			contentPanel.getComponent(0) instanceof LoginPrompt;
 	}
 
-	private void checkAuthorizationAndLoad() {
-		if (client == null || client.getGameState() != GameState.LOGGED_IN || client.getAccountHash() == -1) {
+	private void loadAuthorized() {
+		if (client == null || client.getAccountHash() == -1) {
 			showNotLoggedIn();
 			return;
 		}
 
-		if (ClanValidator.validateClan(client)) {
-			buildFullUI();
-			currentAccountHash = client.getAccountHash();
-			currentPlayerName = client.getLocalPlayer() != null ? client.getLocalPlayer().getName() : null;
-			loadEvents();
-		} else {
-			scheduleRetry(1, 10, client.getAccountHash());
-		}
-	}
-
-	private void scheduleRetry(int attempt, int maxAttempts, long accountHash) {
-		if (attempt > maxAttempts) {
-			showNotLoggedIn();
-			return;
-		}
-
-		Timer timer = new Timer(attempt * 1000, e -> {
-			if (ClanValidator.validateClan(client)) {
-				buildFullUI();
-				currentAccountHash = accountHash;
-				currentPlayerName = client.getLocalPlayer() != null ? client.getLocalPlayer().getName() : null;
-				loadEvents();
-			} else {
-				scheduleRetry(attempt + 1, maxAttempts, accountHash);
-			}
-		});
-		timer.setRepeats(false);
-		timer.start();
+		buildFullUI();
+		currentAccountHash = client.getAccountHash();
+		currentPlayerName = client.getLocalPlayer() != null ? client.getLocalPlayer().getName() : null;
+		loadEvents();
 	}
 
 	private void buildFullUI() {

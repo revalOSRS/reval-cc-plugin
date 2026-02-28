@@ -10,7 +10,6 @@ import com.revalclan.ui.components.AdminButton;
 import com.revalclan.ui.components.GradientSeparator;
 import com.revalclan.ui.components.PanelTitle;
 import com.revalclan.ui.constants.UIConstants;
-import com.revalclan.util.ClanValidator;
 import com.revalclan.util.UIAssetLoader;
 import lombok.Getter;
 import net.runelite.api.Client;
@@ -381,18 +380,15 @@ public class RevalPanel extends PluginPanel {
 	private void checkAdminEligibility(int attempt) {
 		if (attempt > 10) return;
 
-		if (!ClanValidator.validateClan(client)) {
-			// Clan channel not ready yet — retry with increasing delay (same pattern as AchievementsPanel)
+		ClanChannel clanChannel = client.getClanChannel();
+		String playerName = client.getLocalPlayer() != null ? client.getLocalPlayer().getName() : null;
+		if (clanChannel == null || playerName == null) {
+			// Clan channel not ready yet — retry with delay
 			Timer timer = new Timer(attempt * 1000, e -> checkAdminEligibility(attempt + 1));
 			timer.setRepeats(false);
 			timer.start();
 			return;
 		}
-
-		// Clan is validated, now check rank
-		ClanChannel clanChannel = client.getClanChannel();
-		String playerName = client.getLocalPlayer() != null ? client.getLocalPlayer().getName() : null;
-		if (clanChannel == null || playerName == null) return;
 
 		ClanChannelMember member = clanChannel.findMember(playerName);
 		if (member != null && member.getRank().getRank() >= ADMIN_MIN_RANK.getRank()) {

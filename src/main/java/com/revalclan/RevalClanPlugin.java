@@ -112,7 +112,9 @@ public class RevalClanPlugin extends Plugin {
 	private volatile boolean inRequiredClan = false;
 	private int clanValidationAttempt = -1;
 
-	private static final int MAX_CLAN_VALIDATION_TICKS = 25;
+	private static final int FAST_VALIDATION_TICKS = 25;
+	private static final int SLOW_VALIDATION_INTERVAL = 5;
+	private static final int MAX_CLAN_VALIDATION_TICKS = 1000;
 
 	private static final Pattern COL_OPEN = Pattern.compile("<col=[0-9a-fA-F]+>");
 	private static final Pattern COL_CLOSE = Pattern.compile("</col>");
@@ -233,12 +235,19 @@ public class RevalClanPlugin extends Plugin {
 		}
 
 		if (clanValidationAttempt >= 0) {
-			if (ClanValidator.validateClan(client)) {
-				inRequiredClan = true;
+			if (clanValidationAttempt > MAX_CLAN_VALIDATION_TICKS) {
 				clanValidationAttempt = -1;
-				onClanValidated();
-			} else if (++clanValidationAttempt > MAX_CLAN_VALIDATION_TICKS) {
-				clanValidationAttempt = -1;
+			} else {
+				boolean shouldCheck = clanValidationAttempt < FAST_VALIDATION_TICKS
+					|| clanValidationAttempt % SLOW_VALIDATION_INTERVAL == 0;
+
+				if (shouldCheck && ClanValidator.validateClan(client)) {
+					inRequiredClan = true;
+					clanValidationAttempt = -1;
+					onClanValidated();
+				} else {
+					clanValidationAttempt++;
+				}
 			}
 		}
 

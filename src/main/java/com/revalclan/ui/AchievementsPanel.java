@@ -6,9 +6,7 @@ import com.revalclan.ui.components.Badge;
 import com.revalclan.ui.components.LoginPrompt;
 import com.revalclan.ui.components.RefreshButton;
 import com.revalclan.ui.constants.UIConstants;
-import com.revalclan.util.ClanValidator;
 import net.runelite.api.Client;
-import net.runelite.api.GameState;
 import net.runelite.client.ui.FontManager;
 
 import javax.swing.*;
@@ -59,15 +57,10 @@ public class AchievementsPanel extends JPanel {
 	public void init(RevalApiService apiService, Client client) {
 		this.apiService = apiService;
 		this.client = client;
-		if (!isAuthorized()) showNotLoggedIn();
 	}
 
 	public void onLoggedIn() {
-		if (isAuthorized()) {
-			loadData();
-		} else {
-			scheduleRetry(1);
-		}
+		loadData();
 	}
 
 	public void onLoggedOut() {
@@ -78,28 +71,8 @@ public class AchievementsPanel extends JPanel {
 		loadData();
 	}
 
-	private void scheduleRetry(int attempt) {
-		if (attempt > 10) {
-			showNotLoggedIn();
-			return;
-		}
-		Timer timer = new Timer(attempt * 1000, e -> {
-			if (ClanValidator.validateClan(client)) loadData();
-			else scheduleRetry(attempt + 1);
-		});
-		timer.setRepeats(false);
-		timer.start();
-	}
-
-	private boolean isAuthorized() {
-		return client != null && 
-			client.getGameState() == GameState.LOGGED_IN && 
-			client.getAccountHash() != -1 && 
-			ClanValidator.validateClan(client);
-	}
-
 	private void loadData() {
-		if (!isAuthorized() || apiService == null) {
+		if (client == null || client.getAccountHash() == -1 || apiService == null) {
 			showNotLoggedIn();
 			return;
 		}
@@ -130,11 +103,6 @@ public class AchievementsPanel extends JPanel {
 
 	private void buildUI() {
 		contentPanel.removeAll();
-
-		if (!isAuthorized()) {
-			showNotLoggedIn();
-			return;
-		}
 
 		JPanel header = new JPanel(new BorderLayout());
 		header.setBackground(UIConstants.BACKGROUND);
