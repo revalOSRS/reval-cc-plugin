@@ -6,6 +6,7 @@ import com.revalclan.ui.components.BackButton;
 import com.revalclan.ui.components.PanelTitle;
 import com.revalclan.ui.components.RefreshButton;
 import com.revalclan.ui.constants.UIConstants;
+import com.revalclan.util.DateTimeUtil;
 import net.runelite.api.Client;
 import net.runelite.client.ui.FontManager;
 
@@ -14,7 +15,7 @@ import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.time.ZonedDateTime;
+import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -559,8 +560,8 @@ public class CompetitionsPanel extends JPanel {
 	private String formatTimeRemaining(String dateStr) {
 		if (dateStr == null) return "Unknown";
 		try {
-			ZonedDateTime target = ZonedDateTime.parse(dateStr);
-			ZonedDateTime now = ZonedDateTime.now();
+			Instant target = DateTimeUtil.parseToInstant(dateStr);
+			Instant now = Instant.now();
 			long days = ChronoUnit.DAYS.between(now, target);
 			long hours = ChronoUnit.HOURS.between(now, target) % 24;
 			if (days < 0 || (days == 0 && hours < 0)) return "Ended";

@@ -8,7 +8,12 @@ import net.runelite.client.ui.FontManager;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
-import java.text.SimpleDateFormat;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 
 public class PointsBreakdownPanel extends JDialog {
@@ -140,9 +145,16 @@ public class PointsBreakdownPanel extends JDialog {
 	private String formatDate(String dateStr) {
 		if (dateStr == null || dateStr.isEmpty()) return "Unknown date";
 		try {
-			SimpleDateFormat in = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
-			SimpleDateFormat out = new SimpleDateFormat("MMM dd, yyyy");
-			return out.format(in.parse(dateStr));
+			ZonedDateTime local;
+			try {
+				local = ZonedDateTime.parse(dateStr)
+					.withZoneSameInstant(ZoneId.systemDefault());
+			} catch (DateTimeParseException e) {
+				local = LocalDateTime.parse(dateStr)
+					.atZone(ZoneOffset.UTC)
+					.withZoneSameInstant(ZoneId.systemDefault());
+			}
+			return local.format(DateTimeFormatter.ofPattern("MMM dd, yyyy"));
 		} catch (Exception e) {
 			return dateStr;
 		}

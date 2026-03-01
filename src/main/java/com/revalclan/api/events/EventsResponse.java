@@ -1,13 +1,13 @@
 package com.revalclan.api.events;
 
 import com.revalclan.api.common.ApiResponse;
+import com.revalclan.util.DateTimeUtil;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 
 import java.time.Instant;
-import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -52,31 +52,31 @@ public class EventsResponse extends ApiResponse {
         
         public String getFormattedStartDate() {
             try {
-                ZonedDateTime zdt = ZonedDateTime.parse(startDate);
-                return zdt.format(DateTimeFormatter.ofPattern("MMM d HH:mm"));
+                return DateTimeUtil.parseToLocal(startDate)
+                    .format(DateTimeFormatter.ofPattern("MMM d HH:mm"));
             } catch (Exception e) {
                 return startDate;
             }
         }
-        
+
         public String getFormattedEndDate() {
             try {
-                ZonedDateTime zdt = ZonedDateTime.parse(endDate);
-                return zdt.format(DateTimeFormatter.ofPattern("MMM d HH:mm"));
+                return DateTimeUtil.parseToLocal(endDate)
+                    .format(DateTimeFormatter.ofPattern("MMM d HH:mm"));
             } catch (Exception e) {
                 return endDate;
             }
         }
-        
+
         public String getDuration() {
             try {
-                Instant start = Instant.parse(startDate);
-                Instant end = Instant.parse(endDate);
+                Instant start = DateTimeUtil.parseToInstant(startDate);
+                Instant end = DateTimeUtil.parseToInstant(endDate);
                 long days = ChronoUnit.DAYS.between(start, end);
                 long hours = ChronoUnit.HOURS.between(start, end) % 24;
-                
+
                 if (days > 0) {
-                    return days + " day" + (days != 1 ? "s" : "") + 
+                    return days + " day" + (days != 1 ? "s" : "") +
                            (hours > 0 ? " " + hours + "h" : "");
                 } else {
                     return hours + " hour" + (hours != 1 ? "s" : "");
@@ -85,17 +85,17 @@ public class EventsResponse extends ApiResponse {
                 return "Unknown";
             }
         }
-        
+
         public String getTimeUntilStart() {
             try {
-                Instant start = Instant.parse(startDate);
+                Instant start = DateTimeUtil.parseToInstant(startDate);
                 Instant now = Instant.now();
-                
+
                 if (now.isAfter(start)) return "Started";
-                
+
                 long days = ChronoUnit.DAYS.between(now, start);
                 long hours = ChronoUnit.HOURS.between(now, start) % 24;
-                
+
                 if (days > 0) {
                     return "Starts in " + days + "d " + hours + "h";
                 } else if (hours > 0) {
