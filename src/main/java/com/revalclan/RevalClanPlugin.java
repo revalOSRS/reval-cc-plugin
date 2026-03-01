@@ -205,11 +205,15 @@ public class RevalClanPlugin extends Plugin {
 				clanValidationAttempt = 0;
 			}
 		} else if (gameStateChanged.getGameState() == GameState.LOGIN_SCREEN) {
+			boolean wasInClan = inRequiredClan;
 			inRequiredClan = false;
 			clanValidationAttempt = -1;
+			pendingLoginNotification = false;
 
 			if (wasLoggedIn) {
-				logoutNotifier.onLogout();
+				if (wasInClan) {
+					logoutNotifier.onLogout();
+				}
 				wasLoggedIn = false;
 
 				if (revalPanel != null) {
@@ -222,6 +226,11 @@ public class RevalClanPlugin extends Plugin {
 	private void onClanValidated() {
 		eventFilterManager.fetchFiltersAsync();
 
+		if (pendingLoginNotification) {
+			pendingLoginNotification = false;
+			loginNotifier.onLogin();
+		}
+
 		if (revalPanel != null) {
 			revalPanel.onLoggedIn();
 		}
@@ -229,11 +238,6 @@ public class RevalClanPlugin extends Plugin {
 
 	@Subscribe
 	public void onGameTick(GameTick gameTick) {
-		if (pendingLoginNotification) {
-			pendingLoginNotification = false;
-			loginNotifier.onLogin();
-		}
-
 		if (clanValidationAttempt >= 0) {
 			if (clanValidationAttempt > MAX_CLAN_VALIDATION_TICKS) {
 				clanValidationAttempt = -1;

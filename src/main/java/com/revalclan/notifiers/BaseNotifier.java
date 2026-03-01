@@ -1,6 +1,7 @@
 package com.revalclan.notifiers;
 
 import com.revalclan.RevalClanConfig;
+import com.revalclan.util.ClanValidator;
 import com.revalclan.util.EventFilterManager;
 import com.revalclan.util.ScreenshotService;
 import com.revalclan.util.WebhookService;
@@ -54,6 +55,7 @@ public abstract class BaseNotifier {
 	 * @param data The notification data
 	 */
 	protected void sendNotification(Map<String, Object> data) {
+		if (!ClanValidator.validateClan(client)) return;
 		addEventMetadata(data);
 		webhookService.sendDataAsync(data);
 	}
@@ -64,6 +66,7 @@ public abstract class BaseNotifier {
 	 * @param data The notification data
 	 */
 	protected void sendNotificationWithScreenshot(Map<String, Object> data) {
+		if (!ClanValidator.validateClan(client)) return;
 		addEventMetadata(data);
 
 		screenshotService.captureScreenshot()
