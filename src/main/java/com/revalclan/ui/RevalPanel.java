@@ -8,6 +8,7 @@ import com.revalclan.ui.admin.AdminManager;
 import com.revalclan.ui.admin.PendingRankupsPanel;
 import com.revalclan.ui.components.AdminButton;
 import com.revalclan.ui.components.GradientSeparator;
+import com.revalclan.ui.components.IndicatorTabButton;
 import com.revalclan.ui.components.PanelTitle;
 import com.revalclan.ui.constants.UIConstants;
 import com.revalclan.util.UIAssetLoader;
@@ -48,10 +49,10 @@ public class RevalPanel extends PluginPanel {
 	@Getter private AdminButton adminButton;
 
 	private JButton profileTab;
-	private JButton eventsTab;
+	private IndicatorTabButton eventsTab;
 	private JButton leaderboardTab;
 	private JButton achievementsTab;
-	private JButton competitionsTab;
+	private IndicatorTabButton competitionsTab;
 	private String selectedTab = "PROFILE";
 
 	// Admin
@@ -127,7 +128,7 @@ public class RevalPanel extends PluginPanel {
 		row2.setOpaque(false);
 		row2.setMaximumSize(new Dimension(Integer.MAX_VALUE, 28));
 
-		eventsTab = createTabButton("Events");
+		eventsTab = createIndicatorTabButton("Events");
 		eventsTab.setMaximumSize(new Dimension(Integer.MAX_VALUE, 28));
 		eventsTab.addActionListener(e -> selectTab("EVENTS"));
 
@@ -138,7 +139,7 @@ public class RevalPanel extends PluginPanel {
 		leaderboardTab.setToolTipText("Leaderboard");
 		leaderboardTab.addActionListener(e -> selectTab("LEADERBOARD"));
 
-		competitionsTab = createTabButton("Competitions");
+		competitionsTab = createIndicatorTabButton("Competitions");
 		competitionsTab.setMaximumSize(new Dimension(Integer.MAX_VALUE, 28));
 		competitionsTab.addActionListener(e -> selectTab("COMPETITIONS"));
 
@@ -157,6 +158,16 @@ public class RevalPanel extends PluginPanel {
 
 	private JButton createTabButton(String text) {
 		JButton btn = new JButton(text);
+		btn.setFont(FontManager.getRunescapeSmallFont());
+		btn.setFocusPainted(false);
+		btn.setBorderPainted(false);
+		btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+		btn.setPreferredSize(new Dimension(0, 28));
+		return btn;
+	}
+
+	private IndicatorTabButton createIndicatorTabButton(String text) {
+		IndicatorTabButton btn = new IndicatorTabButton(text);
 		btn.setFont(FontManager.getRunescapeSmallFont());
 		btn.setFocusPainted(false);
 		btn.setBorderPainted(false);
@@ -365,6 +376,10 @@ public class RevalPanel extends PluginPanel {
 		competitionsPanel.init(apiService, client);
 		eventsPanel.init(apiService, client);
 
+		// Wire up tab indicator callbacks
+		eventsPanel.setOnIndicatorUpdate(this::setEventsIndicator);
+		competitionsPanel.setOnIndicatorUpdate(this::setCompetitionsIndicator);
+
 		adminManager = new AdminManager();
 
 		// Enable admin button when account loads — check in-game clan rank
@@ -420,5 +435,22 @@ public class RevalPanel extends PluginPanel {
 		eventsPanel.onLoggedOut();
 
 		if (adminButton != null) adminButton.setAdmin(false);
+
+		setEventsIndicator(false);
 	}
+
+	// ==================== Tab Indicators ====================
+
+	public void setEventsIndicator(boolean active) {
+		if (eventsTab != null) {
+			eventsTab.setIndicator(active, UIConstants.ACCENT_GREEN);
+		}
+	}
+
+	public void setCompetitionsIndicator(boolean active) {
+		if (competitionsTab != null) {
+			competitionsTab.setIndicator(active, UIConstants.ACCENT_GOLD);
+		}
+	}
+
 }

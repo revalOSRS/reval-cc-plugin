@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 
 public class CompetitionsPanel extends JPanel {
 	private RevalApiService apiService;
@@ -36,6 +37,8 @@ public class CompetitionsPanel extends JPanel {
 	private List<CompetitionsResponse.Competition> activeCompetitions = new ArrayList<>();
 	private List<CompetitionsResponse.Competition> scheduledCompetitions = new ArrayList<>();
 	private Map<String, String> myVotes = new HashMap<>();
+
+	private Consumer<Boolean> onIndicatorUpdate;
 
 	public CompetitionsPanel() {
 		setLayout(new BorderLayout());
@@ -79,6 +82,10 @@ public class CompetitionsPanel extends JPanel {
 	public void init(RevalApiService apiService, Client client) {
 		this.apiService = apiService;
 		this.client = client;
+	}
+
+	public void setOnIndicatorUpdate(Consumer<Boolean> callback) {
+		this.onIndicatorUpdate = callback;
 	}
 
 	public void refresh() {
@@ -193,6 +200,11 @@ public class CompetitionsPanel extends JPanel {
 
 		contentPanel.revalidate();
 		contentPanel.repaint();
+
+		if (onIndicatorUpdate != null) {
+			boolean hasActiveOrScheduled = !activeCompetitions.isEmpty() || !scheduledCompetitions.isEmpty();
+			onIndicatorUpdate.accept(hasActiveOrScheduled);
+		}
 	}
 
 	private void addSection(String text) {
