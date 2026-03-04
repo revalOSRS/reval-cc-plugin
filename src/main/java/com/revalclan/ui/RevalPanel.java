@@ -78,7 +78,12 @@ public class RevalPanel extends PluginPanel {
 		eventsPanel = new EventsPanel();
 
 		cardLayout = new CardLayout();
-		contentPanel = new JPanel(cardLayout);
+		contentPanel = new JPanel(cardLayout) {
+			@Override
+			public Dimension getPreferredSize() {
+				return new Dimension(super.getPreferredSize().width, 0);
+			}
+		};
 		contentPanel.setBackground(UIConstants.BACKGROUND);
 
 		contentPanel.add(profilePanel, "PROFILE");

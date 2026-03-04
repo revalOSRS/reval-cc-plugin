@@ -47,8 +47,26 @@ public class EventsPanel extends JPanel {
 		contentPanel.setBackground(UIConstants.BACKGROUND);
 		contentPanel.setBorder(new EmptyBorder(12, 10, 10, 10));
 
+		JPanel wrapper = new JPanel(new BorderLayout()) {
+			@Override
+			public Dimension getPreferredSize() {
+				Dimension size = super.getPreferredSize();
+				if (getParent() != null) size.width = getParent().getWidth();
+				return size;
+			}
+		};
+		wrapper.setBackground(UIConstants.BACKGROUND);
+		wrapper.add(contentPanel, BorderLayout.NORTH);
+
+		JScrollPane scrollPane = new JScrollPane(wrapper);
+		scrollPane.setBackground(UIConstants.BACKGROUND);
+		scrollPane.setBorder(null);
+		scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+		scrollPane.getVerticalScrollBar().setUnitIncrement(16);
+		scrollPane.getViewport().setBackground(UIConstants.BACKGROUND);
+
 		showNotLoggedIn();
-		add(contentPanel, BorderLayout.NORTH);
+		add(scrollPane, BorderLayout.CENTER);
 	}
 
 	public void init(RevalApiService apiService, Client client) {
