@@ -24,7 +24,10 @@ public class LootNotifier extends BaseNotifier {
 		NpcID.WHISPERER, NpcID.WHISPERER_MELEE, NpcID.WHISPERER_QUEST, NpcID.WHISPERER_MELEE_QUEST,
 		NpcID.ARAXXOR, NpcID.ARAXXOR_DEAD, NpcID.RT_FIRE_QUEEN_INACTIVE, NpcID.RT_ICE_KING_INACTIVE,
 		NpcID.YAMA,
-		NpcID.HESPORI
+		NpcID.HESPORI,
+		NpcID.GRYPHON_BOSS,
+		NpcID.GB_HILLGIANT_CHEST,
+		NpcID.GB_MOSSGIANT_CHEST
 	);
 
 	/**
@@ -35,7 +38,9 @@ public class LootNotifier extends BaseNotifier {
 		"Branda the Fire Queen", "Eldric the Ice King",
 		"Crystalline Hunllef", "Corrupted Hunllef",
 		"The Gauntlet", "Corrupted Gauntlet",
-		"Shellbane Gryphon"
+		"Shellbane gryphon",
+		"Obor (Chest)",
+		"Bryophyta (Chest)"
 	);
 
 	@Override
