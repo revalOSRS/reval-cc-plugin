@@ -5,6 +5,7 @@ import com.revalclan.collectionlog.CollectionLogManager;
 import com.revalclan.collectionlog.CollectionLogSyncButton;
 import com.revalclan.notifiers.*;
 import com.revalclan.ui.RevalPanel;
+import com.revalclan.util.AnnouncementService;
 import com.revalclan.util.ClanValidator;
 import com.revalclan.util.EventFilterManager;
 import com.revalclan.util.UIAssetLoader;
@@ -94,6 +95,8 @@ public class RevalClanPlugin extends Plugin {
 
 	@Inject	private EventFilterManager eventFilterManager;
 
+	@Inject	private AnnouncementService announcementService;
+
 	@Inject	private ClientToolbar clientToolbar;
 
 	@Inject	private RevalApiService revalApiService;
@@ -178,6 +181,7 @@ public class RevalClanPlugin extends Plugin {
 		
 		eventBus.unregister(lootNotifier);
 
+		announcementService.reset();
 		levelNotifier.reset();
 		clueNotifier.reset();
 		killCountNotifier.reset();
@@ -209,6 +213,7 @@ public class RevalClanPlugin extends Plugin {
 			inRequiredClan = false;
 			clanValidationAttempt = -1;
 			pendingLoginNotification = false;
+			announcementService.reset();
 
 			if (wasLoggedIn) {
 				if (wasInClan) {
@@ -257,6 +262,7 @@ public class RevalClanPlugin extends Plugin {
 
 		if (!inRequiredClan) return;
 
+		announcementService.onGameTick();
 		detailedKillNotifier.onGameTick(gameTick);
 		killCountNotifier.onTick();
 		diaryNotifier.onGameTick();

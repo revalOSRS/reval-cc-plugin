@@ -10,8 +10,11 @@ import com.revalclan.api.admin.AdminLoginRequest;
 import com.revalclan.api.admin.PendingRankChangesResponse;
 import com.revalclan.api.challenges.ChallengesResponse;
 import com.revalclan.api.competitions.*;
+import com.revalclan.api.announcements.AnnouncementsResponse;
 import com.revalclan.api.common.ApiEndpoints;
 import com.revalclan.api.common.ApiResponse;
+import com.revalclan.api.notifications.NotificationAckResponse;
+import com.revalclan.api.notifications.NotificationsResponse;
 import com.revalclan.api.diaries.DiariesResponse;
 import com.revalclan.api.events.EventsResponse;
 import com.revalclan.api.events.RegistrationResponse;
@@ -23,6 +26,9 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 
 /**
@@ -338,6 +344,28 @@ public class RevalApiService {
                                     Consumer<ActualizeRankChangeResponse> onSuccess, Consumer<Exception> onError) {
         postAdmin(ApiEndpoints.rankChangeActualize(rankChangeId), null, memberCode,
             ActualizeRankChangeResponse.class, onSuccess, onError);
+    }
+
+    // ==================== ANNOUNCEMENTS API ====================
+
+    public void fetchAnnouncements(Consumer<AnnouncementsResponse> onSuccess, Consumer<Exception> onError) {
+        get(ApiEndpoints.ANNOUNCEMENTS, AnnouncementsResponse.class, onSuccess, onError);
+    }
+
+    // ==================== NOTIFICATIONS API ====================
+
+    public void fetchNotifications(long accountHash, Consumer<NotificationsResponse> onSuccess, Consumer<Exception> onError) {
+        get(ApiEndpoints.NOTIFICATIONS + "?accountHash=" + accountHash,
+            NotificationsResponse.class, onSuccess, onError);
+    }
+
+    public void acknowledgeNotifications(long accountHash, List<Integer> notificationIds,
+                                         Consumer<NotificationAckResponse> onSuccess, Consumer<Exception> onError) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("accountHash", String.valueOf(accountHash));
+        body.put("notificationIds", notificationIds);
+        post(ApiEndpoints.NOTIFICATIONS_ACK, gson.toJson(body),
+            NotificationAckResponse.class, onSuccess, onError);
     }
 
     // ==================== CACHE MANAGEMENT ====================

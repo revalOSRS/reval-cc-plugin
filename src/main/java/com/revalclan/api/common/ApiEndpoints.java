@@ -52,6 +52,11 @@ public final class ApiEndpoints {
     // Admin - Authentication
     public static final String ADMIN_AUTH_LOGIN = "/admin/auth/login";
 
+    // Announcements & Notifications
+    public static final String ANNOUNCEMENTS = "/announcements";
+    public static final String NOTIFICATIONS = "/notifications";
+    public static final String NOTIFICATIONS_ACK = "/notifications/ack";
+
     // Admin - Rank Changes
     public static final String ADMIN_RANK_CHANGES_PENDING = "/admin/rank-changes/pending";
     public static final String ADMIN_RANK_CHANGE_ACTUALIZE = "/admin/rank-changes/%d/actualize";
