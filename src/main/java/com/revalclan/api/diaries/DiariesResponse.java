@@ -19,7 +19,7 @@ public class DiariesResponse extends ApiResponse {
     @Data
     public static class DiariesData {
         private List<Diary> diaries;
-        
+
         private DiariesSummary summary;
     }
 
@@ -43,26 +43,24 @@ public class DiariesResponse extends ApiResponse {
         private boolean isActive;
         private int sortOrder;
         private int fullCompletionBonus;
-        
+
         private List<DiaryTier> tiers;
-        
+
         private DiarySummary summary;
-        
+
         @Data
         public static class DiarySummary {
             private int totalTasks;
-            private Map<String, Integer> taskCounts;  // Record<DiaryTier, number>
-            
+            private Map<String, Integer> taskCounts;
+
             // Progress (if accountHash provided)
             private DiaryProgress progress;
         }
-        
+
         @Data
         public static class DiaryProgress {
             private int tasksCompleted;
             private int tasksTotal;
-            private int pointsEarned;
-            private int pointsAvailable;
             private int completionPercent;
         }
 
@@ -71,15 +69,13 @@ public class DiariesResponse extends ApiResponse {
             private String tier;  // 'easy', 'medium', 'hard', 'elite', 'master', 'grandmaster'
             private int completionBonus;
             private int taskCount;
-            
+
             // Progress fields (if accountHash provided)
             private Integer tasksCompleted;
             private Integer tasksTotal;
-            private Integer pointsEarned;
-            private Integer pointsAvailable;
             private Boolean isComplete;
             private Integer completionPercent;
-            
+
             // Tasks in this tier
             private List<DiaryTask> tasks;
         }
@@ -91,25 +87,20 @@ public class DiariesResponse extends ApiResponse {
             private String description;
             private String hint;
             private String icon;
-            private int points;
             private Object requirement;
-            private boolean isRepeatable;
-            private Integer maxRepetitions;
-            private Integer pointsPerRepetition;
             private boolean isHidden;
             private boolean isActive;
             private int sortOrder;
-            
+
             // Progress (if accountHash provided)
             private TaskProgress progress;
-            
+
             @Data
             public static class TaskProgress {
                 private boolean isCompleted;
                 private String completedAt;
                 private Object progressData;
                 private int progressPercent;
-                private Integer repetitions;
             }
         }
     }

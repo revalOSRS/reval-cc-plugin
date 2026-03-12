@@ -300,6 +300,14 @@ public class ProfilePanel extends JPanel {
 		addComponent(buildCombatAchievementsSection());
 		addSpacing(6);
 		addComponent(buildCollectionLogSection());
+		addSpacing(6);
+		addComponent(buildItemChecklistSection("Monkey Backpacks", "MONKEY_BACKPACKS"));
+		addSpacing(6);
+		addComponent(buildItemChecklistSection("ToA Capes", "TOA_CAPES"));
+		addSpacing(6);
+		addComponent(buildItemChecklistSection("ToB Capes", "TOB_CAPES"));
+		addSpacing(6);
+		addComponent(buildItemChecklistSection("CM Capes", "CM_CAPES"));
 		addSpacing(16);
 
 		// Add filler to absorb extra space and keep content at top
@@ -498,9 +506,20 @@ public class ProfilePanel extends JPanel {
 		bottomRow.add(createStatCard(formatNumber(breakdown.getRevalChallenges()), "Challenges", UIConstants.ACCENT_GREEN, "revalChallenges"));
 		bottomRow.add(createStatCard(formatNumber(breakdown.getEvents()), "Events", UIConstants.ACCENT_BLUE, "event"));
 
+		long miscPoints = breakdown.getTotal()
+			- breakdown.getDrops() - breakdown.getPets() - breakdown.getMilestones()
+			- breakdown.getEvents() - breakdown.getRevalDiaries() - breakdown.getRevalChallenges();
+
+		JPanel miscRow = new JPanel(new GridLayout(1, 1));
+		miscRow.setOpaque(false);
+		miscRow.setAlignmentX(Component.LEFT_ALIGNMENT);
+		miscRow.add(createStatCard(formatNumber(miscPoints), "Misc", UIConstants.TEXT_SECONDARY, "misc"));
+
 		section.add(topRow);
 		section.add(Box.createRigidArea(new Dimension(0, 4)));
 		section.add(bottomRow);
+		section.add(Box.createRigidArea(new Dimension(0, 4)));
+		section.add(miscRow);
 
 		return section;
 	}
@@ -584,6 +603,66 @@ public class ProfilePanel extends JPanel {
 	private JPanel buildCollectionLogSection() {
 		return buildTierSection("Collection Log", "COLLECTION_LOG",
 			currentAccount != null ? currentAccount.getCollectionLogUniqueObtained() : 0);
+	}
+
+	private JPanel buildItemChecklistSection(String titleText, String sourceKey) {
+		boolean hideCompleted = config != null && config.hideCompletedItems();
+
+		JPanel wrapper = new JPanel(new BorderLayout());
+		wrapper.setBackground(UIConstants.CARD_BG);
+		wrapper.setBorder(new EmptyBorder(10, 12, 10, 12));
+
+		JLabel title = new JLabel(titleText);
+		title.setFont(FontManager.getRunescapeBoldFont());
+		title.setForeground(UIConstants.TEXT_PRIMARY);
+		title.setBorder(new EmptyBorder(0, 0, 8, 0));
+
+		JPanel list = new JPanel();
+		list.setLayout(new BoxLayout(list, BoxLayout.Y_AXIS));
+		list.setOpaque(false);
+
+		List<PointsResponse.PointSource> definitions = new ArrayList<>();
+		if (pointsData != null && pointsData.getPointSources() != null) {
+			List<PointsResponse.PointSource> sources = pointsData.getPointSources().get(sourceKey);
+			if (sources != null) definitions = sources;
+		}
+
+		Map<String, AccountResponse.Milestone> completedMap = new HashMap<>();
+		if (currentAccount != null && currentAccount.getMilestones() != null) {
+			for (AccountResponse.Milestone m : currentAccount.getMilestones()) {
+				if (m.getType() != null) completedMap.put(m.getType(), m);
+			}
+		}
+
+		if (definitions.isEmpty()) {
+			JLabel empty = new JLabel("No items available");
+			empty.setFont(FontManager.getRunescapeSmallFont());
+			empty.setForeground(UIConstants.TEXT_SECONDARY);
+			list.add(empty);
+		} else {
+			int itemCount = 0;
+			for (PointsResponse.PointSource def : definitions) {
+				AccountResponse.Milestone completed = completedMap.get(def.getId());
+				boolean isCompleted = completed != null && completed.getAchievedAt() != null && !completed.getAchievedAt().isEmpty();
+				if (hideCompleted && isCompleted) continue;
+				String desc = def.getDescription() != null ? def.getDescription() : def.getName();
+				Integer pts = isCompleted && completed.getPointsAwarded() != null ? completed.getPointsAwarded() : def.getPointsValue();
+				list.add(new ChecklistItem(desc, isCompleted, pts, assetLoader));
+				list.add(Box.createRigidArea(new Dimension(0, 4)));
+				itemCount++;
+			}
+
+			if (itemCount == 0) {
+				JLabel allDone = new JLabel("All " + titleText.toLowerCase() + " completed!");
+				allDone.setFont(FontManager.getRunescapeSmallFont());
+				allDone.setForeground(UIConstants.ACCENT_GREEN);
+				list.add(allDone);
+			}
+		}
+
+		wrapper.add(title, BorderLayout.NORTH);
+		wrapper.add(list, BorderLayout.CENTER);
+		return wrapInRoundedPanel(wrapper);
 	}
 
 	private JPanel buildTierSection(String titleText, String sourceKey, Integer currentProgress) {
@@ -743,12 +822,23 @@ public class ProfilePanel extends JPanel {
 		}
 
 		List<AccountResponse.PointsLogEntry> filtered = new ArrayList<>();
-		String filterType = sourceType.equals("revalDiaries") ? "reval_diary" 
-			: sourceType.equals("revalChallenges") ? "reval_challenge" : sourceType;
 
-		for (AccountResponse.PointsLogEntry entry : pointsLog) {
-			if (entry.getSourceType() != null && entry.getSourceType().equalsIgnoreCase(filterType)) {
-				filtered.add(entry);
+		if ("misc".equals(sourceType)) {
+			Set<String> knownTypes = new HashSet<>(Arrays.asList(
+				"drop", "pet", "milestone", "event", "reval_diary", "reval_challenge"
+			));
+			for (AccountResponse.PointsLogEntry entry : pointsLog) {
+				if (entry.getSourceType() == null || !knownTypes.contains(entry.getSourceType().toLowerCase())) {
+					filtered.add(entry);
+				}
+			}
+		} else {
+			String filterType = sourceType.equals("revalDiaries") ? "reval_diary"
+				: sourceType.equals("revalChallenges") ? "reval_challenge" : sourceType;
+			for (AccountResponse.PointsLogEntry entry : pointsLog) {
+				if (entry.getSourceType() != null && entry.getSourceType().equalsIgnoreCase(filterType)) {
+					filtered.add(entry);
+				}
 			}
 		}
 

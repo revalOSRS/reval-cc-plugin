@@ -161,9 +161,9 @@ public class AnnouncementService {
 
 	private String formatNotificationMessage(Notification notification) {
 		if (notification.getTitle() != null && !notification.getTitle().isEmpty()) {
-			return "<col=FFD700>[" + notification.getTitle() + "]</col> " + notification.getMessage();
+			return "<col=FFD700>[Reval] " + notification.getTitle() + ":</col> " + notification.getMessage();
 		}
-		return "<col=FFD700>" + notification.getMessage() + "</col>";
+		return "<col=FFD700>[Reval]</col> " + notification.getMessage();
 	}
 
 	public void reset() {

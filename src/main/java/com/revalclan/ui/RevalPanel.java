@@ -42,6 +42,7 @@ public class RevalPanel extends PluginPanel {
 	@Getter private final AchievementsPanel achievementsPanel;
 	@Getter private final CompetitionsPanel competitionsPanel;
 	@Getter private final EventsPanel eventsPanel;
+	@Getter private final DiaryPanel diaryPanel;
 
 	private JLabel infoButton;
 	private JLabel discordIcon;
@@ -53,6 +54,7 @@ public class RevalPanel extends PluginPanel {
 	private JButton leaderboardTab;
 	private JButton achievementsTab;
 	private IndicatorTabButton competitionsTab;
+	private JButton diaryTab;
 	private String selectedTab = "PROFILE";
 
 	// Admin
@@ -76,7 +78,7 @@ public class RevalPanel extends PluginPanel {
 		achievementsPanel = new AchievementsPanel();
 		competitionsPanel = new CompetitionsPanel();
 		eventsPanel = new EventsPanel();
-
+		diaryPanel = new DiaryPanel();
 		cardLayout = new CardLayout();
 		contentPanel = new JPanel(cardLayout) {
 			@Override
@@ -92,7 +94,7 @@ public class RevalPanel extends PluginPanel {
 		contentPanel.add(achievementsPanel, "ACHIEVEMENTS");
 		contentPanel.add(competitionsPanel, "COMPETITIONS");
 		contentPanel.add(eventsPanel, "EVENTS");
-
+		contentPanel.add(diaryPanel, "DIARY");
 		JPanel header = createHeader();
 		JPanel navBar = createNavBar();
 
@@ -154,9 +156,21 @@ public class RevalPanel extends PluginPanel {
 		row2.add(Box.createRigidArea(new Dimension(4, 0)));
 		row2.add(competitionsTab);
 
+		// Third row: Diary
+		JPanel row3 = new JPanel(new GridLayout(1, 1, 4, 0));
+		row3.setOpaque(false);
+		row3.setMaximumSize(new Dimension(Integer.MAX_VALUE, 28));
+
+		diaryTab = createTabButton("Diary");
+		diaryTab.addActionListener(e -> selectTab("DIARY"));
+
+		row3.add(diaryTab);
+
 		navBar.add(row1);
 		navBar.add(Box.createRigidArea(new Dimension(0, 4)));
 		navBar.add(row2);
+		navBar.add(Box.createRigidArea(new Dimension(0, 4)));
+		navBar.add(row3);
 
 		return navBar;
 	}
@@ -265,6 +279,7 @@ public class RevalPanel extends PluginPanel {
 		styleTab(leaderboardTab, "LEADERBOARD".equals(selectedTab));
 		styleTab(achievementsTab, "ACHIEVEMENTS".equals(selectedTab));
 		styleTab(competitionsTab, "COMPETITIONS".equals(selectedTab));
+		styleTab(diaryTab, "DIARY".equals(selectedTab));
 	}
 
 	private void styleTab(JButton tab, boolean active) {
@@ -380,7 +395,7 @@ public class RevalPanel extends PluginPanel {
 		achievementsPanel.init(apiService, client);
 		competitionsPanel.init(apiService, client);
 		eventsPanel.init(apiService, client);
-
+		diaryPanel.init(apiService, client, assetLoader);
 		// Wire up tab indicator callbacks
 		eventsPanel.setOnIndicatorUpdate(this::setEventsIndicator);
 		competitionsPanel.setOnIndicatorUpdate(this::setCompetitionsIndicator);
@@ -432,13 +447,14 @@ public class RevalPanel extends PluginPanel {
 		achievementsPanel.onLoggedIn();
 		competitionsPanel.refresh();
 		eventsPanel.onLoggedIn();
+		diaryPanel.onLoggedIn();
 	}
 
 	public void onLoggedOut() {
 		profilePanel.onLoggedOut();
 		achievementsPanel.onLoggedOut();
 		eventsPanel.onLoggedOut();
-
+		diaryPanel.onLoggedOut();
 		if (adminButton != null) adminButton.setAdmin(false);
 
 		setEventsIndicator(false);
