@@ -46,7 +46,6 @@ public class AnnouncementService {
 		}
 
 		if (tickCounter % POLL_INTERVAL_TICKS == 0) {
-			fetchAnnouncements();
 			fetchNotifications();
 		}
 

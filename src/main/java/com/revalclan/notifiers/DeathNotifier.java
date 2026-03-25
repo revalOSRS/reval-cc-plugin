@@ -8,17 +8,25 @@
 package com.revalclan.notifiers;
 
 import net.runelite.api.Actor;
+import net.runelite.api.Item;
+import net.runelite.api.ItemComposition;
+import net.runelite.api.ItemContainer;
 import net.runelite.api.NPC;
 import net.runelite.api.NPCComposition;
 import net.runelite.api.Player;
+import net.runelite.api.Prayer;
+import net.runelite.api.SkullIcon;
 import net.runelite.api.WorldType;
 import net.runelite.api.events.ActorDeath;
 import net.runelite.api.events.InteractingChanged;
 
 import javax.inject.Singleton;
 import java.lang.ref.WeakReference;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Singleton
@@ -82,10 +90,10 @@ public class DeathNotifier extends BaseNotifier {
 
 	private void handleDeath() {
 		Map<String, Object> deathData = new HashMap<>();
-		
+
 		// Identify killer using sophisticated algorithm
 		Actor killer = identifyKiller();
-		
+
 		if (killer instanceof NPC) {
 			NPC npc = (NPC) killer;
 			deathData.put("killedBy", npc.getName());
@@ -101,14 +109,103 @@ public class DeathNotifier extends BaseNotifier {
 			deathData.put("killedBy", "Unknown");
 			deathData.put("killerType", "UNKNOWN");
 		}
-		
+
 		EnumSet<WorldType> worldTypes = client.getWorldType();
 		deathData.put("isPvpWorld", worldTypes.contains(WorldType.PVP));
 		deathData.put("isHighRiskWorld", worldTypes.contains(WorldType.HIGH_RISK));
-		
+
+		// Collect all items and split into kept/lost
+		List<Map<String, Object>> allItems = getAllPricedItems();
+		int keepCount = getKeepCount();
+
+		List<Map<String, Object>> keptItems = new ArrayList<>();
+		List<Map<String, Object>> lostItems = new ArrayList<>();
+		long totalLostValue = 0;
+
+		for (int i = 0; i < allItems.size(); i++) {
+			Map<String, Object> item = allItems.get(i);
+			if (i < keepCount) {
+				keptItems.add(item);
+			} else {
+				lostItems.add(item);
+				int gePrice = (int) item.get("gePrice");
+				int quantity = (int) item.get("quantity");
+				totalLostValue += (long) gePrice * quantity;
+			}
+		}
+
+		deathData.put("keptItems", keptItems);
+		deathData.put("lostItems", lostItems);
+		deathData.put("totalLostValue", totalLostValue);
+
 		sendNotificationWithScreenshot(deathData);
-		
+
 		reset();
+	}
+
+	/**
+	 * Determine how many items the player keeps on death based on skull and Protect Item prayer.
+	 */
+	private int getKeepCount() {
+		Player localPlayer = client.getLocalPlayer();
+		if (localPlayer == null) return 3;
+
+		int skull = localPlayer.getSkullIcon();
+		int keepCount = (skull == SkullIcon.NONE) ? 3 : 0;
+
+		if (client.isPrayerActive(Prayer.PROTECT_ITEM)) {
+			keepCount++;
+		}
+
+		return keepCount;
+	}
+
+	/**
+	 * Collect all items from inventory and equipment, priced and sorted by GE value descending.
+	 * Each item stack is expanded into individual units for proper kept/lost splitting.
+	 */
+	private List<Map<String, Object>> getAllPricedItems() {
+		List<Map<String, Object>> items = new ArrayList<>();
+
+		// Gather from inventory (container 93) and equipment (container 94)
+		collectItemsFromContainer(93, items);
+		collectItemsFromContainer(94, items);
+
+		// Sort by GE price descending (most valuable kept first)
+		items.sort(Comparator.<Map<String, Object>>comparingInt(m -> (int) m.get("gePrice")).reversed());
+
+		return items;
+	}
+
+	/**
+	 * Collect items from a specific container into the provided list.
+	 */
+	private void collectItemsFromContainer(int containerId, List<Map<String, Object>> items) {
+		ItemContainer container = client.getItemContainer(containerId);
+		if (container == null) return;
+
+		Item[] containerItems = container.getItems();
+		if (containerItems == null) return;
+
+		for (Item item : containerItems) {
+			if (item.getId() <= 0 || item.getQuantity() <= 0) continue;
+
+			int gePrice = itemManager.getItemPrice(item.getId());
+			String name;
+			try {
+				ItemComposition comp = itemManager.getItemComposition(item.getId());
+				name = (comp != null) ? comp.getName() : "Unknown";
+			} catch (Exception e) {
+				name = "Unknown";
+			}
+
+			Map<String, Object> itemData = new HashMap<>();
+			itemData.put("id", item.getId());
+			itemData.put("name", name);
+			itemData.put("quantity", item.getQuantity());
+			itemData.put("gePrice", gePrice);
+			items.add(itemData);
+		}
 	}
 	
 	/**

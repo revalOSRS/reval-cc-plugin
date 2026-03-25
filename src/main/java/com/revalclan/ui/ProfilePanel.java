@@ -10,6 +10,7 @@ import com.revalclan.ui.components.RefreshButton;
 import com.revalclan.ui.constants.UIConstants;
 import com.revalclan.util.UIAssetLoader;
 import net.runelite.api.Client;
+import net.runelite.client.game.ItemManager;
 import net.runelite.client.ui.FontManager;
 
 import javax.swing.*;
@@ -32,6 +33,7 @@ public class ProfilePanel extends JPanel {
 	private Client client;
 	private UIAssetLoader assetLoader;
 	private RevalClanConfig config;
+	private ItemManager itemManager;
 	private Consumer<AccountResponse.AccountData> onAccountLoaded;
 
 	private AccountResponse.AccountData currentAccount;
@@ -87,11 +89,12 @@ public class ProfilePanel extends JPanel {
 		contentPanel.add(Box.createVerticalStrut(height), gbc);
 	}
 
-	public void init(RevalApiService apiService, Client client, UIAssetLoader assetLoader, RevalClanConfig config) {
+	public void init(RevalApiService apiService, Client client, UIAssetLoader assetLoader, RevalClanConfig config, ItemManager itemManager) {
 		this.apiService = apiService;
 		this.client = client;
 		this.assetLoader = assetLoader;
 		this.config = config;
+		this.itemManager = itemManager;
 		fetchRanks();
 	}
 
@@ -847,6 +850,6 @@ public class ProfilePanel extends JPanel {
 			return b.getCreatedAt().compareTo(a.getCreatedAt());
 		});
 
-		new PointsBreakdownPanel(title, filtered).setVisible(true);
+		new PointsBreakdownPanel(title, filtered, itemManager).setVisible(true);
 	}
 }

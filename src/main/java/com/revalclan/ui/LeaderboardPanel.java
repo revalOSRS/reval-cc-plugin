@@ -7,6 +7,7 @@ import com.revalclan.ui.components.RefreshButton;
 import com.revalclan.ui.constants.UIConstants;
 import com.revalclan.util.UIAssetLoader;
 
+import net.runelite.client.game.ItemManager;
 import net.runelite.client.ui.FontManager;
 
 import javax.swing.*;
@@ -23,6 +24,7 @@ import java.util.stream.Collectors;
 public class LeaderboardPanel extends JPanel {
 	private RevalApiService apiService;
 	private UIAssetLoader assetLoader;
+	private ItemManager itemManager;
 
 	private final CardLayout cardLayout;
 	private final JPanel cardContainer;
@@ -119,9 +121,10 @@ public class LeaderboardPanel extends JPanel {
 		return header;
 	}
 
-	public void init(RevalApiService apiService, UIAssetLoader assetLoader) {
+	public void init(RevalApiService apiService, UIAssetLoader assetLoader, ItemManager itemManager) {
 		this.apiService = apiService;
 		this.assetLoader = assetLoader;
+		this.itemManager = itemManager;
 		loadLeaderboard();
 	}
 
@@ -138,7 +141,7 @@ public class LeaderboardPanel extends JPanel {
 		profileViewPanel.add(createBackHeader(playerName), BorderLayout.NORTH);
 
 		ProfilePanel profile = new ProfilePanel();
-		profile.init(apiService, null, assetLoader, null);
+		profile.init(apiService, null, assetLoader, null, itemManager);
 		profile.loadAccountById(osrsAccountId);
 
 		profileViewPanel.add(profile, BorderLayout.CENTER);

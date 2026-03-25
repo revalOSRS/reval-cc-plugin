@@ -14,7 +14,6 @@ import net.runelite.api.coords.WorldPoint;
 import net.runelite.client.game.ItemManager;
 
 import javax.inject.Inject;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;

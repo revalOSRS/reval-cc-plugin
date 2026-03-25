@@ -390,8 +390,8 @@ public class RevalPanel extends PluginPanel {
 		}
 
 		rankingPanel.init(apiService, itemManager, spriteManager);
-		profilePanel.init(apiService, client, assetLoader, config);
-		leaderboardPanel.init(apiService, assetLoader);
+		profilePanel.init(apiService, client, assetLoader, config, itemManager);
+		leaderboardPanel.init(apiService, assetLoader, itemManager);
 		achievementsPanel.init(apiService, client);
 		competitionsPanel.init(apiService, client);
 		eventsPanel.init(apiService, client);

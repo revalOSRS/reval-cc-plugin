@@ -82,6 +82,7 @@ public class AccountResponse extends ApiResponse {
         private Integer pointsAfter;
         private String sourceType; // 'drop' | 'pet' | 'milestone' | 'manual' | 'event' | 'prestige' | 'decay' | 'initial'
         private Integer sourceId;
+        private Integer itemId;
         private String sourceDescription;
         private String createdAt;
     }
