@@ -141,9 +141,16 @@ public class PointsBreakdownPanel extends JDialog {
 
 		String desc = entry.getSourceDescription() != null ? entry.getSourceDescription() : "Unknown source";
 
-		JLabel descLabel = new JLabel("<html>" + desc + "</html>");
+		JTextArea descLabel = new JTextArea(desc);
 		descLabel.setFont(FontManager.getRunescapeSmallFont());
 		descLabel.setForeground(UIConstants.TEXT_PRIMARY);
+		descLabel.setBackground(UIConstants.CARD_BG);
+		descLabel.setBorder(null);
+		descLabel.setMargin(new Insets(0, 0, 0, 0));
+		descLabel.setEditable(false);
+		descLabel.setFocusable(false);
+		descLabel.setLineWrap(true);
+		descLabel.setWrapStyleWord(true);
 		descLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
 		JLabel dateLabel = new JLabel(formatDate(entry.getCreatedAt()));
