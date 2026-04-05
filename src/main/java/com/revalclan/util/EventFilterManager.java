@@ -58,6 +58,7 @@ public class EventFilterManager{
 		@Getter private boolean emoteEnabled = true;
 		@Getter private boolean chatEnabled = true;
 		@Getter private boolean musicEnabled = true;
+		@Getter private boolean leaguesEnabled = false;
 	}
 	
 	public EventFilterManager() {
@@ -222,6 +223,7 @@ public class EventFilterManager{
 				if (enabled.has("emote")) newFilters.emoteEnabled = enabled.get("emote").getAsBoolean();
 				if (enabled.has("chat")) newFilters.chatEnabled = enabled.get("chat").getAsBoolean();
 				if (enabled.has("music")) newFilters.musicEnabled = enabled.get("music").getAsBoolean();
+				if (enabled.has("leagues")) newFilters.leaguesEnabled = enabled.get("leagues").getAsBoolean();
 			}
 			
 			// Atomically replace filters

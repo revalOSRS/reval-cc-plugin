@@ -30,6 +30,9 @@ public final class ApiEndpoints {
     // Challenges
     public static final String CHALLENGES = "/challenges";
 
+    // Leagues
+    public static final String LEAGUES_CONFIG = "/leagues/config";
+
     // Competitions
     public static final String COMPETITIONS = "/competitions";
     public static final String COMPETITIONS_SCHEDULED = "/competitions/scheduled";

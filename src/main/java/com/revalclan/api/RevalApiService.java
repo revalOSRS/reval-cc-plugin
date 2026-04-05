@@ -9,6 +9,7 @@ import com.revalclan.api.admin.AdminAuthResponse;
 import com.revalclan.api.admin.AdminLoginRequest;
 import com.revalclan.api.admin.PendingRankChangesResponse;
 import com.revalclan.api.challenges.ChallengesResponse;
+import com.revalclan.api.leagues.LeaguesConfigResponse;
 import com.revalclan.api.competitions.*;
 import com.revalclan.api.announcements.AnnouncementsResponse;
 import com.revalclan.api.common.ApiEndpoints;
@@ -61,6 +62,9 @@ public class RevalApiService {
     private long lastDiariesFetch = 0;
     private ChallengesResponse cachedChallenges;
     private long lastChallengesFetch = 0;
+
+    // Leagues config - session-level cache (no TTL, cleared on logout)
+    private LeaguesConfigResponse.LeaguesConfig cachedLeaguesConfig;
 
     @Inject
     public RevalApiService(OkHttpClient httpClient, Gson gson) {
@@ -246,6 +250,27 @@ public class RevalApiService {
         fetchChallenges(null, onSuccess, onError);
     }
 
+    // ==================== LEAGUES API ====================
+
+    public void fetchLeaguesConfig(Consumer<LeaguesConfigResponse.LeaguesConfig> onSuccess, Consumer<Exception> onError) {
+        if (cachedLeaguesConfig != null) {
+            onSuccess.accept(cachedLeaguesConfig);
+            return;
+        }
+        get(ApiEndpoints.LEAGUES_CONFIG, LeaguesConfigResponse.class, response -> {
+            cachedLeaguesConfig = response.getData();
+            onSuccess.accept(cachedLeaguesConfig);
+        }, onError);
+    }
+
+    public LeaguesConfigResponse.LeaguesConfig getCachedLeaguesConfig() {
+        return cachedLeaguesConfig;
+    }
+
+    public void clearLeaguesCache() {
+        cachedLeaguesConfig = null;
+    }
+
     // ==================== COMPETITIONS API ====================
 
     public void fetchCompetitions(String status, Consumer<CompetitionsResponse> onSuccess, Consumer<Exception> onError) {
@@ -384,6 +409,7 @@ public class RevalApiService {
         lastDiariesFetch = 0;
         cachedChallenges = null;
         lastChallengesFetch = 0;
+        cachedLeaguesConfig = null;
     }
 
     public void clearAccountCache() {

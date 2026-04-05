@@ -200,4 +200,26 @@ public interface RevalClanConfig extends Config {
 	default boolean notifyMusic() {
 		return true;
 	}
+
+	@ConfigItem(
+		keyName = "notifyLeagues",
+		name = "Leagues Events",
+		description = "Track Leagues events (tasks, relics, areas, combat masteries)",
+		section = eventsSection,
+		position = 18
+	)
+	default boolean notifyLeagues() {
+		return true;
+	}
+
+	@ConfigItem(
+		keyName = "showAnnouncements",
+		name = "In-Game Announcements",
+		description = "Show Reval announcements and notifications in chat",
+		section = eventsSection,
+		position = 19
+	)
+	default boolean showAnnouncements() {
+		return true;
+	}
 }

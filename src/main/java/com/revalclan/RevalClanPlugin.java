@@ -19,6 +19,7 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
+import net.runelite.api.WorldType;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.HitsplatApplied;
@@ -80,6 +81,8 @@ public class RevalClanPlugin extends Plugin {
 	@Inject	private ChatNotifier chatNotifier;
 
 	@Inject	private MusicNotifier musicNotifier;
+
+	@Inject	private LeaguesNotifier leaguesNotifier;
 
 	@Inject	private LoginNotifier loginNotifier;
 
@@ -186,6 +189,7 @@ public class RevalClanPlugin extends Plugin {
 		clueNotifier.reset();
 		killCountNotifier.reset();
 		detailedKillNotifier.reset();
+		leaguesNotifier.reset();
 
 		// Remove the side panel
 		if (navButton != null) {
@@ -214,6 +218,7 @@ public class RevalClanPlugin extends Plugin {
 			clanValidationAttempt = -1;
 			pendingLoginNotification = false;
 			announcementService.reset();
+			leaguesNotifier.reset();
 
 			if (wasLoggedIn) {
 				if (wasInClan) {
@@ -230,6 +235,11 @@ public class RevalClanPlugin extends Plugin {
 
 	private void onClanValidated() {
 		eventFilterManager.fetchFiltersAsync();
+
+		// Fetch leagues config if on a seasonal world
+		if (client.getWorldType().contains(WorldType.SEASONAL)) {
+			leaguesNotifier.fetchConfig();
+		}
 
 		if (pendingLoginNotification) {
 			pendingLoginNotification = false;
@@ -267,6 +277,7 @@ public class RevalClanPlugin extends Plugin {
 		killCountNotifier.onTick();
 		diaryNotifier.onGameTick();
 		petNotifier.onGameTick();
+		leaguesNotifier.onGameTick();
 	}
 
 	/**
@@ -312,6 +323,7 @@ public class RevalClanPlugin extends Plugin {
 			clueNotifier.onChatMessage(cleanMessage);
 			combatAchievementNotifier.onChatMessage(cleanMessage);
 			collectionNotifier.onChatMessage(cleanMessage);
+			leaguesNotifier.onChatMessage(cleanMessage);
 		} else if (type == ChatMessageType.CLAN_MESSAGE ||
 			type == ChatMessageType.CLAN_CHAT ||
 			type == ChatMessageType.CLAN_GUEST_CHAT) {

@@ -21,6 +21,7 @@ public class AnnouncementService {
 	@Inject private ChatMessageManager chatMessageManager;
 	@Inject private RevalApiService revalApiService;
 	@Inject private Client client;
+	@Inject private com.revalclan.RevalClanConfig config;
 
 	private int tickCounter = 0;
 	private boolean initialFetchDone = false;
@@ -32,6 +33,10 @@ public class AnnouncementService {
 	private final List<Announcement> cachedAnnouncements = new CopyOnWriteArrayList<>();
 
 	public void onGameTick() {
+		if (!config.showAnnouncements()) {
+			return;
+		}
+
 		tickCounter++;
 
 		if (tickCounter < INITIAL_DELAY_TICKS) {
