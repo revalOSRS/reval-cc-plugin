@@ -84,6 +84,8 @@ public class RevalClanPlugin extends Plugin {
 
 	@Inject	private LeaguesNotifier leaguesNotifier;
 
+	@Inject	private LeaguesSyncNotifier leaguesSyncNotifier;
+
 	@Inject	private LoginNotifier loginNotifier;
 
 	@Inject	private LogoutNotifier logoutNotifier;
@@ -190,6 +192,7 @@ public class RevalClanPlugin extends Plugin {
 		killCountNotifier.reset();
 		detailedKillNotifier.reset();
 		leaguesNotifier.reset();
+		leaguesSyncNotifier.reset();
 
 		// Remove the side panel
 		if (navButton != null) {
@@ -219,6 +222,7 @@ public class RevalClanPlugin extends Plugin {
 			pendingLoginNotification = false;
 			announcementService.reset();
 			leaguesNotifier.reset();
+			leaguesSyncNotifier.reset();
 
 			if (wasLoggedIn) {
 				if (wasInClan) {
@@ -239,6 +243,7 @@ public class RevalClanPlugin extends Plugin {
 		// Fetch leagues config if on a seasonal world
 		if (client.getWorldType().contains(WorldType.SEASONAL)) {
 			leaguesNotifier.fetchConfig();
+			leaguesSyncNotifier.init();
 		}
 
 		if (pendingLoginNotification) {
@@ -278,6 +283,7 @@ public class RevalClanPlugin extends Plugin {
 		diaryNotifier.onGameTick();
 		petNotifier.onGameTick();
 		leaguesNotifier.onGameTick();
+		leaguesSyncNotifier.onGameTick();
 	}
 
 	/**
@@ -342,6 +348,7 @@ public class RevalClanPlugin extends Plugin {
 		if (!inRequiredClan) return;
 		questNotifier.onWidgetLoaded(event);
 		clueNotifier.onWidgetLoaded(event);
+		leaguesSyncNotifier.onWidgetLoaded(event);
 	}
 
 	@Subscribe
@@ -374,6 +381,7 @@ public class RevalClanPlugin extends Plugin {
 	public void onVarbitChanged(VarbitChanged event) {
 		if (!inRequiredClan) return;
 		diaryNotifier.onVarbitChanged(event);
+		leaguesSyncNotifier.onVarbitChanged();
 	}
 
 	@Subscribe

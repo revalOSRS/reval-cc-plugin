@@ -27,7 +27,7 @@ dependencies {
 }
 
 group = 'com.revalclan'
-version = '2.13'
+version = '2.14'
 
 tasks.withType(JavaCompile).configureEach {
 	options.encoding = 'UTF-8'
