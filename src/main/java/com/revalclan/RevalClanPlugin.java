@@ -243,7 +243,7 @@ public class RevalClanPlugin extends Plugin {
 		// Fetch leagues config if on a seasonal world
 		if (client.getWorldType().contains(WorldType.SEASONAL)) {
 			leaguesNotifier.fetchConfig();
-			leaguesSyncNotifier.init();
+			leaguesSyncNotifier.onLogin();
 		}
 
 		if (pendingLoginNotification) {
@@ -381,7 +381,6 @@ public class RevalClanPlugin extends Plugin {
 	public void onVarbitChanged(VarbitChanged event) {
 		if (!inRequiredClan) return;
 		diaryNotifier.onVarbitChanged(event);
-		leaguesSyncNotifier.onVarbitChanged();
 	}
 
 	@Subscribe

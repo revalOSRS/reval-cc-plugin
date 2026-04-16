@@ -15,8 +15,9 @@ import java.util.Map;
 
 /**
  * Leagues panel sync notifier.
- * Sends LEAGUES_SYNC events with: leagueType, totalPoints, tasksCompleted,
- * areaSelections (id + name), and optionally selectedRelics (when Relics modal was opened).
+ * Sends LEAGUES_SYNC on login and when the Relics modal is opened.
+ * Payload: leagueType, totalPoints, tasksCompleted, areaSelections (id + name),
+ * and selectedRelics (when available from Relics modal).
  */
 @Slf4j
 @Singleton
@@ -27,19 +28,16 @@ public class LeaguesSyncNotifier extends BaseNotifier {
 	private static final int RELIC_SELECTED_COLOR = 0xF47113;
 	private static final int RELIC_UNSELECTED_COLOR = 0xAAAAAA;
 
-	private final Map<Integer, String> areaNames = new HashMap<>();
+	private static final Map<Integer, String> AREA_NAMES = new HashMap<>();
+	static {
+		AREA_NAMES.put(2, "Karamja");
+		AREA_NAMES.put(7, "Tirannwn");
+		AREA_NAMES.put(21, "Varlamore");
+	}
+
 	private List<String> cachedSelectedRelics = null;
 	private int pendingRelicRead = -1;
 	private int pendingRelicTicks = 0;
-
-	private int lastTotalPoints = -1;
-	private int lastTotalTasks = -1;
-	private int lastArea0 = -1;
-	private int lastArea1 = -1;
-	private int lastArea2 = -1;
-	private int lastArea3 = -1;
-	private int lastArea4 = -1;
-	private int lastArea5 = -1;
 
 	@Override
 	public boolean isEnabled() {
@@ -52,14 +50,11 @@ public class LeaguesSyncNotifier extends BaseNotifier {
 	}
 
 	/**
-	 * Loads area ID -> name mapping. Called after login on a seasonal world.
+	 * Called after login on a seasonal world. Sends initial sync.
 	 */
-	public void init() {
-		if (!areaNames.isEmpty()) return;
-
-		areaNames.put(2, "Karamja");
-		areaNames.put(7, "Tirannwn");
-		areaNames.put(21, "Varlamore");
+	public void onLogin() {
+		if (!isEnabled()) return;
+		sendSync();
 	}
 
 	public void onWidgetLoaded(WidgetLoaded event) {
@@ -82,43 +77,10 @@ public class LeaguesSyncNotifier extends BaseNotifier {
 		}
 	}
 
-	public void onVarbitChanged() {
-		if (!isEnabled()) return;
-
-		try {
-			int totalPoints = client.getVarpValue(VarPlayerID.LEAGUE_POINTS_COMPLETED);
-			int totalTasks = client.getVarbitValue(VarbitID.LEAGUE_TOTAL_TASKS_COMPLETED);
-			int a0 = client.getVarbitValue(VarbitID.LEAGUE_AREA_SELECTION_0);
-			int a1 = client.getVarbitValue(VarbitID.LEAGUE_AREA_SELECTION_1);
-			int a2 = client.getVarbitValue(VarbitID.LEAGUE_AREA_SELECTION_2);
-			int a3 = client.getVarbitValue(VarbitID.LEAGUE_AREA_SELECTION_3);
-			int a4 = client.getVarbitValue(VarbitID.LEAGUE_AREA_SELECTION_4);
-			int a5 = client.getVarbitValue(VarbitID.LEAGUE_AREA_SELECTION_5);
-
-			boolean changed = totalPoints != lastTotalPoints || totalTasks != lastTotalTasks
-				|| a0 != lastArea0 || a1 != lastArea1 || a2 != lastArea2
-				|| a3 != lastArea3 || a4 != lastArea4 || a5 != lastArea5;
-			if (!changed) return;
-
-			lastTotalPoints = totalPoints;
-			lastTotalTasks = totalTasks;
-			lastArea0 = a0; lastArea1 = a1; lastArea2 = a2;
-			lastArea3 = a3; lastArea4 = a4; lastArea5 = a5;
-
-			sendSync();
-		} catch (Exception e) {
-			log.warn("Error reading Leagues varbits", e);
-		}
-	}
-
 	public void reset() {
 		pendingRelicRead = -1;
 		pendingRelicTicks = 0;
 		cachedSelectedRelics = null;
-		lastTotalPoints = -1; lastTotalTasks = -1;
-		lastArea0 = -1; lastArea1 = -1; lastArea2 = -1;
-		lastArea3 = -1; lastArea4 = -1; lastArea5 = -1;
-		areaNames.clear();
 	}
 
 	// ========== Payload ==========
@@ -142,7 +104,7 @@ public class LeaguesSyncNotifier extends BaseNotifier {
 			if (areaId != 0) {
 				Map<String, Object> area = new HashMap<>();
 				area.put("id", areaId);
-				String name = areaNames.get(areaId);
+				String name = AREA_NAMES.get(areaId);
 				area.put("name", name != null ? name : "Unknown");
 				areas.add(area);
 			}
