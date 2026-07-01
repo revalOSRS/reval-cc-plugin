@@ -34,7 +34,7 @@ public class LootNotifier extends BaseNotifier {
 	 * NPC names that fire LootReceived instead of NpcLootReceived
 	 */
 	private static final Set<String> SPECIAL_LOOT_NPC_NAMES = Set.of(
-		"The Whisperer", "Araxxor",
+		"The Whisperer", "Araxxor", "Maggot King",
 		"Branda the Fire Queen", "Eldric the Ice King",
 		"Crystalline Hunllef", "Corrupted Hunllef",
 		"The Gauntlet", "Corrupted Gauntlet",
