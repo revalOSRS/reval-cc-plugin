@@ -193,10 +193,9 @@ public class LootNotifier extends BaseNotifier {
 							item.put("isNewCollectionLogItem", isNewClogSlot);
 						}
 						sendNotification(pending.lootData);
-					} catch (Exception e) {
+					} catch (Exception ignored) {
 						// Never let one payload break the tick dispatch for
 						// other pending loot or the notifiers after us
-						System.err.println("[RevalClan] Failed to send buffered loot event: " + e.getMessage());
 					}
 				}
 			}
