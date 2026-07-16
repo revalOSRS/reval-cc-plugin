@@ -278,6 +278,7 @@ public class RevalClanPlugin extends Plugin {
 		if (!inRequiredClan) return;
 
 		announcementService.onGameTick();
+		lootNotifier.onGameTick();
 		detailedKillNotifier.onGameTick(gameTick);
 		killCountNotifier.onTick();
 		diaryNotifier.onGameTick();
