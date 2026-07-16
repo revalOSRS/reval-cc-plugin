@@ -13,9 +13,48 @@ import net.runelite.http.api.loottracker.LootRecordType;
 
 import javax.inject.Singleton;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Singleton
 public class LootNotifier extends BaseNotifier {
+	/**
+	 * The game announces each new collection log slot exactly once, on the same
+	 * tick as the loot itself. Loot payloads are buffered for a couple of ticks
+	 * so the announcement can be correlated regardless of within-tick ordering,
+	 * and each item is sent with an explicit isNewCollectionLogItem flag.
+	 */
+	private static final Pattern COLLECTION_LOG_PATTERN = Pattern.compile(
+		"New item added to your collection log: (?<item>.+)",
+		Pattern.CASE_INSENSITIVE
+	);
+
+	/** Ticks to hold a loot payload before sending (correlation window). */
+	private static final int LOOT_BUFFER_TICKS = 2;
+
+	/** How many ticks a clog announcement stays eligible for matching. */
+	private static final int CLOG_MESSAGE_TTL_TICKS = 10;
+
+	/** Lowercased item name → tick the clog announcement was seen on. */
+	private final Map<String, Integer> recentClogItems = new HashMap<>();
+
+	/** Loot payloads waiting out the correlation window. */
+	private final List<PendingLoot> pendingLoot = new ArrayList<>();
+
+	private int tickCounter = 0;
+
+	private static class PendingLoot {
+		final Map<String, Object> lootData;
+		final List<Map<String, Object>> items;
+		final int sendOnTick;
+
+		PendingLoot(Map<String, Object> lootData, List<Map<String, Object>> items, int sendOnTick) {
+			this.lootData = lootData;
+			this.items = items;
+			this.sendOnTick = sendOnTick;
+		}
+	}
+
 	/**
 	 * NPC IDs that fire LootReceived instead of NpcLootReceived
 	 * These should be handled in onLootReceived, not onNpcLootReceived
@@ -117,14 +156,53 @@ public class LootNotifier extends BaseNotifier {
 	}
 
 	/**
-	 * Handle game messages for special loot cases that don't fire normal loot events
+	 * Handle game messages for special loot cases that don't fire normal loot events,
+	 * and record collection log announcements for loot correlation
 	 */
 	public void onGameMessage(String message) {
 		if (!isEnabled()) return;
 
+		// Track "New item added to your collection log: X" for the buffered loot flag
+		Matcher clogMatcher = COLLECTION_LOG_PATTERN.matcher(message);
+		if (clogMatcher.find()) {
+			recentClogItems.put(clogMatcher.group("item").trim().toLowerCase(), tickCounter);
+			return;
+		}
+
 		// Pyramid Plunder: Pharaoh's sceptre doesn't fire a normal loot event
 		if ("You have found the Pharaoh's sceptre!".equals(message) || "You have found a Pharaoh's sceptre!".equals(message)) {
 			handleLootDrop(List.of(new ItemStack(ItemID.PHARAOHS_SCEPTRE, 1)), "Pyramid Plunder", "EVENT", null);
+		}
+	}
+
+	/**
+	 * Flush loot payloads whose correlation window has elapsed, marking each item
+	 * with whether the game announced it as a new collection log slot
+	 */
+	public void onGameTick() {
+		tickCounter++;
+
+		if (!pendingLoot.isEmpty()) {
+			Iterator<PendingLoot> it = pendingLoot.iterator();
+			while (it.hasNext()) {
+				PendingLoot pending = it.next();
+				if (tickCounter >= pending.sendOnTick) {
+					for (Map<String, Object> item : pending.items) {
+						String name = String.valueOf(item.get("name")).toLowerCase();
+						Integer seenTick = recentClogItems.get(name);
+						boolean isNewClogSlot = seenTick != null
+							&& tickCounter - seenTick <= CLOG_MESSAGE_TTL_TICKS;
+						item.put("isNewCollectionLogItem", isNewClogSlot);
+					}
+					sendNotification(pending.lootData);
+					it.remove();
+				}
+			}
+		}
+
+		// Expire stale clog announcements so the map can't grow unbounded
+		if (!recentClogItems.isEmpty()) {
+			recentClogItems.values().removeIf(tick -> tickCounter - tick > CLOG_MESSAGE_TTL_TICKS);
 		}
 	}
 
@@ -184,6 +262,8 @@ public class LootNotifier extends BaseNotifier {
 		lootData.put("totalHAValue", totalHAValue);
 		lootData.put("items", itemsList);
 
-		sendNotification(lootData);
+		// Buffer for the clog correlation window instead of sending immediately;
+		// onGameTick stamps isNewCollectionLogItem on each item and sends
+		pendingLoot.add(new PendingLoot(lootData, itemsList, tickCounter + LOOT_BUFFER_TICKS));
 	}
 }
