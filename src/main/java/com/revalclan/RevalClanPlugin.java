@@ -4,10 +4,12 @@ import com.revalclan.api.RevalApiService;
 import com.revalclan.collectionlog.CollectionLogManager;
 import com.revalclan.collectionlog.CollectionLogSyncButton;
 import com.revalclan.notifiers.*;
+import com.revalclan.session.SessionTracker;
 import com.revalclan.ui.RevalPanel;
 import com.revalclan.util.AnnouncementService;
 import com.revalclan.util.ClanValidator;
 import com.revalclan.util.EventFilterManager;
+import com.revalclan.util.SyncStateManager;
 import com.revalclan.util.UIAssetLoader;
 import com.google.inject.Provides;
 
@@ -90,6 +92,12 @@ public class RevalClanPlugin extends Plugin {
 
 	@Inject	private LogoutNotifier logoutNotifier;
 
+	@Inject	private SyncNotifier syncNotifier;
+
+	@Inject	private SessionTracker sessionTracker;
+
+	@Inject	private SyncStateManager syncStateManager;
+
 	@Inject	private EventBus eventBus;
 
 	@Inject	private ClientThread clientThread;
@@ -124,6 +132,10 @@ public class RevalClanPlugin extends Plugin {
 	private static final int SLOW_VALIDATION_INTERVAL = 5;
 	private static final int MAX_CLAN_VALIDATION_TICKS = 1000;
 
+	/** Refetch event filters every ~10 minutes so activated events propagate without a relog */
+	private static final int FILTER_REFETCH_INTERVAL_TICKS = 1000;
+	private int filterRefetchTicks = 0;
+
 	private static final Pattern COL_OPEN = Pattern.compile("<col=[0-9a-fA-F]+>");
 	private static final Pattern COL_CLOSE = Pattern.compile("</col>");
 
@@ -151,7 +163,10 @@ public class RevalClanPlugin extends Plugin {
 		});
 
 		syncButton.startUp();
-		
+
+		// Replay any session left behind by a crash / X-out as a recovered summary
+		sessionTracker.recoverPersistedSession();
+
 		eventBus.register(lootNotifier);
 
 		// Initialize and add the side panel
@@ -183,8 +198,12 @@ public class RevalClanPlugin extends Plugin {
 
 		collectionLogManager.clearObtainedItems();
 		syncButton.shutDown();
-		
+
 		eventBus.unregister(lootNotifier);
+
+		// In-memory reset only: the persisted session (if any) stays on disk and is
+		// replayed as 'recovered' on the next startUp, so no data is lost
+		sessionTracker.reset();
 
 		announcementService.reset();
 		levelNotifier.reset();
@@ -226,7 +245,8 @@ public class RevalClanPlugin extends Plugin {
 
 			if (wasLoggedIn) {
 				if (wasInClan) {
-					logoutNotifier.onLogout();
+					// Finalize the client-side session and deliver it inline on LOGOUT
+					logoutNotifier.onLogout(sessionTracker.finalizeSession());
 				}
 				wasLoggedIn = false;
 
@@ -248,6 +268,7 @@ public class RevalClanPlugin extends Plugin {
 
 		if (pendingLoginNotification) {
 			pendingLoginNotification = false;
+			sessionTracker.startSession();
 			loginNotifier.onLogin();
 		}
 
@@ -285,6 +306,20 @@ public class RevalClanPlugin extends Plugin {
 		petNotifier.onGameTick();
 		leaguesNotifier.onGameTick();
 		leaguesSyncNotifier.onGameTick();
+		sessionTracker.onGameTick();
+
+		// Periodic filter refetch: activated events/competitions change the derived
+		// whitelists server-side; without this only a relog would pick them up
+		if (++filterRefetchTicks >= FILTER_REFETCH_INTERVAL_TICKS) {
+			filterRefetchTicks = 0;
+			eventFilterManager.fetchFiltersAsync();
+		}
+
+		// The server flagged our sync fingerprint as stale — repair with a full sync
+		// (runs here because collecting data requires the client thread)
+		if (syncStateManager.consumeFullSyncRequest()) {
+			syncNotifier.triggerSync();
+		}
 	}
 
 	/**

@@ -1,5 +1,6 @@
 package com.revalclan.notifiers;
 
+import com.revalclan.session.SessionTracker;
 import net.runelite.api.NPC;
 import net.runelite.api.gameval.ItemID;
 import net.runelite.api.gameval.NpcID;
@@ -11,6 +12,7 @@ import net.runelite.client.game.ItemStack;
 import net.runelite.client.plugins.loottracker.LootReceived;
 import net.runelite.http.api.loottracker.LootRecordType;
 
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -18,6 +20,9 @@ import java.util.regex.Pattern;
 
 @Singleton
 public class LootNotifier extends BaseNotifier {
+	@Inject
+	private SessionTracker sessionTracker;
+
 	private static final Pattern COLLECTION_LOG_PATTERN = Pattern.compile(
 		"New item added to your collection log: (?<item>.+)",
 		Pattern.CASE_INSENSITIVE
@@ -241,6 +246,9 @@ public class LootNotifier extends BaseNotifier {
 
 			totalGEValue += (long) gePrice * item.getQuantity();
 			totalHAValue += (long) haValue * item.getQuantity();
+
+			// Session loot totals are complete and local — independent of server filters
+			sessionTracker.addLoot(source, itemId, itemName, item.getQuantity(), gePrice);
 
 			// Check for special items
 			if (whitelistItemIds.contains(itemId)) hasWhitelistedItem = true;

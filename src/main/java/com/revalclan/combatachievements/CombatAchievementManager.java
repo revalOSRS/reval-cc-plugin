@@ -103,6 +103,34 @@ public class CombatAchievementManager {
 	}
 
 	/**
+	 * Compute the current total CA points directly from the game cache + varps,
+	 * without building the full task list. Used by the CA notifier so the
+	 * COMBAT_ACHIEVEMENT event carries the authoritative total (v2.17+) and the
+	 * backend doesn't have to re-derive it from stored completions.
+	 */
+	public int computeCurrentTotalPoints() {
+		int total = 0;
+		for (Map.Entry<Integer, String> tierEntry : TIER_ENUMS.entrySet()) {
+			try {
+				EnumComposition tierEnum = client.getEnum(tierEntry.getKey());
+				if (tierEnum == null) continue;
+
+				int pointsPerTask = getPointsForTier(tierEntry.getValue());
+				for (int structId : tierEnum.getIntVals()) {
+					try {
+						StructComposition struct = client.getStructComposition(structId);
+						if (struct == null) continue;
+						if (isTaskCompleted(struct.getIntValue(FIELD_TASK_ID))) {
+							total += pointsPerTask;
+						}
+					} catch (Exception ignored) {}
+				}
+			} catch (Exception ignored) {}
+		}
+		return total;
+	}
+
+	/**
 	 * Loads a single task from a struct
 	 */
 	private CombatAchievementTask loadTaskFromStruct(int structId, String tierName) {

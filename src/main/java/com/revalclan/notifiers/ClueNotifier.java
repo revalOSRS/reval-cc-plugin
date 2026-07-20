@@ -7,10 +7,12 @@
  */
 package com.revalclan.notifiers;
 
+import com.revalclan.session.SessionTracker;
 import net.runelite.api.events.WidgetLoaded;
 import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.widgets.Widget;
 
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -21,6 +23,9 @@ import java.util.regex.Pattern;
 
 @Singleton
 public class ClueNotifier extends BaseNotifier {
+	@Inject
+	private SessionTracker sessionTracker;
+
 	private static final Pattern CLUE_PATTERN = Pattern.compile(
 		"You have completed (?<count>\\d+) (?<tier>\\w+) Treasure Trails?\\.",
 		Pattern.CASE_INSENSITIVE
@@ -88,6 +93,8 @@ public class ClueNotifier extends BaseNotifier {
 	}
 
 	private void handleClueCompletion(List<Map<String, Object>> items, long totalValue) {
+		sessionTracker.addClue(clueTier);
+
 		Map<String, Object> clueData = new HashMap<>();
 		clueData.put("tier", clueTier);
 		clueData.put("count", clueCount);

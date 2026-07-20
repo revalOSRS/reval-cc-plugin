@@ -1,7 +1,9 @@
 package com.revalclan.notifiers;
 
+import com.revalclan.session.SessionTracker;
 import lombok.extern.slf4j.Slf4j;
 
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -14,6 +16,9 @@ import java.util.regex.Pattern;
 @Slf4j
 @Singleton
 public class PetNotifier extends BaseNotifier {
+	@Inject
+	private SessionTracker sessionTracker;
+
 	/**
 	 * Pattern matching the initial pet drop message
 	 */
@@ -226,6 +231,10 @@ public class PetNotifier extends BaseNotifier {
 		// Add kill count if available
 		if (this.killCount != null && !this.killCount.isEmpty()) {
 			petData.put("killCount", this.killCount);
+		}
+
+		if (this.petName != null && !this.petName.isEmpty()) {
+			sessionTracker.addPet(this.petName);
 		}
 
 		sendNotification(petData);

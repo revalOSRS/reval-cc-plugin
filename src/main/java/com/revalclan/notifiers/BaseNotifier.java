@@ -50,13 +50,24 @@ public abstract class BaseNotifier {
 
 	/**
 	 * Send a notification with the given data (no screenshot).
-	 * 
+	 *
 	 * @param data The notification data
 	 */
 	protected void sendNotification(Map<String, Object> data) {
 		if (!ClanValidator.validateClan(client)) return;
 		addEventMetadata(data);
 		webhookService.sendDataAsync(data);
+	}
+
+	/**
+	 * Send a notification and hand the parsed JSON response to the consumer
+	 * (HTTP thread — must not touch the client). Used by the session-boundary
+	 * notifiers for the sync-fingerprint ack handshake.
+	 */
+	protected void sendNotificationWithResponse(Map<String, Object> data, java.util.function.Consumer<com.google.gson.JsonObject> onResponse) {
+		if (!ClanValidator.validateClan(client)) return;
+		addEventMetadata(data);
+		webhookService.sendDataAsync(data, onResponse);
 	}
 
 	/**

@@ -1,6 +1,7 @@
 package com.revalclan.util;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.*;
 
@@ -9,6 +10,7 @@ import javax.inject.Singleton;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Map;
+import java.util.function.Consumer;
 import java.util.zip.GZIPOutputStream;
 
 @Slf4j
@@ -16,11 +18,11 @@ import java.util.zip.GZIPOutputStream;
 public class WebhookService {
 	private static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
 	private static final String WEBHOOK_URL = "https://api.revalosrs.ee/reval-webhook";
-	private static final String PLUGIN_VERSION = "2.16";
-	
+	private static final String PLUGIN_VERSION = "2.17";
+
 	@Inject
 	private OkHttpClient httpClient;
-	
+
 	@Inject
 	private Gson gson;
 
@@ -28,16 +30,26 @@ public class WebhookService {
 	 * Sends player data to webhook asynchronously
 	 */
 	public void sendDataAsync(Map<String, Object> data) {
-		sendDataAsync(WEBHOOK_URL, data);
+		sendDataAsync(WEBHOOK_URL, data, null);
+	}
+
+	/**
+	 * Sends player data to webhook asynchronously and hands the parsed JSON
+	 * response body to the given consumer on success (HTTP thread — do not touch
+	 * the client from it). Used for the sync-fingerprint ack handshake.
+	 */
+	public void sendDataAsync(Map<String, Object> data, Consumer<JsonObject> onResponse) {
+		sendDataAsync(WEBHOOK_URL, data, onResponse);
 	}
 
 	/**
 	 * Sends player data to a specific webhook URL asynchronously
-	 * 
+	 *
 	 * @param webhookUrl The webhook endpoint URL
 	 * @param data The player data to send
+	 * @param onResponse Optional consumer for the parsed JSON response body
 	 */
-	private void sendDataAsync(String webhookUrl, Map<String, Object> data) {
+	private void sendDataAsync(String webhookUrl, Map<String, Object> data, Consumer<JsonObject> onResponse) {
 		if (webhookUrl == null || webhookUrl.trim().isEmpty()) {
 			return;
 		}
@@ -73,6 +85,17 @@ public class WebhookService {
 					try {
 						if (!response.isSuccessful()) {
 							log.warn("Webhook returned non-successful status: {}", response.code());
+							return;
+						}
+						if (onResponse != null && response.body() != null) {
+							try {
+								JsonObject parsed = gson.fromJson(response.body().string(), JsonObject.class);
+								if (parsed != null) {
+									onResponse.accept(parsed);
+								}
+							} catch (Exception e) {
+								log.warn("Failed to parse webhook response: {}", e.getMessage());
+							}
 						}
 					} finally {
 						response.close();
