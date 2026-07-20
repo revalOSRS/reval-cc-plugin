@@ -1,0 +1,770 @@
+{
+  "abyssal_sire": {
+    "primary": {
+      "source": "varp",
+      "id": 1526,
+      "value": 0
+    }
+  },
+  "alchemical_hydra": {
+    "primary": {
+      "source": "varp",
+      "id": 2074,
+      "value": 0
+    }
+  },
+  "amoxliatl": {
+    "primary": {
+      "source": "varp",
+      "id": 4403,
+      "value": 92
+    }
+  },
+  "araxxor": {
+    "primary": {
+      "source": "varp",
+      "id": 4260,
+      "value": 0
+    }
+  },
+  "barbarian_assault": {
+    "primary": {
+      "source": "varp",
+      "id": 1605,
+      "value": 0
+    }
+  },
+  "barrows_chests": {
+    "primary": {
+      "source": "varp",
+      "id": 1502,
+      "value": 242
+    }
+  },
+  "beginner_treasure_trails": {
+    "primary": {
+      "source": "varbit",
+      "id": 11996,
+      "value": 0
+    }
+  },
+  "bryophyta": {
+    "primary": {
+      "source": "varp",
+      "id": 1733,
+      "value": 58
+    }
+  },
+  "callisto_and_artio": {
+    "primary": {
+      "source": "varp",
+      "id": 1510,
+      "value": 1203
+    },
+    "additional": {
+      "artio_kc": {
+        "source": "varp",
+        "id": 3761,
+        "value": 1
+      },
+      "callisto_combined_kc": {
+        "source": "varp",
+        "id": 1510,
+        "value": 1203
+      }
+    },
+    "derivedRules": {
+      "callisto_kc": "callisto_combined_kc - artio_kc"
+    }
+  },
+  "cerberus": {
+    "primary": {
+      "source": "varp",
+      "id": 1525,
+      "value": 0
+    }
+  },
+  "chambers_of_xeric": {
+    "primary": {
+      "source": "varp",
+      "id": 1532,
+      "value": 15
+    },
+    "additional": {
+      "challenge_mode": {
+        "source": "varp",
+        "id": 1735,
+        "value": 6
+      }
+    }
+  },
+  "chaos_elemental": {
+    "primary": {
+      "source": "varp",
+      "id": 1513,
+      "value": 21
+    }
+  },
+  "chaos_fanatic": {
+    "primary": {
+      "source": "varp",
+      "id": 1519,
+      "value": 238
+    }
+  },
+  "commander_zilyana": {
+    "primary": {
+      "source": "varp",
+      "id": 1505,
+      "value": 1
+    }
+  },
+  "corporeal_beast": {
+    "primary": {
+      "source": "varp",
+      "id": 1517,
+      "value": 11
+    }
+  },
+  "crazy_archaeologist": {
+    "primary": {
+      "source": "varp",
+      "id": 1521,
+      "value": 329
+    }
+  },
+  "dagannoth_kings": {
+    "primary": {
+      "source": "varp",
+      "id": 1507,
+      "value": 4
+    },
+    "additional": {
+      "dagannoth_prime_kc": {
+        "source": "varp",
+        "id": 1507,
+        "value": 4
+      },
+      "dagannoth_supreme_kc": {
+        "source": "varp",
+        "id": 1509,
+        "value": 4
+      },
+      "dagannoth_rex_kc": {
+        "source": "varp",
+        "id": 1508,
+        "value": 3
+      }
+    }
+  },
+  "deranged_archaeologist": {
+    "primary": {
+      "source": "varp",
+      "id": 1661,
+      "value": 25
+    }
+  },
+  "doom_of_mokhaiotl": {
+    "primary": {
+      "source": "varp",
+      "id": 4182,
+      "value": 16384
+    },
+    "additional": {
+      "level_5_completions": {
+        "source": "varp",
+        "id": 4812,
+        "value": 0
+      },
+      "deepest_delves": {
+        "source": "varp",
+        "id": 4806,
+        "value": 3
+      },
+      "level_8_plus_completions": {
+        "source": "varp",
+        "id": 4816,
+        "value": 0
+      },
+      "level_2_completions": {
+        "source": "varp",
+        "id": 4809,
+        "value": 9
+      },
+      "level_6_completions": {
+        "source": "varp",
+        "id": 4813,
+        "value": 0
+      },
+      "level_1_completions": {
+        "source": "varp",
+        "id": 4808,
+        "value": 9
+      },
+      "level_3_completions": {
+        "source": "varp",
+        "id": 4810,
+        "value": 5
+      },
+      "level_7_completions": {
+        "source": "varp",
+        "id": 4814,
+        "value": 0
+      },
+      "level_4_completions": {
+        "source": "varp",
+        "id": 4811,
+        "value": 1
+      },
+      "level_8_completions": {
+        "source": "varp",
+        "id": 4815,
+        "value": 0
+      }
+    },
+    "summedRules": {
+      "total_completions": "level_1_completions + level_2_completions + level_3_completions + level_4_completions + level_5_completions + level_6_completions + level_7_completions + level_8_completions + level_8_plus_completions"
+    }
+  },
+  "duke_sucellus": {
+    "primary": {
+      "source": "varp",
+      "id": 3967,
+      "value": 161
+    }
+  },
+  "easy_treasure_trails": {
+    "primary": {
+      "source": "varbit",
+      "id": 11997,
+      "value": 0
+    }
+  },
+  "elite_treasure_trails": {
+    "primary": {
+      "source": "varbit",
+      "id": 12000,
+      "value": 0
+    }
+  },
+  "elite_treasure_trails_rare": {
+    "primary": {
+      "source": "varbit",
+      "id": 12000,
+      "value": 0
+    }
+  },
+  "fortis_colosseum": {
+    "primary": {
+      "source": "varp",
+      "id": 4131,
+      "value": 1
+    },
+    "additional": {
+      "colosseum_glory": {
+        "source": "varp",
+        "id": 4132,
+        "value": 0
+      }
+    }
+  },
+  "general_graardor": {
+    "primary": {
+      "source": "varp",
+      "id": 1504,
+      "value": 3
+    }
+  },
+  "giant_mole": {
+    "primary": {
+      "source": "varp",
+      "id": 1515,
+      "value": 26
+    }
+  },
+  "gloughs_experiments": {
+    "primary": {
+      "source": "varp",
+      "id": 1685,
+      "value": -1216722729
+    },
+    "additional": {
+      "tortured_gorillas_kc": {
+        "source": "varp",
+        "id": 4321,
+        "value": 0
+      },
+      "demonic_gorillas_kc": {
+        "source": "varp",
+        "id": 1685,
+        "value": -1216722729
+      }
+    }
+  },
+  "grotesque_guardians": {
+    "primary": {
+      "source": "varp",
+      "id": 1669,
+      "value": 199
+    }
+  },
+  "guardians_of_the_rift": {
+    "primary": {
+      "source": "varp",
+      "id": 3397,
+      "value": 20
+    },
+    "additional": {
+      "rifts_closed": {
+        "source": "varp",
+        "id": 3397,
+        "value": 20
+      }
+    }
+  },
+  "hallowed_sepulchre": {
+    "primary": {
+      "source": "varp",
+      "id": 2936,
+      "value": 0
+    }
+  },
+  "hard_treasure_trails": {
+    "primary": {
+      "source": "varbit",
+      "id": 11999,
+      "value": 0
+    }
+  },
+  "hard_treasure_trails_rare": {
+    "primary": {
+      "source": "varbit",
+      "id": 11999,
+      "value": 0
+    }
+  },
+  "hespori": {
+    "primary": {
+      "source": "varp",
+      "id": 2075,
+      "value": 5
+    }
+  },
+  "kalphite_queen": {
+    "primary": {
+      "source": "varp",
+      "id": 1516,
+      "value": 1
+    }
+  },
+  "king_black_dragon": {
+    "primary": {
+      "source": "varp",
+      "id": 1514,
+      "value": 104
+    }
+  },
+  "kraken": {
+    "primary": {
+      "source": "varp",
+      "id": 1523,
+      "value": 0
+    }
+  },
+  "kreearra": {
+    "primary": {
+      "source": "varp",
+      "id": 1503,
+      "value": 1
+    }
+  },
+  "kril_tsutsaroth": {
+    "primary": {
+      "source": "varp",
+      "id": 1506,
+      "value": 25
+    }
+  },
+  "last_man_standing": {
+    "primary": {
+      "source": "varp",
+      "id": 2396,
+      "value": 0
+    },
+    "additional": {
+      "lms_wins": {
+        "source": "varp",
+        "id": 2397,
+        "value": 0
+      },
+      "lms_kills": {
+        "source": "varp",
+        "id": 2398,
+        "value": 0
+      }
+    }
+  },
+  "master_treasure_trails": {
+    "primary": {
+      "source": "varbit",
+      "id": 12001,
+      "value": 0
+    }
+  },
+  "master_treasure_trails_rare": {
+    "primary": {
+      "source": "varbit",
+      "id": 12001,
+      "value": 0
+    }
+  },
+  "mastering_mixology": {
+    "primary": {
+      "source": "varp",
+      "id": 4480,
+      "value": 961
+    }
+  },
+  "medium_treasure_trails": {
+    "primary": {
+      "source": "varbit",
+      "id": 11998,
+      "value": 0
+    }
+  },
+  "mimic": {
+    "primary": {
+      "source": "varp",
+      "id": 2221,
+      "value": 0
+    }
+  },
+  "moons_of_peril": {
+    "primary": {
+      "source": "varp",
+      "id": 4186,
+      "value": 169
+    },
+    "additional": {
+      "blood_moon_kc": {
+        "source": "varp",
+        "id": 4150,
+        "value": 128
+      },
+      "eclipse_moon_kc": {
+        "source": "varp",
+        "id": 4148,
+        "value": 86
+      },
+      "blue_moon_kc": {
+        "source": "varp",
+        "id": 4149,
+        "value": 65
+      }
+    }
+  },
+  "nex": {
+    "primary": {
+      "source": "varp",
+      "id": 3269,
+      "value": 103
+    }
+  },
+  "obor": {
+    "primary": {
+      "source": "varp",
+      "id": 1529,
+      "value": 91
+    }
+  },
+  "phantom_muspah": {
+    "primary": {
+      "source": "varp",
+      "id": 3752,
+      "value": 0
+    }
+  },
+  "phosanis_nightmare": {
+    "primary": {
+      "source": "varp",
+      "id": 2671,
+      "value": 1
+    }
+  },
+  "royal_titans": {
+    "primary": {
+      "source": "varp",
+      "id": 4648,
+      "value": 407
+    }
+  },
+  "sarachnis": {
+    "primary": {
+      "source": "varp",
+      "id": 2233,
+      "value": 823
+    }
+  },
+  "scorpia": {
+    "primary": {
+      "source": "varp",
+      "id": 1520,
+      "value": 78
+    }
+  },
+  "scurrius": {
+    "primary": {
+      "source": "varp",
+      "id": 4079,
+      "value": 110
+    }
+  },
+  "skotizo": {
+    "primary": {
+      "source": "varp",
+      "id": 1527,
+      "value": 9
+    }
+  },
+  "soul_wars": {
+    "primary": {
+      "source": "varp",
+      "id": 2871,
+      "value": 33
+    },
+    "additional": {
+      "total_deaths": {
+        "source": "varp",
+        "id": 2873,
+        "value": 4
+      },
+      "total_kills": {
+        "source": "varp",
+        "id": 2872,
+        "value": 5
+      },
+      "total_games": {
+        "source": "varp",
+        "id": 2874,
+        "value": 1
+      },
+      "total_wins": {
+        "source": "varp",
+        "id": 2875,
+        "value": 0
+      },
+      "zeal_tokens": {
+        "source": "varp",
+        "id": 2876,
+        "value": 33
+      }
+    }
+  },
+  "tempoross": {
+    "primary": {
+      "source": "varp",
+      "id": 2934,
+      "value": 74
+    },
+    "additional": {
+      "tempoross_rewards": {
+        "source": "varbit",
+        "id": 11936,
+        "value": 1
+      }
+    }
+  },
+  "the_fight_caves": {
+    "primary": {
+      "source": "varp",
+      "id": 1522,
+      "value": 2
+    }
+  },
+  "the_gauntlet": {
+    "primary": {
+      "source": "varp",
+      "id": 2353,
+      "value": 2
+    },
+    "additional": {
+      "corrupted_gauntlet_kc": {
+        "source": "varp",
+        "id": 2354,
+        "value": 0
+      }
+    }
+  },
+  "the_hueycoatl": {
+    "primary": {
+      "source": "varp",
+      "id": 4404,
+      "value": 205
+    }
+  },
+  "the_inferno": {
+    "primary": {
+      "source": "varp",
+      "id": 1585,
+      "value": 0
+    }
+  },
+  "the_leviathan": {
+    "primary": {
+      "source": "varp",
+      "id": 3968,
+      "value": 191
+    }
+  },
+  "the_nightmare": {
+    "primary": {
+      "source": "varp",
+      "id": 2664,
+      "value": 0
+    }
+  },
+  "the_whisperer": {
+    "primary": {
+      "source": "varp",
+      "id": 3969,
+      "value": 61
+    }
+  },
+  "theatre_of_blood": {
+    "primary": {
+      "source": "varp",
+      "id": 1748,
+      "value": 14
+    },
+    "additional": {
+      "hard_mode": {
+        "source": "varp",
+        "id": 3057,
+        "value": 0
+      }
+    }
+  },
+  "thermonuclear_smoke_devil": {
+    "primary": {
+      "source": "varp",
+      "id": 1524,
+      "value": 0
+    }
+  },
+  "tombs_of_amascut": {
+    "primary": {
+      "source": "varp",
+      "id": 3646,
+      "value": 13
+    },
+    "additional": {
+      "entry_mode": {
+        "source": "varp",
+        "id": 3645,
+        "value": 2
+      },
+      "expert_mode": {
+        "source": "varp",
+        "id": 3647,
+        "value": 104
+      }
+    }
+  },
+  "tormented_demons": {
+    "primary": {
+      "source": "varp",
+      "id": 4240,
+      "value": 40
+    }
+  },
+  "vardorvis": {
+    "primary": {
+      "source": "varp",
+      "id": 3970,
+      "value": 3
+    }
+  },
+  "venenatis_and_spindel": {
+    "primary": {
+      "source": "varp",
+      "id": 1511,
+      "value": 2
+    },
+    "additional": {
+      "spindel_kc": {
+        "source": "varp",
+        "id": 3762,
+        "value": 5
+      },
+      "venenatis_kc": {
+        "source": "varp",
+        "id": 1511,
+        "value": 2
+      }
+    }
+  },
+  "vetion_and_calvarion": {
+    "primary": {
+      "source": "varp",
+      "id": 1512,
+      "value": 89
+    },
+    "additional": {
+      "vetion_combined_kc": {
+        "source": "varp",
+        "id": 1512,
+        "value": 89
+      },
+      "calvarion_kc": {
+        "source": "varp",
+        "id": 3763,
+        "value": 19
+      }
+    },
+    "derivedRules": {
+      "vetion_kc": "vetion_combined_kc - calvarion_kc"
+    }
+  },
+  "vorkath": {
+    "primary": {
+      "source": "varp",
+      "id": 1691,
+      "value": 149
+    }
+  },
+  "wintertodt": {
+    "primary": {
+      "source": "varp",
+      "id": 1528,
+      "value": 361
+    },
+    "additional": {
+      "wintertodt_rewards": {
+        "source": "varp",
+        "id": 1941,
+        "value": 0
+      }
+    }
+  },
+  "yama": {
+    "primary": {
+      "source": "varp",
+      "id": 4701,
+      "value": 9
+    }
+  },
+  "zalcano": {
+    "primary": {
+      "source": "varp",
+      "id": 2352,
+      "value": 0
+    }
+  },
+  "zulrah": {
+    "primary": {
+      "source": "varp",
+      "id": 1518,
+      "value": 4
+    }
+  }
+}

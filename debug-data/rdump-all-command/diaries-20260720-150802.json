@@ -1,0 +1,298 @@
+{
+  "managedSync": {
+    "totalDiaries": 48,
+    "totalCompleted": 33,
+    "progress": {
+      "Western": {
+        "elite": false,
+        "medium": true,
+        "hard": true,
+        "easy": true
+      },
+      "Karamja": {
+        "elite": false,
+        "medium": true,
+        "hard": true,
+        "easy": true
+      },
+      "Varrock": {
+        "elite": false,
+        "medium": true,
+        "hard": true,
+        "easy": true
+      },
+      "Wilderness": {
+        "elite": false,
+        "medium": true,
+        "hard": true,
+        "easy": true
+      },
+      "Fremennik": {
+        "elite": false,
+        "medium": true,
+        "hard": true,
+        "easy": true
+      },
+      "Kourend": {
+        "elite": false,
+        "medium": true,
+        "hard": true,
+        "easy": true
+      },
+      "Lumbridge": {
+        "elite": false,
+        "medium": true,
+        "hard": false,
+        "easy": true
+      },
+      "Morytania": {
+        "elite": false,
+        "medium": true,
+        "hard": true,
+        "easy": true
+      },
+      "Kandarin": {
+        "elite": false,
+        "medium": true,
+        "hard": true,
+        "easy": true
+      },
+      "Desert": {
+        "elite": false,
+        "medium": true,
+        "hard": false,
+        "easy": true
+      },
+      "Falador": {
+        "elite": false,
+        "medium": true,
+        "hard": true,
+        "easy": true
+      },
+      "Ardougne": {
+        "elite": false,
+        "medium": true,
+        "hard": false,
+        "easy": true
+      }
+    }
+  },
+  "rawVarbits": {
+    "Western": {
+      "elite": {
+        "varbitId": 4474,
+        "value": 0
+      },
+      "medium": {
+        "varbitId": 4472,
+        "value": 1
+      },
+      "hard": {
+        "varbitId": 4473,
+        "value": 1
+      },
+      "easy": {
+        "varbitId": 4471,
+        "value": 1
+      }
+    },
+    "Karamja": {
+      "elite": {
+        "varbitId": 4566,
+        "value": 0
+      },
+      "medium": {
+        "varbitId": 3599,
+        "value": 2
+      },
+      "hard": {
+        "varbitId": 3611,
+        "value": 2
+      },
+      "easy": {
+        "varbitId": 3578,
+        "value": 2
+      }
+    },
+    "Varrock": {
+      "elite": {
+        "varbitId": 4482,
+        "value": 0
+      },
+      "medium": {
+        "varbitId": 4480,
+        "value": 1
+      },
+      "hard": {
+        "varbitId": 4481,
+        "value": 1
+      },
+      "easy": {
+        "varbitId": 4479,
+        "value": 1
+      }
+    },
+    "Wilderness": {
+      "elite": {
+        "varbitId": 4469,
+        "value": 0
+      },
+      "medium": {
+        "varbitId": 4467,
+        "value": 1
+      },
+      "hard": {
+        "varbitId": 4468,
+        "value": 1
+      },
+      "easy": {
+        "varbitId": 4466,
+        "value": 1
+      }
+    },
+    "Fremennik": {
+      "elite": {
+        "varbitId": 4494,
+        "value": 0
+      },
+      "medium": {
+        "varbitId": 4492,
+        "value": 1
+      },
+      "hard": {
+        "varbitId": 4493,
+        "value": 1
+      },
+      "easy": {
+        "varbitId": 4491,
+        "value": 1
+      }
+    },
+    "Kourend": {
+      "elite": {
+        "varbitId": 7928,
+        "value": 0
+      },
+      "medium": {
+        "varbitId": 7926,
+        "value": 1
+      },
+      "hard": {
+        "varbitId": 7927,
+        "value": 1
+      },
+      "easy": {
+        "varbitId": 7925,
+        "value": 1
+      }
+    },
+    "Lumbridge": {
+      "elite": {
+        "varbitId": 4498,
+        "value": 0
+      },
+      "medium": {
+        "varbitId": 4496,
+        "value": 1
+      },
+      "hard": {
+        "varbitId": 4497,
+        "value": 0
+      },
+      "easy": {
+        "varbitId": 4495,
+        "value": 1
+      }
+    },
+    "Morytania": {
+      "elite": {
+        "varbitId": 4490,
+        "value": 0
+      },
+      "medium": {
+        "varbitId": 4488,
+        "value": 1
+      },
+      "hard": {
+        "varbitId": 4489,
+        "value": 1
+      },
+      "easy": {
+        "varbitId": 4487,
+        "value": 1
+      }
+    },
+    "Kandarin": {
+      "elite": {
+        "varbitId": 4478,
+        "value": 0
+      },
+      "medium": {
+        "varbitId": 4476,
+        "value": 1
+      },
+      "hard": {
+        "varbitId": 4477,
+        "value": 1
+      },
+      "easy": {
+        "varbitId": 4475,
+        "value": 1
+      }
+    },
+    "Desert": {
+      "elite": {
+        "varbitId": 4486,
+        "value": 0
+      },
+      "medium": {
+        "varbitId": 4484,
+        "value": 1
+      },
+      "hard": {
+        "varbitId": 4485,
+        "value": 0
+      },
+      "easy": {
+        "varbitId": 4483,
+        "value": 1
+      }
+    },
+    "Falador": {
+      "elite": {
+        "varbitId": 4465,
+        "value": 0
+      },
+      "medium": {
+        "varbitId": 4463,
+        "value": 1
+      },
+      "hard": {
+        "varbitId": 4464,
+        "value": 1
+      },
+      "easy": {
+        "varbitId": 4462,
+        "value": 1
+      }
+    },
+    "Ardougne": {
+      "elite": {
+        "varbitId": 4461,
+        "value": 0
+      },
+      "medium": {
+        "varbitId": 4459,
+        "value": 1
+      },
+      "hard": {
+        "varbitId": 4460,
+        "value": 0
+      },
+      "easy": {
+        "varbitId": 4458,
+        "value": 1
+      }
+    }
+  }
+}

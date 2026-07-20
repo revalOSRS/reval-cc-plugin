@@ -1,0 +1,157 @@
+{
+  "containerId": 93,
+  "loaded": true,
+  "itemCount": 25,
+  "items": [
+    {
+      "slot": 1,
+      "id": 2347,
+      "quantity": 1,
+      "name": "Hammer"
+    },
+    {
+      "slot": 4,
+      "id": 385,
+      "quantity": 1,
+      "name": "Shark"
+    },
+    {
+      "slot": 5,
+      "id": 385,
+      "quantity": 1,
+      "name": "Shark"
+    },
+    {
+      "slot": 6,
+      "id": 385,
+      "quantity": 1,
+      "name": "Shark"
+    },
+    {
+      "slot": 7,
+      "id": 385,
+      "quantity": 1,
+      "name": "Shark"
+    },
+    {
+      "slot": 8,
+      "id": 385,
+      "quantity": 1,
+      "name": "Shark"
+    },
+    {
+      "slot": 9,
+      "id": 385,
+      "quantity": 1,
+      "name": "Shark"
+    },
+    {
+      "slot": 10,
+      "id": 385,
+      "quantity": 1,
+      "name": "Shark"
+    },
+    {
+      "slot": 11,
+      "id": 385,
+      "quantity": 1,
+      "name": "Shark"
+    },
+    {
+      "slot": 12,
+      "id": 385,
+      "quantity": 1,
+      "name": "Shark"
+    },
+    {
+      "slot": 13,
+      "id": 21143,
+      "quantity": 1,
+      "name": "Dodgy necklace"
+    },
+    {
+      "slot": 14,
+      "id": 21143,
+      "quantity": 1,
+      "name": "Dodgy necklace"
+    },
+    {
+      "slot": 15,
+      "id": 21143,
+      "quantity": 1,
+      "name": "Dodgy necklace"
+    },
+    {
+      "slot": 16,
+      "id": 21143,
+      "quantity": 1,
+      "name": "Dodgy necklace"
+    },
+    {
+      "slot": 17,
+      "id": 21143,
+      "quantity": 1,
+      "name": "Dodgy necklace"
+    },
+    {
+      "slot": 18,
+      "id": 21143,
+      "quantity": 1,
+      "name": "Dodgy necklace"
+    },
+    {
+      "slot": 19,
+      "id": 21143,
+      "quantity": 1,
+      "name": "Dodgy necklace"
+    },
+    {
+      "slot": 20,
+      "id": 21143,
+      "quantity": 1,
+      "name": "Dodgy necklace"
+    },
+    {
+      "slot": 21,
+      "id": 21143,
+      "quantity": 1,
+      "name": "Dodgy necklace"
+    },
+    {
+      "slot": 22,
+      "id": 21143,
+      "quantity": 1,
+      "name": "Dodgy necklace"
+    },
+    {
+      "slot": 23,
+      "id": 21143,
+      "quantity": 1,
+      "name": "Dodgy necklace"
+    },
+    {
+      "slot": 24,
+      "id": 21143,
+      "quantity": 1,
+      "name": "Dodgy necklace"
+    },
+    {
+      "slot": 25,
+      "id": 21143,
+      "quantity": 1,
+      "name": "Dodgy necklace"
+    },
+    {
+      "slot": 26,
+      "id": 21143,
+      "quantity": 1,
+      "name": "Dodgy necklace"
+    },
+    {
+      "slot": 27,
+      "id": 21143,
+      "quantity": 1,
+      "name": "Dodgy necklace"
+    }
+  ]
+}

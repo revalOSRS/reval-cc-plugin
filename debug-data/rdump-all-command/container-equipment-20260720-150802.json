@@ -1,0 +1,49 @@
+{
+  "containerId": 94,
+  "loaded": true,
+  "itemCount": 7,
+  "items": [
+    {
+      "slot": 0,
+      "id": 5554,
+      "quantity": 1,
+      "name": "Rogue mask"
+    },
+    {
+      "slot": 2,
+      "id": 21143,
+      "quantity": 1,
+      "name": "Dodgy necklace"
+    },
+    {
+      "slot": 3,
+      "id": 30955,
+      "quantity": 1,
+      "name": "Arkan blade"
+    },
+    {
+      "slot": 4,
+      "id": 5553,
+      "quantity": 1,
+      "name": "Rogue top"
+    },
+    {
+      "slot": 7,
+      "id": 5555,
+      "quantity": 1,
+      "name": "Rogue trousers"
+    },
+    {
+      "slot": 9,
+      "id": 10075,
+      "quantity": 1,
+      "name": "Gloves of silence"
+    },
+    {
+      "slot": 10,
+      "id": 5557,
+      "quantity": 1,
+      "name": "Rogue boots"
+    }
+  ]
+}
