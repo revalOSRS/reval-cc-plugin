@@ -5,6 +5,8 @@
  */
 package com.revalclan.collectionlog;
 
+import com.revalclan.RevalClanConfig;
+import com.revalclan.debug.DebugDataDumper;
 import com.revalclan.notifiers.SyncNotifier;
 import com.revalclan.util.ClanValidator;
 import lombok.extern.slf4j.Slf4j;
@@ -35,6 +37,7 @@ public class CollectionLogSyncButton {
 	private static final int FONT_COLOR = 0xFF981F;
 	private static final int FONT_COLOR_ACTIVE = 0xFFFFFF;
 	private static final String BUTTON_TEXT = "Sync Reval";
+	private static final String DEBUG_BUTTON_TEXT = "Reval Debug Dump";
 	private static final int SYNC_DELAY_TICKS = 3; // Wait 3 ticks for search to complete
 
 	@Inject
@@ -49,9 +52,16 @@ public class CollectionLogSyncButton {
 	@Inject
 	private SyncNotifier syncNotifier;
 
+	@Inject
+	private RevalClanConfig config;
+
+	@Inject
+	private DebugDataDumper debugDumper;
+
 	private int baseMenuHeight = -1;
 	private int lastAttemptedSync = -1;
 	private int pendingSyncTick = -1;
+	private int pendingDebugDumpTick = -1;
 
 	public void startUp() {
 		eventBus.register(this);
@@ -71,7 +81,10 @@ public class CollectionLogSyncButton {
 		int menuId = (int) args[3];
 
 		try {
-			addButton(menuId, this::onButtonClick);
+			addButton(menuId, BUTTON_TEXT, "Sync collection log to Reval", this::onButtonClick);
+			if (config.debugMode()) {
+				addButton(menuId, DEBUG_BUTTON_TEXT, "Dump raw data to local files (debug)", this::onDebugButtonClick);
+			}
 		} catch (Exception e) {
 			log.debug("Failed to add Reval button to menu: {}", e.getMessage());
 		}
@@ -106,6 +119,21 @@ public class CollectionLogSyncButton {
 		scheduleSync();
 	}
 
+	/**
+	 * Debug-mode button: runs the same collection log scan as the sync button,
+	 * then dumps everything to local files instead of sending to the backend.
+	 * No clan validation — this is purely local test tooling.
+	 */
+	private void onDebugButtonClick() {
+		collectionLogManager.clearObtainedItems();
+
+		client.menuAction(-1, 40697932, MenuAction.CC_OP, 1, -1, "Search", null);
+		client.runScript(2240);
+
+		client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "Reval Debug: Scanning collection log for dump...", "");
+		pendingDebugDumpTick = client.getTickCount() + SYNC_DELAY_TICKS;
+	}
+
 	private void scheduleSync() {
 		pendingSyncTick = client.getTickCount() + SYNC_DELAY_TICKS;
 	}
@@ -115,6 +143,17 @@ public class CollectionLogSyncButton {
 		if (pendingSyncTick != -1 && client.getTickCount() >= pendingSyncTick) {
 			pendingSyncTick = -1;
 			performSync();
+		}
+
+		if (pendingDebugDumpTick != -1 && client.getTickCount() >= pendingDebugDumpTick) {
+			pendingDebugDumpTick = -1;
+			try {
+				debugDumper.dumpAll();
+				debugDumper.dumpClogRawStructure();
+			} catch (Exception e) {
+				log.warn("Debug dump failed", e);
+				client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "Reval Debug: dump failed - " + e.getMessage(), "");
+			}
 		}
 	}
 
@@ -128,7 +167,8 @@ public class CollectionLogSyncButton {
 		}
 	}
 
-	private void addButton(int menuId, Runnable onClick) throws NullPointerException, NoSuchElementException {
+	private void addButton(int menuId, String buttonText, String actionText, Runnable onClick)
+			throws NullPointerException, NoSuchElementException {
 		// Don't add button if viewing from POH adventure log (viewing someone else's log)
 		boolean isOpenedFromAdventureLog = client.getVarbitValue(VarbitID.COLLECTION_POH_HOST_BOOK_OPEN) == 1;
 		if (isOpenedFromAdventureLog) return;
@@ -141,14 +181,16 @@ public class CollectionLogSyncButton {
 		}
 
 		// Find the last rectangle and text widgets to use as templates
+		// (after a Reval button is added, its own widgets become the templates,
+		// so subsequent buttons stack below it)
 		List<Widget> reversedMenuChildren = new ArrayList<>(Arrays.asList(menuChildren));
 		Collections.reverse(reversedMenuChildren);
-		
+
 		Widget lastRectangle = reversedMenuChildren.stream()
 			.filter(w -> w.getType() == WidgetType.RECTANGLE)
 			.findFirst()
 			.orElseThrow(() -> new NoSuchElementException("No RECTANGLE widget found in menu"));
-		
+
 		Widget lastText = reversedMenuChildren.stream()
 			.filter(w -> w.getType() == WidgetType.TEXT)
 			.findFirst()
@@ -159,7 +201,7 @@ public class CollectionLogSyncButton {
 
 		// Check if button already exists
 		final boolean existingButton = Arrays.stream(menuChildren)
-			.anyMatch(w -> w.getText() != null && w.getText().equals(BUTTON_TEXT));
+			.anyMatch(w -> w.getText() != null && w.getText().equals(buttonText));
 
 		if (!existingButton) {
 			// Create background rectangle
@@ -174,7 +216,7 @@ public class CollectionLogSyncButton {
 
 			// Create text button
 			final Widget text = menu.createChild(WidgetType.TEXT)
-				.setText(BUTTON_TEXT)
+				.setText(buttonText)
 				.setTextColor(FONT_COLOR)
 				.setFontId(lastText.getFontId())
 				.setTextShadowed(lastText.getTextShadowed())
@@ -184,18 +226,27 @@ public class CollectionLogSyncButton {
 				.setOriginalY(buttonY)
 				.setXTextAlignment(lastText.getXTextAlignment())
 				.setYTextAlignment(lastText.getYTextAlignment());
-			
+
 			text.setHasListener(true);
 			text.setOnMouseOverListener((JavaScriptCallback) ev -> text.setTextColor(FONT_COLOR_ACTIVE));
 			text.setOnMouseLeaveListener((JavaScriptCallback) ev -> text.setTextColor(FONT_COLOR));
-			text.setAction(0, "Sync collection log to Reval");
+			text.setAction(0, actionText);
 			text.setOnOpListener((JavaScriptCallback) ev -> onClick.run());
 			text.revalidate();
 		}
 
-		// Extend menu height to fit new button
-		if (menu.getOriginalHeight() <= baseMenuHeight) {
-			menu.setOriginalHeight(menu.getOriginalHeight() + buttonHeight);
+		// Extend menu height so every Reval button fits (re-fetch children:
+		// createChild above may have appended to the array)
+		Widget[] currentChildren = menu.getChildren();
+		if (currentChildren != null) {
+			long revalButtons = Arrays.stream(currentChildren)
+				.filter(w -> w != null && w.getText() != null
+					&& (w.getText().equals(BUTTON_TEXT) || w.getText().equals(DEBUG_BUTTON_TEXT)))
+				.count();
+			int desiredHeight = baseMenuHeight + (int) revalButtons * buttonHeight;
+			if (menu.getOriginalHeight() < desiredHeight) {
+				menu.setOriginalHeight(desiredHeight);
+			}
 		}
 
 		menu.revalidate();

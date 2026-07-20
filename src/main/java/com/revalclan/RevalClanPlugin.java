@@ -3,6 +3,8 @@ package com.revalclan;
 import com.revalclan.api.RevalApiService;
 import com.revalclan.collectionlog.CollectionLogManager;
 import com.revalclan.collectionlog.CollectionLogSyncButton;
+import com.revalclan.debug.DebugCommandHandler;
+import com.revalclan.debug.DebugEventLogger;
 import com.revalclan.notifiers.*;
 import com.revalclan.pbs.ClogPersonalBestCapture;
 import com.revalclan.session.SessionTracker;
@@ -120,6 +122,10 @@ public class RevalClanPlugin extends Plugin {
 
 	@Inject	private UIAssetLoader uiAssetLoader;
 
+	@Inject	private DebugEventLogger debugEventLogger;
+
+	@Inject	private DebugCommandHandler debugCommandHandler;
+
 	@Inject	private RevalClanConfig config;
 
 	private RevalPanel revalPanel;
@@ -173,6 +179,10 @@ public class RevalClanPlugin extends Plugin {
 		eventBus.register(lootNotifier);
 		eventBus.register(clogPersonalBestCapture);
 
+		// Test-mode data collection: no-ops unless debug mode is enabled in config
+		eventBus.register(debugEventLogger);
+		eventBus.register(debugCommandHandler);
+
 		// Initialize and add the side panel
 		try {
 			revalPanel = new RevalPanel();
@@ -205,6 +215,10 @@ public class RevalClanPlugin extends Plugin {
 
 		eventBus.unregister(lootNotifier);
 		eventBus.unregister(clogPersonalBestCapture);
+
+		eventBus.unregister(debugEventLogger);
+		eventBus.unregister(debugCommandHandler);
+		debugEventLogger.flush();
 
 		// In-memory reset only: the persisted session (if any) stays on disk and is
 		// replayed as 'recovered' on the next startUp, so no data is lost
@@ -333,7 +347,8 @@ public class RevalClanPlugin extends Plugin {
 	 */
 	@Subscribe
 	public void onScriptPreFired(ScriptPreFired preFired) {
-		if (!inRequiredClan) return;
+		// Debug mode bypasses clan gating so raw dumps work on any account
+		if (!inRequiredClan && !config.debugMode()) return;
 
 		if (preFired.getScriptId() == 4100) {
 			try {
