@@ -3,6 +3,7 @@ package com.revalclan.debug;
 import com.revalclan.RevalClanConfig;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.events.CommandExecuted;
+import net.runelite.client.callback.ClientThread;
 import net.runelite.client.eventbus.Subscribe;
 
 import javax.inject.Inject;
@@ -27,6 +28,7 @@ public class DebugCommandHandler {
 	@Inject private RevalClanConfig config;
 	@Inject private DebugDataDumper dumper;
 	@Inject private DebugEventLogger eventLogger;
+	@Inject private ClientThread clientThread;
 
 	@Subscribe
 	public void onCommandExecuted(CommandExecuted event) {
@@ -42,12 +44,17 @@ public class DebugCommandHandler {
 
 		if (!"rdump".equals(command)) return;
 
-		try {
-			handleDump(args);
-		} catch (Exception e) {
-			dumper.chat("dump failed: " + e.getMessage());
-			log.warn("Debug dump failed", e);
-		}
+		// CommandExecuted is dispatched from inside the chat input script, and
+		// some dumps run scripts themselves (Quest.getState) — scripts are not
+		// reentrant, so defer to a fresh client-thread invocation
+		clientThread.invokeLater(() -> {
+			try {
+				handleDump(args);
+			} catch (Exception e) {
+				dumper.chat("dump failed: " + e.getMessage());
+				log.warn("Debug dump failed", e);
+			}
+		});
 	}
 
 	private void handleLogToggle(String[] args) {
