@@ -32,10 +32,16 @@ public class DebugCommandHandler {
 
 	@Subscribe
 	public void onCommandExecuted(CommandExecuted event) {
-		if (!config.debugMode()) return;
-
 		String command = event.getCommand().toLowerCase();
 		String[] args = event.getArguments();
+
+		if (!config.debugMode()) {
+			// Answer our own commands even when disabled — silence looks broken
+			if ("rdump".equals(command) || "rlog".equals(command)) {
+				dumper.chat("debug mode is OFF. Enable it in Reval Clan config -> Debug / Test Mode.");
+			}
+			return;
+		}
 
 		if ("rlog".equals(command)) {
 			handleLogToggle(args);
@@ -75,6 +81,7 @@ public class DebugCommandHandler {
 		}
 
 		String what = args[0].toLowerCase();
+		dumper.chat("running '" + what + "' dump...");
 		switch (what) {
 			case "all":
 				dumper.dumpAll();
