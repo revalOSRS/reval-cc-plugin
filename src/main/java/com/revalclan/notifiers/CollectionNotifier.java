@@ -7,6 +7,9 @@
  */
 package com.revalclan.notifiers;
 
+import com.revalclan.session.SessionTracker;
+
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.HashMap;
 import java.util.Map;
@@ -15,6 +18,9 @@ import java.util.regex.Pattern;
 
 @Singleton
 public class CollectionNotifier extends BaseNotifier {
+	@Inject
+	private SessionTracker sessionTracker;
+
 	private static final Pattern COLLECTION_PATTERN = Pattern.compile(
 		"New item added to your collection log: (?<item>.+)",
 		Pattern.CASE_INSENSITIVE
@@ -41,6 +47,8 @@ public class CollectionNotifier extends BaseNotifier {
 	}
 
 	private void handleCollectionItem(String itemName) {
+		sessionTracker.addCollectionLogSlot(itemName);
+
 		Map<String, Object> collectionData = new HashMap<>();
 		collectionData.put("item", itemName);
 
