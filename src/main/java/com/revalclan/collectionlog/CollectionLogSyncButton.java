@@ -19,6 +19,7 @@ import net.runelite.api.gameval.VarbitID;
 import net.runelite.api.widgets.JavaScriptCallback;
 import net.runelite.api.widgets.Widget;
 import net.runelite.api.widgets.WidgetType;
+import net.runelite.client.callback.ClientThread;
 import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
 
@@ -42,6 +43,9 @@ public class CollectionLogSyncButton {
 
 	@Inject
 	private Client client;
+
+	@Inject
+	private ClientThread clientThread;
 
 	@Inject
 	private EventBus eventBus;
@@ -106,17 +110,21 @@ public class CollectionLogSyncButton {
 			return;
 		}
 
-		// Clear existing data and trigger collection log scan
-		collectionLogManager.clearObtainedItems();
+		// Clear existing data and trigger collection log scan.
+		// Deferred: the click callback runs inside a script, and runScript is
+		// not reentrant (asserts in dev clients run with -ea)
+		clientThread.invokeLater(() -> {
+			collectionLogManager.clearObtainedItems();
 
-		// Trigger the search to scan all items
-		client.menuAction(-1, 40697932, MenuAction.CC_OP, 1, -1, "Search", null);
-		client.runScript(2240);
+			// Trigger the search to scan all items
+			client.menuAction(-1, 40697932, MenuAction.CC_OP, 1, -1, "Search", null);
+			client.runScript(2240);
 
-		client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "Reval: Scanning collection log...", "");
+			client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "Reval: Scanning collection log...", "");
 
-		// Schedule the sync after a short delay to allow the search to populate items
-		scheduleSync();
+			// Schedule the sync after a short delay to allow the search to populate items
+			scheduleSync();
+		});
 	}
 
 	/**
@@ -125,13 +133,16 @@ public class CollectionLogSyncButton {
 	 * No clan validation — this is purely local test tooling.
 	 */
 	private void onDebugButtonClick() {
-		collectionLogManager.clearObtainedItems();
+		// Deferred for the same script-reentrancy reason as onButtonClick
+		clientThread.invokeLater(() -> {
+			collectionLogManager.clearObtainedItems();
 
-		client.menuAction(-1, 40697932, MenuAction.CC_OP, 1, -1, "Search", null);
-		client.runScript(2240);
+			client.menuAction(-1, 40697932, MenuAction.CC_OP, 1, -1, "Search", null);
+			client.runScript(2240);
 
-		client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "Reval Debug: Scanning collection log for dump...", "");
-		pendingDebugDumpTick = client.getTickCount() + SYNC_DELAY_TICKS;
+			client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "Reval Debug: Scanning collection log for dump...", "");
+			pendingDebugDumpTick = client.getTickCount() + SYNC_DELAY_TICKS;
+		});
 	}
 
 	private void scheduleSync() {
