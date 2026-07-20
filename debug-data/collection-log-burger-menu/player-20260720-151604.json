@@ -1,0 +1,273 @@
+{
+  "managedSync": {
+    "skills": {
+      "magic": {
+        "level": 96,
+        "experience": 10144304
+      },
+      "slayer": {
+        "level": 84,
+        "experience": 3225631
+      },
+      "strength": {
+        "level": 99,
+        "experience": 19649033
+      },
+      "defence": {
+        "level": 99,
+        "experience": 13570195
+      },
+      "fletching": {
+        "level": 87,
+        "experience": 3976976
+      },
+      "fishing": {
+        "level": 82,
+        "experience": 2664368
+      },
+      "mining": {
+        "level": 86,
+        "experience": 3602812
+      },
+      "herblore": {
+        "level": 85,
+        "experience": 3393372
+      },
+      "hitpoints": {
+        "level": 99,
+        "experience": 21830330
+      },
+      "smithing": {
+        "level": 83,
+        "experience": 2687768
+      },
+      "woodcutting": {
+        "level": 86,
+        "experience": 3662456
+      },
+      "prayer": {
+        "level": 85,
+        "experience": 3265952
+      },
+      "runecraft": {
+        "level": 64,
+        "experience": 441590
+      },
+      "ranged": {
+        "level": 99,
+        "experience": 13457027
+      },
+      "attack": {
+        "level": 99,
+        "experience": 13326621
+      },
+      "crafting": {
+        "level": 95,
+        "experience": 9006873
+      },
+      "farming": {
+        "level": 86,
+        "experience": 3748779
+      },
+      "firemaking": {
+        "level": 93,
+        "experience": 7604261
+      },
+      "construction": {
+        "level": 84,
+        "experience": 2995233
+      },
+      "cooking": {
+        "level": 98,
+        "experience": 13030913
+      },
+      "agility": {
+        "level": 83,
+        "experience": 2924100
+      },
+      "hunter": {
+        "level": 71,
+        "experience": 842612
+      },
+      "sailing": {
+        "level": 60,
+        "experience": 281268
+      },
+      "thieving": {
+        "level": 76,
+        "experience": 1410023
+      }
+    },
+    "accountHash": -2102231178570601644,
+    "totalLevel": 2079,
+    "totalExperience": 160742497,
+    "accountType": "NORMAL",
+    "combatLevel": 124,
+    "username": "Lightroom"
+  },
+  "raw": {
+    "world": 406,
+    "worldTypes": "[MEMBERS]",
+    "gameState": "LOGGED_IN",
+    "tickCount": 884,
+    "accountHash": -2102231178570601644,
+    "weight": 10,
+    "runEnergy": 10000,
+    "specialAttackPercent": 1000,
+    "membershipDaysVarp1780": 20,
+    "questPointsVarp101": 337,
+    "clogObtainedCountVarp2943": 292,
+    "localPlayer": {
+      "name": "Lightroom",
+      "combatLevel": 124,
+      "location": {
+        "y": 3508,
+        "plane": 0,
+        "x": 3195
+      },
+      "animation": -1,
+      "poseAnimation": 808,
+      "equipmentIds": [
+        7602,
+        0,
+        23191,
+        33003,
+        7601,
+        0,
+        0,
+        7603,
+        0,
+        12123,
+        7605,
+        0
+      ]
+    },
+    "clanChannel": {
+      "memberCount": 46,
+      "name": "Reval"
+    },
+    "clanSettingsName": "Reval",
+    "skills": {
+      "attack": {
+        "realLevel": 99,
+        "boostedLevel": 99,
+        "experience": 13326621
+      },
+      "defence": {
+        "realLevel": 99,
+        "boostedLevel": 99,
+        "experience": 13570195
+      },
+      "strength": {
+        "realLevel": 99,
+        "boostedLevel": 99,
+        "experience": 19649033
+      },
+      "hitpoints": {
+        "realLevel": 99,
+        "boostedLevel": 99,
+        "experience": 21830330
+      },
+      "ranged": {
+        "realLevel": 99,
+        "boostedLevel": 99,
+        "experience": 13457027
+      },
+      "prayer": {
+        "realLevel": 85,
+        "boostedLevel": 85,
+        "experience": 3265952
+      },
+      "magic": {
+        "realLevel": 96,
+        "boostedLevel": 96,
+        "experience": 10144304
+      },
+      "cooking": {
+        "realLevel": 98,
+        "boostedLevel": 98,
+        "experience": 13030913
+      },
+      "woodcutting": {
+        "realLevel": 86,
+        "boostedLevel": 86,
+        "experience": 3662456
+      },
+      "fletching": {
+        "realLevel": 87,
+        "boostedLevel": 87,
+        "experience": 3976976
+      },
+      "fishing": {
+        "realLevel": 82,
+        "boostedLevel": 82,
+        "experience": 2664368
+      },
+      "firemaking": {
+        "realLevel": 93,
+        "boostedLevel": 93,
+        "experience": 7604261
+      },
+      "crafting": {
+        "realLevel": 95,
+        "boostedLevel": 95,
+        "experience": 9006873
+      },
+      "smithing": {
+        "realLevel": 83,
+        "boostedLevel": 83,
+        "experience": 2687768
+      },
+      "mining": {
+        "realLevel": 86,
+        "boostedLevel": 86,
+        "experience": 3602812
+      },
+      "herblore": {
+        "realLevel": 85,
+        "boostedLevel": 85,
+        "experience": 3393372
+      },
+      "agility": {
+        "realLevel": 83,
+        "boostedLevel": 83,
+        "experience": 2924100
+      },
+      "thieving": {
+        "realLevel": 76,
+        "boostedLevel": 76,
+        "experience": 1410023
+      },
+      "slayer": {
+        "realLevel": 84,
+        "boostedLevel": 84,
+        "experience": 3225631
+      },
+      "farming": {
+        "realLevel": 86,
+        "boostedLevel": 86,
+        "experience": 3748779
+      },
+      "runecraft": {
+        "realLevel": 64,
+        "boostedLevel": 64,
+        "experience": 441590
+      },
+      "hunter": {
+        "realLevel": 71,
+        "boostedLevel": 71,
+        "experience": 842612
+      },
+      "construction": {
+        "realLevel": 84,
+        "boostedLevel": 84,
+        "experience": 2995233
+      },
+      "sailing": {
+        "realLevel": 60,
+        "boostedLevel": 60,
+        "experience": 281268
+      }
+    }
+  }
+}
