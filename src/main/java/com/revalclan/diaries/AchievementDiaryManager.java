@@ -1,5 +1,6 @@
 package com.revalclan.diaries;
 
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 
@@ -17,6 +18,7 @@ public class AchievementDiaryManager {
 	@Inject
 	private Client client;
 
+	@Getter
 	private final Map<String, Map<String, Integer>> diaryVarbits = new HashMap<>();
 
 	public AchievementDiaryManager() {

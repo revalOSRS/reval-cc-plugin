@@ -222,4 +222,35 @@ public interface RevalClanConfig extends Config {
 	default boolean showAnnouncements() {
 		return true;
 	}
+
+	// ── Debug / Test Mode ──────────────────────────────────────────────
+	@ConfigSection(
+		name = "Debug / Test Mode",
+		description = "Developer tools: dump raw game data to local files (~/.runelite/reval-debug). Nothing is sent to the server.",
+		position = 2,
+		closedByDefault = true
+	)
+	String debugSection = "debugSection";
+
+	@ConfigItem(
+		keyName = "debugMode",
+		name = "Enable debug mode",
+		description = "Enables ::rdump chat commands and the raw-data dump button in the collection log menu. Dumps are written locally only.",
+		section = debugSection,
+		position = 0
+	)
+	default boolean debugMode() {
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = "debugEventStream",
+		name = "Stream raw events to file",
+		description = "Writes every raw RuneLite event (varbits, stats, chat, loot, widgets) to a local JSONL file for offline analysis. Requires debug mode. Can also be toggled with ::rlog on|off.",
+		section = debugSection,
+		position = 1
+	)
+	default boolean debugEventStream() {
+		return false;
+	}
 }

@@ -541,5 +541,72 @@ public class CollectionLogManager {
 	public void clearObtainedItems() {
 		obtainedItems.clear();
 	}
+
+	/**
+	 * Debug snapshot of every KC source we track: the raw varp/varbit id it
+	 * reads from and the current live value, plus derived/summed rules.
+	 * Used by the test-mode data dumper — never sent to the server.
+	 */
+	public Map<String, Object> debugKCSnapshot() {
+		if (categoryKCMap.isEmpty()) {
+			initializeKCMap();
+		}
+
+		Map<String, Object> snapshot = new LinkedHashMap<>();
+		Set<String> subcategories = new TreeSet<>();
+		subcategories.addAll(categoryKCMap.keySet());
+		subcategories.addAll(additionalKCMap.keySet());
+
+		for (String subcategory : subcategories) {
+			Map<String, Object> entry = new LinkedHashMap<>();
+
+			KCSource primary = categoryKCMap.get(subcategory);
+			if (primary != null) {
+				entry.put("primary", describeKCSource(primary));
+			}
+
+			Map<String, KCSource> additional = additionalKCMap.get(subcategory);
+			if (additional != null) {
+				Map<String, Object> additionalOut = new LinkedHashMap<>();
+				for (Map.Entry<String, KCSource> kc : additional.entrySet()) {
+					additionalOut.put(kc.getKey(), describeKCSource(kc.getValue()));
+				}
+				entry.put("additional", additionalOut);
+			}
+
+			Map<String, String[]> derived = derivedKCMap.get(subcategory);
+			if (derived != null) {
+				Map<String, Object> derivedOut = new LinkedHashMap<>();
+				for (Map.Entry<String, String[]> rule : derived.entrySet()) {
+					derivedOut.put(rule.getKey(), rule.getValue()[0] + " - " + rule.getValue()[1]);
+				}
+				entry.put("derivedRules", derivedOut);
+			}
+
+			Map<String, String[]> summed = summedKCMap.get(subcategory);
+			if (summed != null) {
+				Map<String, Object> summedOut = new LinkedHashMap<>();
+				for (Map.Entry<String, String[]> rule : summed.entrySet()) {
+					summedOut.put(rule.getKey(), String.join(" + ", rule.getValue()));
+				}
+				entry.put("summedRules", summedOut);
+			}
+
+			snapshot.put(subcategory, entry);
+		}
+		return snapshot;
+	}
+
+	private Map<String, Object> describeKCSource(KCSource source) {
+		Map<String, Object> out = new LinkedHashMap<>();
+		out.put("source", source.isVarbit ? "varbit" : "varp");
+		out.put("id", source.id);
+		try {
+			out.put("value", source.isVarbit ? client.getVarbitValue(source.id) : client.getVarpValue(source.id));
+		} catch (Exception e) {
+			out.put("value", "ERROR: " + e.getMessage());
+		}
+		return out;
+	}
 }
 
