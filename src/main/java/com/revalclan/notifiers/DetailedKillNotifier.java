@@ -1,5 +1,6 @@
 package com.revalclan.notifiers;
 
+import com.revalclan.session.SessionTracker;
 import net.runelite.api.Actor;
 import net.runelite.api.NPC;
 import net.runelite.api.Player;
@@ -7,14 +8,28 @@ import net.runelite.api.Hitsplat;
 import net.runelite.api.events.ActorDeath;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.HitsplatApplied;
+
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * Tracks per-kill combat details (damage, weapons, specs).
+ *
+ * Kill ACCUMULATION always runs (cheap, in-memory) — it feeds the local
+ * SessionTracker with complete kill counts regardless of server filters.
+ * Only the DETAILED_KILL webhook send is gated by the server-driven filters:
+ * the enabled toggle plus the NPC id/name whitelists derived from active
+ * requirements, so the backend only receives kills it can actually use.
+ */
 @Singleton
 public class DetailedKillNotifier extends BaseNotifier {
+	@Inject
+	private SessionTracker sessionTracker;
+
 	private final Map<NPC, KillData> activeKills = new ConcurrentHashMap<>();
-	
+
 	private int previousSpecEnergy = 100;
 	private int specTicksRemaining = 0;
 	private String specWeaponName = null;
@@ -30,10 +45,8 @@ public class DetailedKillNotifier extends BaseNotifier {
 	}
 
 	public void onGameTick(GameTick event) {
-		if (!isEnabled()) return;
-
 		int currentSpecEnergy = client.getVarpValue(300);
-		
+
 		if (currentSpecEnergy < previousSpecEnergy) {
 			Player localPlayer = client.getLocalPlayer();
 			if (localPlayer != null) {
@@ -47,13 +60,11 @@ public class DetailedKillNotifier extends BaseNotifier {
 				specWeaponName = null;
 			}
 		}
-		
+
 		previousSpecEnergy = currentSpecEnergy;
 	}
 
 	public void onHitsplatApplied(HitsplatApplied event) {
-		if (!isEnabled()) return;
-
 		Actor actor = event.getActor();
 		if (!(actor instanceof NPC)) return;
 
@@ -75,8 +86,6 @@ public class DetailedKillNotifier extends BaseNotifier {
 	}
 
 	public void onActorDeath(ActorDeath event) {
-		if (!isEnabled()) return;
-
 		Actor actor = event.getActor();
 		if (!(actor instanceof NPC)) return;
 
@@ -84,16 +93,21 @@ public class DetailedKillNotifier extends BaseNotifier {
 		KillData data = activeKills.remove(npc);
 
 		if (data != null && data.totalDamage > 0) {
-			handleDetailedKill(data);
+			// Session kill counts are complete and local — independent of server filters
+			sessionTracker.addKill(data.npcName);
+
+			if (isEnabled()) {
+				handleDetailedKill(data);
+			}
 		}
 	}
 
 	private void handleDetailedKill(KillData data) {
 		// Apply filters
-		if (!shouldNotifyKill(data.npcId)) {
+		if (!shouldNotifyKill(data.npcId, data.npcName)) {
 			return;
 		}
-		
+
 		Map<String, Object> killData = new HashMap<>();
 		killData.put("npcName", data.npcName);
 		killData.put("npcId", data.npcId);
@@ -108,36 +122,45 @@ public class DetailedKillNotifier extends BaseNotifier {
 
 		sendNotification(killData);
 	}
-	
+
 	/**
-	 * Check if we should notify for this NPC based on filters
+	 * Check if we should notify for this NPC based on filters.
 	 * Filter priority:
-	 * 1. If whitelist has entries and NPC is in whitelist -> ALLOW
-	 * 2. If NPC is in blacklist -> DENY
-	 * 3. If whitelist is empty -> ALLOW (default behavior)
-	 * 4. Otherwise -> DENY
+	 * 1. If NPC is in the id blacklist -> DENY
+	 * 2. If both whitelists are empty -> ALLOW (server controls volume via the enabled toggle)
+	 * 3. If NPC id is in the id whitelist -> ALLOW
+	 * 4. If NPC name matches the name whitelist (containment, case-insensitive,
+	 *    mirroring the backend requirement matcher) -> ALLOW
+	 * 5. Otherwise -> DENY
 	 */
-	private boolean shouldNotifyKill(int npcId) {
+	private boolean shouldNotifyKill(int npcId, String npcName) {
 		var filters = filterManager.getFilters();
-		
-		// Check ID whitelist first (highest priority)
-		boolean hasIdWhitelist = !filters.getDetailedKillNpcIdWhitelist().isEmpty();
-		if (hasIdWhitelist && filters.getDetailedKillNpcIdWhitelist().contains(npcId)) {
-			return true; // Explicitly whitelisted by ID
-		}
-		
-		// Check ID blacklist
+
 		if (filters.getDetailedKillNpcIdBlacklist().contains(npcId)) {
-			return false; // Explicitly blacklisted by ID
-		}
-		
-		// If whitelist exists and NPC wasn't in it, deny
-		if (hasIdWhitelist) {
 			return false;
 		}
-		
-		// No filters configured, allow all
-		return true;
+
+		Set<Integer> idWhitelist = filters.getDetailedKillNpcIdWhitelist();
+		Set<String> nameWhitelist = filters.getDetailedKillNpcNameWhitelist();
+
+		if (idWhitelist.isEmpty() && nameWhitelist.isEmpty()) {
+			return true;
+		}
+
+		if (idWhitelist.contains(npcId)) {
+			return true;
+		}
+
+		if (npcName != null && !nameWhitelist.isEmpty()) {
+			String lowerName = npcName.toLowerCase();
+			for (String target : nameWhitelist) {
+				if (lowerName.contains(target) || target.contains(lowerName)) {
+					return true;
+				}
+			}
+		}
+
+		return false;
 	}
 
 	public void reset() {
@@ -178,4 +201,3 @@ public class DetailedKillNotifier extends BaseNotifier {
 		}
 	}
 }
-

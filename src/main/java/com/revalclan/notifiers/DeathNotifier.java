@@ -7,6 +7,7 @@
  */
 package com.revalclan.notifiers;
 
+import com.revalclan.session.SessionTracker;
 import net.runelite.api.Actor;
 import net.runelite.api.Item;
 import net.runelite.api.ItemComposition;
@@ -20,6 +21,7 @@ import net.runelite.api.WorldType;
 import net.runelite.api.events.ActorDeath;
 import net.runelite.api.events.InteractingChanged;
 
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
@@ -31,6 +33,9 @@ import java.util.Map;
 
 @Singleton
 public class DeathNotifier extends BaseNotifier {
+	@Inject
+	private SessionTracker sessionTracker;
+
 	private static final String ATTACK_OPTION = "Attack";
 
 	private Actor lastAttacker = null;
@@ -137,6 +142,8 @@ public class DeathNotifier extends BaseNotifier {
 		deathData.put("keptItems", keptItems);
 		deathData.put("lostItems", lostItems);
 		deathData.put("totalLostValue", totalLostValue);
+
+		sessionTracker.addDeath(String.valueOf(deathData.get("killedBy")));
 
 		sendNotificationWithScreenshot(deathData);
 
