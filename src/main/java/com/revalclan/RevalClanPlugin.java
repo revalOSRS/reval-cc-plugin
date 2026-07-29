@@ -4,6 +4,7 @@ import com.revalclan.api.RevalApiService;
 import com.revalclan.collectionlog.CollectionLogManager;
 import com.revalclan.collectionlog.CollectionLogSyncButton;
 import com.revalclan.notifiers.*;
+import com.revalclan.pbs.ClogPersonalBestCapture;
 import com.revalclan.ui.RevalPanel;
 import com.revalclan.util.AnnouncementService;
 import com.revalclan.util.ClanValidator;
@@ -55,6 +56,8 @@ public class RevalClanPlugin extends Plugin {
 	@Inject	private CollectionLogSyncButton syncButton;
 
 	@Inject	private LootNotifier lootNotifier;
+
+	@Inject	private ClogPersonalBestCapture clogPersonalBestCapture;
 
 	@Inject	private PetNotifier petNotifier;
 
@@ -153,6 +156,7 @@ public class RevalClanPlugin extends Plugin {
 		syncButton.startUp();
 		
 		eventBus.register(lootNotifier);
+		eventBus.register(clogPersonalBestCapture);
 
 		// Initialize and add the side panel
 		try {
@@ -185,6 +189,7 @@ public class RevalClanPlugin extends Plugin {
 		syncButton.shutDown();
 		
 		eventBus.unregister(lootNotifier);
+		eventBus.unregister(clogPersonalBestCapture);
 
 		announcementService.reset();
 		levelNotifier.reset();
