@@ -50,6 +50,19 @@ public class LootNotifier extends BaseNotifier {
 	}
 
 	/**
+	 * Mad Angel (Wyrmscraig) — constants not yet in the released runelite-api
+	 * gameval NpcID, so the ids are inlined (values match the api master branch:
+	 * MAD_ANGEL, MAD_ANGEL_QUEST, MAD_ANGEL_CATHEDRAL_VIS, MAD_ANGEL_CATHEDRAL_VIS_QUEST).
+	 */
+	private static final int MAD_ANGEL = 16305;
+	private static final int MAD_ANGEL_QUEST = 16309;
+	private static final int MAD_ANGEL_CATHEDRAL_VIS = 16314;
+	private static final int MAD_ANGEL_CATHEDRAL_VIS_QUEST = 16315;
+	private static final Set<Integer> MAD_ANGEL_IDS = Set.of(
+		MAD_ANGEL, MAD_ANGEL_QUEST, MAD_ANGEL_CATHEDRAL_VIS, MAD_ANGEL_CATHEDRAL_VIS_QUEST
+	);
+
+	/**
 	 * NPC IDs that fire LootReceived instead of NpcLootReceived
 	 * These should be handled in onLootReceived, not onNpcLootReceived
 	 */
@@ -60,7 +73,8 @@ public class LootNotifier extends BaseNotifier {
 		NpcID.HESPORI,
 		NpcID.GRYPHON_BOSS,
 		NpcID.GB_HILLGIANT_CHEST,
-		NpcID.GB_MOSSGIANT_CHEST
+		NpcID.GB_MOSSGIANT_CHEST,
+		MAD_ANGEL, MAD_ANGEL_QUEST, MAD_ANGEL_CATHEDRAL_VIS, MAD_ANGEL_CATHEDRAL_VIS_QUEST
 	);
 
 	/**
@@ -93,9 +107,9 @@ public class LootNotifier extends BaseNotifier {
 		// Most NPCs are handled by NpcLootReceived or LootReceived to avoid duplicates
 		int npcId = event.getComposition().getId();
 		var name = event.getComposition().getName();
-		
-		// Only handle Yama, Hespori, and Hallowed Sepulchre
-		if (npcId != NpcID.YAMA && npcId != NpcID.HESPORI && !name.startsWith("Hallowed Sepulchre")) {
+
+		// Only handle Yama, Hespori, Mad Angel, and Hallowed Sepulchre
+		if (npcId != NpcID.YAMA && npcId != NpcID.HESPORI && !MAD_ANGEL_IDS.contains(npcId) && !name.startsWith("Hallowed Sepulchre")) {
 			return;
 		}
 
