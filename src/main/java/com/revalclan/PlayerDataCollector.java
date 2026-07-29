@@ -3,6 +3,8 @@ package com.revalclan;
 import com.revalclan.collectionlog.CollectionLogManager;
 import com.revalclan.combatachievements.CombatAchievementManager;
 import com.revalclan.diaries.AchievementDiaryManager;
+import com.revalclan.pbs.ClogPersonalBestCapture;
+import com.revalclan.pbs.PersonalBestManager;
 import com.revalclan.player.PlayerManager;
 import com.revalclan.quests.QuestManager;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +35,12 @@ public class PlayerDataCollector {
 	@Inject
 	private CollectionLogManager collectionLogManager;
 
+	@Inject
+	private PersonalBestManager personalBestManager;
+
+	@Inject
+	private ClogPersonalBestCapture clogPersonalBestCapture;
+
 	/**
 	 * Collects all player data and returns it as a map
 	 */
@@ -44,6 +52,8 @@ public class PlayerDataCollector {
 		data.put("achievementDiaries", achievementDiaryManager.sync());
 		data.put("combatAchievements", combatAchievementManager.sync());
 		data.put("collectionLog", collectionLogManager.sync());
+		data.put("personalBests", personalBestManager.sync());
+		data.put("clogPersonalBests", clogPersonalBestCapture.sync());
 		
 		return data;
 	}
