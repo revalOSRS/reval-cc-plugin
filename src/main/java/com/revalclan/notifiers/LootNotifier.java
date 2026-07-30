@@ -50,16 +50,14 @@ public class LootNotifier extends BaseNotifier {
 	}
 
 	/**
-	 * Mad Angel (Wyrmscraig) — constants not yet in the released runelite-api
-	 * gameval NpcID, so the ids are inlined (values match the api master branch:
-	 * MAD_ANGEL, MAD_ANGEL_QUEST, MAD_ANGEL_CATHEDRAL_VIS, MAD_ANGEL_CATHEDRAL_VIS_QUEST).
+	 * Mad Angel (Wyrmscraig) — all encounter variant ids: base, initial, anim and
+	 * dead forms, their quest mirrors, and the cathedral (+ vis) forms. Constants
+	 * are not yet in the released runelite-api gameval NpcID, so the ids are
+	 * inlined (values match MAD_ANGEL..MAD_ANGEL_CATHEDRAL_VIS_QUEST on the api
+	 * master branch; same set Dink uses).
 	 */
-	private static final int MAD_ANGEL = 16305;
-	private static final int MAD_ANGEL_QUEST = 16309;
-	private static final int MAD_ANGEL_CATHEDRAL_VIS = 16314;
-	private static final int MAD_ANGEL_CATHEDRAL_VIS_QUEST = 16315;
 	private static final Set<Integer> MAD_ANGEL_IDS = Set.of(
-		MAD_ANGEL, MAD_ANGEL_QUEST, MAD_ANGEL_CATHEDRAL_VIS, MAD_ANGEL_CATHEDRAL_VIS_QUEST
+		16305, 16306, 16307, 16308, 16309, 16310, 16311, 16312, 16313, 16314, 16315
 	);
 
 	/**
@@ -73,8 +71,7 @@ public class LootNotifier extends BaseNotifier {
 		NpcID.HESPORI,
 		NpcID.GRYPHON_BOSS,
 		NpcID.GB_HILLGIANT_CHEST,
-		NpcID.GB_MOSSGIANT_CHEST,
-		MAD_ANGEL, MAD_ANGEL_QUEST, MAD_ANGEL_CATHEDRAL_VIS, MAD_ANGEL_CATHEDRAL_VIS_QUEST
+		NpcID.GB_MOSSGIANT_CHEST
 	);
 
 	/**
@@ -124,8 +121,8 @@ public class LootNotifier extends BaseNotifier {
 		NPC npc = event.getNpc();
 		int npcId = npc.getId();
 
-		// Skip NPCs that fire LootReceived instead (to avoid duplicates)
-		if (SPECIAL_LOOT_NPC_IDS.contains(npcId)) return;
+		// Skip NPCs that fire LootReceived or ServerNpcLoot instead (to avoid duplicates)
+		if (SPECIAL_LOOT_NPC_IDS.contains(npcId) || MAD_ANGEL_IDS.contains(npcId)) return;
 
 		Collection<ItemStack> items = event.getItems();
 		handleLootDrop(items, npc.getName(), "NPC", npcId);
