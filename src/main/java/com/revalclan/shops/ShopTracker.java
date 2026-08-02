@@ -474,11 +474,23 @@ public class ShopTracker extends BaseNotifier {
 			sb.append(" (").append(gpDelta > 0 ? "+" : "").append(gpDelta).append(" gp)");
 		}
 		if (!currencyDeltas.isEmpty()) {
-			Map<String, Object> first = currencyDeltas.get(0);
-			sb.append(" [var ").append(first.get("varbitId") != null && (int) first.get("varbitId") != -1
-					? "b" + first.get("varbitId") : "p" + first.get("varpId"))
-				.append(": ").append(first.get("delta")).append(currencyDeltas.size() > 1
-					? ", +" + (currencyDeltas.size() - 1) + " more]" : "]");
+			sb.append(" [");
+			int shown = 0;
+			for (Map<String, Object> d : currencyDeltas) {
+				if (shown == 3) {
+					sb.append(", +").append(currencyDeltas.size() - shown).append(" more");
+					break;
+				}
+				String key = d.get("varbitId") != null && (int) d.get("varbitId") != -1
+					? "b" + d.get("varbitId") : "p" + d.get("varpId");
+				String name = KNOWN_CURRENCIES.get(key);
+				if (shown > 0) {
+					sb.append(", ");
+				}
+				sb.append(name != null ? name : "var " + key).append(": ").append(d.get("delta"));
+				shown++;
+			}
+			sb.append(']');
 		}
 		sb.append(" @ ").append(shopName);
 
@@ -489,13 +501,31 @@ public class ShopTracker extends BaseNotifier {
 	 * Aggregate the var changes that happened since the click into per-var net deltas.
 	 * These are the candidate "currency" movements for reward shops.
 	 */
+	/** Vars that change constantly regardless of shopping (tick counters) — mapped
+	 *  from live session logs; excluded so currencyDeltas carries signal only. */
+	private static final Set<Integer> AMBIENT_VARPS = Set.of(3077, 3079);
+
+	/** Known currency vars, mapped from live purchases (values verified against
+	 *  in-game balances). p4513 is the account-wide coins-spent-in-shops stat —
+	 *  its delta equals the GP price, kept as a cross-check. */
+	private static final Map<String, String> KNOWN_CURRENCIES = Map.of(
+		"p4416", "Mox resin",
+		"p4415", "Aga resin",
+		"p4414", "Lye resin",
+		"p261", "Telekinetic pts",
+		"p262", "Alchemist pts",
+		"p263", "Enchantment pts",
+		"p264", "Graveyard pts",
+		"p4513", "coins-spent stat"
+	);
+
 	private List<Map<String, Object>> collectCurrencyDeltas(int clickTick) {
 		// key -> [firstOld (nullable), lastNew]
 		Map<String, Integer[]> perVar = new LinkedHashMap<>();
 		Map<String, int[]> ids = new HashMap<>();
 
 		for (VarChange c : recentVarChanges) {
-			if (c.tick < clickTick) {
+			if (c.tick < clickTick || AMBIENT_VARPS.contains(c.varpId)) {
 				continue;
 			}
 			String key = c.varbitId != -1 ? "b" + c.varbitId : "p" + c.varpId;
