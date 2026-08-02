@@ -50,6 +50,17 @@ public class LootNotifier extends BaseNotifier {
 	}
 
 	/**
+	 * Mad Angel (Wyrmscraig) — all encounter variant ids: base, initial, anim and
+	 * dead forms, their quest mirrors, and the cathedral (+ vis) forms. Constants
+	 * are not yet in the released runelite-api gameval NpcID, so the ids are
+	 * inlined (values match MAD_ANGEL..MAD_ANGEL_CATHEDRAL_VIS_QUEST on the api
+	 * master branch; same set Dink uses).
+	 */
+	private static final Set<Integer> MAD_ANGEL_IDS = Set.of(
+		16305, 16306, 16307, 16308, 16309, 16310, 16311, 16312, 16313, 16314, 16315
+	);
+
+	/**
 	 * NPC IDs that fire LootReceived instead of NpcLootReceived
 	 * These should be handled in onLootReceived, not onNpcLootReceived
 	 */
@@ -93,9 +104,9 @@ public class LootNotifier extends BaseNotifier {
 		// Most NPCs are handled by NpcLootReceived or LootReceived to avoid duplicates
 		int npcId = event.getComposition().getId();
 		var name = event.getComposition().getName();
-		
-		// Only handle Yama, Hespori, and Hallowed Sepulchre
-		if (npcId != NpcID.YAMA && npcId != NpcID.HESPORI && !name.startsWith("Hallowed Sepulchre")) {
+
+		// Only handle Yama, Hespori, Mad Angel, and Hallowed Sepulchre
+		if (npcId != NpcID.YAMA && npcId != NpcID.HESPORI && !MAD_ANGEL_IDS.contains(npcId) && !name.startsWith("Hallowed Sepulchre")) {
 			return;
 		}
 
@@ -110,8 +121,8 @@ public class LootNotifier extends BaseNotifier {
 		NPC npc = event.getNpc();
 		int npcId = npc.getId();
 
-		// Skip NPCs that fire LootReceived instead (to avoid duplicates)
-		if (SPECIAL_LOOT_NPC_IDS.contains(npcId)) return;
+		// Skip NPCs that fire LootReceived or ServerNpcLoot instead (to avoid duplicates)
+		if (SPECIAL_LOOT_NPC_IDS.contains(npcId) || MAD_ANGEL_IDS.contains(npcId)) return;
 
 		Collection<ItemStack> items = event.getItems();
 		handleLootDrop(items, npc.getName(), "NPC", npcId);

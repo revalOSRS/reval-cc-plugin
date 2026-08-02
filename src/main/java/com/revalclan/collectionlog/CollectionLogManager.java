@@ -8,6 +8,7 @@ package com.revalclan.collectionlog;
 
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
+import net.runelite.api.gameval.VarPlayerID;
 import net.runelite.api.Client;
 import net.runelite.api.EnumComposition;
 import net.runelite.api.StructComposition;
@@ -157,6 +158,9 @@ public class CollectionLogManager {
 		kc("amoxliatl").primaryKC(4403);
 		kc("araxxor").primaryKC(4260);
 		kc("barrows_chests").primaryKC(1502);
+		kc("mad_angel").primaryKC(5712); // Total Mad Angel kills (no VarPlayerID constant yet)
+		kc("maggot_king").primaryKC(VarPlayerID.TOTAL_MAGGOT_KING_KILLS);
+		kc("shellbane_gryphon").primaryKC(VarPlayerID.TOTAL_GRYPHON_BOSS_KILLS);
 		kc("bryophyta").primaryKC(1733);
 		
 		kc("callisto_and_artio").bossPair(1510, "callisto", 3761, "artio");
@@ -203,7 +207,7 @@ public class CollectionLogManager {
 		kc("the_fight_caves").primaryKC(1522);
 		
 		kc("fortis_colosseum")
-			.primaryKC(4131)
+			.primaryKC(VarPlayerID.TOTAL_SOL_KILLS)
 			.additionalKC("colosseum_glory", 4132);
 		
 		kc("the_gauntlet")
