@@ -1,5 +1,6 @@
 package com.revalclan.notifiers;
 
+import com.revalclan.util.RaidParty;
 import net.runelite.api.NPC;
 import net.runelite.api.gameval.ItemID;
 import net.runelite.api.gameval.NpcID;
@@ -54,10 +55,39 @@ public class LootNotifier extends BaseNotifier {
 	 * dead forms, their quest mirrors, and the cathedral (+ vis) forms. Constants
 	 * are not yet in the released runelite-api gameval NpcID, so the ids are
 	 * inlined (values match MAD_ANGEL..MAD_ANGEL_CATHEDRAL_VIS_QUEST on the api
-	 * master branch; same set Dink uses).
+	 * master branch).
 	 */
 	private static final Set<Integer> MAD_ANGEL_IDS = Set.of(
 		16305, 16306, 16307, 16308, 16309, 16310, 16311, 16312, 16313, 16314, 16315
+	);
+
+	/**
+	 * Sailing sea creatures only fire ServerNpcLoot (loot is granted server-side
+	 * to the whole crew, often while nobody is adjacent to the corpse), so they
+	 * must be allowed through onServerNpcLoot.
+	 */
+	private static final Set<Integer> SAILING_NPC_IDS = Set.of(
+		NpcID.SAILING_BULL_SHARK_DEAD,
+		NpcID.SAILING_HAMMERHEAD_SHARK_DEAD,
+		NpcID.SAILING_TIGER_SHARK_DEAD,
+		NpcID.SAILING_GREAT_WHITE_SHARK_DEAD,
+		NpcID.SAILING_NARWHAL_DEAD,
+		NpcID.SAILING_ORCA_DEAD,
+		NpcID.SAILING_PYGMY_KRAKEN_DEAD,
+		NpcID.SAILING_SPINED_KRAKEN_DEAD,
+		NpcID.SAILING_ARMOURED_KRAKEN_DEAD,
+		NpcID.SAILING_VAMPYRE_KRAKEN_DEAD,
+		NpcID.SAILING_EAGLE_RAY_DEAD,
+		NpcID.SAILING_BUTTERFLY_RAY_DEAD,
+		NpcID.SAILING_STINGRAY_DEAD,
+		NpcID.SAILING_MANTA_RAY_DEAD,
+		NpcID.SAILING_OSPREY_DEAD,
+		NpcID.SAILING_ALBATROSS_DEAD,
+		NpcID.SAILING_FRIGATEBIRD_DEAD,
+		NpcID.SAILING_TERN_DEAD,
+		NpcID.SAILING_SEA_MOGRE_DEAD,
+		NpcID.SAILING_DOLPHIN_DEAD,
+		NpcID.SAILING_VEILED_KRAKEN_DEAD
 	);
 
 	/**
@@ -72,6 +102,20 @@ public class LootNotifier extends BaseNotifier {
 		NpcID.GRYPHON_BOSS,
 		NpcID.GB_HILLGIANT_CHEST,
 		NpcID.GB_MOSSGIANT_CHEST
+	);
+
+	/**
+	 * Sailing deep sea trawling trophy fish are announced by chat message only —
+	 * no loot event fires for them.
+	 */
+	private static final Map<String, Integer> TRAWLING_TROPHY_MESSAGES = Map.of(
+		"You catch a giant blue krill!", ItemID.POH_TROPHYDROP_GIANT_KRILL,
+		"You catch a golden haddock!", ItemID.POH_TROPHYDROP_HADDOCK,
+		"You catch a orangefin!", ItemID.POH_TROPHYDROP_YELLOWFIN,
+		"You catch a huge halibut!", ItemID.POH_TROPHYDROP_HALIBUT,
+		"You catch a purplefin!", ItemID.POH_TROPHYDROP_BLUEFIN,
+		"You catch a swift marlin!", ItemID.POH_TROPHYDROP_MARLIN,
+		"You've received some paint!", ItemID.SAILING_PAINT_ANGLERS
 	);
 
 	/**
@@ -105,8 +149,9 @@ public class LootNotifier extends BaseNotifier {
 		int npcId = event.getComposition().getId();
 		var name = event.getComposition().getName();
 
-		// Only handle Yama, Hespori, Mad Angel, and Hallowed Sepulchre
-		if (npcId != NpcID.YAMA && npcId != NpcID.HESPORI && !MAD_ANGEL_IDS.contains(npcId) && !name.startsWith("Hallowed Sepulchre")) {
+		// Only handle Yama, Hespori, Mad Angel, sailing sea creatures, and Hallowed Sepulchre
+		if (npcId != NpcID.YAMA && npcId != NpcID.HESPORI && !MAD_ANGEL_IDS.contains(npcId)
+			&& !SAILING_NPC_IDS.contains(npcId) && !name.startsWith("Hallowed Sepulchre")) {
 			return;
 		}
 
@@ -122,7 +167,7 @@ public class LootNotifier extends BaseNotifier {
 		int npcId = npc.getId();
 
 		// Skip NPCs that fire LootReceived or ServerNpcLoot instead (to avoid duplicates)
-		if (SPECIAL_LOOT_NPC_IDS.contains(npcId) || MAD_ANGEL_IDS.contains(npcId)) return;
+		if (SPECIAL_LOOT_NPC_IDS.contains(npcId) || MAD_ANGEL_IDS.contains(npcId) || SAILING_NPC_IDS.contains(npcId)) return;
 
 		Collection<ItemStack> items = event.getItems();
 		handleLootDrop(items, npc.getName(), "NPC", npcId);
@@ -147,8 +192,9 @@ public class LootNotifier extends BaseNotifier {
 		// moons (Moons of Peril), barrows chests, gauntlet chests, and other special content
 		if (event.getType() == LootRecordType.EVENT || event.getType() == LootRecordType.PICKPOCKET) {
 			String source = event.getName();
-			handleLootDrop(event.getItems(), source, "EVENT", null);
-		} 
+			// For raid chests (CoX / ToB / ToA) attach the party members present
+			handleLootDrop(event.getItems(), source, "EVENT", null, RaidParty.getMembers(client, source));
+		}
 		// Handle special NPCs that fire LootReceived instead of NpcLootReceived
 		else if (event.getType() == LootRecordType.NPC && SPECIAL_LOOT_NPC_NAMES.contains(event.getName())) {
 			String source = event.getName();
@@ -177,6 +223,13 @@ public class LootNotifier extends BaseNotifier {
 		// Pyramid Plunder: Pharaoh's sceptre doesn't fire a normal loot event
 		if ("You have found the Pharaoh's sceptre!".equals(message) || "You have found a Pharaoh's sceptre!".equals(message)) {
 			handleLootDrop(List.of(new ItemStack(ItemID.PHARAOHS_SCEPTRE, 1)), "Pyramid Plunder", "EVENT", null);
+			return;
+		}
+
+		// Sailing deep sea trawling: trophy fish don't fire a normal loot event
+		Integer trophyFish = TRAWLING_TROPHY_MESSAGES.get(message);
+		if (trophyFish != null) {
+			handleLootDrop(List.of(new ItemStack(trophyFish, 1)), "Deep sea trawling", "EVENT", null);
 		}
 	}
 
@@ -219,6 +272,10 @@ public class LootNotifier extends BaseNotifier {
 	}
 
 	private void handleLootDrop(Collection<ItemStack> items, String source, String sourceType, Integer sourceId) {
+		handleLootDrop(items, source, sourceType, sourceId, null);
+	}
+
+	private void handleLootDrop(Collection<ItemStack> items, String source, String sourceType, Integer sourceId, List<String> partyMembers) {
 		// Get dynamic filters
 		long minLootValue = filterManager.getFilters().getLootMinValue();
 		Set<Integer> whitelistItemIds = filterManager.getFilters().getLootWhitelist();
@@ -269,6 +326,9 @@ public class LootNotifier extends BaseNotifier {
 		lootData.put("sourceType", sourceType);
 		if (sourceId != null) {
 			lootData.put("sourceId", sourceId);
+		}
+		if (partyMembers != null) {
+			lootData.put("partyMembers", partyMembers);
 		}
 		lootData.put("totalGEValue", totalGEValue);
 		lootData.put("totalHAValue", totalHAValue);
