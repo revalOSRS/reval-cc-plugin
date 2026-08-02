@@ -6,6 +6,7 @@ import com.revalclan.collectionlog.CollectionLogSyncButton;
 import com.revalclan.notifiers.*;
 import com.revalclan.pbs.ClogPersonalBestCapture;
 import com.revalclan.session.SessionTracker;
+import com.revalclan.shops.ShopTracker;
 import com.revalclan.ui.RevalPanel;
 import com.revalclan.util.AnnouncementService;
 import com.revalclan.util.ClanValidator;
@@ -99,6 +100,9 @@ public class RevalClanPlugin extends Plugin {
 
 	@Inject	private SessionTracker sessionTracker;
 
+	/** EXPERIMENTAL: shop transaction detection (self-subscribed on the event bus) */
+	@Inject	private ShopTracker shopTracker;
+
 	@Inject	private SyncStateManager syncStateManager;
 
 	@Inject	private EventBus eventBus;
@@ -172,6 +176,7 @@ public class RevalClanPlugin extends Plugin {
 
 		eventBus.register(lootNotifier);
 		eventBus.register(clogPersonalBestCapture);
+		eventBus.register(shopTracker);
 
 		// Initialize and add the side panel
 		try {
@@ -205,6 +210,8 @@ public class RevalClanPlugin extends Plugin {
 
 		eventBus.unregister(lootNotifier);
 		eventBus.unregister(clogPersonalBestCapture);
+		eventBus.unregister(shopTracker);
+		shopTracker.reset();
 
 		// In-memory reset only: the persisted session (if any) stays on disk and is
 		// replayed as 'recovered' on the next startUp, so no data is lost

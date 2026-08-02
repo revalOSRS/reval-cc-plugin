@@ -222,4 +222,24 @@ public interface RevalClanConfig extends Config {
 	default boolean showAnnouncements() {
 		return true;
 	}
+
+	// ── Experimental ───────────────────────────────────────────────────
+	@ConfigSection(
+		name = "Experimental",
+		description = "Experimental features under development — leave off unless you know what you're doing",
+		position = 2,
+		closedByDefault = true
+	)
+	String experimentalSection = "experimentalSection";
+
+	@ConfigItem(
+		keyName = "debugMode",
+		name = "Debug mode",
+		description = "Enables experimental shop transaction detection: writes raw event logs to ~/.runelite/reval-debug/, shows detected transactions in chat, and sends SHOP_TRANSACTION events",
+		section = experimentalSection,
+		position = 0
+	)
+	default boolean debugMode() {
+		return false;
+	}
 }
