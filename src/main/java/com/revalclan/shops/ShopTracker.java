@@ -116,7 +116,10 @@ public class ShopTracker extends BaseNotifier {
 	/** Learned stock container id of the currently open standard shop, -1 if unknown. */
 	private int shopContainerId = -1;
 	/** Non-standard, non-blacklisted interface groups currently loaded (reward-shop candidates). */
-	private final Set<Integer> openCandidateGroups = new HashSet<>();
+	/** Open candidate reward-shop interfaces in open order: groupId -> resolved title
+	 *  (null until readable). Attribution uses the OLDEST open group's title, so a
+	 *  confirm/item-info modal stacked on a shop doesn't steal the shop's name. */
+	private final LinkedHashMap<Integer, String> openCandidateGroups = new LinkedHashMap<>();
 
 	/** Last observed values so VarbitChanged (which only carries the new value) can report old -> new. */
 	private final Map<Integer, Integer> lastVarpValues = new HashMap<>();
@@ -159,7 +162,7 @@ public class ShopTracker extends BaseNotifier {
 			shopName = null;      // read from the title widget on the next tick (text may not be set yet)
 			shopContainerId = -1; // learned from the next non-player ItemContainerChanged
 		} else if (!IGNORED_GROUPS.contains(group)) {
-			openCandidateGroups.add(group);
+			openCandidateGroups.put(group, null);
 		}
 
 		// Group ids are the key to mapping unknown reward shops — log all loads while debugging
@@ -167,7 +170,7 @@ public class ShopTracker extends BaseNotifier {
 			Map<String, Object> f = new LinkedHashMap<>();
 			f.put("groupId", group);
 			f.put("standardShop", group == InterfaceID.SHOPMAIN);
-			f.put("candidate", openCandidateGroups.contains(group));
+			f.put("candidate", openCandidateGroups.containsKey(group));
 			debugLog.write("widget_loaded", tick, f);
 		}
 	}
@@ -225,7 +228,7 @@ public class ShopTracker extends BaseNotifier {
 		p.param0 = event.getParam0();
 		p.param1 = event.getParam1();
 		p.standardShop = standardShopOpen;
-		p.shopName = shopName != null ? shopName : "unknown";
+		p.shopName = resolveShopName();
 		p.interfaceGroup = resolveInterfaceGroup(event);
 		p.invSnapshot = snapshotContainer(INV_CONTAINER);
 		p.coinsSnapshot = countOf(p.invSnapshot, COINS_ITEM_ID);
@@ -310,6 +313,23 @@ public class ShopTracker extends BaseNotifier {
 				Map<String, Object> f = new LinkedHashMap<>();
 				f.put("shopName", shopName);
 				debugLog.write("shop_title", tick, f);
+			}
+		}
+
+		// Lazily resolve titles of open candidate interfaces (text may not exist at load)
+		for (Map.Entry<Integer, String> entry : openCandidateGroups.entrySet()) {
+			if (entry.getValue() != null) {
+				continue;
+			}
+			String title = readGroupTitle(entry.getKey());
+			if (title != null) {
+				entry.setValue(title);
+				if (config.debugMode()) {
+					Map<String, Object> f = new LinkedHashMap<>();
+					f.put("groupId", entry.getKey());
+					f.put("title", title);
+					debugLog.write("candidate_title", tick, f);
+				}
 			}
 		}
 
@@ -569,6 +589,56 @@ public class ShopTracker extends BaseNotifier {
 	 * of its dynamic children. Scan for the first non-empty text rather than trusting
 	 * a fixed dynamic index.
 	 */
+	/**
+	 * Best shop name for the current context: the standard shop title when open,
+	 * else the OLDEST open candidate interface with a readable title (the actual
+	 * shop opens before any item-info/confirm modal stacked on top of it).
+	 */
+	private String resolveShopName() {
+		if (standardShopOpen && shopName != null) {
+			return shopName;
+		}
+		for (String title : openCandidateGroups.values()) {
+			if (title != null) {
+				return title;
+			}
+		}
+		return shopName != null ? shopName : "unknown";
+	}
+
+	/**
+	 * Generic title read for a candidate interface group: the first non-empty
+	 * short text among the group's first root widgets (titles render early and
+	 * are short; long texts are body copy).
+	 */
+	private String readGroupTitle(int group) {
+		for (int child = 0; child < 40; child++) {
+			Widget w = client.getWidget(group, child);
+			if (w == null) {
+				continue;
+			}
+			String text = titleish(w.getText());
+			if (text == null) {
+				text = titleish(firstText(w.getDynamicChildren()));
+			}
+			if (text == null) {
+				text = titleish(firstText(w.getStaticChildren()));
+			}
+			if (text != null) {
+				return text;
+			}
+		}
+		return null;
+	}
+
+	private static String titleish(String text) {
+		if (text == null) {
+			return null;
+		}
+		String clean = net.runelite.client.util.Text.removeTags(text).trim();
+		return (!clean.isEmpty() && clean.length() <= 40) ? clean : null;
+	}
+
 	private String readShopTitle() {
 		Widget frame = client.getWidget(InterfaceID.Shopmain.FRAME);
 		if (frame == null) {
@@ -612,7 +682,7 @@ public class ShopTracker extends BaseNotifier {
 			return InterfaceID.SHOPMAIN;
 		}
 		// Best effort: any open candidate group
-		return openCandidateGroups.isEmpty() ? -1 : openCandidateGroups.iterator().next();
+		return openCandidateGroups.isEmpty() ? -1 : openCandidateGroups.keySet().iterator().next();
 	}
 
 	// ── Debug record builders ──────────────────────────────────────────
@@ -640,7 +710,7 @@ public class ShopTracker extends BaseNotifier {
 			f.put("widgetName", w.getName());
 			f.put("widgetText", w.getText());
 		}
-		f.put("openGroups", new ArrayList<>(openCandidateGroups));
+		f.put("openGroups", new ArrayList<>(openCandidateGroups.keySet()));
 		f.put("standardShopOpen", standardShopOpen);
 		return f;
 	}
