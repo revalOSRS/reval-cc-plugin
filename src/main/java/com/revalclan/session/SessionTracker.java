@@ -4,7 +4,6 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.revalclan.util.WebhookService;
 import lombok.extern.slf4j.Slf4j;
-import com.revalclan.util.Worlds;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.Skill;
@@ -84,9 +83,6 @@ public class SessionTracker {
 	 * tracked — session summaries describe the main-game character.
 	 */
 	public void startSession() {
-		if (!Worlds.isTrackable(client)) {
-			return;
-		}
 		resetState();
 		sessionId = UUID.randomUUID().toString();
 		startedAtMs = System.currentTimeMillis();
