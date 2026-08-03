@@ -47,7 +47,6 @@ public class CollectionNotifier extends BaseNotifier {
 	}
 
 	private void handleCollectionItem(String itemName) {
-		sessionTracker.addCollectionLogSlot(itemName);
 
 		Map<String, Object> collectionData = new HashMap<>();
 		collectionData.put("item", itemName);

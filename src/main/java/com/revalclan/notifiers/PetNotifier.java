@@ -234,7 +234,6 @@ public class PetNotifier extends BaseNotifier {
 		}
 
 		if (this.petName != null && !this.petName.isEmpty()) {
-			sessionTracker.addPet(this.petName);
 		}
 
 		sendNotification(petData);
