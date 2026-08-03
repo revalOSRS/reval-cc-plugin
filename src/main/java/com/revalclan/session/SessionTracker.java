@@ -52,6 +52,7 @@ public class SessionTracker {
 
 	@Inject private Client client;
 	@Inject private ConfigManager configManager;
+	@Inject private com.revalclan.RevalClanConfig config;
 	@Inject private Gson gson;
 	@Inject private WebhookService webhookService;
 
@@ -105,6 +106,7 @@ public class SessionTracker {
 		refreshEndSnapshot();
 		lastUpdateMs = System.currentTimeMillis();
 		Map<String, Object> summary = buildSummary("logout", lastUpdateMs);
+		debugDump(summary);
 
 		active = false;
 		clearPersisted();
@@ -301,5 +303,20 @@ public class SessionTracker {
 		try {
 			configManager.unsetConfiguration(CONFIG_GROUP, CONFIG_KEY);
 		} catch (Exception ignored) {}
+	}
+
+	/** Debug mode: write the finished summary to ~/.runelite/reval-debug/ for inspection. */
+	private void debugDump(Map<String, Object> summary) {
+		if (!config.debugMode()) return;
+		try {
+			java.io.File dir = new java.io.File(net.runelite.client.RuneLite.RUNELITE_DIR, "reval-debug");
+			if (!dir.exists()) dir.mkdirs();
+			String name = "session-summary-" + new java.text.SimpleDateFormat("yyyyMMdd-HHmmss").format(new java.util.Date()) + ".json";
+			java.nio.file.Files.write(new java.io.File(dir, name).toPath(),
+				gson.toJson(summary).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+			log.info("Session summary dumped to {}", name);
+		} catch (Exception e) {
+			log.warn("Session debug dump failed: {}", e.getMessage());
+		}
 	}
 }
