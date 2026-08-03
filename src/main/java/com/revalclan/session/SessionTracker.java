@@ -47,7 +47,7 @@ public class SessionTracker {
 	 *  loot entries (item+source); totals stay exact even past the cap. */
 	private static final int MAX_LOOT_ENTRIES = 5000;
 
-	/** Malfunction guard for list-shaped collections (pets, clog slots, deaths) */
+	/** Malfunction guard for list-shaped collections (deaths) */
 	private static final int MAX_LIST_ENTRIES = 1000;
 
 	@Inject private Client client;
@@ -71,8 +71,6 @@ public class SessionTracker {
 	/** key: itemId + "|" + source → aggregated loot entry */
 	private final Map<String, Map<String, Object>> loot = new LinkedHashMap<>();
 	private long totalLootValue = 0;
-	private final List<Map<String, Object>> pets = new ArrayList<>();
-	private final List<Map<String, Object>> collectionLogSlots = new ArrayList<>();
 	private final List<Map<String, Object>> deaths = new ArrayList<>();
 
 	// ==================== LIFECYCLE ====================
@@ -204,28 +202,15 @@ public class SessionTracker {
 		dirty = true;
 	}
 
-	public void addPet(String petName) {
-		if (!active || pets.size() >= MAX_LIST_ENTRIES) return;
-		Map<String, Object> pet = new HashMap<>();
-		pet.put("petName", petName);
-		pet.put("timestamp", System.currentTimeMillis());
-		pets.add(pet);
-		dirty = true;
-	}
-
-	public void addCollectionLogSlot(String itemName) {
-		if (!active || collectionLogSlots.size() >= MAX_LIST_ENTRIES) return;
-		Map<String, Object> slot = new HashMap<>();
-		slot.put("itemName", itemName);
-		slot.put("timestamp", System.currentTimeMillis());
-		collectionLogSlots.add(slot);
-		dirty = true;
-	}
-
-	public void addDeath(String location) {
+	public void addDeath(String killedBy, long gpLost) {
 		if (!active || deaths.size() >= MAX_LIST_ENTRIES) return;
 		Map<String, Object> death = new HashMap<>();
-		death.put("location", location);
+		death.put("killedBy", killedBy);
+		death.put("gpLost", gpLost);
+		if (client.getLocalPlayer() != null) {
+			net.runelite.api.coords.WorldPoint wp = client.getLocalPlayer().getWorldLocation();
+			death.put("location", wp.getX() + "," + wp.getY() + "," + wp.getPlane());
+		}
 		death.put("timestamp", System.currentTimeMillis());
 		deaths.add(death);
 		dirty = true;
@@ -245,8 +230,6 @@ public class SessionTracker {
 		clues.clear();
 		loot.clear();
 		totalLootValue = 0;
-		pets.clear();
-		collectionLogSlots.clear();
 		deaths.clear();
 		dirty = false;
 		ticksSincePersist = 0;
@@ -301,8 +284,6 @@ public class SessionTracker {
 		summary.put("clues", new HashMap<>(clues));
 		summary.put("totalLootValue", totalLootValue);
 		summary.put("lootItems", new ArrayList<>(loot.values()));
-		summary.put("pets", new ArrayList<>(pets));
-		summary.put("collectionLogSlots", new ArrayList<>(collectionLogSlots));
 		summary.put("deaths", new ArrayList<>(deaths));
 		return summary;
 	}
