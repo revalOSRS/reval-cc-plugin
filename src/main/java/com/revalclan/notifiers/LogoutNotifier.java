@@ -12,7 +12,7 @@ import com.revalclan.util.SyncStateManager;
  * Handles logout events.
  * Sends the session-boundary payload (full state when changed since the last
  * server ack, slim otherwise) plus the client-side session summary accumulated
- * since login (v2.17+).
+ * since login.
  */
 @Singleton
 public class LogoutNotifier extends BaseNotifier {

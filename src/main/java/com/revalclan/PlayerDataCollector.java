@@ -51,10 +51,7 @@ public class PlayerDataCollector {
 	private SyncStateManager syncStateManager;
 
 	/**
-	 * Collects all player data and returns it as a map.
-	 * Includes the state fingerprint (non-seasonal worlds) so the server can
-	 * record what it processed. Used by the manual SYNC button — always full,
-	 * doubling as the repair path for fingerprint drift.
+	 * Collects all player data as a full payload, fingerprint included.
 	 */
 	public Map<String, Object> collectAllData() {
 		Map<String, Object> data = new HashMap<>();
@@ -74,10 +71,8 @@ public class PlayerDataCollector {
 	}
 
 	/**
-	 * Collects data for a LOGIN/LOGOUT session boundary. When the state
-	 * fingerprint equals the last server-acked one, the four bulky state
-	 * categories are OMITTED — the payload carries only player (incl. skills)
-	 * and the fingerprint, and the backend skips the redundant reprocessing.
+	 * LOGIN/LOGOUT payload: slim (player + fingerprint) when state is
+	 * unchanged since the last acked fingerprint, full otherwise.
 	 */
 	public Map<String, Object> collectBoundaryData() {
 		Map<String, Object> data = collectAllData();

@@ -21,14 +21,12 @@ import java.util.UUID;
 /**
  * Accumulates the whole play session client-side (kills, loot, clues, pets,
  * deaths, collection log slots, start/end skill snapshots) and delivers it to
- * the backend as ONE session summary:
+ * one session summary:
  *
  *   - attached to the LOGOUT event on a clean logout, or
  *   - replayed as a standalone SESSION_SUMMARY event ("recovered") on the next
  *     plugin startup when the client crashed / was X'd out before LOGOUT fired.
- *
- * This replaces per-event server-side session tracking entirely — the backend
- * receives one write per session instead of one per kill/drop/clue.
+
  *
  * Crash resilience: the accumulator is periodically serialized into the RuneLite
  * config store (local disk, cheap, throttled to once per PERSIST_INTERVAL_TICKS

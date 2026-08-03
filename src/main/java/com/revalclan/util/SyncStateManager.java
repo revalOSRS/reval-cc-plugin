@@ -14,14 +14,13 @@ import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Tracks the sync-state fingerprint handshake with the backend (v2.17+).
+ * Tracks the sync-state fingerprint handshake.
  *
  * The plugin hashes its full account state (quests, diaries, combat achievements,
  * collection log obtained items — kill counts deliberately EXCLUDED, they change
  * constantly and are delivered by KILL_COUNT events / manual sync) and sends the
  * hash with LOGIN/LOGOUT/SYNC payloads. When the hash equals the last one the
- * server acknowledged, the bulky state categories are omitted from the payload
- * and the backend skips reprocessing them.
+ * server acknowledged, the bulky state categories are omitted from the payload.
  *
  * The server's ack (webhook response `sync: {fingerprint, stale}`) is persisted
  * per account in the RuneLite config store. `stale: true` means the server never
