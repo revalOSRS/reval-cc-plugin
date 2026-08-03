@@ -6,6 +6,7 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 
 import com.revalclan.PlayerDataCollector;
+import com.revalclan.session.SessionTracker;
 import com.revalclan.util.SyncStateManager;
 
 /**
@@ -21,6 +22,9 @@ public class LogoutNotifier extends BaseNotifier {
 
 	@Inject
 	private SyncStateManager syncStateManager;
+
+	@Inject
+	private SessionTracker sessionTracker;
 
 	@Override
 	public boolean isEnabled() {
@@ -43,7 +47,11 @@ public class LogoutNotifier extends BaseNotifier {
 			data.put("sessionSummary", sessionSummary);
 		}
 		long accountHash = client.getAccountHash();
-		sendNotificationWithResponse(data, response ->
-			syncStateManager.handleSyncAckResponse(response, accountHash));
+		sendNotificationWithResponse(data, response -> {
+			syncStateManager.handleSyncAckResponse(response, accountHash);
+			if (sessionSummary != null) {
+				sessionTracker.confirmDelivered();
+			}
+		});
 	}
 }
