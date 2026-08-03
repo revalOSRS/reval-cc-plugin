@@ -7,7 +7,10 @@ import com.revalclan.pbs.ClogPersonalBestCapture;
 import com.revalclan.pbs.PersonalBestManager;
 import com.revalclan.player.PlayerManager;
 import com.revalclan.quests.QuestManager;
+import com.revalclan.util.SyncStateManager;
 import lombok.extern.slf4j.Slf4j;
+import net.runelite.api.Client;
+import net.runelite.api.WorldType;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -21,14 +24,17 @@ import java.util.Map;
 @Singleton
 public class PlayerDataCollector {
 	@Inject
+	private Client client;
+
+	@Inject
 	private PlayerManager playerManager;
-	
+
 	@Inject
 	private QuestManager questManager;
-	
+
 	@Inject
 	private AchievementDiaryManager achievementDiaryManager;
-	
+
 	@Inject
 	private CombatAchievementManager combatAchievementManager;
 
@@ -41,12 +47,15 @@ public class PlayerDataCollector {
 	@Inject
 	private ClogPersonalBestCapture clogPersonalBestCapture;
 
+	@Inject
+	private SyncStateManager syncStateManager;
+
 	/**
-	 * Collects all player data and returns it as a map
+	 * Collects all player data as a full payload, fingerprint included.
 	 */
 	public Map<String, Object> collectAllData() {
 		Map<String, Object> data = new HashMap<>();
-		
+
 		data.put("player", playerManager.sync());
 		data.put("quests", questManager.sync());
 		data.put("achievementDiaries", achievementDiaryManager.sync());
@@ -54,7 +63,48 @@ public class PlayerDataCollector {
 		data.put("collectionLog", collectionLogManager.sync());
 		data.put("personalBests", personalBestManager.sync());
 		data.put("clogPersonalBests", clogPersonalBestCapture.sync());
-		
+
+		attachFingerprint(data);
+
+
 		return data;
+	}
+
+	/**
+	 * LOGIN/LOGOUT payload: slim (player + fingerprint) when state is
+	 * unchanged since the last acked fingerprint, full otherwise.
+	 */
+	public Map<String, Object> collectBoundaryData() {
+		Map<String, Object> data = collectAllData();
+
+		String fingerprint = (String) data.get("syncFingerprint");
+		if (fingerprint == null) return data;
+
+		String acked = syncStateManager.getAckedFingerprint(client.getAccountHash());
+		if (fingerprint.equals(acked)) {
+			Map<String, Object> slim = new HashMap<>();
+			slim.put("player", data.get("player"));
+			slim.put("syncFingerprint", fingerprint);
+			return slim;
+		}
+
+		return data;
+	}
+
+	/**
+	 * Compute and attach the state fingerprint. Skipped on seasonal (leagues)
+	 * worlds — leagues state is a different character and flows through the
+	 * leagues pipeline, which does not participate in the fingerprint handshake.
+	 */
+	private void attachFingerprint(Map<String, Object> data) {
+		try {
+			if (client.getWorldType().contains(WorldType.SEASONAL)) return;
+			String fingerprint = syncStateManager.computeFingerprint(data);
+			if (fingerprint != null) {
+				data.put("syncFingerprint", fingerprint);
+			}
+		} catch (Exception e) {
+			log.warn("Failed to attach sync fingerprint: {}", e.getMessage());
+		}
 	}
 }

@@ -39,6 +39,8 @@ public class EventFilterManager{
 		// Detailed kill filter settings
 		@Getter private Set<Integer> detailedKillNpcIdWhitelist = new HashSet<>();
 		@Getter private Set<Integer> detailedKillNpcIdBlacklist = new HashSet<>();
+		/** NPC names (lowercase) needed by active server-side requirements; matched by containment */
+		@Getter private Set<String> detailedKillNpcNameWhitelist = new HashSet<>();
 		
 		// Chat filter settings
 		@Getter private List<String> chatPatterns = new ArrayList<>(); // Empty by default = no patterns, all messages pass
@@ -187,8 +189,15 @@ public class EventFilterManager{
 				
 				newFilters.detailedKillNpcIdBlacklist.clear();
 				if (detailedKill.has("npcIdBlacklist") && detailedKill.get("npcIdBlacklist").isJsonArray()) {
-					detailedKill.getAsJsonArray("npcIdBlacklist").forEach(id -> 
+					detailedKill.getAsJsonArray("npcIdBlacklist").forEach(id ->
 						newFilters.detailedKillNpcIdBlacklist.add(id.getAsInt())
+					);
+				}
+
+				newFilters.detailedKillNpcNameWhitelist.clear();
+				if (detailedKill.has("npcNameWhitelist") && detailedKill.get("npcNameWhitelist").isJsonArray()) {
+					detailedKill.getAsJsonArray("npcNameWhitelist").forEach(name ->
+						newFilters.detailedKillNpcNameWhitelist.add(name.getAsString().toLowerCase())
 					);
 				}
 			}

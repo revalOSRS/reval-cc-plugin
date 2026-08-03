@@ -103,6 +103,32 @@ public class CombatAchievementManager {
 	}
 
 	/**
+	 * Current total CA points from the game cache + varps, without building
+	 * the full task list.
+	 */
+	public int computeCurrentTotalPoints() {
+		int total = 0;
+		for (Map.Entry<Integer, String> tierEntry : TIER_ENUMS.entrySet()) {
+			try {
+				EnumComposition tierEnum = client.getEnum(tierEntry.getKey());
+				if (tierEnum == null) continue;
+
+				int pointsPerTask = getPointsForTier(tierEntry.getValue());
+				for (int structId : tierEnum.getIntVals()) {
+					try {
+						StructComposition struct = client.getStructComposition(structId);
+						if (struct == null) continue;
+						if (isTaskCompleted(struct.getIntValue(FIELD_TASK_ID))) {
+							total += pointsPerTask;
+						}
+					} catch (Exception ignored) {}
+				}
+			} catch (Exception ignored) {}
+		}
+		return total;
+	}
+
+	/**
 	 * Loads a single task from a struct
 	 */
 	private CombatAchievementTask loadTaskFromStruct(int structId, String tierName) {

@@ -6,15 +6,25 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 
 import com.revalclan.PlayerDataCollector;
+import com.revalclan.session.SessionTracker;
+import com.revalclan.util.SyncStateManager;
 
 /**
  * Handles logout events.
- * Triggers a full account sync when the player logs out.
+ * Sends the session-boundary payload (full state when changed since the last
+ * server ack, slim otherwise) plus the client-side session summary accumulated
+ * since login.
  */
 @Singleton
 public class LogoutNotifier extends BaseNotifier {
 	@Inject
 	private PlayerDataCollector dataCollector;
+
+	@Inject
+	private SyncStateManager syncStateManager;
+
+	@Inject
+	private SessionTracker sessionTracker;
 
 	@Override
 	public boolean isEnabled() {
@@ -28,11 +38,20 @@ public class LogoutNotifier extends BaseNotifier {
 
 	/**
 	 * Called when the player logs out.
-	 * Triggers a full account sync.
+	 *
+	 * @param sessionSummary Finalized session summary from SessionTracker (nullable)
 	 */
-	public void onLogout() {
-		Map<String, Object> data = dataCollector.collectAllData();
-		sendNotification(data);
+	public void onLogout(Map<String, Object> sessionSummary) {
+		Map<String, Object> data = dataCollector.collectBoundaryData();
+		if (sessionSummary != null) {
+			data.put("sessionSummary", sessionSummary);
+		}
+		long accountHash = client.getAccountHash();
+		sendNotificationWithResponse(data, response -> {
+			syncStateManager.handleSyncAckResponse(response, accountHash);
+			if (sessionSummary != null) {
+				sessionTracker.confirmDelivered();
+			}
+		});
 	}
 }
-
