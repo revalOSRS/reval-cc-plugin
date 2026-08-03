@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.revalclan.util.WebhookService;
 import lombok.extern.slf4j.Slf4j;
+import com.revalclan.util.Worlds;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.Skill;
@@ -40,14 +41,15 @@ public class SessionTracker {
 	private static final String CONFIG_GROUP = "revalclan";
 	private static final String CONFIG_KEY = "activeSessionJson";
 
-	/** Persist locally at most once per this many game ticks (~60s) and only when dirty */
-	private static final int PERSIST_INTERVAL_TICKS = 100;
+	/** Persist locally at most once per this many game ticks (~30s) and only when dirty */
+	private static final int PERSIST_INTERVAL_TICKS = 50;
 
-	/** Cap on distinct loot entries (item+source) to bound memory/payload; totals stay exact */
-	private static final int MAX_LOOT_ENTRIES = 500;
+	/** Malfunction guard only — no legitimate session reaches these. Distinct
+	 *  loot entries (item+source); totals stay exact even past the cap. */
+	private static final int MAX_LOOT_ENTRIES = 5000;
 
-	/** Cap on list-shaped collections (pets, clog slots, deaths) */
-	private static final int MAX_LIST_ENTRIES = 200;
+	/** Malfunction guard for list-shaped collections (pets, clog slots, deaths) */
+	private static final int MAX_LIST_ENTRIES = 1000;
 
 	@Inject private Client client;
 	@Inject private ConfigManager configManager;
@@ -82,7 +84,7 @@ public class SessionTracker {
 	 * tracked — session summaries describe the main-game character.
 	 */
 	public void startSession() {
-		if (client.getWorldType().contains(net.runelite.api.WorldType.SEASONAL)) {
+		if (!Worlds.isTrackable(client)) {
 			return;
 		}
 		resetState();
