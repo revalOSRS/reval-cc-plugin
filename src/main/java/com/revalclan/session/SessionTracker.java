@@ -97,7 +97,8 @@ public class SessionTracker {
 	/**
 	 * Finalize the current session (clean logout) and return the summary map to
 	 * embed in the LOGOUT payload, or null when no session is active.
-	 * Clears the local persistence so it can't be replayed as "recovered".
+	 * The persisted copy is kept until the server confirms delivery
+	 * (confirmDelivered) — a client closed mid-send replays it on next startup.
 	 */
 	public Map<String, Object> finalizeSession() {
 		if (!active) return null;
@@ -106,11 +107,21 @@ public class SessionTracker {
 		lastUpdateMs = System.currentTimeMillis();
 		Map<String, Object> summary = buildSummary("logout", lastUpdateMs);
 
+		Map<String, Object> persisted = new HashMap<>();
+		persisted.put("accountHash", accountHash);
+		persisted.put("username", username);
+		persisted.put("summary", summary);
+		configManager.setConfiguration(CONFIG_GROUP, CONFIG_KEY, gson.toJson(persisted));
+
 		active = false;
-		clearPersisted();
 		resetState();
 
 		return summary;
+	}
+
+	/** Server confirmed it received the summary — safe to drop the local copy. */
+	public void confirmDelivered() {
+		clearPersisted();
 	}
 
 	/**
@@ -122,7 +133,6 @@ public class SessionTracker {
 		try {
 			String json = configManager.getConfiguration(CONFIG_GROUP, CONFIG_KEY);
 			if (json == null || json.isEmpty()) return;
-			clearPersisted();
 
 			JsonObject persisted = gson.fromJson(json, JsonObject.class);
 			if (persisted == null || !persisted.has("summary")) return;
@@ -135,7 +145,8 @@ public class SessionTracker {
 			// JsonElement values serialize natively through Gson — no lossy Map round-trip
 			payload.put("sessionSummary", persisted.get("summary"));
 
-			webhookService.sendDataAsync(payload);
+			// Clear only once the server confirms receipt; otherwise retry next startup
+			webhookService.sendDataAsync(payload, response -> clearPersisted());
 			log.info("Recovered unfinished session, replayed as SESSION_SUMMARY");
 		} catch (Exception e) {
 			log.warn("Failed to recover persisted session: {}", e.getMessage());
