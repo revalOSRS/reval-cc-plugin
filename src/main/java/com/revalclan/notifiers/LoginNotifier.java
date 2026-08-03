@@ -11,7 +11,7 @@ import java.util.Map;
 /**
  * Notifies when a player logs in.
  * Sends the session-boundary payload: full state when it changed since the last
- * server ack, or a slim player+fingerprint payload when unchanged (v2.17+).
+ * server ack, or a slim player+fingerprint payload when unchanged.
  */
 @Singleton
 public class LoginNotifier extends BaseNotifier {

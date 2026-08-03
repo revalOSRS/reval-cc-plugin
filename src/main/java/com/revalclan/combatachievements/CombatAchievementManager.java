@@ -106,10 +106,8 @@ public class CombatAchievementManager {
 	}
 
 	/**
-	 * Compute the current total CA points directly from the game cache + varps,
-	 * without building the full task list. Used by the CA notifier so the
-	 * COMBAT_ACHIEVEMENT event carries the authoritative total (v2.17+) and the
-	 * backend doesn't have to re-derive it from stored completions.
+	 * Current total CA points from the game cache + varps, without building
+	 * the full task list.
 	 */
 	public int computeCurrentTotalPoints() {
 		int total = 0;
