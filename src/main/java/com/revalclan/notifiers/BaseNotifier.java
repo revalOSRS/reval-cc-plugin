@@ -98,6 +98,9 @@ public abstract class BaseNotifier {
 		data.put("accountHash", client.getAccountHash());
 		data.put("username", getPlayerName());
 		data.put("world", client.getWorld());
+		java.util.List<String> worldFlags = new java.util.ArrayList<>();
+		for (net.runelite.api.WorldType t : client.getWorldType()) worldFlags.add(t.name());
+		data.put("worldFlags", worldFlags);
 		
 		if (client.getLocalPlayer() != null) {
 			WorldPoint wp = client.getLocalPlayer().getWorldLocation();

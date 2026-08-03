@@ -143,7 +143,7 @@ public class DeathNotifier extends BaseNotifier {
 		deathData.put("lostItems", lostItems);
 		deathData.put("totalLostValue", totalLostValue);
 
-		sessionTracker.addDeath(String.valueOf(deathData.get("killedBy")));
+		sessionTracker.addDeath(String.valueOf(deathData.get("killedBy")), totalLostValue);
 
 		sendNotificationWithScreenshot(deathData);
 

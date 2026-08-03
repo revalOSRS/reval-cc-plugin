@@ -21,14 +21,12 @@ import java.util.UUID;
 /**
  * Accumulates the whole play session client-side (kills, loot, clues, pets,
  * deaths, collection log slots, start/end skill snapshots) and delivers it to
- * the backend as ONE session summary:
+ * one session summary:
  *
  *   - attached to the LOGOUT event on a clean logout, or
  *   - replayed as a standalone SESSION_SUMMARY event ("recovered") on the next
  *     plugin startup when the client crashed / was X'd out before LOGOUT fired.
- *
- * This replaces per-event server-side session tracking entirely — the backend
- * receives one write per session instead of one per kill/drop/clue.
+
  *
  * Crash resilience: the accumulator is periodically serialized into the RuneLite
  * config store (local disk, cheap, throttled to once per PERSIST_INTERVAL_TICKS
@@ -42,14 +40,15 @@ public class SessionTracker {
 	private static final String CONFIG_GROUP = "revalclan";
 	private static final String CONFIG_KEY = "activeSessionJson";
 
-	/** Persist locally at most once per this many game ticks (~60s) and only when dirty */
-	private static final int PERSIST_INTERVAL_TICKS = 100;
+	/** Persist locally at most once per this many game ticks (~30s) and only when dirty */
+	private static final int PERSIST_INTERVAL_TICKS = 50;
 
-	/** Cap on distinct loot entries (item+source) to bound memory/payload; totals stay exact */
-	private static final int MAX_LOOT_ENTRIES = 500;
+	/** Malfunction guard only — no legitimate session reaches these. Distinct
+	 *  loot entries (item+source); totals stay exact even past the cap. */
+	private static final int MAX_LOOT_ENTRIES = 5000;
 
-	/** Cap on list-shaped collections (pets, clog slots, deaths) */
-	private static final int MAX_LIST_ENTRIES = 200;
+	/** Malfunction guard for list-shaped collections (deaths) */
+	private static final int MAX_LIST_ENTRIES = 1000;
 
 	@Inject private Client client;
 	@Inject private ConfigManager configManager;
@@ -72,8 +71,6 @@ public class SessionTracker {
 	/** key: itemId + "|" + source → aggregated loot entry */
 	private final Map<String, Map<String, Object>> loot = new LinkedHashMap<>();
 	private long totalLootValue = 0;
-	private final List<Map<String, Object>> pets = new ArrayList<>();
-	private final List<Map<String, Object>> collectionLogSlots = new ArrayList<>();
 	private final List<Map<String, Object>> deaths = new ArrayList<>();
 
 	// ==================== LIFECYCLE ====================
@@ -84,9 +81,6 @@ public class SessionTracker {
 	 * tracked — session summaries describe the main-game character.
 	 */
 	public void startSession() {
-		if (client.getWorldType().contains(net.runelite.api.WorldType.SEASONAL)) {
-			return;
-		}
 		resetState();
 		sessionId = UUID.randomUUID().toString();
 		startedAtMs = System.currentTimeMillis();
@@ -208,28 +202,15 @@ public class SessionTracker {
 		dirty = true;
 	}
 
-	public void addPet(String petName) {
-		if (!active || pets.size() >= MAX_LIST_ENTRIES) return;
-		Map<String, Object> pet = new HashMap<>();
-		pet.put("petName", petName);
-		pet.put("timestamp", System.currentTimeMillis());
-		pets.add(pet);
-		dirty = true;
-	}
-
-	public void addCollectionLogSlot(String itemName) {
-		if (!active || collectionLogSlots.size() >= MAX_LIST_ENTRIES) return;
-		Map<String, Object> slot = new HashMap<>();
-		slot.put("itemName", itemName);
-		slot.put("timestamp", System.currentTimeMillis());
-		collectionLogSlots.add(slot);
-		dirty = true;
-	}
-
-	public void addDeath(String location) {
+	public void addDeath(String killedBy, long gpLost) {
 		if (!active || deaths.size() >= MAX_LIST_ENTRIES) return;
 		Map<String, Object> death = new HashMap<>();
-		death.put("location", location);
+		death.put("killedBy", killedBy);
+		death.put("gpLost", gpLost);
+		if (client.getLocalPlayer() != null) {
+			net.runelite.api.coords.WorldPoint wp = client.getLocalPlayer().getWorldLocation();
+			death.put("location", wp.getX() + "," + wp.getY() + "," + wp.getPlane());
+		}
 		death.put("timestamp", System.currentTimeMillis());
 		deaths.add(death);
 		dirty = true;
@@ -249,8 +230,6 @@ public class SessionTracker {
 		clues.clear();
 		loot.clear();
 		totalLootValue = 0;
-		pets.clear();
-		collectionLogSlots.clear();
 		deaths.clear();
 		dirty = false;
 		ticksSincePersist = 0;
@@ -305,8 +284,6 @@ public class SessionTracker {
 		summary.put("clues", new HashMap<>(clues));
 		summary.put("totalLootValue", totalLootValue);
 		summary.put("lootItems", new ArrayList<>(loot.values()));
-		summary.put("pets", new ArrayList<>(pets));
-		summary.put("collectionLogSlots", new ArrayList<>(collectionLogSlots));
 		summary.put("deaths", new ArrayList<>(deaths));
 		return summary;
 	}

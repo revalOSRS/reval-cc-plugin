@@ -21,7 +21,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * SessionTracker with complete kill counts regardless of server filters.
  * Only the DETAILED_KILL webhook send is gated by the server-driven filters:
  * the enabled toggle plus the NPC id/name whitelists derived from active
- * requirements, so the backend only receives kills it can actually use.
+ * requirements.
  */
 @Singleton
 public class DetailedKillNotifier extends BaseNotifier {
@@ -129,8 +129,7 @@ public class DetailedKillNotifier extends BaseNotifier {
 	 * 1. If NPC is in the id blacklist -> DENY
 	 * 2. If both whitelists are empty -> ALLOW (server controls volume via the enabled toggle)
 	 * 3. If NPC id is in the id whitelist -> ALLOW
-	 * 4. If NPC name matches the name whitelist (containment, case-insensitive,
-	 *    mirroring the backend requirement matcher) -> ALLOW
+	 * 4. If NPC name matches the name whitelist (containment, case-insensitive) -> ALLOW
 	 * 5. Otherwise -> DENY
 	 */
 	private boolean shouldNotifyKill(int npcId, String npcName) {

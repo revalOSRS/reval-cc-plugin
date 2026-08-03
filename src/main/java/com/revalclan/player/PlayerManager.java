@@ -33,6 +33,10 @@ public class PlayerManager {
 		}
 		
 		metadata.put("accountHash", client.getAccountHash());
+		metadata.put("world", client.getWorld());
+		java.util.List<String> worldFlags = new java.util.ArrayList<>();
+		for (net.runelite.api.WorldType t : client.getWorldType()) worldFlags.add(t.name());
+		metadata.put("worldFlags", worldFlags);
 		metadata.put("accountType", getAccountType(client.getVarbitValue(VarbitID.IRONMAN)));
 		metadata.put("totalLevel", client.getTotalLevel());
 		metadata.put("totalExperience", client.getOverallExperience());
