@@ -48,9 +48,13 @@ public class CollectionLogManager {
 	@Getter private final Set<Integer> allCollectionLogItems = new HashSet<>();
 
 	/**
-	 * Set of items the player has obtained (populated when collection log is opened)
+	 * Items the player has obtained (populated when the collection log is opened),
+	 * keyed by item id so a re-observed item always carries the LATEST count.
+	 * A plain Set kept stale entries alive: after obtaining a duplicate, reopening
+	 * the log added (id, count=2) NEXT TO the old (id, count=1) — equals() covers
+	 * count — and payload quantities became a coin flip between the two.
 	 */
-	@Getter private final Set<ObtainedCollectionItem> obtainedItems = new HashSet<>();
+	@Getter private final Map<Integer, ObtainedCollectionItem> obtainedItems = new HashMap<>();
 
 	/**
 	 * Maps category slugs to their KC varbit/varp IDs
@@ -374,7 +378,7 @@ public class CollectionLogManager {
 	 * Called when collection log opens - tracks which items the player has obtained
 	 */
 	public void onCollectionLogItemObtained(int itemId, int itemCount, String itemName) {
-		obtainedItems.add(new ObtainedCollectionItem(itemId, itemName, itemCount));
+		obtainedItems.put(itemId, new ObtainedCollectionItem(itemId, itemName, itemCount));
 	}
 
 	/**
@@ -398,11 +402,8 @@ public class CollectionLogManager {
 			}
 		}
 
-		// Map obtained items for quick lookup
-		Map<Integer, ObtainedCollectionItem> obtainedItemsMap = new HashMap<>();
-		for (ObtainedCollectionItem item : obtainedItems) {
-			obtainedItemsMap.put(item.getId(), item);
-		}
+		// Obtained items are already keyed by item id with the latest count
+		Map<Integer, ObtainedCollectionItem> obtainedItemsMap = obtainedItems;
 
 		// Build hierarchical structure: Category > Subcategory > Items
 		Map<String, Map<String, Map<String, Object>>> categoriesData = new LinkedHashMap<>();
