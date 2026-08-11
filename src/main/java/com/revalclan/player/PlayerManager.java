@@ -1,5 +1,6 @@
 package com.revalclan.player;
 
+import com.revalclan.util.Worlds;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.Skill;
@@ -34,9 +35,7 @@ public class PlayerManager {
 		
 		metadata.put("accountHash", client.getAccountHash());
 		metadata.put("world", client.getWorld());
-		java.util.List<String> worldFlags = new java.util.ArrayList<>();
-		for (net.runelite.api.WorldType t : client.getWorldType()) worldFlags.add(t.name());
-		metadata.put("worldFlags", worldFlags);
+		metadata.put("worldFlags", Worlds.flagNames(client));
 		metadata.put("accountType", getAccountType(client.getVarbitValue(VarbitID.IRONMAN)));
 		metadata.put("totalLevel", client.getTotalLevel());
 		metadata.put("totalExperience", client.getOverallExperience());

@@ -3,6 +3,7 @@ package com.revalclan.session;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.revalclan.util.WebhookService;
+import com.revalclan.util.Worlds;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
@@ -19,14 +20,12 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Accumulates the whole play session client-side (kills, loot, clues, pets,
- * deaths, collection log slots, start/end skill snapshots) and delivers it to
- * one session summary:
+ * Accumulates the whole play session client-side (kills, loot, clues, deaths,
+ * start/end skill snapshots) and delivers it as one session summary:
  *
  *   - attached to the LOGOUT event on a clean logout, or
  *   - replayed as a standalone SESSION_SUMMARY event ("recovered") on the next
  *     plugin startup when the client crashed / was X'd out before LOGOUT fired.
-
  *
  * Crash resilience: the accumulator is periodically serialized into the RuneLite
  * config store (local disk, cheap, throttled to once per PERSIST_INTERVAL_TICKS
@@ -63,7 +62,9 @@ public class SessionTracker {
 	private long startedAtMs;
 	private long lastUpdateMs;
 	private String username;
-	private String accountHash;
+	private long accountHash;
+	private int world;
+	private List<String> worldFlags;
 	private Map<String, Object> startSnapshot;
 	private Map<String, Object> endSnapshot;
 	private final Map<String, Integer> kills = new HashMap<>();
@@ -77,8 +78,9 @@ public class SessionTracker {
 
 	/**
 	 * Start tracking a new session. Must be called on the client thread while
-	 * logged in (clan validation point). Seasonal (leagues) worlds are not
-	 * tracked — session summaries describe the main-game character.
+	 * logged in (clan validation point). Sessions start on any world — the
+	 * backend owns the regular-worlds-only rule and gates every payload on the
+	 * worldFlags captured here.
 	 */
 	public void startSession() {
 		resetState();
@@ -86,7 +88,9 @@ public class SessionTracker {
 		startedAtMs = System.currentTimeMillis();
 		lastUpdateMs = startedAtMs;
 		username = client.getLocalPlayer() != null ? client.getLocalPlayer().getName() : "Unknown";
-		accountHash = String.valueOf(client.getAccountHash());
+		accountHash = client.getAccountHash();
+		world = client.getWorld();
+		worldFlags = Worlds.flagNames(client);
 		startSnapshot = buildSnapshot();
 		endSnapshot = startSnapshot;
 		active = true;
@@ -107,11 +111,7 @@ public class SessionTracker {
 		lastUpdateMs = System.currentTimeMillis();
 		Map<String, Object> summary = buildSummary("logout", lastUpdateMs);
 
-		Map<String, Object> persisted = new HashMap<>();
-		persisted.put("accountHash", accountHash);
-		persisted.put("username", username);
-		persisted.put("summary", summary);
-		configManager.setConfiguration(CONFIG_GROUP, CONFIG_KEY, gson.toJson(persisted));
+		configManager.setConfiguration(CONFIG_GROUP, CONFIG_KEY, gson.toJson(persistedEnvelope(summary)));
 
 		active = false;
 		resetState();
@@ -119,9 +119,13 @@ public class SessionTracker {
 		return summary;
 	}
 
-	/** Server confirmed it received the summary — safe to drop the local copy. */
-	public void confirmDelivered() {
-		clearPersisted();
+	/**
+	 * Server confirmed it received the summary with the given sessionId — drop
+	 * the local copy, but only if it still belongs to that session. A delayed
+	 * ack arriving after a quick relog must not delete the new session's copy.
+	 */
+	public void confirmDelivered(String deliveredSessionId) {
+		clearPersistedIfSession(deliveredSessionId);
 	}
 
 	/**
@@ -140,13 +144,25 @@ public class SessionTracker {
 			Map<String, Object> payload = new HashMap<>();
 			payload.put("eventType", "SESSION_SUMMARY");
 			payload.put("eventTimestamp", System.currentTimeMillis());
-			payload.put("accountHash", persisted.get("accountHash").getAsString());
+			payload.put("accountHash", persisted.get("accountHash").getAsLong());
 			payload.put("username", persisted.get("username").getAsString());
+			// The session's world flags drive the server's world gate — without
+			// them a recovered leagues session would be ingested as main-game data
+			if (persisted.has("world")) {
+				payload.put("world", persisted.get("world").getAsInt());
+			}
+			if (persisted.has("worldFlags")) {
+				payload.put("worldFlags", persisted.get("worldFlags"));
+			}
 			// JsonElement values serialize natively through Gson — no lossy Map round-trip
 			payload.put("sessionSummary", persisted.get("summary"));
 
+			String recoveredSessionId = persisted.getAsJsonObject("summary").has("sessionId")
+				? persisted.getAsJsonObject("summary").get("sessionId").getAsString()
+				: null;
+
 			// Clear only once the server confirms receipt; otherwise retry next startup
-			webhookService.sendDataAsync(payload, response -> clearPersisted());
+			webhookService.sendDataAsync(payload, response -> clearPersistedIfSession(recoveredSessionId));
 			log.info("Recovered unfinished session, replayed as SESSION_SUMMARY");
 		} catch (Exception e) {
 			log.warn("Failed to recover persisted session: {}", e.getMessage());
@@ -159,6 +175,15 @@ public class SessionTracker {
 	 */
 	public void onGameTick() {
 		if (!active) return;
+		// XP moves without firing any accumulator event (pure skilling never
+		// touches addKill/addLoot/...), so treat XP movement as dirtiness itself.
+		// Refreshing here also keeps the end snapshot current for a clean logout,
+		// where refreshEndSnapshot() can no longer run (game state left LOGGED_IN).
+		if (xpChangedSinceSnapshot()) {
+			refreshEndSnapshot();
+			lastUpdateMs = System.currentTimeMillis();
+			dirty = true;
+		}
 		ticksSincePersist++;
 		if (dirty && ticksSincePersist >= PERSIST_INTERVAL_TICKS) {
 			ticksSincePersist = 0;
@@ -234,7 +259,9 @@ public class SessionTracker {
 		startedAtMs = 0;
 		lastUpdateMs = 0;
 		username = null;
-		accountHash = null;
+		accountHash = 0;
+		world = 0;
+		worldFlags = null;
 		startSnapshot = null;
 		endSnapshot = null;
 		kills.clear();
@@ -254,6 +281,13 @@ public class SessionTracker {
 				endSnapshot = snapshot;
 			}
 		}
+	}
+
+	/** Cheap per-tick probe: has overall XP moved since the last end snapshot? */
+	private boolean xpChangedSinceSnapshot() {
+		if (client.getGameState() != GameState.LOGGED_IN || endSnapshot == null) return false;
+		Object totalXp = endSnapshot.get("totalXp");
+		return totalXp instanceof Number && ((Number) totalXp).longValue() != client.getOverallExperience();
 	}
 
 	/**
@@ -300,12 +334,46 @@ public class SessionTracker {
 	}
 
 	private void persist() {
+		// Persisted summaries replay as "recovered"; endedAt = last local update we saw
+		Map<String, Object> persisted = persistedEnvelope(buildSummary("recovered", lastUpdateMs));
+		configManager.setConfiguration(CONFIG_GROUP, CONFIG_KEY, gson.toJson(persisted));
+	}
+
+	/** Envelope written to the config store: identity + world context + summary */
+	private Map<String, Object> persistedEnvelope(Map<String, Object> summary) {
 		Map<String, Object> persisted = new HashMap<>();
 		persisted.put("accountHash", accountHash);
 		persisted.put("username", username);
-		// Persisted summaries replay as "recovered"; endedAt = last local update we saw
-		persisted.put("summary", buildSummary("recovered", lastUpdateMs));
-		configManager.setConfiguration(CONFIG_GROUP, CONFIG_KEY, gson.toJson(persisted));
+		persisted.put("world", world);
+		persisted.put("worldFlags", worldFlags);
+		persisted.put("summary", summary);
+		return persisted;
+	}
+
+	/**
+	 * Drop the persisted copy only if it still holds the given session — a stale
+	 * ack must never delete a newer session's crash-recovery copy.
+	 */
+	private void clearPersistedIfSession(String expectedSessionId) {
+		try {
+			String json = configManager.getConfiguration(CONFIG_GROUP, CONFIG_KEY);
+			if (json == null || json.isEmpty()) return;
+
+			if (expectedSessionId != null) {
+				JsonObject persisted = gson.fromJson(json, JsonObject.class);
+				if (persisted != null && persisted.has("summary")) {
+					JsonObject summary = persisted.getAsJsonObject("summary");
+					if (summary.has("sessionId")
+						&& !expectedSessionId.equals(summary.get("sessionId").getAsString())) {
+						return;
+					}
+				}
+			}
+			clearPersisted();
+		} catch (Exception e) {
+			// Unparseable copy is useless for recovery anyway
+			clearPersisted();
+		}
 	}
 
 	private void clearPersisted() {

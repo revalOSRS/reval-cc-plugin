@@ -49,12 +49,11 @@ public class CombatAchievementNotifier extends BaseNotifier {
 		caData.put("tier", tier);
 		caData.put("task", task);
 
-		try {
-			int totalPoints = combatAchievementManager.computeCurrentTotalPoints();
-			if (totalPoints > 0) {
-				caData.put("totalPoints", totalPoints);
-			}
-		} catch (Exception ignored) {}
+		// Cache read failures are handled (and logged) inside the manager's traversal
+		int totalPoints = combatAchievementManager.computeCurrentTotalPoints();
+		if (totalPoints > 0) {
+			caData.put("totalPoints", totalPoints);
+		}
 
 		sendNotification(caData);
 	}

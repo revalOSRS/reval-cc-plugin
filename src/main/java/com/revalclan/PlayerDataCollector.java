@@ -54,19 +54,8 @@ public class PlayerDataCollector {
 	 * Collects all player data as a full payload, fingerprint included.
 	 */
 	public Map<String, Object> collectAllData() {
-		Map<String, Object> data = new HashMap<>();
-
-		data.put("player", playerManager.sync());
-		data.put("quests", questManager.sync());
-		data.put("achievementDiaries", achievementDiaryManager.sync());
-		data.put("combatAchievements", combatAchievementManager.sync());
-		data.put("collectionLog", collectionLogManager.sync());
-		data.put("personalBests", personalBestManager.sync());
-		data.put("clogPersonalBests", clogPersonalBestCapture.sync());
-
+		Map<String, Object> data = collectFullState();
 		attachFingerprint(data);
-
-
 		return data;
 	}
 
@@ -75,9 +64,9 @@ public class PlayerDataCollector {
 	 * unchanged since the last acked fingerprint, full otherwise.
 	 */
 	public Map<String, Object> collectBoundaryData() {
-		Map<String, Object> data = collectAllData();
+		Map<String, Object> data = collectFullState();
 
-		String fingerprint = (String) data.get("syncFingerprint");
+		String fingerprint = attachFingerprint(data);
 		if (fingerprint == null) return data;
 
 		String acked = syncStateManager.getAckedFingerprint(client.getAccountHash());
@@ -91,20 +80,35 @@ public class PlayerDataCollector {
 		return data;
 	}
 
+	private Map<String, Object> collectFullState() {
+		Map<String, Object> data = new HashMap<>();
+		data.put("player", playerManager.sync());
+		data.put("quests", questManager.sync());
+		data.put("achievementDiaries", achievementDiaryManager.sync());
+		data.put("combatAchievements", combatAchievementManager.sync());
+		data.put("collectionLog", collectionLogManager.sync());
+		data.put("personalBests", personalBestManager.sync());
+		data.put("clogPersonalBests", clogPersonalBestCapture.sync());
+		return data;
+	}
+
 	/**
-	 * Compute and attach the state fingerprint. Skipped on seasonal (leagues)
-	 * worlds — leagues state is a different character and flows through the
-	 * leagues pipeline, which does not participate in the fingerprint handshake.
+	 * Compute and attach the state fingerprint, returning it (null when not
+	 * attached). Skipped on seasonal (leagues) worlds — leagues state is a
+	 * different character and flows through the leagues pipeline, which does
+	 * not participate in the fingerprint handshake.
 	 */
-	private void attachFingerprint(Map<String, Object> data) {
+	private String attachFingerprint(Map<String, Object> data) {
 		try {
-			if (client.getWorldType().contains(WorldType.SEASONAL)) return;
+			if (client.getWorldType().contains(WorldType.SEASONAL)) return null;
 			String fingerprint = syncStateManager.computeFingerprint(data);
 			if (fingerprint != null) {
 				data.put("syncFingerprint", fingerprint);
 			}
+			return fingerprint;
 		} catch (Exception e) {
 			log.warn("Failed to attach sync fingerprint: {}", e.getMessage());
+			return null;
 		}
 	}
 }

@@ -9,6 +9,7 @@ import net.runelite.api.gameval.VarbitID;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.*;
+import java.util.function.BiConsumer;
 
 /**
  * Manages Combat Achievement task data by reading from game cache (enums/structs)
@@ -77,31 +78,23 @@ public class CombatAchievementManager {
 	 */
 	public Map<String, Object> sync() {
 		allTasks.clear();
-		
-		for (Map.Entry<Integer, String> tierEntry : TIER_ENUMS.entrySet()) {
-			try {
-				EnumComposition tierEnum = client.getEnum(tierEntry.getKey());
-				if (tierEnum == null) continue;
-				
-				for (int structId : tierEnum.getIntVals()) {
-					try {
-						CombatAchievementTask task = loadTaskFromStruct(structId, tierEntry.getValue());
-						if (task != null) allTasks.add(task);
-					} catch (Exception ignored) {}
-				}
-			} catch (Exception ignored) {}
-		}
-		
+
+		forEachTaskStruct((struct, tierName) -> {
+			CombatAchievementTask task = loadTaskFromStruct(struct, tierName);
+			if (task != null) allTasks.add(task);
+		});
+
+		// Prefer the game's own CA points varp; fall back to summing completions
 		int totalPoints = readCaPointsVarbit();
 		if (totalPoints <= 0) totalPoints = calculateTotalPoints();
-		
+
 		Map<String, Object> data = new HashMap<>();
 		data.put("currentTier", calculateCurrentTier(totalPoints));
 		data.put("totalPoints", totalPoints);
 		data.put("tierProgress", getTierProgress());
 		data.put("allTasks", getAllTasksDetailed());
 		data.put("totalTasksLoaded", allTasks.size());
-		
+
 		return data;
 	}
 
@@ -110,34 +103,48 @@ public class CombatAchievementManager {
 	 * the full task list.
 	 */
 	public int computeCurrentTotalPoints() {
-		int total = 0;
-		for (Map.Entry<Integer, String> tierEntry : TIER_ENUMS.entrySet()) {
-			try {
-				EnumComposition tierEnum = client.getEnum(tierEntry.getKey());
-				if (tierEnum == null) continue;
+		int[] total = {0};
+		forEachTaskStruct((struct, tierName) -> {
+			if (isTaskCompleted(struct.getIntValue(FIELD_TASK_ID))) {
+				total[0] += getPointsForTier(tierName);
+			}
+		});
+		return total[0];
+	}
 
-				int pointsPerTask = getPointsForTier(tierEntry.getValue());
-				for (int structId : tierEnum.getIntVals()) {
-					try {
-						StructComposition struct = client.getStructComposition(structId);
-						if (struct == null) continue;
-						if (isTaskCompleted(struct.getIntValue(FIELD_TASK_ID))) {
-							total += pointsPerTask;
-						}
-					} catch (Exception ignored) {}
+	/**
+	 * Single traversal of the game-cache task structs shared by sync() and
+	 * computeCurrentTotalPoints(), keeping the two in lockstep. Cache read
+	 * failures are logged once here, not swallowed at every layer.
+	 */
+	private void forEachTaskStruct(BiConsumer<StructComposition, String> visitor) {
+		for (Map.Entry<Integer, String> tierEntry : TIER_ENUMS.entrySet()) {
+			EnumComposition tierEnum;
+			try {
+				tierEnum = client.getEnum(tierEntry.getKey());
+			} catch (Exception e) {
+				log.debug("Failed to read CA tier enum {}: {}", tierEntry.getKey(), e.getMessage());
+				continue;
+			}
+			if (tierEnum == null) continue;
+
+			for (int structId : tierEnum.getIntVals()) {
+				try {
+					StructComposition struct = client.getStructComposition(structId);
+					if (struct != null) {
+						visitor.accept(struct, tierEntry.getValue());
+					}
+				} catch (Exception e) {
+					log.debug("Failed to read CA struct {}: {}", structId, e.getMessage());
 				}
-			} catch (Exception ignored) {}
+			}
 		}
-		return total;
 	}
 
 	/**
 	 * Loads a single task from a struct
 	 */
-	private CombatAchievementTask loadTaskFromStruct(int structId, String tierName) {
-		StructComposition struct = client.getStructComposition(structId);
-		if (struct == null) return null;
-		
+	private CombatAchievementTask loadTaskFromStruct(StructComposition struct, String tierName) {
 		String name = struct.getStringValue(FIELD_NAME);
 		String description = struct.getStringValue(FIELD_DESCRIPTION);
 		int taskId = struct.getIntValue(FIELD_TASK_ID);
@@ -234,7 +241,9 @@ public class CombatAchievementManager {
 	}
 
 	/**
-	 * Calculate current tier based on total points
+	 * Calculate current tier based on total points. Thresholds are the in-game
+	 * points required for each tier's rewards (as of the 2026-08 task additions)
+	 * and must be kept in sync with the wiki when Jagex adds tasks.
 	 */
 	private String calculateCurrentTier(int totalPoints) {
 		// In-game unlock points as of the 2026-08-12 rebalance

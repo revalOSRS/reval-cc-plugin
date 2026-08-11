@@ -1,10 +1,12 @@
 package com.revalclan.notifiers;
 
+import com.google.gson.JsonObject;
 import com.revalclan.RevalClanConfig;
 import com.revalclan.util.ClanValidator;
 import com.revalclan.util.EventFilterManager;
 import com.revalclan.util.ScreenshotService;
 import com.revalclan.util.WebhookService;
+import com.revalclan.util.Worlds;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.Item;
@@ -18,6 +20,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 
 /**
  * Base class for all notification types (loot, death, pets, etc.)
@@ -64,7 +67,7 @@ public abstract class BaseNotifier {
 	 * (HTTP thread — must not touch the client). Used by the session-boundary
 	 * notifiers for the sync-fingerprint ack handshake.
 	 */
-	protected void sendNotificationWithResponse(Map<String, Object> data, java.util.function.Consumer<com.google.gson.JsonObject> onResponse) {
+	protected void sendNotificationWithResponse(Map<String, Object> data, Consumer<JsonObject> onResponse) {
 		if (!ClanValidator.validateClan(client)) return;
 		addEventMetadata(data);
 		webhookService.sendDataAsync(data, onResponse);
@@ -98,9 +101,7 @@ public abstract class BaseNotifier {
 		data.put("accountHash", client.getAccountHash());
 		data.put("username", getPlayerName());
 		data.put("world", client.getWorld());
-		java.util.List<String> worldFlags = new java.util.ArrayList<>();
-		for (net.runelite.api.WorldType t : client.getWorldType()) worldFlags.add(t.name());
-		data.put("worldFlags", worldFlags);
+		data.put("worldFlags", Worlds.flagNames(client));
 		
 		if (client.getLocalPlayer() != null) {
 			WorldPoint wp = client.getLocalPlayer().getWorldLocation();

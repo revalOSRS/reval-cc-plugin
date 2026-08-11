@@ -28,6 +28,7 @@ import net.runelite.api.events.GameTick;
 import net.runelite.api.events.HitsplatApplied;
 import net.runelite.api.events.InteractingChanged;
 import net.runelite.api.events.MenuOptionClicked;
+import net.runelite.api.events.NpcDespawned;
 import net.runelite.api.events.ActorDeath;
 import net.runelite.api.events.ChatMessage;
 import net.runelite.api.events.StatChanged;
@@ -403,6 +404,14 @@ public class RevalClanPlugin extends Plugin {
 	public void onHitsplatApplied(HitsplatApplied event) {
 		if (!inRequiredClan) return;
 		detailedKillNotifier.onHitsplatApplied(event);
+	}
+
+	@Subscribe
+	public void onNpcDespawned(NpcDespawned event) {
+		// Deliberately not gated on inRequiredClan: this only evicts the NPC's
+		// entry from the kill accumulator, and must run even if clan membership
+		// flipped mid-fight so damaged-but-never-died NPCs don't pin memory
+		detailedKillNotifier.onNpcDespawned(event);
 	}
 
 	@Subscribe

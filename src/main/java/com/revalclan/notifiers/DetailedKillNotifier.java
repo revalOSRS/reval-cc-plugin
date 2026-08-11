@@ -8,6 +8,7 @@ import net.runelite.api.Hitsplat;
 import net.runelite.api.events.ActorDeath;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.HitsplatApplied;
+import net.runelite.api.events.NpcDespawned;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -85,6 +86,15 @@ public class DetailedKillNotifier extends BaseNotifier {
 		data.addHit(damage, weaponName, isSpec);
 	}
 
+	/**
+	 * Every damaged NPC lands in activeKills, so entries whose NPC despawns
+	 * without dying (player ran away, instance teardown) must be dropped here —
+	 * death fires a despawn too, making this the single cleanup point.
+	 */
+	public void onNpcDespawned(NpcDespawned event) {
+		activeKills.remove(event.getNpc());
+	}
+
 	public void onActorDeath(ActorDeath event) {
 		Actor actor = event.getActor();
 		if (!(actor instanceof NPC)) return;
@@ -153,7 +163,10 @@ public class DetailedKillNotifier extends BaseNotifier {
 		if (npcName != null && !nameWhitelist.isEmpty()) {
 			String lowerName = npcName.toLowerCase();
 			for (String target : nameWhitelist) {
-				if (lowerName.contains(target) || target.contains(lowerName)) {
+				// Forward containment only: the NPC's name must contain the whitelist
+				// entry. The reverse direction would let short generic names match any
+				// entry they appear in ("Rat" vs a "brine rat" entry).
+				if (lowerName.contains(target)) {
 					return true;
 				}
 			}

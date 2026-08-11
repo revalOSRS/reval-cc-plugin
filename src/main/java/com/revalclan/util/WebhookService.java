@@ -20,7 +20,6 @@ public class WebhookService {
 	private static final String WEBHOOK_URL = "https://api.revalosrs.ee/reval-webhook";
 	private static final String PLUGIN_VERSION = "2.18";
 
-
 	@Inject
 	private OkHttpClient httpClient;
 
@@ -89,13 +88,18 @@ public class WebhookService {
 							return;
 						}
 						if (onResponse != null && response.body() != null) {
+							JsonObject parsed = null;
 							try {
-								JsonObject parsed = gson.fromJson(response.body().string(), JsonObject.class);
-								if (parsed != null) {
-									onResponse.accept(parsed);
-								}
+								parsed = gson.fromJson(response.body().string(), JsonObject.class);
 							} catch (Exception e) {
 								log.warn("Failed to parse webhook response: {}", e.getMessage());
+							}
+							if (parsed != null) {
+								try {
+									onResponse.accept(parsed);
+								} catch (Exception e) {
+									log.warn("Webhook response handler failed: {}", e.getMessage());
+								}
 							}
 						}
 					} finally {
