@@ -4,6 +4,7 @@ import com.revalclan.api.RevalApiService;
 import com.revalclan.api.points.PointsResponse;
 import com.revalclan.ui.components.*;
 import com.revalclan.ui.constants.UIConstants;
+import com.revalclan.util.ClanRankIconResolver;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.game.SpriteManager;
 import net.runelite.client.util.AsyncBufferedImage;
@@ -23,8 +24,6 @@ import java.util.stream.Collectors;
  * Ranking tab panel - displays clan ranks and point sources
  */
 public class RankingPanel extends JPanel {
-	private static final int PARAGON_SPRITE_ID = 3109;
-
 	private final JPanel contentPanel;
 	private final JLabel loadingLabel;
 	private final GridBagConstraints gbc;
@@ -33,6 +32,7 @@ public class RankingPanel extends JPanel {
 	private RevalApiService apiService;
 	private ItemManager itemManager;
 	private SpriteManager spriteManager;
+	private ClanRankIconResolver rankIconResolver;
 
 	public RankingPanel() {
 		setLayout(new BorderLayout());
@@ -78,10 +78,12 @@ public class RankingPanel extends JPanel {
 		add(scrollPane, BorderLayout.CENTER);
 	}
 
-	public void init(RevalApiService apiService, ItemManager itemManager, SpriteManager spriteManager) {
+	public void init(RevalApiService apiService, ItemManager itemManager, SpriteManager spriteManager,
+					 ClanRankIconResolver rankIconResolver) {
 		this.apiService = apiService;
 		this.itemManager = itemManager;
 		this.spriteManager = spriteManager;
+		this.rankIconResolver = rankIconResolver;
 		loadData();
 	}
 
@@ -191,30 +193,8 @@ public class RankingPanel extends JPanel {
 		if (data.getRanks() != null && !data.getRanks().isEmpty()) {
 			addComponent(createSectionHeader("RANKS", "Clan rank progression"));
 
-			List<PointsResponse.Rank> regularRanks = data.getRanks().stream()
-				.filter(r -> r.getPrestigeRequired() == 0)
-				.collect(Collectors.toList());
-
-			List<PointsResponse.Rank> prestigeRanks = data.getRanks().stream()
-				.filter(r -> r.getPrestigeRequired() > 0)
-				.collect(Collectors.toList());
-
-			for (PointsResponse.Rank rank : regularRanks) {
-				addComponent(new RankCard(rank, spriteManager));
-			}
-
-			if (!prestigeRanks.isEmpty()) {
-				addSpacing(6);
-
-				JPanel prestigePanel = createVerticalPanel();
-				for (PointsResponse.Rank rank : prestigeRanks) {
-					prestigePanel.add(new RankCard(rank, spriteManager));
-					prestigePanel.add(Box.createRigidArea(new Dimension(0, 2)));
-				}
-
-				CollapsibleSection section = new CollapsibleSection("Prestige Ranks", "Requires prestige level 1+", prestigePanel, false);
-				loadPrestigeIcon(section);
-				addComponent(section);
+			for (PointsResponse.Rank rank : data.getRanks()) {
+				addComponent(new RankCard(rank, spriteManager, rankIconResolver));
 			}
 		}
 
@@ -284,18 +264,6 @@ public class RankingPanel extends JPanel {
 
 		header.add(textPanel, BorderLayout.WEST);
 		return header;
-	}
-
-	private void loadPrestigeIcon(CollapsibleSection section) {
-		if (spriteManager == null) return;
-		spriteManager.getSpriteAsync(PARAGON_SPRITE_ID, 0, sprite -> {
-			if (sprite != null) {
-				SwingUtilities.invokeLater(() -> {
-					BufferedImage scaled = ImageUtil.resizeImage(sprite, 18, 18);
-					section.setIcon(new ImageIcon(scaled));
-				});
-			}
-		});
 	}
 
 	private void loadSectionIcon(int itemId, CollapsibleSection section) {

@@ -11,6 +11,7 @@ import com.revalclan.ui.components.GradientSeparator;
 import com.revalclan.ui.components.IndicatorTabButton;
 import com.revalclan.ui.components.PanelTitle;
 import com.revalclan.ui.constants.UIConstants;
+import com.revalclan.util.ClanRankIconResolver;
 import com.revalclan.util.UIAssetLoader;
 import lombok.Getter;
 import net.runelite.api.Client;
@@ -373,7 +374,7 @@ public class RevalPanel extends PluginPanel {
 
 	public void init(RevalApiService apiService, Client client,
 					 UIAssetLoader assetLoader, ItemManager itemManager, SpriteManager spriteManager,
-					 RevalClanConfig config) {
+					 RevalClanConfig config, ClanRankIconResolver rankIconResolver) {
 		this.apiService = apiService;
 		this.client = client;
 		this.assetLoader = assetLoader;
@@ -389,7 +390,7 @@ public class RevalPanel extends PluginPanel {
 			if (websiteImg != null && websiteIcon != null) websiteIcon.setIcon(websiteImg);
 		}
 
-		rankingPanel.init(apiService, itemManager, spriteManager);
+		rankingPanel.init(apiService, itemManager, spriteManager, rankIconResolver);
 		profilePanel.init(apiService, client, assetLoader, config, itemManager);
 		leaderboardPanel.init(apiService, assetLoader, itemManager);
 		achievementsPanel.init(apiService, client);

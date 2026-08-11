@@ -9,6 +9,7 @@ import com.revalclan.pbs.ClogPersonalBestCapture;
 import com.revalclan.session.SessionTracker;
 import com.revalclan.ui.RevalPanel;
 import com.revalclan.util.AnnouncementService;
+import com.revalclan.util.ClanRankIconResolver;
 import com.revalclan.util.ClanValidator;
 import com.revalclan.util.EventFilterManager;
 import com.revalclan.util.SyncStateManager;
@@ -179,7 +180,8 @@ public class RevalClanPlugin extends Plugin {
 		// Initialize and add the side panel
 		try {
 			revalPanel = new RevalPanel();
-			revalPanel.init(revalApiService, client, uiAssetLoader, itemManager, spriteManager, config);
+			revalPanel.init(revalApiService, client, uiAssetLoader, itemManager, spriteManager, config,
+				new ClanRankIconResolver(client, clientThread));
 			
 			BufferedImage icon = uiAssetLoader.getImage("reval.png");
 			

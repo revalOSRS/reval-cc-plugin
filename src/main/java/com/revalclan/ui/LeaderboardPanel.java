@@ -5,6 +5,7 @@ import com.revalclan.api.leaderboard.LeaderboardResponse;
 import com.revalclan.ui.components.BackButton;
 import com.revalclan.ui.components.RefreshButton;
 import com.revalclan.ui.constants.UIConstants;
+import com.revalclan.util.RankNames;
 import com.revalclan.util.UIAssetLoader;
 
 import net.runelite.client.game.ItemManager;
@@ -289,13 +290,6 @@ public class LeaderboardPanel extends JPanel {
 		leftPanel.add(Box.createRigidArea(new Dimension(6, 0)));
 		leftPanel.add(nameLabel);
 
-		if (entry.getPrestigeLevel() > 0) {
-			JLabel prestigeLabel = new JLabel(" ★" + entry.getPrestigeLevel());
-			prestigeLabel.setFont(FontManager.getRunescapeBoldFont());
-			prestigeLabel.setForeground(UIConstants.ACCENT_PURPLE);
-			leftPanel.add(prestigeLabel);
-		}
-
 		// Right: Points + Rank
 		JPanel rightPanel = new JPanel();
 		rightPanel.setLayout(new BoxLayout(rightPanel, BoxLayout.Y_AXIS));
@@ -306,7 +300,7 @@ public class LeaderboardPanel extends JPanel {
 		pointsLabel.setForeground(UIConstants.ACCENT_GOLD);
 		pointsLabel.setAlignmentX(Component.RIGHT_ALIGNMENT);
 
-		JLabel clanRankLabel = new JLabel(capitalize(entry.getClanRank()));
+		JLabel clanRankLabel = new JLabel(RankNames.display(entry.getClanRank()));
 		clanRankLabel.setFont(FontManager.getRunescapeSmallFont());
 		clanRankLabel.setForeground(UIConstants.TEXT_MUTED);
 		clanRankLabel.setAlignmentX(Component.RIGHT_ALIGNMENT);
@@ -334,8 +328,4 @@ public class LeaderboardPanel extends JPanel {
 		return String.valueOf(points);
 	}
 
-	private String capitalize(String s) {
-		if (s == null || s.isEmpty()) return s;
-		return s.substring(0, 1).toUpperCase() + s.substring(1).toLowerCase();
-	}
 }

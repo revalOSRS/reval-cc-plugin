@@ -5,6 +5,7 @@ import com.revalclan.api.admin.PendingRankChangesResponse;
 import com.revalclan.ui.components.BackButton;
 import com.revalclan.ui.components.PanelTitle;
 import com.revalclan.ui.constants.UIConstants;
+import com.revalclan.util.RankNames;
 import com.revalclan.util.UIAssetLoader;
 import net.runelite.client.ui.FontManager;
 
@@ -14,32 +15,9 @@ import java.awt.*;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Map;
 
 public class PendingRankupsPanel extends JPanel {
 	private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("MMM dd, yyyy HH:mm");
-
-	// Map rank names to OSRS Wiki clan icon names
-	private static final Map<String, String> RANK_DISPLAY = Map.ofEntries(
-		Map.entry("member", "Mentor"),
-		Map.entry("advanced", "Prefect"),
-		Map.entry("elite", "Leader"),
-		Map.entry("veteran", "Supervisor"),
-		Map.entry("hero", "Superior"),
-		Map.entry("champion", "Executive"),
-		Map.entry("legend", "Senator"),
-		Map.entry("mythic", "Monarch"),
-		Map.entry("paragon", "Brigadier"),
-		Map.entry("ascended", "Admiral"),
-		Map.entry("eternal", "Marshal"),
-		// Also handle lowercase versions
-		Map.entry("recruit", "Recruit"),
-		Map.entry("corporal", "Corporal"),
-		Map.entry("sergeant", "Sergeant"),
-		Map.entry("lieutenant", "Lieutenant"),
-		Map.entry("captain", "Captain"),
-		Map.entry("general", "General")
-	);
 
 	private final RevalApiService apiService;
 	private final String memberCode;
@@ -252,9 +230,7 @@ public class PendingRankupsPanel extends JPanel {
 	}
 
 	private String rankDisplay(String rank) {
-		if (rank == null) return "?";
-		String display = RANK_DISPLAY.get(rank.toLowerCase());
-		return display != null ? display : rank;
+		return RankNames.display(rank);
 	}
 
 	private String formatTimestamp(String timestamp) {
