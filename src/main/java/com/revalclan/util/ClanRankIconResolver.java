@@ -17,7 +17,9 @@ import java.util.function.IntConsumer;
  * back to a small verified static map when the cache lookup is unavailable.
  */
 public class ClanRankIconResolver {
-	// Sprite ids that were verified in production before runtime resolution existed
+	// Verified against the game cache enums CLAN_RANK_NAME (3797) → CLAN_RANK_GRAPHIC
+	// (3798): every rank title's icon sprite id, dumped 2026-08-11. Mentor→Monarch
+	// (3137–3144) and Marshal (3111) also match what the plugin shipped before.
 	private static final Map<String, Integer> FALLBACK_SPRITES = Map.ofEntries(
 		Map.entry("mentor", 3137),
 		Map.entry("prefect", 3138),
@@ -27,6 +29,14 @@ public class ClanRankIconResolver {
 		Map.entry("executive", 3142),
 		Map.entry("senator", 3143),
 		Map.entry("monarch", 3144),
+		Map.entry("red_topaz", 3129),
+		Map.entry("sapphire", 3130),
+		Map.entry("emerald", 3131),
+		Map.entry("ruby", 3132),
+		Map.entry("diamond", 3133),
+		Map.entry("dragonstone", 3134),
+		Map.entry("onyx", 3135),
+		Map.entry("zenyte", 3136),
 		Map.entry("marshal", 3111)
 	);
 
