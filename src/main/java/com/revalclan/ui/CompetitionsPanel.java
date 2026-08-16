@@ -603,7 +603,7 @@ public class CompetitionsPanel extends JPanel {
 
 	/** Prize breakdown as a two-column grid: place on the left, points on the right */
 	private JPanel createRewardsGrid(Map<String, Integer> rewards) {
-		JPanel grid = new JPanel(new GridLayout(0, 2, 14, 3));
+		JPanel grid = new JPanel(new GridLayout(0, 1, 0, 3));
 		grid.setOpaque(false);
 		grid.setAlignmentX(Component.LEFT_ALIGNMENT);
 

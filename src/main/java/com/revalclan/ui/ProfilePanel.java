@@ -8,10 +8,14 @@ import com.revalclan.ui.components.ChecklistItem;
 import com.revalclan.ui.components.LoginPrompt;
 import com.revalclan.ui.components.RefreshButton;
 import com.revalclan.ui.constants.UIConstants;
+import com.revalclan.ui.components.ArrowIcon;
+import com.revalclan.util.ClanRankIconResolver;
 import com.revalclan.util.UIAssetLoader;
 import net.runelite.api.Client;
 import net.runelite.client.game.ItemManager;
+import net.runelite.client.game.SpriteManager;
 import net.runelite.client.ui.FontManager;
+import net.runelite.client.util.LinkBrowser;
 
 import javax.swing.*;
 import javax.swing.Timer;
@@ -34,6 +38,8 @@ public class ProfilePanel extends JPanel {
 	private UIAssetLoader assetLoader;
 	private RevalClanConfig config;
 	private ItemManager itemManager;
+	private SpriteManager spriteManager;
+	private ClanRankIconResolver rankIconResolver;
 	private Consumer<AccountResponse.AccountData> onAccountLoaded;
 
 	private AccountResponse.AccountData currentAccount;
@@ -89,12 +95,15 @@ public class ProfilePanel extends JPanel {
 		contentPanel.add(Box.createVerticalStrut(height), gbc);
 	}
 
-	public void init(RevalApiService apiService, Client client, UIAssetLoader assetLoader, RevalClanConfig config, ItemManager itemManager) {
+	public void init(RevalApiService apiService, Client client, UIAssetLoader assetLoader, RevalClanConfig config,
+					 ItemManager itemManager, SpriteManager spriteManager, ClanRankIconResolver rankIconResolver) {
 		this.apiService = apiService;
 		this.client = client;
 		this.assetLoader = assetLoader;
 		this.config = config;
 		this.itemManager = itemManager;
+		this.spriteManager = spriteManager;
+		this.rankIconResolver = rankIconResolver;
 		fetchRanks();
 	}
 
@@ -322,37 +331,31 @@ public class ProfilePanel extends JPanel {
 	}
 
 	private JPanel buildHeaderSection(AccountResponse.OsrsAccount account) {
-		JPanel header = new JPanel(new BorderLayout(8, 0));
+		JPanel header = new JPanel();
+		header.setLayout(new BoxLayout(header, BoxLayout.Y_AXIS));
 		header.setBackground(UIConstants.CARD_BG);
 		header.setBorder(new EmptyBorder(10, 12, 10, 12));
 
-		JPanel leftPanel = new JPanel();
-		leftPanel.setLayout(new BoxLayout(leftPanel, BoxLayout.Y_AXIS));
-		leftPanel.setOpaque(false);
+		// Top row: rank icon + nickname on the left, points on the right
+		JPanel topRow = new JPanel(new BorderLayout(8, 0));
+		topRow.setOpaque(false);
+		topRow.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-		JPanel nameRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
-		nameRow.setOpaque(false);
-		nameRow.setAlignmentX(Component.LEFT_ALIGNMENT);
+		JPanel namePanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+		namePanel.setOpaque(false);
+
+		JLabel rankIcon = new JLabel();
+		rankIcon.setPreferredSize(new Dimension(20, 20));
+		rankIcon.setToolTipText(getRankDisplayName(account.getClanRank()));
+		if (rankIconResolver != null && spriteManager != null && account.getClanRank() != null) {
+			rankIconResolver.apply(account.getClanRank(), spriteManager, rankIcon, 20);
+		}
+		namePanel.add(rankIcon);
 
 		JLabel nameLabel = new JLabel(account.getOsrsNickname());
 		nameLabel.setFont(FontManager.getRunescapeBoldFont());
 		nameLabel.setForeground(UIConstants.TEXT_PRIMARY);
-		nameRow.add(nameLabel);
-
-		JLabel rankLabel = new JLabel(getRankDisplayName(account.getClanRank()));
-		rankLabel.setFont(FontManager.getRunescapeBoldFont());
-		rankLabel.setForeground(UIConstants.ACCENT_GOLD);
-		rankLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-
-		leftPanel.add(nameRow);
-		leftPanel.add(rankLabel);
-
-		JPanel rankProgress = buildRankProgressBar(account);
-		if (rankProgress != null) {
-			leftPanel.add(Box.createRigidArea(new Dimension(0, 6)));
-			rankProgress.setAlignmentX(Component.LEFT_ALIGNMENT);
-			leftPanel.add(rankProgress);
-		}
+		namePanel.add(nameLabel);
 
 		JPanel pointsDisplay = new JPanel();
 		pointsDisplay.setLayout(new BoxLayout(pointsDisplay, BoxLayout.Y_AXIS));
@@ -372,19 +375,56 @@ public class ProfilePanel extends JPanel {
 		pointsDisplay.add(pointsValue);
 		pointsDisplay.add(pointsLabel);
 
-		JPanel refreshRow = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
-		refreshRow.setOpaque(false);
-		refreshRow.add(new RefreshButton(this::refresh));
+		topRow.add(namePanel, BorderLayout.WEST);
+		topRow.add(pointsDisplay, BorderLayout.EAST);
+		header.add(topRow);
 
-		JPanel rightPanel = new JPanel(new BorderLayout(0, 4));
-		rightPanel.setOpaque(false);
-		rightPanel.add(pointsDisplay, BorderLayout.NORTH);
-		rightPanel.add(refreshRow, BorderLayout.SOUTH);
+		JPanel rankProgress = buildRankProgressBar(account);
+		if (rankProgress != null) {
+			header.add(Box.createRigidArea(new Dimension(0, 8)));
+			rankProgress.setAlignmentX(Component.LEFT_ALIGNMENT);
+			header.add(rankProgress);
+		}
 
-		header.add(leftPanel, BorderLayout.CENTER);
-		header.add(rightPanel, BorderLayout.EAST);
+		header.add(Box.createRigidArea(new Dimension(0, 8)));
+		JButton refreshButton = buildRefreshProfileButton();
+		refreshButton.setAlignmentX(Component.LEFT_ALIGNMENT);
+		header.add(refreshButton);
 
 		return wrapInRoundedPanel(header);
+	}
+
+	/** Full-width block button so the refresh action stands out */
+	private JButton buildRefreshProfileButton() {
+		JButton btn = new JButton("Refresh Profile") {
+			@Override
+			protected void paintComponent(Graphics g) {
+				Graphics2D g2d = (Graphics2D) g.create();
+				g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+				g2d.setColor(getModel().isRollover() && isEnabled() ? UIConstants.CARD_HOVER : UIConstants.BACKGROUND);
+				g2d.fillRoundRect(0, 0, getWidth(), getHeight(), 6, 6);
+				Color gold = UIConstants.ACCENT_GOLD;
+				g2d.setColor(new Color(gold.getRed(), gold.getGreen(), gold.getBlue(), 110));
+				g2d.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 6, 6);
+				g2d.dispose();
+				super.paintComponent(g);
+			}
+		};
+		btn.setFont(FontManager.getRunescapeSmallFont());
+		btn.setForeground(UIConstants.ACCENT_GOLD);
+		btn.setContentAreaFilled(false);
+		btn.setBorderPainted(false);
+		btn.setFocusPainted(false);
+		btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+		btn.setHorizontalAlignment(SwingConstants.CENTER);
+		btn.setPreferredSize(new Dimension(100, 26));
+		btn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 26));
+		btn.addActionListener(e -> {
+			btn.setText("Refreshing...");
+			btn.setEnabled(false);
+			refresh();
+		});
+		return btn;
 	}
 
 	private JPanel buildRankProgressBar(AccountResponse.OsrsAccount account) {
@@ -435,44 +475,86 @@ public class ProfilePanel extends JPanel {
 		int pointsRemaining = nextRank.getPointsRequired() - currentPoints;
 		boolean needsRankUp = pointsRemaining < 0;
 
-		JPanel progressPanel = new JPanel();
+		// Clickable sub-panel: hover highlight, opens the ranks page on the website
+		final boolean[] hovered = { false };
+		JPanel progressPanel = new JPanel() {
+			@Override
+			protected void paintComponent(Graphics g) {
+				Graphics2D g2d = (Graphics2D) g.create();
+				g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+				g2d.setColor(hovered[0] ? UIConstants.CARD_HOVER : UIConstants.BACKGROUND);
+				g2d.fillRoundRect(0, 0, getWidth(), getHeight(), 6, 6);
+				g2d.dispose();
+				super.paintComponent(g);
+			}
+		};
 		progressPanel.setLayout(new BoxLayout(progressPanel, BoxLayout.Y_AXIS));
 		progressPanel.setOpaque(false);
+		progressPanel.setBorder(new EmptyBorder(6, 8, 8, 8));
+		progressPanel.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+		progressPanel.setToolTipText("Open the ranks page");
 
-		JPanel labelRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+		JPanel labelRow = new JPanel(new BorderLayout(4, 0));
 		labelRow.setOpaque(false);
 		labelRow.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-		String nextRankName = nextRank.getDisplayName() != null ? nextRank.getDisplayName() : nextRank.getName();
-		JLabel progressLabel = new JLabel(pointsRemaining + " pts to " + nextRankName);
+		JPanel labelLeft = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
+		labelLeft.setOpaque(false);
+
+		JLabel progressLabel = new JLabel(String.format("%,d", pointsRemaining).replace(",", " ") + " pts to");
 		progressLabel.setFont(FontManager.getRunescapeSmallFont());
 		progressLabel.setForeground(UIConstants.TEXT_SECONDARY);
-		labelRow.add(progressLabel);
+		labelLeft.add(progressLabel);
+
+		JLabel nextRankIcon = new JLabel();
+		nextRankIcon.setPreferredSize(new Dimension(14, 14));
+		if (rankIconResolver != null && spriteManager != null) {
+			rankIconResolver.apply(nextRank.getName(), spriteManager, nextRankIcon, 14);
+		}
+		labelLeft.add(nextRankIcon);
+
+		String nextRankName = nextRank.getDisplayName() != null ? nextRank.getDisplayName() : nextRank.getName();
+		JLabel nextRankLabel = new JLabel(nextRankName);
+		nextRankLabel.setFont(FontManager.getRunescapeSmallFont());
+		nextRankLabel.setForeground(UIConstants.ACCENT_GOLD);
+		labelLeft.add(nextRankLabel);
 
 		if (needsRankUp) {
 			ImageIcon infoIcon = assetLoader != null ? assetLoader.getIcon("info.png", 12) : null;
-			JLabel infoIconLabel = infoIcon != null ? new JLabel(infoIcon) : new JLabel("ℹ");
-			if (infoIcon == null) {
-				infoIconLabel.setFont(FontManager.getRunescapeSmallFont());
-				infoIconLabel.setForeground(UIConstants.TEXT_SECONDARY);
+			if (infoIcon != null) {
+				JLabel infoIconLabel = new JLabel(infoIcon);
+				infoIconLabel.setToolTipText("Waiting for a staff member to give you the correct rank");
+				labelLeft.add(infoIconLabel);
 			}
-			infoIconLabel.setToolTipText("Waiting for a staff member to give you the correct rank");
-			infoIconLabel.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-			labelRow.add(infoIconLabel);
 		}
+
+		labelRow.add(labelLeft, BorderLayout.WEST);
+		labelRow.add(new JLabel(new ArrowIcon(11, UIConstants.TEXT_MUTED)), BorderLayout.EAST);
 
 		JProgressBar bar = new JProgressBar(0, 100);
 		bar.setValue((int) (progress * 100));
 		bar.setBackground(UIConstants.PROGRESS_BG);
 		bar.setForeground(UIConstants.ACCENT_GOLD);
 		bar.setBorderPainted(false);
-		bar.setPreferredSize(new Dimension(100, 4));
-		bar.setMaximumSize(new Dimension(120, 4));
+		bar.setPreferredSize(new Dimension(100, 5));
+		bar.setMaximumSize(new Dimension(Integer.MAX_VALUE, 5));
 		bar.setAlignmentX(Component.LEFT_ALIGNMENT);
 
 		progressPanel.add(labelRow);
-		progressPanel.add(Box.createRigidArea(new Dimension(0, 2)));
+		progressPanel.add(Box.createRigidArea(new Dimension(0, 4)));
 		progressPanel.add(bar);
+		progressPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, progressPanel.getPreferredSize().height));
+
+		progressPanel.addMouseListener(new MouseAdapter() {
+			@Override
+			public void mouseEntered(MouseEvent e) { hovered[0] = true; progressPanel.repaint(); }
+			@Override
+			public void mouseExited(MouseEvent e) { hovered[0] = false; progressPanel.repaint(); }
+			@Override
+			public void mousePressed(MouseEvent e) {
+				if (SwingUtilities.isLeftMouseButton(e)) LinkBrowser.browse("https://www.revalosrs.ee/ranks");
+			}
+		});
 
 		return progressPanel;
 	}
