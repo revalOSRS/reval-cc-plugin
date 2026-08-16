@@ -25,6 +25,9 @@ import java.awt.RenderingHints;
  */
 public class SyncGuideOverlay extends Overlay {
 	private static final Color GOLD = new Color(255, 200, 60);
+	// The pre-collection-log hint gives up after this long; once the log is
+	// open the player is clearly following the guide, so it keeps going.
+	private static final long BANNER_TIMEOUT_MS = 20_000;
 
 	private final Client client;
 	private final SyncGuide guide;
@@ -47,6 +50,10 @@ public class SyncGuideOverlay extends Overlay {
 
 		Widget burger = client.getWidget(InterfaceID.Collection.BURGER_BTN_MENU);
 		if (burger == null || burger.isHidden()) {
+			if (guide.armedForMs() > BANNER_TIMEOUT_MS) {
+				guide.disarm();
+				return null;
+			}
 			drawHint(g, "Open your Collection Log to sync your points");
 			return null;
 		}
