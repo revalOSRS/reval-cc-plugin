@@ -18,7 +18,7 @@ public class RankCard extends JPanel {
 	public RankCard(PointsResponse.Rank rank, SpriteManager spriteManager, ClanRankIconResolver iconResolver) {
 		setLayout(new BorderLayout(6, 0));
 		setBackground(UIConstants.CARD_BG);
-		setBorder(new EmptyBorder(8, 10, 8, 10));
+		setBorder(new EmptyBorder(8, 6, 8, 10));
 
 		String displayName = rank.getDisplayName() != null ? rank.getDisplayName() : rank.getName();
 

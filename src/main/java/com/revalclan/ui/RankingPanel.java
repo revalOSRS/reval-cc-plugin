@@ -5,6 +5,7 @@ import com.revalclan.api.points.PointsResponse;
 import com.revalclan.ui.components.*;
 import com.revalclan.ui.constants.UIConstants;
 import com.revalclan.util.ClanRankIconResolver;
+import com.revalclan.util.UIAssetLoader;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.game.SpriteManager;
 import net.runelite.client.util.AsyncBufferedImage;
@@ -33,6 +34,7 @@ public class RankingPanel extends JPanel {
 	private ItemManager itemManager;
 	private SpriteManager spriteManager;
 	private ClanRankIconResolver rankIconResolver;
+	private UIAssetLoader assetLoader;
 
 	public RankingPanel() {
 		setLayout(new BorderLayout());
@@ -79,11 +81,12 @@ public class RankingPanel extends JPanel {
 	}
 
 	public void init(RevalApiService apiService, ItemManager itemManager, SpriteManager spriteManager,
-					 ClanRankIconResolver rankIconResolver) {
+					 ClanRankIconResolver rankIconResolver, UIAssetLoader assetLoader) {
 		this.apiService = apiService;
 		this.itemManager = itemManager;
 		this.spriteManager = spriteManager;
 		this.rankIconResolver = rankIconResolver;
+		this.assetLoader = assetLoader;
 		loadData();
 	}
 
@@ -214,7 +217,12 @@ public class RankingPanel extends JPanel {
 
 				CollapsibleSection section = new CollapsibleSection(displayName, null, content, false);
 				Integer itemId = sources.get(0).getMetadata() != null ? sources.get(0).getMetadata().getItemId() : null;
-				if (itemId != null) loadSectionIcon(itemId, section);
+				if (itemId != null) {
+					loadSectionIcon(itemId, section);
+				} else if (assetLoader != null && category.toUpperCase().equals("MISC")) {
+					ImageIcon icon = assetLoader.getIcon("total_level.png", 20);
+					if (icon != null) section.setIcon(icon);
+				}
 				addComponent(section);
 			}
 		}
