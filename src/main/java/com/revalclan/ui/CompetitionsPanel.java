@@ -24,6 +24,10 @@ import java.util.Map;
 import java.util.function.Consumer;
 
 public class CompetitionsPanel extends JPanel {
+	private static final Color MEDAL_GOLD = new Color(255, 215, 0);
+	private static final Color MEDAL_SILVER = new Color(198, 198, 198);
+	private static final Color MEDAL_BRONZE = new Color(205, 127, 80);
+
 	private RevalApiService apiService;
 	private Client client;
 	private RefreshButton refreshButton;
@@ -597,11 +601,7 @@ public class CompetitionsPanel extends JPanel {
 		}
 	}
 
-	private static final Color MEDAL_GOLD = new Color(255, 215, 0);
-	private static final Color MEDAL_SILVER = new Color(198, 198, 198);
-	private static final Color MEDAL_BRONZE = new Color(205, 127, 80);
-
-	/** Prize breakdown as a two-column grid: place on the left, points on the right */
+	/** Prize breakdown rows: place on the left, points on the right */
 	private JPanel createRewardsGrid(Map<String, Integer> rewards) {
 		JPanel grid = new JPanel(new GridLayout(0, 1, 0, 3));
 		grid.setOpaque(false);
