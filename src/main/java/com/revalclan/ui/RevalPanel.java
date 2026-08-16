@@ -22,10 +22,12 @@ import net.runelite.client.game.ItemManager;
 import net.runelite.client.game.SpriteManager;
 import net.runelite.client.ui.FontManager;
 import net.runelite.client.ui.PluginPanel;
+import net.runelite.client.util.ImageUtil;
 import net.runelite.client.util.LinkBrowser;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+import java.awt.image.BufferedImage;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
@@ -132,7 +134,7 @@ public class RevalPanel extends PluginPanel {
 		row1.add(profileTab);
 		row1.add(achievementsTab);
 
-		// Second row: Events, 🏆 (small), Competitions
+		// Second row: Events, trophy (small), Competitions
 		JPanel row2 = new JPanel();
 		row2.setLayout(new BoxLayout(row2, BoxLayout.X_AXIS));
 		row2.setOpaque(false);
@@ -142,7 +144,9 @@ public class RevalPanel extends PluginPanel {
 		eventsTab.setMaximumSize(new Dimension(Integer.MAX_VALUE, 28));
 		eventsTab.addActionListener(e -> selectTab("EVENTS"));
 
-		leaderboardTab = createTabButton("\uD83C\uDFC6");
+		// Text is a fallback until init() swaps in the trophy sprite — the 🏆
+		// emoji has no glyph in the RuneScape font (missing-glyph box on macOS)
+		leaderboardTab = createTabButton("LB");
 		leaderboardTab.setPreferredSize(new Dimension(36, 28));
 		leaderboardTab.setMinimumSize(new Dimension(36, 28));
 		leaderboardTab.setMaximumSize(new Dimension(36, 28));
@@ -383,6 +387,25 @@ public class RevalPanel extends PluginPanel {
 		this.assetLoader = assetLoader;
 		this.spriteManager = spriteManager;
 		this.rankIconResolver = rankIconResolver;
+
+		// Leaderboard tab icon: leagues trophy from the game cache
+		if (spriteManager != null && leaderboardTab != null) {
+			spriteManager.getSpriteAsync(net.runelite.api.gameval.SpriteID.LeagueTrophyIcons._5, 0, sprite -> {
+				if (sprite != null) {
+					SwingUtilities.invokeLater(() -> {
+						BufferedImage img = sprite;
+						if (img.getWidth() > 16 || img.getHeight() > 16) {
+							double scale = Math.min(16.0 / img.getWidth(), 16.0 / img.getHeight());
+							img = ImageUtil.resizeImage(img,
+								Math.max(1, (int) Math.round(img.getWidth() * scale)),
+								Math.max(1, (int) Math.round(img.getHeight() * scale)));
+						}
+						leaderboardTab.setIcon(new ImageIcon(ImageUtil.resizeCanvas(img, 16, 16)));
+						leaderboardTab.setText("");
+					});
+				}
+			});
+		}
 
 		if (assetLoader != null) {
 			ImageIcon infoIcon = assetLoader.getIcon("info.png", 16);
