@@ -50,6 +50,10 @@ public class SyncGuideOverlay extends Overlay {
 
 		Widget burger = client.getWidget(InterfaceID.Collection.BURGER_BTN_MENU);
 		if (burger == null || burger.isHidden()) {
+			if (guide.hasSeenCollectionLog()) {
+				drawHint(g, "Open your Collection Log to sync your points", -1, 0);
+				return null;
+			}
 			long remaining = BANNER_TIMEOUT_MS - guide.armedForMs();
 			if (remaining <= 0) {
 				guide.disarm();
@@ -59,6 +63,7 @@ public class SyncGuideOverlay extends Overlay {
 				(double) remaining / BANNER_TIMEOUT_MS, (int) Math.ceil(remaining / 1000.0));
 			return null;
 		}
+		guide.markCollectionLogSeen();
 
 		Widget menuFrame = client.getWidget(InterfaceID.Collection.BURGER_MENU_FRAME);
 		boolean menuOpen = menuFrame != null && !menuFrame.isHidden();
