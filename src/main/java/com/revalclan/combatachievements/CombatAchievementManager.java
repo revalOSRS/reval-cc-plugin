@@ -65,7 +65,8 @@ public class CombatAchievementManager {
 		3774,  // CA_TASK_COMPLETED_16
 		4204,  // CA_TASK_COMPLETED_17
 		4496,  // CA_TASK_COMPLETED_18
-		4721   // CA_TASK_COMPLETED_19
+		4721,  // CA_TASK_COMPLETED_19
+		5673   // CA_TASK_COMPLETED_20 (task ids 640+, e.g. Maggot King — added 2026-08-12)
 	};
 
 	private final List<CombatAchievementTask> allTasks = new ArrayList<>();
@@ -194,12 +195,13 @@ public class CombatAchievementManager {
 	 * Calculate current tier based on total points
 	 */
 	private String calculateCurrentTier(int totalPoints) {
-		if (totalPoints >= 1550) return "Grandmaster";
-		if (totalPoints >= 1265) return "Master";
-		if (totalPoints >= 977) return "Elite";
-		if (totalPoints >= 683) return "Hard";
-		if (totalPoints >= 391) return "Medium";
-		if (totalPoints >= 110) return "Easy";
+		// In-game unlock points as of the 2026-08-12 rebalance
+		if (totalPoints >= 2672) return "Grandmaster";
+		if (totalPoints >= 1940) return "Master";
+		if (totalPoints >= 1075) return "Elite";
+		if (totalPoints >= 419) return "Hard";
+		if (totalPoints >= 161) return "Medium";
+		if (totalPoints >= 41) return "Easy";
 		return "None";
 	}
 
