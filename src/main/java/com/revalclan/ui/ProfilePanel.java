@@ -967,7 +967,7 @@ public class ProfilePanel extends JPanel {
 		}
 		String playerName = (currentAccount != null && currentAccount.getOsrsAccount() != null)
 			? currentAccount.getOsrsAccount().getOsrsNickname() : null;
-		albumWindow = new PointsAlbumWindow(playerName, pointsLog, itemManager, onSyncGuide);
+		albumWindow = new PointsAlbumWindow(playerName, pointsLog, itemManager);
 		albumWindow.selectSource(sourceType);
 		albumWindow.setVisible(true);
 		albumWindow.toFront();

@@ -76,8 +76,7 @@ public class PointsAlbumWindow extends JFrame {
 	private List<CardData> filtered = new ArrayList<>();
 	private int page = 0;
 
-	public PointsAlbumWindow(String playerName, List<AccountResponse.PointsLogEntry> entries, ItemManager itemManager,
-							 Runnable onSyncGuide) {
+	public PointsAlbumWindow(String playerName, List<AccountResponse.PointsLogEntry> entries, ItemManager itemManager) {
 		super("Reval - " + (playerName != null ? playerName + "'s " : "") + "Points Log");
 		this.itemManager = itemManager;
 		this.allEntries = entries != null ? entries : new ArrayList<>();
@@ -142,21 +141,6 @@ public class PointsAlbumWindow extends JFrame {
 		pagingRow.add(prevButton);
 		pagingRow.add(pageLabel);
 		pagingRow.add(nextButton);
-
-		if (onSyncGuide != null) {
-			pagingRow.add(Box.createHorizontalStrut(16));
-			JButton syncButton = pagingButton("Sync missing points");
-			syncButton.setForeground(UIConstants.ACCENT_GOLD);
-			syncButton.setToolTipText("Highlights the Sync Reval button in your in-game Collection Log");
-			syncButton.addActionListener(e -> {
-				onSyncGuide.run();
-				syncButton.setText("Check your Collection Log in-game");
-				Timer reset = new Timer(4000, ev -> syncButton.setText("Sync missing points"));
-				reset.setRepeats(false);
-				reset.start();
-			});
-			pagingRow.add(syncButton);
-		}
 
 		controls.add(filterRow);
 		controls.add(Box.createRigidArea(new Dimension(0, 8)));
@@ -327,13 +311,8 @@ public class PointsAlbumWindow extends JFrame {
 		panel.setBorder(new EmptyBorder(8, 10, 8, 10));
 		panel.setPreferredSize(new Dimension(200, 150));
 
-		// Title: wraps so the full text is always visible
-		JLabel title = new JLabel(
-			"<html><div style='text-align:center;width:160px'>" + escapeHtml(card.title) + "</div></html>",
-			SwingConstants.CENTER);
-		title.setFont(FontManager.getRunescapeSmallFont());
-		title.setForeground(UIConstants.TEXT_PRIMARY);
-		title.setHorizontalAlignment(SwingConstants.CENTER);
+		// Title: wraps so the full text is always visible, centered per line
+		WrapLabel title = new WrapLabel(card.title, FontManager.getRunescapeSmallFont(), UIConstants.TEXT_PRIMARY, 172);
 		panel.add(title, BorderLayout.NORTH);
 
 		// Center: icon + origin line
@@ -354,11 +333,7 @@ public class PointsAlbumWindow extends JFrame {
 		}
 		center.add(icon);
 
-		JLabel origin = new JLabel(
-			"<html><div style='text-align:center;width:160px'>" + escapeHtml(card.origin) + "</div></html>",
-			SwingConstants.CENTER);
-		origin.setFont(FontManager.getRunescapeSmallFont());
-		origin.setForeground(UIConstants.TEXT_SECONDARY);
+		WrapLabel origin = new WrapLabel(card.origin, FontManager.getRunescapeSmallFont(), UIConstants.TEXT_SECONDARY, 172);
 		origin.setAlignmentX(Component.CENTER_ALIGNMENT);
 		center.add(Box.createRigidArea(new Dimension(0, 3)));
 		center.add(origin);
@@ -396,12 +371,21 @@ public class PointsAlbumWindow extends JFrame {
 		return panel;
 	}
 
+	/** Label prefixes that carry no information beyond the source type */
+	private static final Set<String> STRIP_PREFIXES = new HashSet<>(Arrays.asList(
+		"drop", "pet", "new pet", "duplicate pet", "milestone", "xp milestone",
+		"loyalty", "event", "manual", "misc", "diary", "challenge", "achievement",
+		"admin adjustment"
+	));
+
 	/** [what, where-from] from descriptions like "Drop: Elder venator fang from Maggot King (KC: 152)" */
 	private String[] splitDescription(String desc) {
 		if (desc == null || desc.isEmpty()) return new String[]{"Unknown", " "};
 		String body = desc;
 		int colon = body.indexOf(": ");
-		if (colon > 0 && colon < 20) body = body.substring(colon + 2);
+		if (colon > 0 && STRIP_PREFIXES.contains(body.substring(0, colon).toLowerCase())) {
+			body = body.substring(colon + 2);
+		}
 		int from = body.lastIndexOf(" from ");
 		if (from > 0) {
 			return new String[]{body.substring(0, from), body.substring(from + 6)};
@@ -412,11 +396,6 @@ public class PointsAlbumWindow extends JFrame {
 	private String stripKc(String origin) {
 		if (origin == null) return " ";
 		return origin.replaceAll(" \\(KC: [^)]*\\)$", "");
-	}
-
-	private String escapeHtml(String text) {
-		if (text == null) return "";
-		return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
 	}
 
 	private void loadItemIcon(int itemId, JLabel target) {
@@ -493,6 +472,72 @@ public class PointsAlbumWindow extends JFrame {
 		btn.setBorder(new EmptyBorder(4, 10, 4, 10));
 		btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 		return btn;
+	}
+
+	/**
+	 * Word-wrapped, line-centered text component. Swing's HTML width handling
+	 * wraps inconsistently with the RuneScape font, so lines are computed and
+	 * painted manually.
+	 */
+	private static class WrapLabel extends JComponent {
+		private final List<String> lines = new ArrayList<>();
+		private final Font font;
+		private final int lineHeight;
+		private final int wrapWidth;
+
+		WrapLabel(String text, Font font, Color color, int wrapWidth) {
+			this.font = font;
+			this.wrapWidth = wrapWidth;
+			setForeground(color);
+			FontMetrics fm = getFontMetrics(font);
+			this.lineHeight = fm.getHeight();
+			wrap(text != null ? text.trim() : "", fm);
+		}
+
+		private void wrap(String text, FontMetrics fm) {
+			if (text.isEmpty()) {
+				lines.add(" ");
+				return;
+			}
+			StringBuilder line = new StringBuilder();
+			for (String word : text.split(" ")) {
+				String candidate = line.length() == 0 ? word : line + " " + word;
+				if (fm.stringWidth(candidate) <= wrapWidth || line.length() == 0) {
+					line = new StringBuilder(candidate);
+				} else {
+					lines.add(line.toString());
+					line = new StringBuilder(word);
+				}
+			}
+			if (line.length() > 0) {
+				lines.add(line.toString());
+			}
+		}
+
+		@Override
+		public Dimension getPreferredSize() {
+			return new Dimension(wrapWidth, lines.size() * lineHeight + 2);
+		}
+
+		@Override
+		public Dimension getMaximumSize() {
+			return new Dimension(Integer.MAX_VALUE, getPreferredSize().height);
+		}
+
+		@Override
+		protected void paintComponent(Graphics g) {
+			Graphics2D g2d = (Graphics2D) g.create();
+			g2d.setFont(font);
+			g2d.setColor(getForeground());
+			FontMetrics fm = g2d.getFontMetrics();
+			int y = fm.getAscent();
+			for (String line : lines) {
+				int x = (getWidth() - fm.stringWidth(line)) / 2;
+				g2d.drawString(line, Math.max(0, x), y);
+				y += lineHeight;
+			}
+			g2d.dispose();
+		}
 	}
 
 	/** Round badge with the source initial, for entries without an item icon */
