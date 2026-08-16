@@ -208,7 +208,7 @@ public class DiaryPanel extends JPanel {
 		card.addMouseListener(new MouseAdapter() {
 			public void mouseEntered(MouseEvent e) { isHovered[0] = true; card.repaint(); }
 			public void mouseExited(MouseEvent e) { isHovered[0] = false; card.repaint(); }
-			public void mouseClicked(MouseEvent e) { showDiaryDetail(diary); }
+			public void mousePressed(MouseEvent e) { if (SwingUtilities.isLeftMouseButton(e)) showDiaryDetail(diary); }
 		});
 
 		return card;
@@ -384,7 +384,8 @@ public class DiaryPanel extends JPanel {
 		tierSection.add(tasksContainer);
 
 		headerRef[0].addMouseListener(new MouseAdapter() {
-			public void mouseClicked(MouseEvent e) {
+			public void mousePressed(MouseEvent e) {
+				if (!SwingUtilities.isLeftMouseButton(e)) return;
 				expanded[0] = !expanded[0];
 				tasksContainer.setVisible(expanded[0]);
 				if (expanded[0]) expandedTiers.add(tierKey);

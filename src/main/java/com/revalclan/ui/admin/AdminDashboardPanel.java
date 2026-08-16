@@ -171,7 +171,7 @@ public class AdminDashboardPanel extends JPanel {
 
 		btn.addMouseListener(new MouseAdapter() {
 			@Override
-			public void mouseClicked(MouseEvent e) { onClick.run(); }
+			public void mousePressed(MouseEvent e) { if (SwingUtilities.isLeftMouseButton(e)) onClick.run(); }
 			@Override
 			public void mouseEntered(MouseEvent e) { btn.setBackground(UIConstants.CARD_HOVER); btn.repaint(); }
 			@Override

@@ -822,7 +822,7 @@ public class ProfilePanel extends JPanel {
 				if (sourceType != null) {
 					addMouseListener(new MouseAdapter() {
 						@Override
-						public void mouseClicked(MouseEvent e) { showPointsBreakdown(sourceType, label); }
+						public void mousePressed(MouseEvent e) { if (SwingUtilities.isLeftMouseButton(e)) showPointsBreakdown(sourceType, label); }
 						@Override
 						public void mouseEntered(MouseEvent e) { hovered = true; setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)); repaint(); }
 						@Override
