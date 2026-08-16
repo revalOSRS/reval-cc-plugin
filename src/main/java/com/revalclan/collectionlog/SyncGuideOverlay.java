@@ -50,11 +50,13 @@ public class SyncGuideOverlay extends Overlay {
 
 		Widget burger = client.getWidget(InterfaceID.Collection.BURGER_BTN_MENU);
 		if (burger == null || burger.isHidden()) {
-			if (guide.armedForMs() > BANNER_TIMEOUT_MS) {
+			long remaining = BANNER_TIMEOUT_MS - guide.armedForMs();
+			if (remaining <= 0) {
 				guide.disarm();
 				return null;
 			}
-			drawHint(g, "Open your Collection Log to sync your points");
+			drawHint(g, "Open your Collection Log to sync your points",
+				(double) remaining / BANNER_TIMEOUT_MS, (int) Math.ceil(remaining / 1000.0));
 			return null;
 		}
 
@@ -65,15 +67,15 @@ public class SyncGuideOverlay extends Overlay {
 			Widget syncEntry = guide.getSyncButtonWidget();
 			if (syncEntry != null && !syncEntry.isHidden()) {
 				glow(g, syncEntry.getBounds());
-				drawHint(g, "Click Sync Reval");
+				drawHint(g, "Click Sync Reval", -1, 0);
 				return null;
 			}
-			drawHint(g, "Click Sync Reval in the menu");
+			drawHint(g, "Click Sync Reval in the menu", -1, 0);
 			return null;
 		}
 
 		glow(g, burger.getBounds());
-		drawHint(g, "Open this menu, then click Sync Reval");
+		drawHint(g, "Open this menu, then click Sync Reval", -1, 0);
 		return null;
 	}
 
@@ -93,11 +95,21 @@ public class SyncGuideOverlay extends Overlay {
 		g.drawRoundRect(bounds.x - 3, bounds.y - 3, bounds.width + 6, bounds.height + 6, 8, 8);
 	}
 
-	private void drawHint(Graphics2D g, String text) {
+	/**
+	 * Hint banner. When {@code fraction} is >= 0 a slim time bar drains along
+	 * the bottom edge and a small seconds counter sits to the right of the text.
+	 */
+	private void drawHint(Graphics2D g, String text, double fraction, int secondsLeft) {
+		boolean timed = fraction >= 0;
+
 		g.setFont(FontManager.getRunescapeFont());
 		FontMetrics fm = g.getFontMetrics();
-		int width = fm.stringWidth(text) + 24;
-		int height = fm.getHeight() + 12;
+		FontMetrics smallFm = g.getFontMetrics(FontManager.getRunescapeSmallFont());
+
+		String secondsText = secondsLeft + "s";
+		int secondsWidth = timed ? smallFm.stringWidth(secondsText) + 10 : 0;
+		int width = fm.stringWidth(text) + 24 + secondsWidth;
+		int height = fm.getHeight() + 12 + (timed ? 7 : 0);
 		int x = (client.getCanvasWidth() - width) / 2;
 		int y = 26;
 
@@ -109,5 +121,25 @@ public class SyncGuideOverlay extends Overlay {
 
 		g.setColor(GOLD);
 		g.drawString(text, x + 12, y + fm.getAscent() + 6);
+
+		if (timed) {
+			// seconds counter, muted, right of the text
+			g.setFont(FontManager.getRunescapeSmallFont());
+			g.setColor(new Color(GOLD.getRed(), GOLD.getGreen(), GOLD.getBlue(), 150));
+			g.drawString(secondsText, x + width - smallFm.stringWidth(secondsText) - 10,
+				y + fm.getAscent() + 6);
+
+			// draining time bar along the bottom edge
+			int trackX = x + 8;
+			int trackWidth = width - 16;
+			int barY = y + height - 6;
+			g.setColor(new Color(255, 255, 255, 30));
+			g.fillRoundRect(trackX, barY, trackWidth, 3, 3, 3);
+			int fillWidth = (int) Math.round(trackWidth * Math.min(1.0, Math.max(0.0, fraction)));
+			if (fillWidth > 0) {
+				g.setColor(new Color(GOLD.getRed(), GOLD.getGreen(), GOLD.getBlue(), 220));
+				g.fillRoundRect(trackX, barY, fillWidth, 3, 3, 3);
+			}
+		}
 	}
 }
