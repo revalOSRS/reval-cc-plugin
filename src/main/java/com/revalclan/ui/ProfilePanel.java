@@ -402,7 +402,50 @@ public class ProfilePanel extends JPanel {
 		refreshButton.setAlignmentX(Component.LEFT_ALIGNMENT);
 		header.add(refreshButton);
 
+		if (onSyncGuide != null) {
+			header.add(Box.createRigidArea(new Dimension(0, 6)));
+			JButton syncButton = buildSyncGuideButton();
+			syncButton.setAlignmentX(Component.LEFT_ALIGNMENT);
+			header.add(syncButton);
+		}
+
 		return wrapInRoundedPanel(header);
+	}
+
+	/** Arms the in-game collection log sync guide */
+	private JButton buildSyncGuideButton() {
+		JButton btn = new JButton("Sync missing points") {
+			@Override
+			protected void paintComponent(Graphics g) {
+				Graphics2D g2d = (Graphics2D) g.create();
+				g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+				g2d.setColor(getModel().isRollover() && isEnabled() ? UIConstants.CARD_HOVER : UIConstants.BACKGROUND);
+				g2d.fillRoundRect(0, 0, getWidth(), getHeight(), 6, 6);
+				Color border = UIConstants.TEXT_MUTED;
+				g2d.setColor(new Color(border.getRed(), border.getGreen(), border.getBlue(), 150));
+				g2d.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 6, 6);
+				g2d.dispose();
+				super.paintComponent(g);
+			}
+		};
+		btn.setFont(FontManager.getRunescapeSmallFont());
+		btn.setForeground(UIConstants.TEXT_SECONDARY);
+		btn.setContentAreaFilled(false);
+		btn.setBorderPainted(false);
+		btn.setFocusPainted(false);
+		btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+		btn.setHorizontalAlignment(SwingConstants.CENTER);
+		btn.setPreferredSize(new Dimension(100, 24));
+		btn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 24));
+		btn.setToolTipText("Highlights the Sync Reval button in your in-game Collection Log");
+		btn.addActionListener(e -> {
+			if (onSyncGuide != null) onSyncGuide.run();
+			btn.setText("Check your Collection Log in-game");
+			Timer reset = new Timer(4000, ev -> btn.setText("Sync missing points"));
+			reset.setRepeats(false);
+			reset.start();
+		});
+		return btn;
 	}
 
 	/** Full-width block button so the refresh action stands out */
