@@ -390,7 +390,7 @@ public class RevalPanel extends PluginPanel {
 			if (websiteImg != null && websiteIcon != null) websiteIcon.setIcon(websiteImg);
 		}
 
-		rankingPanel.init(apiService, itemManager, spriteManager, rankIconResolver, assetLoader);
+		rankingPanel.init(apiService, itemManager, spriteManager, rankIconResolver);
 		profilePanel.init(apiService, client, assetLoader, config, itemManager);
 		leaderboardPanel.init(apiService, assetLoader, itemManager);
 		achievementsPanel.init(apiService, client);

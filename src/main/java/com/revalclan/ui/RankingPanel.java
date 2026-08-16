@@ -5,7 +5,7 @@ import com.revalclan.api.points.PointsResponse;
 import com.revalclan.ui.components.*;
 import com.revalclan.ui.constants.UIConstants;
 import com.revalclan.util.ClanRankIconResolver;
-import com.revalclan.util.UIAssetLoader;
+import net.runelite.api.SpriteID;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.game.SpriteManager;
 import net.runelite.client.util.AsyncBufferedImage;
@@ -34,7 +34,6 @@ public class RankingPanel extends JPanel {
 	private ItemManager itemManager;
 	private SpriteManager spriteManager;
 	private ClanRankIconResolver rankIconResolver;
-	private UIAssetLoader assetLoader;
 
 	public RankingPanel() {
 		setLayout(new BorderLayout());
@@ -81,12 +80,11 @@ public class RankingPanel extends JPanel {
 	}
 
 	public void init(RevalApiService apiService, ItemManager itemManager, SpriteManager spriteManager,
-					 ClanRankIconResolver rankIconResolver, UIAssetLoader assetLoader) {
+					 ClanRankIconResolver rankIconResolver) {
 		this.apiService = apiService;
 		this.itemManager = itemManager;
 		this.spriteManager = spriteManager;
 		this.rankIconResolver = rankIconResolver;
-		this.assetLoader = assetLoader;
 		loadData();
 	}
 
@@ -219,9 +217,9 @@ public class RankingPanel extends JPanel {
 				Integer itemId = sources.get(0).getMetadata() != null ? sources.get(0).getMetadata().getItemId() : null;
 				if (itemId != null) {
 					loadSectionIcon(itemId, section);
-				} else if (assetLoader != null && category.toUpperCase().equals("MISC")) {
-					ImageIcon icon = assetLoader.getIcon("total_level.png", 20);
-					if (icon != null) section.setIcon(icon);
+				} else if (category.toUpperCase().equals("MISC")) {
+					// Misc has no item id — use the stats side-tab sprite (total level icon)
+					loadSpriteIcon(SpriteID.TAB_STATS, section);
 				}
 				addComponent(section);
 			}
@@ -272,6 +270,24 @@ public class RankingPanel extends JPanel {
 
 		header.add(textPanel, BorderLayout.WEST);
 		return header;
+	}
+
+	private void loadSpriteIcon(int spriteId, CollapsibleSection section) {
+		if (spriteManager == null) return;
+		spriteManager.getSpriteAsync(spriteId, 0, sprite -> {
+			if (sprite != null) {
+				SwingUtilities.invokeLater(() -> {
+					BufferedImage img = sprite;
+					if (img.getWidth() > 22 || img.getHeight() > 22) {
+						double scale = Math.min(22.0 / img.getWidth(), 22.0 / img.getHeight());
+						img = ImageUtil.resizeImage(img,
+							Math.max(1, (int) Math.round(img.getWidth() * scale)),
+							Math.max(1, (int) Math.round(img.getHeight() * scale)));
+					}
+					section.setIcon(new ImageIcon(ImageUtil.resizeCanvas(img, 24, 24)));
+				});
+			}
+		});
 	}
 
 	private void loadSectionIcon(int itemId, CollapsibleSection section) {
