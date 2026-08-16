@@ -375,17 +375,20 @@ public class PointsAlbumWindow extends JFrame {
 	private static final Set<String> STRIP_PREFIXES = new HashSet<>(Arrays.asList(
 		"drop", "pet", "new pet", "duplicate pet", "milestone", "xp milestone",
 		"loyalty", "event", "manual", "misc", "diary", "challenge", "achievement",
-		"admin adjustment"
+		"admin adjustment", "combat achievement upgrade"
 	));
 
 	/** [what, where-from] from descriptions like "Drop: Elder venator fang from Maggot King (KC: 152)" */
 	private String[] splitDescription(String desc) {
 		if (desc == null || desc.isEmpty()) return new String[]{"Unknown", " "};
-		String body = desc;
+		// The RuneScape font has no glyphs for these; keep card text ASCII
+		String body = desc.replace(" \u2192 ", " -> ").replace("\u2192", "->").replace("\u2022", "-");
 		int colon = body.indexOf(": ");
 		if (colon > 0 && STRIP_PREFIXES.contains(body.substring(0, colon).toLowerCase())) {
 			body = body.substring(colon + 2);
 		}
+		// Collapse "X: A -> X: B" upgrade chains into "X: A -> B"
+		body = body.replaceAll("^(.+?): (.+?) -> \\1: (.+)$", "$1: $2 -> $3");
 		int from = body.lastIndexOf(" from ");
 		if (from > 0) {
 			return new String[]{body.substring(0, from), body.substring(from + 6)};
