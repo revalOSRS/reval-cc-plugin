@@ -62,7 +62,8 @@ public class PointsAlbumWindow extends JFrame {
 	private List<AccountResponse.PointsLogEntry> filtered = new ArrayList<>();
 	private int page = 0;
 
-	public PointsAlbumWindow(String playerName, List<AccountResponse.PointsLogEntry> entries, ItemManager itemManager) {
+	public PointsAlbumWindow(String playerName, List<AccountResponse.PointsLogEntry> entries, ItemManager itemManager,
+							 Runnable onSyncGuide) {
 		super("Reval - " + (playerName != null ? playerName + "'s " : "") + "Points Log");
 		this.itemManager = itemManager;
 		this.allEntries = entries != null ? entries : new ArrayList<>();
@@ -119,6 +120,21 @@ public class PointsAlbumWindow extends JFrame {
 		pagingRow.add(prevButton);
 		pagingRow.add(pageLabel);
 		pagingRow.add(nextButton);
+
+		if (onSyncGuide != null) {
+			pagingRow.add(Box.createHorizontalStrut(16));
+			JButton syncButton = pagingButton("Sync missing points");
+			syncButton.setForeground(UIConstants.ACCENT_GOLD);
+			syncButton.setToolTipText("Highlights the Sync Reval button in your in-game Collection Log");
+			syncButton.addActionListener(e -> {
+				onSyncGuide.run();
+				syncButton.setText("Check your Collection Log in-game");
+				Timer reset = new Timer(4000, ev -> syncButton.setText("Sync missing points"));
+				reset.setRepeats(false);
+				reset.start();
+			});
+			pagingRow.add(syncButton);
+		}
 
 		controls.add(filterRow);
 		controls.add(Box.createRigidArea(new Dimension(0, 8)));

@@ -4,6 +4,8 @@ import com.revalclan.api.RevalApiService;
 import com.revalclan.combat.KillTracker;
 import com.revalclan.collectionlog.CollectionLogManager;
 import com.revalclan.collectionlog.CollectionLogSyncButton;
+import com.revalclan.collectionlog.SyncGuide;
+import com.revalclan.collectionlog.SyncGuideOverlay;
 import com.revalclan.notifiers.*;
 import com.revalclan.pbs.ClogPersonalBestCapture;
 import com.revalclan.session.SessionTracker;
@@ -59,6 +61,9 @@ public class RevalClanPlugin extends Plugin {
 	@Inject	private CollectionLogManager collectionLogManager;
 
 	@Inject	private CollectionLogSyncButton syncButton;
+	@Inject	private SyncGuide syncGuide;
+	@Inject	private SyncGuideOverlay syncGuideOverlay;
+	@Inject	private net.runelite.client.ui.overlay.OverlayManager overlayManager;
 
 	@Inject	private LootNotifier lootNotifier;
 
@@ -170,6 +175,7 @@ public class RevalClanPlugin extends Plugin {
 		});
 
 		syncButton.startUp();
+		overlayManager.add(syncGuideOverlay);
 
 		// Replay any session left behind by a crash / X-out as a recovered summary
 		sessionTracker.recoverPersistedSession();
@@ -182,6 +188,15 @@ public class RevalClanPlugin extends Plugin {
 			revalPanel = new RevalPanel();
 			revalPanel.init(revalApiService, client, uiAssetLoader, itemManager, spriteManager, config,
 				new ClanRankIconResolver(client, clientThread));
+			revalPanel.getProfilePanel().setOnSyncGuide(() -> {
+				syncGuide.arm();
+				clientThread.invoke(() -> {
+					if (client.getGameState() == GameState.LOGGED_IN) {
+						client.addChatMessage(ChatMessageType.GAMEMESSAGE, "",
+							"Reval: Open your Collection Log - the sync button will be highlighted.", "");
+					}
+				});
+			});
 			
 			BufferedImage icon = uiAssetLoader.getImage("reval.png");
 			
@@ -207,6 +222,7 @@ public class RevalClanPlugin extends Plugin {
 
 		collectionLogManager.clearObtainedItems();
 		syncButton.shutDown();
+		overlayManager.remove(syncGuideOverlay);
 
 		eventBus.unregister(lootNotifier);
 		eventBus.unregister(clogPersonalBestCapture);

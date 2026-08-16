@@ -40,6 +40,7 @@ public class ProfilePanel extends JPanel {
 	private SpriteManager spriteManager;
 	private ClanRankIconResolver rankIconResolver;
 	private Runnable onOpenRanks;
+	private Runnable onSyncGuide;
 	private Consumer<AccountResponse.AccountData> onAccountLoaded;
 
 	private AccountResponse.AccountData currentAccount;
@@ -110,6 +111,11 @@ public class ProfilePanel extends JPanel {
 	/** Where the rank-up bar navigates (the Ranking side-panel view) */
 	public void setOnOpenRanks(Runnable onOpenRanks) {
 		this.onOpenRanks = onOpenRanks;
+	}
+
+	/** Arms the in-game collection log sync guide (points album button) */
+	public void setOnSyncGuide(Runnable onSyncGuide) {
+		this.onSyncGuide = onSyncGuide;
 	}
 
 	public void setOnAccountLoaded(Consumer<AccountResponse.AccountData> callback) {
@@ -918,7 +924,7 @@ public class ProfilePanel extends JPanel {
 		}
 		String playerName = (currentAccount != null && currentAccount.getOsrsAccount() != null)
 			? currentAccount.getOsrsAccount().getOsrsNickname() : null;
-		albumWindow = new PointsAlbumWindow(playerName, pointsLog, itemManager);
+		albumWindow = new PointsAlbumWindow(playerName, pointsLog, itemManager, onSyncGuide);
 		albumWindow.selectSource(sourceType);
 		albumWindow.setVisible(true);
 		albumWindow.toFront();

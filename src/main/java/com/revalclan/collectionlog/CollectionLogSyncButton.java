@@ -49,6 +49,9 @@ public class CollectionLogSyncButton {
 	@Inject
 	private SyncNotifier syncNotifier;
 
+	@Inject
+	private SyncGuide syncGuide;
+
 	private int baseMenuHeight = -1;
 	private int lastAttemptedSync = -1;
 	private int pendingSyncTick = -1;
@@ -78,6 +81,8 @@ public class CollectionLogSyncButton {
 	}
 
 	private void onButtonClick() {
+		syncGuide.disarm();
+
 		// Rate limit: 30 seconds between syncs
 		if (lastAttemptedSync != -1 && lastAttemptedSync + 50 > client.getTickCount()) {
 			int secondsRemaining = (int) Math.round((lastAttemptedSync + 50 - client.getTickCount()) * 0.6);
@@ -158,8 +163,14 @@ public class CollectionLogSyncButton {
 		final int buttonY = lastRectangle.getOriginalY() + buttonHeight;
 
 		// Check if button already exists
-		final boolean existingButton = Arrays.stream(menuChildren)
-			.anyMatch(w -> w.getText() != null && w.getText().equals(BUTTON_TEXT));
+		final Widget existing = Arrays.stream(menuChildren)
+			.filter(w -> w.getText() != null && w.getText().equals(BUTTON_TEXT))
+			.findFirst()
+			.orElse(null);
+		final boolean existingButton = existing != null;
+		if (existingButton) {
+			syncGuide.setSyncButtonWidget(existing);
+		}
 
 		if (!existingButton) {
 			// Create background rectangle
@@ -191,6 +202,7 @@ public class CollectionLogSyncButton {
 			text.setAction(0, "Sync collection log to Reval");
 			text.setOnOpListener((JavaScriptCallback) ev -> onClick.run());
 			text.revalidate();
+			syncGuide.setSyncButtonWidget(text);
 		}
 
 		// Extend menu height to fit new button
