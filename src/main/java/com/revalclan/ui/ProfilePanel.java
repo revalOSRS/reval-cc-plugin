@@ -905,38 +905,22 @@ public class ProfilePanel extends JPanel {
 		return rankName;
 	}
 
+	private PointsAlbumWindow albumWindow;
+
 	private void showPointsBreakdown(String sourceType, String title) {
 		if (pointsLog == null || pointsLog.isEmpty()) {
-			JOptionPane.showMessageDialog(this, "No points log data available.", "Points Breakdown", JOptionPane.INFORMATION_MESSAGE);
+			JOptionPane.showMessageDialog(this, "No points log data available.", "Points Log", JOptionPane.INFORMATION_MESSAGE);
 			return;
 		}
 
-		List<AccountResponse.PointsLogEntry> filtered = new ArrayList<>();
-
-		if ("misc".equals(sourceType)) {
-			Set<String> knownTypes = new HashSet<>(Arrays.asList(
-				"drop", "pet", "milestone", "event", "reval_diary", "reval_challenge"
-			));
-			for (AccountResponse.PointsLogEntry entry : pointsLog) {
-				if (entry.getSourceType() == null || !knownTypes.contains(entry.getSourceType().toLowerCase())) {
-					filtered.add(entry);
-				}
-			}
-		} else {
-			String filterType = sourceType.equals("revalDiaries") ? "reval_diary"
-				: sourceType.equals("revalChallenges") ? "reval_challenge" : sourceType;
-			for (AccountResponse.PointsLogEntry entry : pointsLog) {
-				if (entry.getSourceType() != null && entry.getSourceType().equalsIgnoreCase(filterType)) {
-					filtered.add(entry);
-				}
-			}
+		if (albumWindow != null) {
+			albumWindow.dispose();
 		}
-
-		filtered.sort((a, b) -> {
-			if (a.getCreatedAt() == null || b.getCreatedAt() == null) return 0;
-			return b.getCreatedAt().compareTo(a.getCreatedAt());
-		});
-
-		new PointsBreakdownPanel(title, filtered, itemManager).setVisible(true);
+		String playerName = (currentAccount != null && currentAccount.getOsrsAccount() != null)
+			? currentAccount.getOsrsAccount().getOsrsNickname() : null;
+		albumWindow = new PointsAlbumWindow(playerName, pointsLog, itemManager);
+		albumWindow.selectSource(sourceType);
+		albumWindow.setVisible(true);
+		albumWindow.toFront();
 	}
 }
