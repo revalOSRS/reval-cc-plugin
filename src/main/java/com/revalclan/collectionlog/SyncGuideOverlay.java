@@ -21,16 +21,19 @@ import java.awt.RenderingHints;
  * Highlights the path to the "Sync Reval" collection log entry while the
  * sync guide is armed: a hint banner until the collection log is open, a
  * pulsing glow on the burger menu button, then on the Sync Reval entry once
- * the menu is expanded.
+ * the menu is expanded. Each phase's hint lasts 20 seconds (a slim bar
+ * drains along its bottom edge); moving to another phase restarts the
+ * clock, running one out disarms the guide.
  */
 public class SyncGuideOverlay extends Overlay {
 	private static final Color GOLD = new Color(255, 200, 60);
-	// The pre-collection-log hint gives up after this long; once the log is
-	// open the player is clearly following the guide, so it keeps going.
-	private static final long BANNER_TIMEOUT_MS = 20_000;
+	private static final long HINT_TIMEOUT_MS = 20_000;
 
 	private final Client client;
 	private final SyncGuide guide;
+
+	private String phase;
+	private long phaseStartedAt;
 
 	@Inject
 	public SyncGuideOverlay(Client client, SyncGuide guide) {
@@ -43,6 +46,7 @@ public class SyncGuideOverlay extends Overlay {
 	@Override
 	public Dimension render(Graphics2D g) {
 		if (!guide.isArmed()) {
+			phase = null;
 			return null;
 		}
 
@@ -50,38 +54,52 @@ public class SyncGuideOverlay extends Overlay {
 
 		Widget burger = client.getWidget(InterfaceID.Collection.BURGER_BTN_MENU);
 		if (burger == null || burger.isHidden()) {
-			if (guide.hasSeenCollectionLog()) {
-				drawHint(g, "Open your Collection Log to sync your points", -1, 0);
-				return null;
-			}
-			long remaining = BANNER_TIMEOUT_MS - guide.armedForMs();
-			if (remaining <= 0) {
+			double fraction = phaseFraction("banner");
+			if (fraction <= 0) {
 				guide.disarm();
 				return null;
 			}
-			drawHint(g, "Open your Collection Log to sync your points",
-				(double) remaining / BANNER_TIMEOUT_MS, (int) Math.ceil(remaining / 1000.0));
+			drawHint(g, "Open your Collection Log to sync your points", fraction);
 			return null;
 		}
-		guide.markCollectionLogSeen();
 
 		Widget menuFrame = client.getWidget(InterfaceID.Collection.BURGER_MENU_FRAME);
 		boolean menuOpen = menuFrame != null && !menuFrame.isHidden();
 
 		if (menuOpen) {
+			double fraction = phaseFraction("menu");
+			if (fraction <= 0) {
+				guide.disarm();
+				return null;
+			}
 			Widget syncEntry = guide.getSyncButtonWidget();
 			if (syncEntry != null && !syncEntry.isHidden()) {
 				glow(g, syncEntry.getBounds());
-				drawHint(g, "Click Sync Reval", -1, 0);
+				drawHint(g, "Click Sync Reval", fraction);
 				return null;
 			}
-			drawHint(g, "Click Sync Reval in the menu", -1, 0);
+			drawHint(g, "Click Sync Reval in the menu", fraction);
 			return null;
 		}
 
+		double fraction = phaseFraction("burger");
+		if (fraction <= 0) {
+			guide.disarm();
+			return null;
+		}
 		glow(g, burger.getBounds());
-		drawHint(g, "Open this menu, then click Sync Reval", -1, 0);
+		drawHint(g, "Open this menu, then click Sync Reval", fraction);
 		return null;
+	}
+
+	/** Fraction of the current phase's time left; entering a new phase restarts it. */
+	private double phaseFraction(String newPhase) {
+		long now = System.currentTimeMillis();
+		if (!newPhase.equals(phase)) {
+			phase = newPhase;
+			phaseStartedAt = now;
+		}
+		return (double) (HINT_TIMEOUT_MS - (now - phaseStartedAt)) / HINT_TIMEOUT_MS;
 	}
 
 	private void glow(Graphics2D g, Rectangle bounds) {
@@ -100,21 +118,13 @@ public class SyncGuideOverlay extends Overlay {
 		g.drawRoundRect(bounds.x - 3, bounds.y - 3, bounds.width + 6, bounds.height + 6, 8, 8);
 	}
 
-	/**
-	 * Hint banner. When {@code fraction} is >= 0 a slim time bar drains along
-	 * the bottom edge and a small seconds counter sits to the right of the text.
-	 */
-	private void drawHint(Graphics2D g, String text, double fraction, int secondsLeft) {
-		boolean timed = fraction >= 0;
-
+	/** Hint banner with a slim time bar draining along the bottom edge. */
+	private void drawHint(Graphics2D g, String text, double fraction) {
 		g.setFont(FontManager.getRunescapeFont());
 		FontMetrics fm = g.getFontMetrics();
-		FontMetrics smallFm = g.getFontMetrics(FontManager.getRunescapeSmallFont());
 
-		String secondsText = secondsLeft + "s";
-		int secondsWidth = timed ? smallFm.stringWidth(secondsText) + 10 : 0;
-		int width = fm.stringWidth(text) + 24 + secondsWidth;
-		int height = fm.getHeight() + 12 + (timed ? 7 : 0);
+		int width = fm.stringWidth(text) + 24;
+		int height = fm.getHeight() + 12 + 7;
 		int x = (client.getCanvasWidth() - width) / 2;
 		int y = 26;
 
@@ -127,24 +137,15 @@ public class SyncGuideOverlay extends Overlay {
 		g.setColor(GOLD);
 		g.drawString(text, x + 12, y + fm.getAscent() + 6);
 
-		if (timed) {
-			// seconds counter, muted, right of the text
-			g.setFont(FontManager.getRunescapeSmallFont());
-			g.setColor(new Color(GOLD.getRed(), GOLD.getGreen(), GOLD.getBlue(), 150));
-			g.drawString(secondsText, x + width - smallFm.stringWidth(secondsText) - 10,
-				y + fm.getAscent() + 6);
-
-			// draining time bar along the bottom edge
-			int trackX = x + 8;
-			int trackWidth = width - 16;
-			int barY = y + height - 6;
-			g.setColor(new Color(255, 255, 255, 30));
-			g.fillRoundRect(trackX, barY, trackWidth, 3, 3, 3);
-			int fillWidth = (int) Math.round(trackWidth * Math.min(1.0, Math.max(0.0, fraction)));
-			if (fillWidth > 0) {
-				g.setColor(new Color(GOLD.getRed(), GOLD.getGreen(), GOLD.getBlue(), 220));
-				g.fillRoundRect(trackX, barY, fillWidth, 3, 3, 3);
-			}
+		int trackX = x + 8;
+		int trackWidth = width - 16;
+		int barY = y + height - 6;
+		g.setColor(new Color(255, 255, 255, 30));
+		g.fillRoundRect(trackX, barY, trackWidth, 3, 3, 3);
+		int fillWidth = (int) Math.round(trackWidth * Math.min(1.0, Math.max(0.0, fraction)));
+		if (fillWidth > 0) {
+			g.setColor(new Color(GOLD.getRed(), GOLD.getGreen(), GOLD.getBlue(), 220));
+			g.fillRoundRect(trackX, barY, fillWidth, 3, 3, 3);
 		}
 	}
 }

@@ -15,26 +15,14 @@ public class SyncGuide {
 	private static final long TIMEOUT_MS = 3 * 60_000;
 
 	private volatile long armedAt = 0;
-	private volatile boolean sawCollectionLog;
 	private volatile Widget syncButtonWidget;
 
 	public void arm() {
 		armedAt = System.currentTimeMillis();
-		sawCollectionLog = false;
 	}
 
 	public void disarm() {
 		armedAt = 0;
-		sawCollectionLog = false;
-	}
-
-	/** Once the collection log has been open, the pre-log hint no longer times out. */
-	public void markCollectionLogSeen() {
-		sawCollectionLog = true;
-	}
-
-	public boolean hasSeenCollectionLog() {
-		return sawCollectionLog;
 	}
 
 	public boolean isArmed() {
