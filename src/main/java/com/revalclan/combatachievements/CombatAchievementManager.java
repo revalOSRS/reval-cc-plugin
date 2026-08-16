@@ -4,6 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.EnumComposition;
 import net.runelite.api.StructComposition;
+import net.runelite.api.gameval.VarbitID;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -91,7 +92,8 @@ public class CombatAchievementManager {
 			} catch (Exception ignored) {}
 		}
 		
-		int totalPoints = calculateTotalPoints();
+		int totalPoints = readCaPointsVarbit();
+		if (totalPoints <= 0) totalPoints = calculateTotalPoints();
 		
 		Map<String, Object> data = new HashMap<>();
 		data.put("currentTier", calculateCurrentTier(totalPoints));
@@ -178,6 +180,20 @@ public class CombatAchievementManager {
 			case "master": return 5;
 			case "grandmaster": return 6;
 			default: return 1;
+		}
+	}
+
+	/**
+	 * The game's own CA points counter — authoritative, and immune to Jagex
+	 * adding new completion varps with new task batches (which silently broke
+	 * the per-task sum when task ids passed 640). Returns 0 when the varbit
+	 * is unavailable so callers can fall back to summing completed tasks.
+	 */
+	private int readCaPointsVarbit() {
+		try {
+			return client.getVarbitValue(VarbitID.CA_POINTS);
+		} catch (Exception e) {
+			return 0;
 		}
 	}
 
