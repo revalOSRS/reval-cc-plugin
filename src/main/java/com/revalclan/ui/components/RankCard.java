@@ -63,8 +63,16 @@ public class RankCard extends JPanel {
 		spriteManager.getSpriteAsync(spriteId, 0, sprite -> {
 			if (sprite != null) {
 				SwingUtilities.invokeLater(() -> {
-					BufferedImage scaled = ImageUtil.resizeImage(sprite, 18, 18);
-					iconLabel.setIcon(new ImageIcon(scaled));
+					// Scale preserving aspect ratio, then pad onto an 18x18 canvas —
+					// forcing sprites square stretches non-square icons (e.g. gems)
+					BufferedImage img = sprite;
+					if (img.getWidth() > 18 || img.getHeight() > 18) {
+						double scale = Math.min(18.0 / img.getWidth(), 18.0 / img.getHeight());
+						img = ImageUtil.resizeImage(img,
+							Math.max(1, (int) Math.round(img.getWidth() * scale)),
+							Math.max(1, (int) Math.round(img.getHeight() * scale)));
+					}
+					iconLabel.setIcon(new ImageIcon(ImageUtil.resizeCanvas(img, 18, 18)));
 				});
 			}
 		});
