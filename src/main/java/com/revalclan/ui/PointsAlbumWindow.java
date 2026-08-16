@@ -19,7 +19,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -47,19 +49,31 @@ public class PointsAlbumWindow extends JFrame {
 		"drop", "pet", "milestone", "event", "reval_diary", "reval_challenge"
 	));
 
+	/** One rendered card: a single log entry, or several grouped by title */
+	private static class CardData {
+		String title = "Unknown";
+		String origin = " ";
+		Integer itemId;
+		String sourceType;
+		int points;
+		int count;
+		String latestDate = "";
+	}
+
 	private final ItemManager itemManager;
 	private final List<AccountResponse.PointsLogEntry> allEntries;
 
 	private final JComboBox<String> sourceCombo;
 	private final JComboBox<String> sortCombo;
 	private final JTextField searchField;
+	private final JCheckBox groupToggle;
 	private final JLabel summaryLabel = new JLabel();
 	private final JLabel pageLabel = new JLabel();
 	private final JButton prevButton;
 	private final JButton nextButton;
 	private final JPanel gridPanel;
 
-	private List<AccountResponse.PointsLogEntry> filtered = new ArrayList<>();
+	private List<CardData> filtered = new ArrayList<>();
 	private int page = 0;
 
 	public PointsAlbumWindow(String playerName, List<AccountResponse.PointsLogEntry> entries, ItemManager itemManager,
@@ -69,7 +83,7 @@ public class PointsAlbumWindow extends JFrame {
 		this.allEntries = entries != null ? entries : new ArrayList<>();
 
 		setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-		setSize(920, 680);
+		setSize(920, 700);
 		setLocationRelativeTo(null);
 		getContentPane().setBackground(UIConstants.BACKGROUND);
 		setLayout(new BorderLayout());
@@ -96,13 +110,21 @@ public class PointsAlbumWindow extends JFrame {
 		filterRow.add(sortCombo);
 
 		filterRow.add(mutedLabel("Search:"));
-		searchField = new JTextField(14);
+		searchField = new JTextField(12);
 		searchField.setFont(FontManager.getRunescapeSmallFont());
 		searchField.setForeground(UIConstants.TEXT_PRIMARY);
 		searchField.setBackground(UIConstants.CARD_BG);
 		searchField.setCaretColor(UIConstants.TEXT_PRIMARY);
 		searchField.setBorder(new EmptyBorder(4, 8, 4, 8));
 		filterRow.add(searchField);
+
+		groupToggle = new JCheckBox("Group");
+		groupToggle.setFont(FontManager.getRunescapeSmallFont());
+		groupToggle.setForeground(UIConstants.TEXT_SECONDARY);
+		groupToggle.setOpaque(false);
+		groupToggle.setFocusPainted(false);
+		groupToggle.setToolTipText("Combine repeat entries of the same source into one card");
+		filterRow.add(groupToggle);
 
 		JPanel pagingRow = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 0));
 		pagingRow.setOpaque(false);
@@ -161,6 +183,7 @@ public class PointsAlbumWindow extends JFrame {
 		// ==================== Wiring ====================
 		sourceCombo.addActionListener(e -> { page = 0; rebuild(); });
 		sortCombo.addActionListener(e -> { page = 0; rebuild(); });
+		groupToggle.addActionListener(e -> { page = 0; rebuild(); });
 		searchField.getDocument().addDocumentListener(new DocumentListener() {
 			public void insertUpdate(DocumentEvent e) { page = 0; rebuild(); }
 			public void removeUpdate(DocumentEvent e) { page = 0; rebuild(); }
@@ -192,8 +215,11 @@ public class PointsAlbumWindow extends JFrame {
 		String key = SOURCES[sourceCombo.getSelectedIndex()][1];
 		String query = searchField.getText() != null ? searchField.getText().trim().toLowerCase() : "";
 
-		filtered = new ArrayList<>();
+		List<CardData> cards = new ArrayList<>();
 		long totalPts = 0;
+		int totalEntries = 0;
+		Map<String, CardData> grouped = new LinkedHashMap<>();
+
 		for (AccountResponse.PointsLogEntry entry : allEntries) {
 			if (entry.getPointsChange() == null) continue;
 			String type = entry.getSourceType() != null ? entry.getSourceType().toLowerCase() : "";
@@ -205,27 +231,62 @@ public class PointsAlbumWindow extends JFrame {
 				String desc = entry.getSourceDescription() != null ? entry.getSourceDescription().toLowerCase() : "";
 				if (!desc.contains(query)) continue;
 			}
-			filtered.add(entry);
+
+			String[] parts = splitDescription(entry.getSourceDescription());
 			totalPts += entry.getPointsChange();
+			totalEntries++;
+
+			if (groupToggle.isSelected()) {
+				String groupKey = parts[0].toLowerCase() + "|" + type;
+				CardData card = grouped.get(groupKey);
+				if (card == null) {
+					card = new CardData();
+					card.title = parts[0];
+					card.origin = stripKc(parts[1]);
+					card.itemId = entry.getItemId();
+					card.sourceType = entry.getSourceType();
+					grouped.put(groupKey, card);
+					cards.add(card);
+				} else if (!card.origin.equals(stripKc(parts[1]))) {
+					card.origin = "Various";
+				}
+				if (card.itemId == null) card.itemId = entry.getItemId();
+				card.points += entry.getPointsChange();
+				card.count++;
+				String date = entry.getCreatedAt() != null ? entry.getCreatedAt() : "";
+				if (date.compareTo(card.latestDate) > 0) card.latestDate = date;
+			} else {
+				CardData card = new CardData();
+				card.title = parts[0];
+				card.origin = parts[1];
+				card.itemId = entry.getItemId();
+				card.sourceType = entry.getSourceType();
+				card.points = entry.getPointsChange();
+				card.count = 1;
+				card.latestDate = entry.getCreatedAt() != null ? entry.getCreatedAt() : "";
+				cards.add(card);
+			}
 		}
 
-		Comparator<AccountResponse.PointsLogEntry> byDate =
-			Comparator.comparing(e -> e.getCreatedAt() != null ? e.getCreatedAt() : "");
-		Comparator<AccountResponse.PointsLogEntry> byPoints =
-			Comparator.comparingInt(e -> e.getPointsChange() != null ? e.getPointsChange() : 0);
+		Comparator<CardData> byDate = Comparator.comparing(c -> c.latestDate);
+		Comparator<CardData> byPoints = Comparator.comparingInt(c -> c.points);
 		switch (sortCombo.getSelectedIndex()) {
-			case 1: filtered.sort(byDate); break;
-			case 2: filtered.sort(byPoints.reversed()); break;
-			case 3: filtered.sort(byPoints); break;
-			default: filtered.sort(byDate.reversed()); break;
+			case 1: cards.sort(byDate); break;
+			case 2: cards.sort(byPoints.reversed()); break;
+			case 3: cards.sort(byPoints); break;
+			default: cards.sort(byDate.reversed()); break;
 		}
+		filtered = cards;
 
 		int pages = Math.max(1, (filtered.size() + PAGE_SIZE - 1) / PAGE_SIZE);
 		page = Math.min(page, pages - 1);
 		int from = page * PAGE_SIZE;
 		int to = Math.min(from + PAGE_SIZE, filtered.size());
 
-		summaryLabel.setText(filtered.size() + " entries - " + String.format("%,d", totalPts).replace(",", " ") + " pts");
+		String entryWord = groupToggle.isSelected()
+			? filtered.size() + " sources (" + totalEntries + " entries)"
+			: totalEntries + " entries";
+		summaryLabel.setText(entryWord + " - " + String.format("%,d", totalPts).replace(",", " ") + " pts");
 		pageLabel.setText("Page " + (page + 1) + "/" + pages + "  (" + (filtered.isEmpty() ? 0 : from + 1) + " - " + to + ")");
 		prevButton.setEnabled(page > 0);
 		nextButton.setEnabled(to < filtered.size());
@@ -246,10 +307,10 @@ public class PointsAlbumWindow extends JFrame {
 
 	// ==================== Cards ====================
 
-	private JPanel createEntryCard(AccountResponse.PointsLogEntry entry) {
-		Color accent = sourceColor(entry.getSourceType());
+	private JPanel createEntryCard(CardData card) {
+		Color accent = sourceColor(card.sourceType);
 
-		JPanel card = new JPanel() {
+		JPanel panel = new JPanel() {
 			@Override
 			protected void paintComponent(Graphics g) {
 				Graphics2D g2d = (Graphics2D) g.create();
@@ -261,20 +322,19 @@ public class PointsAlbumWindow extends JFrame {
 				g2d.dispose();
 			}
 		};
-		card.setOpaque(false);
-		card.setLayout(new BorderLayout());
-		card.setBorder(new EmptyBorder(8, 10, 8, 10));
-		card.setPreferredSize(new Dimension(200, 132));
-		if (entry.getSourceDescription() != null) {
-			card.setToolTipText(entry.getSourceDescription());
-		}
+		panel.setOpaque(false);
+		panel.setLayout(new BorderLayout());
+		panel.setBorder(new EmptyBorder(8, 10, 8, 10));
+		panel.setPreferredSize(new Dimension(200, 150));
 
-		// Title band
-		String[] titleParts = splitDescription(entry.getSourceDescription());
-		JLabel title = new JLabel(truncate(titleParts[0], 24), SwingConstants.CENTER);
+		// Title: wraps so the full text is always visible
+		JLabel title = new JLabel(
+			"<html><div style='text-align:center;width:160px'>" + escapeHtml(card.title) + "</div></html>",
+			SwingConstants.CENTER);
 		title.setFont(FontManager.getRunescapeSmallFont());
 		title.setForeground(UIConstants.TEXT_PRIMARY);
-		card.add(title, BorderLayout.NORTH);
+		title.setHorizontalAlignment(SwingConstants.CENTER);
+		panel.add(title, BorderLayout.NORTH);
 
 		// Center: icon + origin line
 		JPanel center = new JPanel();
@@ -287,14 +347,16 @@ public class PointsAlbumWindow extends JFrame {
 		icon.setPreferredSize(new Dimension(36, 36));
 		icon.setMaximumSize(new Dimension(36, 36));
 		icon.setHorizontalAlignment(SwingConstants.CENTER);
-		if (entry.getItemId() != null && itemManager != null) {
-			loadItemIcon(entry.getItemId(), icon);
+		if (card.itemId != null && itemManager != null) {
+			loadItemIcon(card.itemId, icon);
 		} else {
-			icon.setIcon(new SourceBadgeIcon(accent, sourceLabel(entry.getSourceType())));
+			icon.setIcon(new SourceBadgeIcon(accent, sourceLabel(card.sourceType)));
 		}
 		center.add(icon);
 
-		JLabel origin = new JLabel(truncate(titleParts[1], 28), SwingConstants.CENTER);
+		JLabel origin = new JLabel(
+			"<html><div style='text-align:center;width:160px'>" + escapeHtml(card.origin) + "</div></html>",
+			SwingConstants.CENTER);
 		origin.setFont(FontManager.getRunescapeSmallFont());
 		origin.setForeground(UIConstants.TEXT_SECONDARY);
 		origin.setAlignmentX(Component.CENTER_ALIGNMENT);
@@ -302,26 +364,36 @@ public class PointsAlbumWindow extends JFrame {
 		center.add(origin);
 		center.add(Box.createVerticalGlue());
 
-		card.add(center, BorderLayout.CENTER);
+		panel.add(center, BorderLayout.CENTER);
 
-		// Footer: points + date
+		// Footer: points (+ count when grouped) + date
 		JPanel footer = new JPanel(new BorderLayout());
 		footer.setOpaque(false);
 
-		int pts = entry.getPointsChange() != null ? entry.getPointsChange() : 0;
-		JLabel points = new JLabel((pts >= 0 ? "+" : "") + pts + " pts");
-		points.setFont(FontManager.getRunescapeBoldFont());
-		points.setForeground(pts >= 0 ? UIConstants.ACCENT_GOLD : UIConstants.ERROR_COLOR);
+		JPanel pointsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
+		pointsPanel.setOpaque(false);
 
-		JLabel date = new JLabel(formatDate(entry.getCreatedAt()));
+		JLabel points = new JLabel((card.points >= 0 ? "+" : "") + card.points + " pts");
+		points.setFont(FontManager.getRunescapeBoldFont());
+		points.setForeground(card.points >= 0 ? UIConstants.ACCENT_GOLD : UIConstants.ERROR_COLOR);
+		pointsPanel.add(points);
+
+		if (card.count > 1) {
+			JLabel count = new JLabel("x" + card.count);
+			count.setFont(FontManager.getRunescapeSmallFont());
+			count.setForeground(UIConstants.TEXT_SECONDARY);
+			pointsPanel.add(count);
+		}
+
+		JLabel date = new JLabel(formatDate(card.latestDate));
 		date.setFont(FontManager.getRunescapeSmallFont());
 		date.setForeground(UIConstants.TEXT_MUTED);
 
-		footer.add(points, BorderLayout.WEST);
+		footer.add(pointsPanel, BorderLayout.WEST);
 		footer.add(date, BorderLayout.EAST);
-		card.add(footer, BorderLayout.SOUTH);
+		panel.add(footer, BorderLayout.SOUTH);
 
-		return card;
+		return panel;
 	}
 
 	/** [what, where-from] from descriptions like "Drop: Elder venator fang from Maggot King (KC: 152)" */
@@ -337,9 +409,14 @@ public class PointsAlbumWindow extends JFrame {
 		return new String[]{body, " "};
 	}
 
-	private String truncate(String text, int max) {
-		if (text == null) return " ";
-		return text.length() <= max ? text : text.substring(0, max - 2) + "..";
+	private String stripKc(String origin) {
+		if (origin == null) return " ";
+		return origin.replaceAll(" \\(KC: [^)]*\\)$", "");
+	}
+
+	private String escapeHtml(String text) {
+		if (text == null) return "";
+		return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
 	}
 
 	private void loadItemIcon(int itemId, JLabel target) {
@@ -351,7 +428,7 @@ public class PointsAlbumWindow extends JFrame {
 	}
 
 	private String formatDate(String iso) {
-		if (iso == null) return "";
+		if (iso == null || iso.isEmpty()) return "";
 		try {
 			return ZonedDateTime.parse(iso).withZoneSameInstant(ZoneId.systemDefault()).format(DATE_FMT);
 		} catch (Exception e) {
