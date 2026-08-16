@@ -15,7 +15,6 @@ import net.runelite.api.Client;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.game.SpriteManager;
 import net.runelite.client.ui.FontManager;
-import net.runelite.client.util.LinkBrowser;
 
 import javax.swing.*;
 import javax.swing.Timer;
@@ -40,6 +39,7 @@ public class ProfilePanel extends JPanel {
 	private ItemManager itemManager;
 	private SpriteManager spriteManager;
 	private ClanRankIconResolver rankIconResolver;
+	private Runnable onOpenRanks;
 	private Consumer<AccountResponse.AccountData> onAccountLoaded;
 
 	private AccountResponse.AccountData currentAccount;
@@ -105,6 +105,11 @@ public class ProfilePanel extends JPanel {
 		this.spriteManager = spriteManager;
 		this.rankIconResolver = rankIconResolver;
 		fetchRanks();
+	}
+
+	/** Where the rank-up bar navigates (the Ranking side-panel view) */
+	public void setOnOpenRanks(Runnable onOpenRanks) {
+		this.onOpenRanks = onOpenRanks;
 	}
 
 	public void setOnAccountLoaded(Consumer<AccountResponse.AccountData> callback) {
@@ -492,7 +497,7 @@ public class ProfilePanel extends JPanel {
 		progressPanel.setOpaque(false);
 		progressPanel.setBorder(new EmptyBorder(6, 8, 8, 8));
 		progressPanel.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-		progressPanel.setToolTipText("Open the ranks page");
+		progressPanel.setToolTipText("View all ranks");
 
 		JPanel labelRow = new JPanel(new BorderLayout(4, 0));
 		labelRow.setOpaque(false);
@@ -552,7 +557,7 @@ public class ProfilePanel extends JPanel {
 			public void mouseExited(MouseEvent e) { hovered[0] = false; progressPanel.repaint(); }
 			@Override
 			public void mousePressed(MouseEvent e) {
-				if (SwingUtilities.isLeftMouseButton(e)) LinkBrowser.browse("https://www.revalosrs.ee/ranks");
+				if (SwingUtilities.isLeftMouseButton(e) && onOpenRanks != null) onOpenRanks.run();
 			}
 		});
 
