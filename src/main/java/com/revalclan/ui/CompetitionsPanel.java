@@ -222,7 +222,7 @@ public class CompetitionsPanel extends JPanel {
 		}
 
 		card.add(Box.createVerticalStrut(6));
-		card.add(label("Ends in: " + formatTimeRemaining(vote.getVoteEndDate()), FontManager.getRunescapeSmallFont(), UIConstants.TEXT_MUTED));
+		card.add(label("Ends in " + formatTimeRemaining(vote.getVoteEndDate()), FontManager.getRunescapeSmallFont(), UIConstants.TEXT_MUTED));
 		card.add(label(vote.getTotalVotes() + " total votes", FontManager.getRunescapeSmallFont(), UIConstants.TEXT_MUTED));
 
 		if (vote.getOptions() != null && !vote.getOptions().isEmpty()) {
@@ -296,9 +296,9 @@ public class CompetitionsPanel extends JPanel {
 		}
 
 		card.add(Box.createVerticalStrut(6));
-		String timeText = isActive ? "Ends in: " + formatTimeRemaining(comp.getEndDate())
-			: "Starts: " + formatTimeRemaining(comp.getStartDate());
-		card.add(label(timeText, FontManager.getRunescapeSmallFont(), UIConstants.TEXT_MUTED));
+		String timeText = isActive ? "Ends in " + formatTimeRemaining(comp.getEndDate())
+			: "Starts in " + formatTimeRemaining(comp.getStartDate());
+		card.add(label(timeText, FontManager.getRunescapeFont(), isActive ? UIConstants.ACCENT_GREEN : UIConstants.TEXT_PRIMARY));
 
 		if (comp.getParticipantCount() != null && comp.getParticipantCount() > 0) {
 			card.add(label(comp.getParticipantCount() + " participants", FontManager.getRunescapeSmallFont(), UIConstants.TEXT_MUTED));
@@ -317,11 +317,9 @@ public class CompetitionsPanel extends JPanel {
 			divider.setAlignmentX(Component.LEFT_ALIGNMENT);
 			card.add(divider);
 			card.add(Box.createVerticalStrut(8));
-			String topRewards = formatRewards(comp.getRewardConfig());
-			if (!topRewards.isEmpty()) card.add(label(topRewards, FontManager.getRunescapeSmallFont(), UIConstants.ACCENT_GOLD));
-			if (comp.getRewardConfig().containsKey("top10")) {
-				card.add(label("4-10th: " + comp.getRewardConfig().get("top10") + " pts", FontManager.getRunescapeSmallFont(), UIConstants.ACCENT_GOLD));
-			}
+			card.add(label("PRIZES", FontManager.getRunescapeSmallFont(), UIConstants.TEXT_MUTED));
+			card.add(Box.createVerticalStrut(4));
+			card.add(createRewardsGrid(comp.getRewardConfig()));
 		}
 
 		card.addMouseListener(new MouseAdapter() {
@@ -409,9 +407,9 @@ public class CompetitionsPanel extends JPanel {
 		}
 
 		boolean isActive = "active".equalsIgnoreCase(comp.getStatus());
-		String timeText = isActive ? "Ends in: " + formatTimeRemaining(comp.getEndDate())
-			: "Starts: " + formatTimeRemaining(comp.getStartDate());
-		content.add(label(timeText, FontManager.getRunescapeSmallFont(), UIConstants.TEXT_MUTED));
+		String timeText = isActive ? "Ends in " + formatTimeRemaining(comp.getEndDate())
+			: "Starts in " + formatTimeRemaining(comp.getStartDate());
+		content.add(label(timeText, FontManager.getRunescapeFont(), UIConstants.TEXT_PRIMARY));
 
 		if (comp.getParticipantCount() != null) {
 			content.add(label(comp.getParticipantCount() + " participants", FontManager.getRunescapeSmallFont(), UIConstants.TEXT_MUTED));
@@ -599,15 +597,42 @@ public class CompetitionsPanel extends JPanel {
 		}
 	}
 
-	private String formatRewards(Map<String, Integer> rewards) {
-		StringBuilder sb = new StringBuilder();
-		for (int i = 1; i <= 3; i++) {
-			if (rewards.containsKey(String.valueOf(i))) {
-				if (sb.length() > 0) sb.append(" • ");
-				sb.append(i == 1 ? "1st" : i == 2 ? "2nd" : "3rd").append(": ").append(rewards.get(String.valueOf(i))).append(" pts");
-			}
-		}
-		return sb.toString();
+	private static final Color MEDAL_GOLD = new Color(255, 215, 0);
+	private static final Color MEDAL_SILVER = new Color(198, 198, 198);
+	private static final Color MEDAL_BRONZE = new Color(205, 127, 80);
+
+	/** Prize breakdown as a two-column grid: place on the left, points on the right */
+	private JPanel createRewardsGrid(Map<String, Integer> rewards) {
+		JPanel grid = new JPanel(new GridLayout(0, 2, 14, 3));
+		grid.setOpaque(false);
+		grid.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+		addRewardCell(grid, "1st", rewards.get("1"), MEDAL_GOLD);
+		addRewardCell(grid, "2nd", rewards.get("2"), MEDAL_SILVER);
+		addRewardCell(grid, "3rd", rewards.get("3"), MEDAL_BRONZE);
+		addRewardCell(grid, "4-10th", rewards.get("top10"), UIConstants.TEXT_SECONDARY);
+
+		grid.setMaximumSize(new Dimension(Integer.MAX_VALUE, grid.getPreferredSize().height));
+		return grid;
+	}
+
+	private void addRewardCell(JPanel grid, String place, Integer points, Color placeColor) {
+		if (points == null) return;
+
+		JPanel cell = new JPanel(new BorderLayout());
+		cell.setOpaque(false);
+
+		JLabel placeLabel = new JLabel(place);
+		placeLabel.setFont(FontManager.getRunescapeSmallFont());
+		placeLabel.setForeground(placeColor);
+
+		JLabel pointsLabel = new JLabel(points + " pts");
+		pointsLabel.setFont(FontManager.getRunescapeSmallFont());
+		pointsLabel.setForeground(UIConstants.ACCENT_GOLD);
+
+		cell.add(placeLabel, BorderLayout.WEST);
+		cell.add(pointsLabel, BorderLayout.EAST);
+		grid.add(cell);
 	}
 
 	private String formatValue(Integer value) {
