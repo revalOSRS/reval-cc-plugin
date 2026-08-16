@@ -5,8 +5,10 @@ import com.revalclan.api.admin.PendingRankChangesResponse;
 import com.revalclan.ui.components.BackButton;
 import com.revalclan.ui.components.PanelTitle;
 import com.revalclan.ui.constants.UIConstants;
+import com.revalclan.util.ClanRankIconResolver;
 import com.revalclan.util.RankNames;
 import com.revalclan.util.UIAssetLoader;
+import net.runelite.client.game.SpriteManager;
 import net.runelite.client.ui.FontManager;
 
 import javax.swing.*;
@@ -23,16 +25,21 @@ public class PendingRankupsPanel extends JPanel {
 	private final String memberCode;
 	private final Runnable onBack;
 	private final UIAssetLoader assetLoader;
+	private final SpriteManager spriteManager;
+	private final ClanRankIconResolver rankIconResolver;
 
 	private JPanel contentPanel;
 	private boolean isLoading = false;
 
 	public PendingRankupsPanel(RevalApiService apiService, String memberCode,
-	                           Runnable onBack, UIAssetLoader assetLoader) {
+	                           Runnable onBack, UIAssetLoader assetLoader,
+	                           SpriteManager spriteManager, ClanRankIconResolver rankIconResolver) {
 		this.apiService = apiService;
 		this.memberCode = memberCode;
 		this.onBack = onBack;
 		this.assetLoader = assetLoader;
+		this.spriteManager = spriteManager;
+		this.rankIconResolver = rankIconResolver;
 
 		setLayout(new BorderLayout());
 		setBackground(UIConstants.BACKGROUND);
@@ -144,14 +151,39 @@ public class PendingRankupsPanel extends JPanel {
 
 		String prevRank = rankDisplay(change.getPreviousRank());
 		String newRank = rankDisplay(change.getNewRank());
-		JLabel rankLabel = new JLabel(prevRank + " → " + newRank);
-		rankLabel.setFont(FontManager.getRunescapeSmallFont());
-		rankLabel.setForeground(UIConstants.ACCENT_GOLD);
-		rankLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+		JComponent rankLine;
+		if (spriteManager != null && rankIconResolver != null) {
+			JPanel rankPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
+			rankPanel.setOpaque(false);
+
+			JLabel prevIcon = new JLabel();
+			prevIcon.setPreferredSize(new Dimension(18, 18));
+			rankIconResolver.apply(change.getPreviousRank(), spriteManager, prevIcon, 18);
+
+			JLabel arrow = new JLabel("→");
+			arrow.setFont(FontManager.getRunescapeSmallFont());
+			arrow.setForeground(UIConstants.ACCENT_GOLD);
+
+			JLabel newIcon = new JLabel();
+			newIcon.setPreferredSize(new Dimension(18, 18));
+			rankIconResolver.apply(change.getNewRank(), spriteManager, newIcon, 18);
+
+			rankPanel.add(prevIcon);
+			rankPanel.add(arrow);
+			rankPanel.add(newIcon);
+			rankPanel.setToolTipText(prevRank + " → " + newRank);
+			rankLine = rankPanel;
+		} else {
+			JLabel rankLabel = new JLabel(prevRank + " → " + newRank);
+			rankLabel.setFont(FontManager.getRunescapeSmallFont());
+			rankLabel.setForeground(UIConstants.ACCENT_GOLD);
+			rankLine = rankLabel;
+		}
+		rankLine.setAlignmentX(Component.LEFT_ALIGNMENT);
 
 		left.add(nameLabel);
 		left.add(Box.createRigidArea(new Dimension(0, 2)));
-		left.add(rankLabel);
+		left.add(rankLine);
 
 		// Right: actualize button
 		JPanel right = new JPanel(new GridBagLayout());

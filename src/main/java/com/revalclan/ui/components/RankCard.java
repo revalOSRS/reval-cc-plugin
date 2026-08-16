@@ -55,28 +55,10 @@ public class RankCard extends JPanel {
 		}
 
 		if (spriteManager != null && iconResolver != null && rank.getName() != null) {
-			iconResolver.resolve(rank.getName(), spriteId -> loadIcon(spriteId, spriteManager));
+			iconResolver.apply(rank.getName(), spriteManager, iconLabel, 18);
 		}
 	}
 
-	private void loadIcon(int spriteId, SpriteManager spriteManager) {
-		spriteManager.getSpriteAsync(spriteId, 0, sprite -> {
-			if (sprite != null) {
-				SwingUtilities.invokeLater(() -> {
-					// Scale preserving aspect ratio, then pad onto an 18x18 canvas —
-					// forcing sprites square stretches non-square icons (e.g. gems)
-					BufferedImage img = sprite;
-					if (img.getWidth() > 18 || img.getHeight() > 18) {
-						double scale = Math.min(18.0 / img.getWidth(), 18.0 / img.getHeight());
-						img = ImageUtil.resizeImage(img,
-							Math.max(1, (int) Math.round(img.getWidth() * scale)),
-							Math.max(1, (int) Math.round(img.getHeight() * scale)));
-					}
-					iconLabel.setIcon(new ImageIcon(ImageUtil.resizeCanvas(img, 18, 18)));
-				});
-			}
-		});
-	}
 
 	private String formatPoints(int points) {
 		if (points >= 1000) {

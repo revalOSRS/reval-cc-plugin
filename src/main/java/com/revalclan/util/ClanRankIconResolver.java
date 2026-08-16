@@ -4,7 +4,13 @@ import net.runelite.api.Client;
 import net.runelite.api.EnumComposition;
 import net.runelite.api.EnumID;
 import net.runelite.client.callback.ClientThread;
+import net.runelite.client.game.SpriteManager;
+import net.runelite.client.util.ImageUtil;
 
+import javax.swing.ImageIcon;
+import javax.swing.JLabel;
+import javax.swing.SwingUtilities;
+import java.awt.image.BufferedImage;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -80,6 +86,28 @@ public class ClanRankIconResolver {
 		if (spriteId != null) {
 			callback.accept(spriteId);
 		}
+	}
+
+	/**
+	 * Resolve a rank's icon and set it on a Swing label, scaled to fit inside
+	 * a size x size box with the sprite's aspect ratio preserved.
+	 */
+	public void apply(String rankName, SpriteManager spriteManager, JLabel target, int size) {
+		if (spriteManager == null || target == null) return;
+		resolve(rankName, spriteId -> spriteManager.getSpriteAsync(spriteId, 0, sprite -> {
+			if (sprite != null) {
+				SwingUtilities.invokeLater(() -> {
+					BufferedImage img = sprite;
+					if (img.getWidth() > size || img.getHeight() > size) {
+						double scale = Math.min((double) size / img.getWidth(), (double) size / img.getHeight());
+						img = ImageUtil.resizeImage(img,
+							Math.max(1, (int) Math.round(img.getWidth() * scale)),
+							Math.max(1, (int) Math.round(img.getHeight() * scale)));
+					}
+					target.setIcon(new ImageIcon(ImageUtil.resizeCanvas(img, size, size)));
+				});
+			}
+		}));
 	}
 
 	private Map<String, Integer> buildMap() {

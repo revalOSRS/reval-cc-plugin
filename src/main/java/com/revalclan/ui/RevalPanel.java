@@ -65,6 +65,8 @@ public class RevalPanel extends PluginPanel {
 	private PendingRankupsPanel pendingRankupsPanel;
 	private RevalApiService apiService;
 	private Client client;
+	private SpriteManager spriteManager;
+	private ClanRankIconResolver rankIconResolver;
 	private UIAssetLoader assetLoader;
 
 	public RevalPanel() {
@@ -359,7 +361,8 @@ public class RevalPanel extends PluginPanel {
 				if (pendingRankupsPanel == null) {
 					pendingRankupsPanel = new PendingRankupsPanel(
 						apiService, adminManager.getMemberCode(),
-						() -> navigateToAdmin("DASHBOARD"), assetLoader
+						() -> navigateToAdmin("DASHBOARD"), assetLoader,
+						spriteManager, rankIconResolver
 					);
 					contentPanel.add(pendingRankupsPanel, "ADMIN_PENDING_RANKUPS");
 				} else {
@@ -378,6 +381,8 @@ public class RevalPanel extends PluginPanel {
 		this.apiService = apiService;
 		this.client = client;
 		this.assetLoader = assetLoader;
+		this.spriteManager = spriteManager;
+		this.rankIconResolver = rankIconResolver;
 
 		if (assetLoader != null) {
 			ImageIcon infoIcon = assetLoader.getIcon("info.png", 16);
