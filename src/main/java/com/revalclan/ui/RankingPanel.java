@@ -5,6 +5,7 @@ import com.revalclan.api.points.PointsResponse;
 import com.revalclan.ui.components.*;
 import com.revalclan.ui.constants.UIConstants;
 import com.revalclan.util.ClanRankIconResolver;
+import com.revalclan.util.SpriteIcons;
 import net.runelite.api.SpriteID;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.game.SpriteManager;
@@ -16,7 +17,6 @@ import net.runelite.client.ui.FontManager;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
-import java.awt.image.BufferedImage;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -195,7 +195,7 @@ public class RankingPanel extends JPanel {
 			addComponent(createSectionHeader("RANKS", "Clan rank progression"));
 
 			for (PointsResponse.Rank rank : data.getRanks()) {
-				addComponent(new RankCard(rank, spriteManager, rankIconResolver));
+				addComponent(new RankCard(rank, rankIconResolver));
 			}
 		}
 
@@ -273,21 +273,7 @@ public class RankingPanel extends JPanel {
 	}
 
 	private void loadSpriteIcon(int spriteId, CollapsibleSection section) {
-		if (spriteManager == null) return;
-		spriteManager.getSpriteAsync(spriteId, 0, sprite -> {
-			if (sprite != null) {
-				SwingUtilities.invokeLater(() -> {
-					BufferedImage img = sprite;
-					if (img.getWidth() > 22 || img.getHeight() > 22) {
-						double scale = Math.min(22.0 / img.getWidth(), 22.0 / img.getHeight());
-						img = ImageUtil.resizeImage(img,
-							Math.max(1, (int) Math.round(img.getWidth() * scale)),
-							Math.max(1, (int) Math.round(img.getHeight() * scale)));
-					}
-					section.setIcon(new ImageIcon(ImageUtil.resizeCanvas(img, 24, 24)));
-				});
-			}
-		});
+		SpriteIcons.load(spriteManager, spriteId, 24, section::setIcon);
 	}
 
 	private void loadSectionIcon(int itemId, CollapsibleSection section) {

@@ -6,14 +6,14 @@ import com.revalclan.api.account.AccountResponse;
 import com.revalclan.api.points.PointsResponse;
 import com.revalclan.ui.components.ChecklistItem;
 import com.revalclan.ui.components.LoginPrompt;
-import com.revalclan.ui.components.RefreshButton;
 import com.revalclan.ui.constants.UIConstants;
 import com.revalclan.ui.components.ArrowIcon;
+import com.revalclan.ui.components.BlockButton;
 import com.revalclan.util.ClanRankIconResolver;
+import com.revalclan.util.NumberFmt;
 import com.revalclan.util.UIAssetLoader;
 import net.runelite.api.Client;
 import net.runelite.client.game.ItemManager;
-import net.runelite.client.game.SpriteManager;
 import net.runelite.client.ui.FontManager;
 
 import javax.swing.*;
@@ -37,13 +37,13 @@ public class ProfilePanel extends JPanel {
 	private UIAssetLoader assetLoader;
 	private RevalClanConfig config;
 	private ItemManager itemManager;
-	private SpriteManager spriteManager;
 	private ClanRankIconResolver rankIconResolver;
 	private Runnable onOpenRanks;
 	private Runnable onSyncGuide;
 	private Consumer<AccountResponse.AccountData> onAccountLoaded;
 
 	private AccountResponse.AccountData currentAccount;
+	private PointsAlbumWindow albumWindow;
 	private List<PointsResponse.Rank> ranks;
 	private PointsResponse.PointsData pointsData;
 	private List<AccountResponse.PointsLogEntry> pointsLog;
@@ -97,13 +97,12 @@ public class ProfilePanel extends JPanel {
 	}
 
 	public void init(RevalApiService apiService, Client client, UIAssetLoader assetLoader, RevalClanConfig config,
-					 ItemManager itemManager, SpriteManager spriteManager, ClanRankIconResolver rankIconResolver) {
+					 ItemManager itemManager, ClanRankIconResolver rankIconResolver) {
 		this.apiService = apiService;
 		this.client = client;
 		this.assetLoader = assetLoader;
 		this.config = config;
 		this.itemManager = itemManager;
-		this.spriteManager = spriteManager;
 		this.rankIconResolver = rankIconResolver;
 		fetchRanks();
 	}
@@ -358,8 +357,8 @@ public class ProfilePanel extends JPanel {
 		JLabel rankIcon = new JLabel();
 		rankIcon.setPreferredSize(new Dimension(20, 20));
 		rankIcon.setToolTipText(getRankDisplayName(account.getClanRank()));
-		if (rankIconResolver != null && spriteManager != null && account.getClanRank() != null) {
-			rankIconResolver.apply(account.getClanRank(), spriteManager, rankIcon, 20);
+		if (rankIconResolver != null && account.getClanRank() != null) {
+			rankIconResolver.apply(account.getClanRank(), rankIcon, 20);
 		}
 		namePanel.add(rankIcon);
 
@@ -373,7 +372,7 @@ public class ProfilePanel extends JPanel {
 		pointsDisplay.setOpaque(false);
 
 		int points = account.getActivityPoints() != null ? account.getActivityPoints() : 0;
-		JLabel pointsValue = new JLabel(String.format("%,d", points).replace(",", " "));
+		JLabel pointsValue = new JLabel(NumberFmt.group(points));
 		pointsValue.setFont(FontManager.getRunescapeBoldFont());
 		pointsValue.setForeground(UIConstants.ACCENT_GOLD);
 		pointsValue.setAlignmentX(Component.RIGHT_ALIGNMENT);
@@ -397,10 +396,13 @@ public class ProfilePanel extends JPanel {
 			header.add(rankProgress);
 		}
 
-		header.add(Box.createRigidArea(new Dimension(0, 8)));
-		JButton refreshButton = buildRefreshProfileButton();
-		refreshButton.setAlignmentX(Component.LEFT_ALIGNMENT);
-		header.add(refreshButton);
+		// Leaderboard profiles have no client to refresh from
+		if (client != null) {
+			header.add(Box.createRigidArea(new Dimension(0, 8)));
+			JButton refreshButton = buildRefreshProfileButton();
+			refreshButton.setAlignmentX(Component.LEFT_ALIGNMENT);
+			header.add(refreshButton);
+		}
 
 		if (onSyncGuide != null) {
 			header.add(Box.createRigidArea(new Dimension(0, 6)));
@@ -414,29 +416,7 @@ public class ProfilePanel extends JPanel {
 
 	/** Arms the in-game collection log sync guide */
 	private JButton buildSyncGuideButton() {
-		JButton btn = new JButton("Sync missing points") {
-			@Override
-			protected void paintComponent(Graphics g) {
-				Graphics2D g2d = (Graphics2D) g.create();
-				g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-				g2d.setColor(getModel().isRollover() && isEnabled() ? UIConstants.CARD_HOVER : UIConstants.BACKGROUND);
-				g2d.fillRoundRect(0, 0, getWidth(), getHeight(), 6, 6);
-				Color border = UIConstants.TEXT_MUTED;
-				g2d.setColor(new Color(border.getRed(), border.getGreen(), border.getBlue(), 150));
-				g2d.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 6, 6);
-				g2d.dispose();
-				super.paintComponent(g);
-			}
-		};
-		btn.setFont(FontManager.getRunescapeSmallFont());
-		btn.setForeground(UIConstants.TEXT_SECONDARY);
-		btn.setContentAreaFilled(false);
-		btn.setBorderPainted(false);
-		btn.setFocusPainted(false);
-		btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-		btn.setHorizontalAlignment(SwingConstants.CENTER);
-		btn.setPreferredSize(new Dimension(100, 24));
-		btn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 24));
+		JButton btn = new BlockButton("Sync missing points", UIConstants.TEXT_SECONDARY, 24);
 		btn.setToolTipText("Highlights the Sync Reval button in your in-game Collection Log");
 		btn.addActionListener(e -> {
 			if (onSyncGuide != null) onSyncGuide.run();
@@ -450,29 +430,7 @@ public class ProfilePanel extends JPanel {
 
 	/** Full-width block button so the refresh action stands out */
 	private JButton buildRefreshProfileButton() {
-		JButton btn = new JButton("Refresh Profile") {
-			@Override
-			protected void paintComponent(Graphics g) {
-				Graphics2D g2d = (Graphics2D) g.create();
-				g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-				g2d.setColor(getModel().isRollover() && isEnabled() ? UIConstants.CARD_HOVER : UIConstants.BACKGROUND);
-				g2d.fillRoundRect(0, 0, getWidth(), getHeight(), 6, 6);
-				Color gold = UIConstants.ACCENT_GOLD;
-				g2d.setColor(new Color(gold.getRed(), gold.getGreen(), gold.getBlue(), 110));
-				g2d.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 6, 6);
-				g2d.dispose();
-				super.paintComponent(g);
-			}
-		};
-		btn.setFont(FontManager.getRunescapeSmallFont());
-		btn.setForeground(UIConstants.ACCENT_GOLD);
-		btn.setContentAreaFilled(false);
-		btn.setBorderPainted(false);
-		btn.setFocusPainted(false);
-		btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-		btn.setHorizontalAlignment(SwingConstants.CENTER);
-		btn.setPreferredSize(new Dimension(100, 26));
-		btn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 26));
+		JButton btn = new BlockButton("Refresh Profile", UIConstants.ACCENT_GOLD, 26);
 		btn.addActionListener(e -> {
 			btn.setText("Refreshing...");
 			btn.setEnabled(false);
@@ -545,8 +503,10 @@ public class ProfilePanel extends JPanel {
 		progressPanel.setLayout(new BoxLayout(progressPanel, BoxLayout.Y_AXIS));
 		progressPanel.setOpaque(false);
 		progressPanel.setBorder(new EmptyBorder(6, 8, 8, 8));
-		progressPanel.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-		progressPanel.setToolTipText("View all ranks");
+		if (onOpenRanks != null) {
+			progressPanel.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+			progressPanel.setToolTipText("View all ranks");
+		}
 
 		JPanel labelRow = new JPanel(new BorderLayout(4, 0));
 		labelRow.setOpaque(false);
@@ -555,15 +515,15 @@ public class ProfilePanel extends JPanel {
 		JPanel labelLeft = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
 		labelLeft.setOpaque(false);
 
-		JLabel progressLabel = new JLabel(String.format("%,d", pointsRemaining).replace(",", " ") + " pts to");
+		JLabel progressLabel = new JLabel(NumberFmt.group(pointsRemaining) + " pts to");
 		progressLabel.setFont(FontManager.getRunescapeSmallFont());
 		progressLabel.setForeground(UIConstants.TEXT_SECONDARY);
 		labelLeft.add(progressLabel);
 
 		JLabel nextRankIcon = new JLabel();
 		nextRankIcon.setPreferredSize(new Dimension(14, 14));
-		if (rankIconResolver != null && spriteManager != null) {
-			rankIconResolver.apply(nextRank.getName(), spriteManager, nextRankIcon, 14);
+		if (rankIconResolver != null) {
+			rankIconResolver.apply(nextRank.getName(), nextRankIcon, 14);
 		}
 		labelLeft.add(nextRankIcon);
 
@@ -599,16 +559,18 @@ public class ProfilePanel extends JPanel {
 		progressPanel.add(bar);
 		progressPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, progressPanel.getPreferredSize().height));
 
-		progressPanel.addMouseListener(new MouseAdapter() {
-			@Override
-			public void mouseEntered(MouseEvent e) { hovered[0] = true; progressPanel.repaint(); }
-			@Override
-			public void mouseExited(MouseEvent e) { hovered[0] = false; progressPanel.repaint(); }
-			@Override
-			public void mousePressed(MouseEvent e) {
-				if (SwingUtilities.isLeftMouseButton(e) && onOpenRanks != null) onOpenRanks.run();
-			}
-		});
+		if (onOpenRanks != null) {
+			progressPanel.addMouseListener(new MouseAdapter() {
+				@Override
+				public void mouseEntered(MouseEvent e) { hovered[0] = true; progressPanel.repaint(); }
+				@Override
+				public void mouseExited(MouseEvent e) { hovered[0] = false; progressPanel.repaint(); }
+				@Override
+				public void mousePressed(MouseEvent e) {
+					if (SwingUtilities.isLeftMouseButton(e)) onOpenRanks.run();
+				}
+			});
+		}
 
 		return progressPanel;
 	}
@@ -641,8 +603,8 @@ public class ProfilePanel extends JPanel {
 		JPanel bottomRow = new JPanel(new GridLayout(1, 3, 4, 0));
 		bottomRow.setOpaque(false);
 		bottomRow.setAlignmentX(Component.LEFT_ALIGNMENT);
-		bottomRow.add(createStatCard(formatNumber(breakdown.getRevalDiaries()), "Diaries", UIConstants.ACCENT_GOLD, "revalDiaries"));
-		bottomRow.add(createStatCard(formatNumber(breakdown.getRevalChallenges()), "Challenges", UIConstants.ACCENT_GREEN, "revalChallenges"));
+		bottomRow.add(createStatCard(formatNumber(breakdown.getRevalDiaries()), "Diaries", UIConstants.ACCENT_GOLD, "reval_diary"));
+		bottomRow.add(createStatCard(formatNumber(breakdown.getRevalChallenges()), "Challenges", UIConstants.ACCENT_GREEN, "reval_challenge"));
 		bottomRow.add(createStatCard(formatNumber(breakdown.getEvents()), "Events", UIConstants.ACCENT_BLUE, "event"));
 
 		long miscPoints = breakdown.getTotal()
@@ -954,8 +916,6 @@ public class ProfilePanel extends JPanel {
 		return rankName;
 	}
 
-	private PointsAlbumWindow albumWindow;
-
 	private void showPointsBreakdown(String sourceType, String title) {
 		if (pointsLog == null || pointsLog.isEmpty()) {
 			JOptionPane.showMessageDialog(this, "No points log data available.", "Points Log", JOptionPane.INFORMATION_MESSAGE);
@@ -971,5 +931,13 @@ public class ProfilePanel extends JPanel {
 		albumWindow.selectSource(sourceType);
 		albumWindow.setVisible(true);
 		albumWindow.toFront();
+	}
+
+	/** Closes the points album if open; called when the plugin shuts down. */
+	public void disposeAlbum() {
+		if (albumWindow != null) {
+			albumWindow.dispose();
+			albumWindow = null;
+		}
 	}
 }

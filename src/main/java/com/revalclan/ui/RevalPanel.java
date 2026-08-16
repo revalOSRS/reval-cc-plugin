@@ -12,6 +12,7 @@ import com.revalclan.ui.components.IndicatorTabButton;
 import com.revalclan.ui.components.PanelTitle;
 import com.revalclan.ui.constants.UIConstants;
 import com.revalclan.util.ClanRankIconResolver;
+import com.revalclan.util.SpriteIcons;
 import com.revalclan.util.UIAssetLoader;
 import lombok.Getter;
 import net.runelite.api.Client;
@@ -22,12 +23,10 @@ import net.runelite.client.game.ItemManager;
 import net.runelite.client.game.SpriteManager;
 import net.runelite.client.ui.FontManager;
 import net.runelite.client.ui.PluginPanel;
-import net.runelite.client.util.ImageUtil;
 import net.runelite.client.util.LinkBrowser;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
-import java.awt.image.BufferedImage;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
@@ -366,7 +365,7 @@ public class RevalPanel extends PluginPanel {
 					pendingRankupsPanel = new PendingRankupsPanel(
 						apiService, adminManager.getMemberCode(),
 						() -> navigateToAdmin("DASHBOARD"), assetLoader,
-						spriteManager, rankIconResolver
+						rankIconResolver
 					);
 					contentPanel.add(pendingRankupsPanel, "ADMIN_PENDING_RANKUPS");
 				} else {
@@ -389,21 +388,10 @@ public class RevalPanel extends PluginPanel {
 		this.rankIconResolver = rankIconResolver;
 
 		// Leaderboard tab icon: leagues trophy from the game cache
-		if (spriteManager != null && leaderboardTab != null) {
-			spriteManager.getSpriteAsync(net.runelite.api.gameval.SpriteID.LeagueTrophyIcons._5, 0, sprite -> {
-				if (sprite != null) {
-					SwingUtilities.invokeLater(() -> {
-						BufferedImage img = sprite;
-						if (img.getWidth() > 16 || img.getHeight() > 16) {
-							double scale = Math.min(16.0 / img.getWidth(), 16.0 / img.getHeight());
-							img = ImageUtil.resizeImage(img,
-								Math.max(1, (int) Math.round(img.getWidth() * scale)),
-								Math.max(1, (int) Math.round(img.getHeight() * scale)));
-						}
-						leaderboardTab.setIcon(new ImageIcon(ImageUtil.resizeCanvas(img, 16, 16)));
-						leaderboardTab.setText("");
-					});
-				}
+		if (leaderboardTab != null) {
+			SpriteIcons.load(spriteManager, net.runelite.api.gameval.SpriteID.LeagueTrophyIcons._5, 16, icon -> {
+				leaderboardTab.setIcon(icon);
+				leaderboardTab.setText("");
 			});
 		}
 
@@ -419,9 +407,9 @@ public class RevalPanel extends PluginPanel {
 		}
 
 		rankingPanel.init(apiService, itemManager, spriteManager, rankIconResolver);
-		profilePanel.init(apiService, client, assetLoader, config, itemManager, spriteManager, rankIconResolver);
+		profilePanel.init(apiService, client, assetLoader, config, itemManager, rankIconResolver);
 		profilePanel.setOnOpenRanks(() -> selectTab("RANKING"));
-		leaderboardPanel.init(apiService, assetLoader, itemManager, spriteManager, rankIconResolver);
+		leaderboardPanel.init(apiService, assetLoader, itemManager, rankIconResolver);
 		achievementsPanel.init(apiService, client);
 		competitionsPanel.init(apiService, client);
 		eventsPanel.init(apiService, client);

@@ -50,6 +50,7 @@ import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.ClientToolbar;
 import net.runelite.client.ui.NavigationButton;
+import net.runelite.client.ui.overlay.OverlayManager;
 
 @Slf4j
 @PluginDescriptor(
@@ -63,7 +64,8 @@ public class RevalClanPlugin extends Plugin {
 	@Inject	private CollectionLogSyncButton syncButton;
 	@Inject	private SyncGuide syncGuide;
 	@Inject	private SyncGuideOverlay syncGuideOverlay;
-	@Inject	private net.runelite.client.ui.overlay.OverlayManager overlayManager;
+	@Inject	private OverlayManager overlayManager;
+	@Inject	private ClanRankIconResolver rankIconResolver;
 
 	@Inject	private LootNotifier lootNotifier;
 
@@ -187,7 +189,7 @@ public class RevalClanPlugin extends Plugin {
 		try {
 			revalPanel = new RevalPanel();
 			revalPanel.init(revalApiService, client, uiAssetLoader, itemManager, spriteManager, config,
-				new ClanRankIconResolver(client, clientThread));
+				rankIconResolver);
 			revalPanel.getProfilePanel().setOnSyncGuide(() -> {
 				syncGuide.arm();
 				clientThread.invoke(() -> {
@@ -223,6 +225,9 @@ public class RevalClanPlugin extends Plugin {
 		collectionLogManager.clearObtainedItems();
 		syncButton.shutDown();
 		overlayManager.remove(syncGuideOverlay);
+		if (revalPanel != null) {
+			revalPanel.getProfilePanel().disposeAlbum();
+		}
 
 		eventBus.unregister(lootNotifier);
 		eventBus.unregister(clogPersonalBestCapture);

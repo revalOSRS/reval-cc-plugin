@@ -3,19 +3,16 @@ package com.revalclan.ui.components;
 import com.revalclan.api.points.PointsResponse;
 import com.revalclan.ui.constants.UIConstants;
 import com.revalclan.util.ClanRankIconResolver;
-import net.runelite.client.game.SpriteManager;
 import net.runelite.client.ui.FontManager;
-import net.runelite.client.util.ImageUtil;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
-import java.awt.image.BufferedImage;
 
 public class RankCard extends JPanel {
 	private final JLabel iconLabel = new JLabel();
 
-	public RankCard(PointsResponse.Rank rank, SpriteManager spriteManager, ClanRankIconResolver iconResolver) {
+	public RankCard(PointsResponse.Rank rank, ClanRankIconResolver iconResolver) {
 		setLayout(new BorderLayout(6, 0));
 		setBackground(UIConstants.CARD_BG);
 		setBorder(new EmptyBorder(8, 6, 8, 10));
@@ -54,11 +51,10 @@ public class RankCard extends JPanel {
 			setToolTipText(tooltip.toString());
 		}
 
-		if (spriteManager != null && iconResolver != null && rank.getName() != null) {
-			iconResolver.apply(rank.getName(), spriteManager, iconLabel, 18);
+		if (iconResolver != null && rank.getName() != null) {
+			iconResolver.apply(rank.getName(), iconLabel, 18);
 		}
 	}
-
 
 	private String formatPoints(int points) {
 		if (points >= 1000) {

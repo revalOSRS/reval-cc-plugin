@@ -2,6 +2,7 @@ package com.revalclan.ui;
 
 import com.revalclan.api.account.AccountResponse;
 import com.revalclan.ui.constants.UIConstants;
+import com.revalclan.util.NumberFmt;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.ui.FontManager;
 import net.runelite.client.util.AsyncBufferedImage;
@@ -34,20 +35,50 @@ public class PointsAlbumWindow extends JFrame {
 	private static final int GRID_COLUMNS = 4;
 	private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("MMM d, HH:mm");
 
-	/** Combo label -> filter key ("misc" = everything without a dedicated card) */
-	private static final String[][] SOURCES = {
-		{"All sources", null},
-		{"Drops", "drop"},
-		{"Pets", "pet"},
-		{"Milestones", "milestone"},
-		{"Diaries", "reval_diary"},
-		{"Challenges", "reval_challenge"},
-		{"Events", "event"},
-		{"Misc", "misc"},
-	};
-	private static final Set<String> KNOWN_TYPES = new HashSet<>(Arrays.asList(
-		"drop", "pet", "milestone", "event", "reval_diary", "reval_challenge"
-	));
+	/** Point sources: combo label, backend source_type filter, and card accent/badge. */
+	private enum SourceKind {
+		ALL("All sources", null, UIConstants.TEXT_SECONDARY, "?"),
+		DROP("Drops", "drop", UIConstants.ACCENT_GREEN, "D"),
+		PET("Pets", "pet", UIConstants.ACCENT_PURPLE, "P"),
+		MILESTONE("Milestones", "milestone", UIConstants.ACCENT_BLUE, "M"),
+		DIARY("Diaries", "reval_diary", UIConstants.ACCENT_GOLD, "DI"),
+		CHALLENGE("Challenges", "reval_challenge", UIConstants.ACCENT_GREEN, "C"),
+		EVENT("Events", "event", UIConstants.ACCENT_BLUE, "E"),
+		MISC("Misc", "misc", UIConstants.TEXT_SECONDARY, "?");
+
+		final String label;
+		final String key;
+		final Color color;
+		final String badge;
+
+		SourceKind(String label, String key, Color color, String badge) {
+			this.label = label;
+			this.key = key;
+			this.color = color;
+			this.badge = badge;
+		}
+
+		/** The kind a raw source_type renders as; MISC for anything without a dedicated entry. */
+		static SourceKind of(String sourceType) {
+			String t = sourceType != null ? sourceType.toLowerCase() : "";
+			for (SourceKind kind : values()) {
+				if (t.equals(kind.key)) {
+					return kind;
+				}
+			}
+			return MISC;
+		}
+
+		boolean matches(String sourceType) {
+			if (key == null) {
+				return true;
+			}
+			if (this == MISC) {
+				return of(sourceType) == MISC;
+			}
+			return key.equals(sourceType);
+		}
+	}
 
 	/** One rendered card: a single log entry, or several grouped by title */
 	private static class CardData {
@@ -97,8 +128,9 @@ public class PointsAlbumWindow extends JFrame {
 		filterRow.setOpaque(false);
 
 		filterRow.add(mutedLabel("Source:"));
-		String[] sourceLabels = new String[SOURCES.length];
-		for (int i = 0; i < SOURCES.length; i++) sourceLabels[i] = SOURCES[i][0];
+		SourceKind[] kinds = SourceKind.values();
+		String[] sourceLabels = new String[kinds.length];
+		for (int i = 0; i < kinds.length; i++) sourceLabels[i] = kinds[i].label;
 		sourceCombo = styledCombo(new JComboBox<>(sourceLabels));
 		filterRow.add(sourceCombo);
 
@@ -179,14 +211,11 @@ public class PointsAlbumWindow extends JFrame {
 		rebuild();
 	}
 
-	/** Pre-select a source filter using the profile stat-card keys. */
-	public void selectSource(String statCardKey) {
-		String key = statCardKey == null ? null
-			: statCardKey.equals("revalDiaries") ? "reval_diary"
-			: statCardKey.equals("revalChallenges") ? "reval_challenge"
-			: statCardKey;
-		for (int i = 0; i < SOURCES.length; i++) {
-			if (key == null ? SOURCES[i][1] == null : key.equals(SOURCES[i][1])) {
+	/** Pre-select a source filter by its backend source_type key (null = all). */
+	public void selectSource(String sourceKey) {
+		SourceKind[] kinds = SourceKind.values();
+		for (int i = 0; i < kinds.length; i++) {
+			if (sourceKey == null ? kinds[i].key == null : sourceKey.equals(kinds[i].key)) {
 				sourceCombo.setSelectedIndex(i);
 				return;
 			}
@@ -196,7 +225,7 @@ public class PointsAlbumWindow extends JFrame {
 	// ==================== Pipeline ====================
 
 	private void rebuild() {
-		String key = SOURCES[sourceCombo.getSelectedIndex()][1];
+		SourceKind source = SourceKind.values()[sourceCombo.getSelectedIndex()];
 		String query = searchField.getText() != null ? searchField.getText().trim().toLowerCase() : "";
 
 		List<CardData> cards = new ArrayList<>();
@@ -207,10 +236,7 @@ public class PointsAlbumWindow extends JFrame {
 		for (AccountResponse.PointsLogEntry entry : allEntries) {
 			if (entry.getPointsChange() == null) continue;
 			String type = entry.getSourceType() != null ? entry.getSourceType().toLowerCase() : "";
-			if (key != null) {
-				boolean match = "misc".equals(key) ? !KNOWN_TYPES.contains(type) : key.equals(type);
-				if (!match) continue;
-			}
+			if (!source.matches(type)) continue;
 			if (!query.isEmpty()) {
 				String desc = entry.getSourceDescription() != null ? entry.getSourceDescription().toLowerCase() : "";
 				if (!desc.contains(query)) continue;
@@ -270,7 +296,7 @@ public class PointsAlbumWindow extends JFrame {
 		String entryWord = groupToggle.isSelected()
 			? filtered.size() + " sources (" + totalEntries + " entries)"
 			: totalEntries + " entries";
-		summaryLabel.setText(entryWord + " - " + String.format("%,d", totalPts).replace(",", " ") + " pts");
+		summaryLabel.setText(entryWord + " - " + NumberFmt.group(totalPts) + " pts");
 		pageLabel.setText("Page " + (page + 1) + "/" + pages + "  (" + (filtered.isEmpty() ? 0 : from + 1) + " - " + to + ")");
 		prevButton.setEnabled(page > 0);
 		nextButton.setEnabled(to < filtered.size());
@@ -279,8 +305,11 @@ public class PointsAlbumWindow extends JFrame {
 		for (int i = from; i < to; i++) {
 			gridPanel.add(createEntryCard(filtered.get(i)));
 		}
-		// keep card sizes stable on partial pages
-		for (int i = to - from; i < Math.min(PAGE_SIZE, GRID_COLUMNS * 2); i++) {
+		// GridLayout(0, n) re-derives the column count from the row count, so a
+		// partial last row shrinks every column; pad it to keep 4 equal columns
+		int remainder = (to - from) % GRID_COLUMNS;
+		int fillers = (to - from) == 0 ? GRID_COLUMNS : (remainder == 0 ? 0 : GRID_COLUMNS - remainder);
+		for (int i = 0; i < fillers; i++) {
 			JPanel filler = new JPanel();
 			filler.setOpaque(false);
 			gridPanel.add(filler);
@@ -292,7 +321,8 @@ public class PointsAlbumWindow extends JFrame {
 	// ==================== Cards ====================
 
 	private JPanel createEntryCard(CardData card) {
-		Color accent = sourceColor(card.sourceType);
+		SourceKind kind = SourceKind.of(card.sourceType);
+		Color accent = kind.color;
 
 		JPanel panel = new JPanel() {
 			@Override
@@ -329,7 +359,7 @@ public class PointsAlbumWindow extends JFrame {
 		if (card.itemId != null && itemManager != null) {
 			loadItemIcon(card.itemId, icon);
 		} else {
-			icon.setIcon(new SourceBadgeIcon(accent, sourceLabel(card.sourceType)));
+			icon.setIcon(new SourceBadgeIcon(accent, kind.badge));
 		}
 		center.add(icon);
 
@@ -371,7 +401,11 @@ public class PointsAlbumWindow extends JFrame {
 		return panel;
 	}
 
-	/** Label prefixes that carry no information beyond the source type */
+	/**
+	 * Prefixes the backend's points-log description builders emit ("Drop: X from Y",
+	 * "Milestone: ..."). They repeat what the card's badge already shows, so they are
+	 * stripped from titles; anything else ("200M XP:", boss names) is meaningful and kept.
+	 */
 	private static final Set<String> STRIP_PREFIXES = new HashSet<>(Arrays.asList(
 		"drop", "pet", "new pet", "duplicate pet", "milestone", "xp milestone",
 		"loyalty", "event", "manual", "misc", "diary", "challenge", "achievement",
@@ -420,32 +454,6 @@ public class PointsAlbumWindow extends JFrame {
 			} catch (Exception ignored) {
 				return iso.length() > 10 ? iso.substring(0, 10) : iso;
 			}
-		}
-	}
-
-	private Color sourceColor(String sourceType) {
-		String t = sourceType != null ? sourceType.toLowerCase() : "";
-		switch (t) {
-			case "drop": return UIConstants.ACCENT_GREEN;
-			case "pet": return UIConstants.ACCENT_PURPLE;
-			case "milestone": return UIConstants.ACCENT_BLUE;
-			case "reval_diary": return UIConstants.ACCENT_GOLD;
-			case "reval_challenge": return UIConstants.ACCENT_GREEN;
-			case "event": return UIConstants.ACCENT_BLUE;
-			default: return UIConstants.TEXT_SECONDARY;
-		}
-	}
-
-	private String sourceLabel(String sourceType) {
-		String t = sourceType != null ? sourceType.toLowerCase() : "";
-		switch (t) {
-			case "drop": return "D";
-			case "pet": return "P";
-			case "milestone": return "M";
-			case "reval_diary": return "DI";
-			case "reval_challenge": return "C";
-			case "event": return "E";
-			default: return "?";
 		}
 	}
 
