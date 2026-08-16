@@ -3,6 +3,7 @@ package com.revalclan.ui.admin;
 import com.revalclan.api.RevalApiService;
 import com.revalclan.api.admin.AdminAuthResponse;
 import com.revalclan.ui.components.PanelTitle;
+import com.revalclan.ui.components.ArrowIcon;
 import com.revalclan.ui.constants.UIConstants;
 import net.runelite.client.ui.FontManager;
 
@@ -162,9 +163,7 @@ public class AdminDashboardPanel extends JPanel {
 		textPanel.add(Box.createRigidArea(new Dimension(0, 2)));
 		textPanel.add(descLbl);
 
-		JLabel arrow = new JLabel("→");
-		arrow.setFont(FontManager.getRunescapeSmallFont());
-		arrow.setForeground(UIConstants.TEXT_SECONDARY);
+		JLabel arrow = new JLabel(new ArrowIcon(12, UIConstants.TEXT_SECONDARY));
 		arrow.setVerticalAlignment(SwingConstants.CENTER);
 
 		btn.add(textPanel, BorderLayout.CENTER);

@@ -2,6 +2,7 @@ package com.revalclan.ui.admin;
 
 import com.revalclan.api.RevalApiService;
 import com.revalclan.api.admin.PendingRankChangesResponse;
+import com.revalclan.ui.components.ArrowIcon;
 import com.revalclan.ui.components.BackButton;
 import com.revalclan.ui.components.PanelTitle;
 import com.revalclan.ui.constants.UIConstants;
@@ -137,7 +138,7 @@ public class PendingRankupsPanel extends JPanel {
 		card.setAlignmentX(Component.LEFT_ALIGNMENT);
 
 		String name = change.getOsrsNickname() != null ? change.getOsrsNickname() : "Unknown";
-		card.setToolTipText(name + " • " + formatTimestamp(change.getChangedAt()));
+		card.setToolTipText(name + " - " + formatTimestamp(change.getChangedAt()));
 
 		// Left: name + rank transition
 		JPanel left = new JPanel();
@@ -160,9 +161,7 @@ public class PendingRankupsPanel extends JPanel {
 			prevIcon.setPreferredSize(new Dimension(18, 18));
 			rankIconResolver.apply(change.getPreviousRank(), spriteManager, prevIcon, 18);
 
-			JLabel arrow = new JLabel("→");
-			arrow.setFont(FontManager.getRunescapeSmallFont());
-			arrow.setForeground(UIConstants.ACCENT_GOLD);
+			JLabel arrow = new JLabel(new ArrowIcon(12, UIConstants.ACCENT_GOLD));
 
 			JLabel newIcon = new JLabel();
 			newIcon.setPreferredSize(new Dimension(18, 18));
@@ -171,10 +170,10 @@ public class PendingRankupsPanel extends JPanel {
 			rankPanel.add(prevIcon);
 			rankPanel.add(arrow);
 			rankPanel.add(newIcon);
-			rankPanel.setToolTipText(prevRank + " → " + newRank);
+			rankPanel.setToolTipText(prevRank + " -> " + newRank);
 			rankLine = rankPanel;
 		} else {
-			JLabel rankLabel = new JLabel(prevRank + " → " + newRank);
+			JLabel rankLabel = new JLabel(prevRank + " -> " + newRank);
 			rankLabel.setFont(FontManager.getRunescapeSmallFont());
 			rankLabel.setForeground(UIConstants.ACCENT_GOLD);
 			rankLine = rankLabel;
