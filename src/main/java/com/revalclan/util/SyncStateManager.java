@@ -16,11 +16,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /**
  * Tracks the sync-state fingerprint handshake.
  *
- * The plugin hashes its full account state (quests, diaries, combat achievements,
- * collection log obtained items — kill counts deliberately EXCLUDED, they change
- * constantly and are delivered by KILL_COUNT events / manual sync) and sends the
- * hash with LOGIN/LOGOUT/SYNC payloads. When the hash equals the last one the
- * server acknowledged, the bulky state categories are omitted from the payload.
+ * The plugin hashes its account state (quests + miniquests, diaries, combat
+ * achievements — the collection log is deliberately EXCLUDED: boundary payloads
+ * never carry a real scan, so clog truth flows only via explicit Sync; kill
+ * counts are also excluded, they change constantly and are delivered by
+ * KILL_COUNT events / manual sync) and sends the hash with LOGIN/LOGOUT/SYNC
+ * payloads. When the hash equals the last one the server acknowledged, the
+ * bulky state categories are omitted from the payload.
  *
  * The server's ack (webhook response `sync: {fingerprint, stale}`) is persisted
  * per account in the RuneLite config store. `stale: true` means the server never
@@ -50,13 +52,20 @@ public class SyncStateManager {
 		try {
 			StringBuilder canonical = new StringBuilder(16384);
 
-			// Quests: sorted name=state + quest points
+			// Quests: sorted name=state (quests, then miniquests) + quest points
 			Map<String, Object> quests = (Map<String, Object>) data.get("quests");
 			canonical.append("quests|");
 			if (quests != null) {
 				Object questStates = quests.get("questStates");
 				if (questStates instanceof Map) {
 					for (Map.Entry<String, Object> e : new TreeMap<>((Map<String, Object>) questStates).entrySet()) {
+						canonical.append(e.getKey()).append('=').append(e.getValue()).append(';');
+					}
+				}
+				Object miniquestStates = quests.get("miniquestStates");
+				if (miniquestStates instanceof Map) {
+					canonical.append("mini|");
+					for (Map.Entry<String, Object> e : new TreeMap<>((Map<String, Object>) miniquestStates).entrySet()) {
 						canonical.append(e.getKey()).append('=').append(e.getValue()).append(';');
 					}
 				}
@@ -106,46 +115,12 @@ public class SyncStateManager {
 				canonical.append("pts=").append(cas.get("totalPoints"));
 			}
 
-			// Collection log: in-game unique counter + obtained count + sorted
-			// itemId:quantity of obtained items. The items lists carry ONLY
-			// obtained items (slim shape, no `obtained` flag); a present flag is
-			// still honoured for shape tolerance. Hashing uniqueObtained keeps
-			// the server fresh when uniques drop without the log being opened —
-			// and its introduction changes every fingerprint once post-update,
-			// pushing one full payload that delivers the new counter.
-			// KC attributes are intentionally NOT hashed (see class javadoc).
-			Map<String, Object> clog = (Map<String, Object>) data.get("collectionLog");
-			canonical.append("|clog|");
-			if (clog != null) {
-				canonical.append("unique=").append(clog.get("uniqueObtained")).append(';');
-				canonical.append("count=").append(clog.get("obtainedItems")).append(';');
-				Object categories = clog.get("categories");
-				if (categories instanceof Map) {
-					TreeMap<Integer, Integer> obtained = new TreeMap<>();
-					for (Object categoryObj : ((Map<String, Object>) categories).values()) {
-						if (!(categoryObj instanceof Map)) continue;
-						for (Object subObj : ((Map<String, Object>) categoryObj).values()) {
-							if (!(subObj instanceof Map)) continue;
-							Object items = ((Map<String, Object>) subObj).get("items");
-							if (!(items instanceof List)) continue;
-							for (Object itemObj : (List<Object>) items) {
-								if (!(itemObj instanceof Map)) continue;
-								Map<String, Object> item = (Map<String, Object>) itemObj;
-								Object obtainedFlag = item.get("obtained");
-								boolean isObtained = obtainedFlag == null || Boolean.TRUE.equals(obtainedFlag);
-								if (isObtained && item.get("id") instanceof Number) {
-									int id = ((Number) item.get("id")).intValue();
-									int qty = item.get("quantity") instanceof Number ? ((Number) item.get("quantity")).intValue() : 1;
-									obtained.merge(id, qty, Integer::sum);
-								}
-							}
-						}
-					}
-					for (Map.Entry<Integer, Integer> e : obtained.entrySet()) {
-						canonical.append(e.getKey()).append(':').append(e.getValue()).append(';');
-					}
-				}
-			}
+			// Collection log is intentionally NOT part of the fingerprint:
+			// boundary payloads no longer carry it (no real scan exists at
+			// LOGIN/LOGOUT), so hashing scan-dependent clog state only forced
+			// pointless full boundary payloads. Dropping it changes every
+			// fingerprint once post-update. KC attributes are likewise not
+			// hashed (see class javadoc).
 
 			return sha256Hex(canonical.toString());
 		} catch (Exception e) {
