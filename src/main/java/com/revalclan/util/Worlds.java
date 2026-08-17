@@ -7,15 +7,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * World-type helpers. The backend owns the regular-worlds-only rule: every
- * payload is stamped with the client's WorldType flag names and the server
- * dispatcher blocks non-regular worlds (seasonal, deadman, speedrun, ...)
- * centrally.
+ * World-type helpers. Payloads are stamped with WorldType flag names;
+ * the backend owns the regular-worlds-only rule.
  */
 public final class Worlds {
 	private Worlds() {}
 
-	/** WorldType flag names of the world the client is on, for payload stamping. */
+	/** WorldType flag names of the current world. */
 	public static List<String> flagNames(Client client) {
 		List<String> flags = new ArrayList<>();
 		for (WorldType t : client.getWorldType()) {

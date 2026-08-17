@@ -8,10 +8,8 @@ import javax.inject.Singleton;
 import java.util.Map;
 
 /**
- * Handles full account sync events.
- * Triggered manually via the collection log button, or automatically when the
- * server reports the sync fingerprint as stale. ALWAYS sends the full state —
- * this is the repair path for fingerprint drift.
+ * Full account sync — manual button press or server-requested fingerprint
+ * repair. ALWAYS sends the full state.
  */
 @Singleton
 public class SyncNotifier extends BaseNotifier {

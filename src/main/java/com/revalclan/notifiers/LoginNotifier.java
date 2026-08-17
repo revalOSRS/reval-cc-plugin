@@ -9,9 +9,7 @@ import com.revalclan.util.SyncStateManager;
 import java.util.Map;
 
 /**
- * Notifies when a player logs in.
- * Sends the session-boundary payload: full state when it changed since the last
- * server ack, or a slim player+fingerprint payload when unchanged.
+ * Sends the LOGIN boundary payload (full or slim depending on the fingerprint).
  */
 @Singleton
 public class LoginNotifier extends BaseNotifier {

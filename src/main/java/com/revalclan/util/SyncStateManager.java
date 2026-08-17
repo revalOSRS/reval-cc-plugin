@@ -14,20 +14,11 @@ import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Tracks the sync-state fingerprint handshake.
- *
- * The plugin hashes its account state (quests + miniquests, diaries, combat
- * achievements — the collection log is deliberately EXCLUDED: boundary payloads
- * never carry a real scan, so clog truth flows only via explicit Sync; kill
- * counts are also excluded, they change constantly and are delivered by
- * KILL_COUNT events / manual sync) and sends the hash with LOGIN/LOGOUT/SYNC
- * payloads. When the hash equals the last one the server acknowledged, the
- * bulky state categories are omitted from the payload.
- *
- * The server's ack (webhook response `sync: {fingerprint, stale}`) is persisted
- * per account in the RuneLite config store. `stale: true` means the server never
- * processed the state we think it has — the acked fingerprint is cleared and a
- * full SYNC is requested (sent from the game-tick loop, where client access is safe).
+ * Sync-state fingerprint handshake: hashes quests + miniquests, diaries and
+ * CAs (clog and KCs deliberately excluded — no real clog scan exists at
+ * boundaries, KCs change constantly). When the hash matches the last server
+ * ack, boundary payloads go slim. An ack with stale=true clears the stored
+ * fingerprint and requests a full repair SYNC.
  */
 @Slf4j
 @Singleton
@@ -40,13 +31,7 @@ public class SyncStateManager {
 	/** Set from the webhook response thread; consumed on the game-tick thread */
 	private final AtomicBoolean fullSyncRequested = new AtomicBoolean(false);
 
-	// ==================== FINGERPRINT COMPUTATION ====================
-
-	/**
-	 * Compute the canonical state fingerprint from a collected data map
-	 * (the output of PlayerDataCollector.collectAllData()).
-	 * Returns null when the data is too incomplete to fingerprint safely.
-	 */
+	/** Canonical state fingerprint; null when the data is too incomplete to hash safely. */
 	@SuppressWarnings("unchecked")
 	public String computeFingerprint(Map<String, Object> data) {
 		try {
@@ -90,9 +75,8 @@ public class SyncStateManager {
 				}
 			}
 
-			// Combat achievements: sorted completed task names + total points.
-			// allTasks carries ONLY completed tasks (slim shape, no `completed`
-			// flag); a present flag is still honoured for shape tolerance.
+			// CAs: sorted completed task names + total points (a present `completed`
+			// flag is honoured, but the slim shape omits it)
 			Map<String, Object> cas = (Map<String, Object>) data.get("combatAchievements");
 			canonical.append("|cas|");
 			if (cas != null) {
@@ -115,12 +99,7 @@ public class SyncStateManager {
 				canonical.append("pts=").append(cas.get("totalPoints"));
 			}
 
-			// Collection log is intentionally NOT part of the fingerprint:
-			// boundary payloads no longer carry it (no real scan exists at
-			// LOGIN/LOGOUT), so hashing scan-dependent clog state only forced
-			// pointless full boundary payloads. Dropping it changes every
-			// fingerprint once post-update. KC attributes are likewise not
-			// hashed (see class javadoc).
+			// Collection log and KCs are deliberately NOT hashed (see class javadoc)
 
 			return sha256Hex(canonical.toString());
 		} catch (Exception e) {
@@ -128,8 +107,6 @@ public class SyncStateManager {
 			return null;
 		}
 	}
-
-	// ==================== ACKED FINGERPRINT PERSISTENCE ====================
 
 	public String getAckedFingerprint(long accountHash) {
 		return configManager.getConfiguration(CONFIG_GROUP, CONFIG_KEY_PREFIX + accountHash);
@@ -145,12 +122,7 @@ public class SyncStateManager {
 		} catch (Exception ignored) {}
 	}
 
-	// ==================== SERVER ACK HANDLING ====================
-
-	/**
-	 * Handle the `sync` object from a webhook response (runs on the HTTP thread —
-	 * touches only the config store, never the client).
-	 */
+	/** Handles the `sync` object from a webhook response. HTTP thread — never touch the client. */
 	public void handleSyncAckResponse(JsonObject response, long accountHash) {
 		try {
 			if (response == null || !response.has("sync") || !response.get("sync").isJsonObject()) return;
@@ -158,7 +130,6 @@ public class SyncStateManager {
 
 			boolean stale = sync.has("stale") && !sync.get("stale").isJsonNull() && sync.get("stale").getAsBoolean();
 			if (stale) {
-				// Server never processed the state we skipped on — clear and re-send full
 				clearAckedFingerprint(accountHash);
 				fullSyncRequested.set(true);
 				log.info("Sync fingerprint stale — full sync requested");
@@ -173,7 +144,7 @@ public class SyncStateManager {
 		}
 	}
 
-	/** Consume the pending full-sync request (checked from the game-tick loop) */
+	/** Consumed from the game-tick loop */
 	public boolean consumeFullSyncRequest() {
 		return fullSyncRequested.getAndSet(false);
 	}

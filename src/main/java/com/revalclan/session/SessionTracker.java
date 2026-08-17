@@ -20,18 +20,10 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Accumulates the whole play session client-side (kills, loot, clues, deaths,
- * start/end skill snapshots) and delivers it as one session summary:
- *
- *   - attached to the LOGOUT event on a clean logout, or
- *   - replayed as a standalone SESSION_SUMMARY event ("recovered") on the next
- *     plugin startup when the client crashed / was X'd out before LOGOUT fired.
- *
- * Crash resilience: the accumulator is periodically serialized into the RuneLite
- * config store (local disk, cheap, throttled to once per PERSIST_INTERVAL_TICKS
- * and only when dirty). recoverPersistedSession() on startup replays anything
- * left behind. The summary is idempotent server-side on {@code sessionId}, so a
- * replay racing a delivered LOGOUT can never double-store.
+ * Accumulates the play session client-side and delivers ONE summary: attached
+ * to LOGOUT on a clean logout, or replayed as a recovered SESSION_SUMMARY on
+ * next startup after a crash/X-out (periodically persisted to the config
+ * store). Server dedupes on sessionId, so a replay can never double-store.
  */
 @Slf4j
 @Singleton
@@ -39,14 +31,13 @@ public class SessionTracker {
 	private static final String CONFIG_GROUP = "revalclan";
 	private static final String CONFIG_KEY = "activeSessionJson";
 
-	/** Persist locally at most once per this many game ticks (~30s) and only when dirty */
+	/** Persist at most once per this many ticks (~30s), and only when dirty */
 	private static final int PERSIST_INTERVAL_TICKS = 50;
 
-	/** Malfunction guard only — no legitimate session reaches these. Distinct
-	 *  loot entries (item+source); totals stay exact even past the cap. */
+	/** Malfunction guard — totals stay exact even past the cap */
 	private static final int MAX_LOOT_ENTRIES = 5000;
 
-	/** Malfunction guard for list-shaped collections (deaths) */
+	/** Malfunction guard (deaths) */
 	private static final int MAX_LIST_ENTRIES = 1000;
 
 	@Inject private Client client;
@@ -74,13 +65,9 @@ public class SessionTracker {
 	private long totalLootValue = 0;
 	private final List<Map<String, Object>> deaths = new ArrayList<>();
 
-	// ==================== LIFECYCLE ====================
-
 	/**
-	 * Start tracking a new session. Must be called on the client thread while
-	 * logged in (clan validation point). Sessions start on any world — the
-	 * backend owns the regular-worlds-only rule and gates every payload on the
-	 * worldFlags captured here.
+	 * Start a new session (client thread, logged in). Any world — the backend
+	 * gates on the worldFlags captured here.
 	 */
 	public void startSession() {
 		resetState();
@@ -99,10 +86,9 @@ public class SessionTracker {
 	}
 
 	/**
-	 * Finalize the current session (clean logout) and return the summary map to
-	 * embed in the LOGOUT payload, or null when no session is active.
-	 * The persisted copy is kept until the server confirms delivery
-	 * (confirmDelivered) — a client closed mid-send replays it on next startup.
+	 * Finalize (clean logout) and return the summary for the LOGOUT payload, or
+	 * null. The persisted copy is kept until confirmDelivered — a client closed
+	 * mid-send replays it next startup.
 	 */
 	public Map<String, Object> finalizeSession() {
 		if (!active) return null;
@@ -119,20 +105,12 @@ public class SessionTracker {
 		return summary;
 	}
 
-	/**
-	 * Server confirmed it received the summary with the given sessionId — drop
-	 * the local copy, but only if it still belongs to that session. A delayed
-	 * ack arriving after a quick relog must not delete the new session's copy.
-	 */
+	/** Drop the persisted copy — only if it still belongs to this sessionId. */
 	public void confirmDelivered(String deliveredSessionId) {
 		clearPersistedIfSession(deliveredSessionId);
 	}
 
-	/**
-	 * On plugin startup: if a previous session was persisted but never finalized
-	 * (crash / X-out), replay it to the backend as a recovered SESSION_SUMMARY.
-	 * Safe to call when nothing is persisted.
-	 */
+	/** Replay a persisted-but-unfinalized session as a recovered SESSION_SUMMARY. */
 	public void recoverPersistedSession() {
 		try {
 			String json = configManager.getConfiguration(CONFIG_GROUP, CONFIG_KEY);
@@ -146,22 +124,20 @@ public class SessionTracker {
 			payload.put("eventTimestamp", System.currentTimeMillis());
 			payload.put("accountHash", persisted.get("accountHash").getAsLong());
 			payload.put("username", persisted.get("username").getAsString());
-			// The session's world flags drive the server's world gate — without
-			// them a recovered leagues session would be ingested as main-game data
+			// World flags drive the server's world gate (keeps leagues sessions out)
 			if (persisted.has("world")) {
 				payload.put("world", persisted.get("world").getAsInt());
 			}
 			if (persisted.has("worldFlags")) {
 				payload.put("worldFlags", persisted.get("worldFlags"));
 			}
-			// JsonElement values serialize natively through Gson — no lossy Map round-trip
 			payload.put("sessionSummary", persisted.get("summary"));
 
 			String recoveredSessionId = persisted.getAsJsonObject("summary").has("sessionId")
 				? persisted.getAsJsonObject("summary").get("sessionId").getAsString()
 				: null;
 
-			// Clear only once the server confirms receipt; otherwise retry next startup
+			// Clear only on server confirm; otherwise retry next startup
 			webhookService.sendDataAsync(payload, response -> clearPersistedIfSession(recoveredSessionId));
 			log.info("Recovered unfinished session, replayed as SESSION_SUMMARY");
 		} catch (Exception e) {
@@ -170,15 +146,10 @@ public class SessionTracker {
 		}
 	}
 
-	/**
-	 * Tick driver: throttled local persistence of the accumulator (client thread).
-	 */
+	/** Throttled local persistence (client thread). */
 	public void onGameTick() {
 		if (!active) return;
-		// XP moves without firing any accumulator event (pure skilling never
-		// touches addKill/addLoot/...), so treat XP movement as dirtiness itself.
-		// Refreshing here also keeps the end snapshot current for a clean logout,
-		// where refreshEndSnapshot() can no longer run (game state left LOGGED_IN).
+		// Pure skilling fires no accumulator event — treat XP movement as dirtiness
 		if (xpChangedSinceSnapshot()) {
 			refreshEndSnapshot();
 			lastUpdateMs = System.currentTimeMillis();
@@ -203,8 +174,6 @@ public class SessionTracker {
 		resetState();
 	}
 
-	// ==================== ACCUMULATORS ====================
-
 	public void addKill(String npcName) {
 		if (!active || npcName == null || npcName.isEmpty()) return;
 		kills.merge(npcName, 1, Integer::sum);
@@ -228,7 +197,6 @@ public class SessionTracker {
 			entry.put("source", source);
 			loot.put(key, entry);
 		}
-		// over the cap: value still counts via totalLootValue
 		dirty = true;
 	}
 
@@ -252,8 +220,6 @@ public class SessionTracker {
 		dirty = true;
 	}
 
-	// ==================== INTERNALS ====================
-
 	private void resetState() {
 		sessionId = null;
 		startedAtMs = 0;
@@ -273,7 +239,7 @@ public class SessionTracker {
 		ticksSincePersist = 0;
 	}
 
-	/** Rebuild the end snapshot from the live client if still logged in */
+	/** Rebuild the end snapshot if still logged in */
 	private void refreshEndSnapshot() {
 		if (client.getGameState() == GameState.LOGGED_IN) {
 			Map<String, Object> snapshot = buildSnapshot();
@@ -283,7 +249,7 @@ public class SessionTracker {
 		}
 	}
 
-	/** Cheap per-tick probe: has overall XP moved since the last end snapshot? */
+	/** Has overall XP moved since the last end snapshot? */
 	private boolean xpChangedSinceSnapshot() {
 		if (client.getGameState() != GameState.LOGGED_IN || endSnapshot == null) return false;
 		Object totalXp = endSnapshot.get("totalXp");
@@ -350,10 +316,7 @@ public class SessionTracker {
 		return persisted;
 	}
 
-	/**
-	 * Drop the persisted copy only if it still holds the given session — a stale
-	 * ack must never delete a newer session's crash-recovery copy.
-	 */
+	/** Clear only if it still holds this session — a stale ack must not delete a newer copy. */
 	private void clearPersistedIfSession(String expectedSessionId) {
 		try {
 			String json = configManager.getConfiguration(CONFIG_GROUP, CONFIG_KEY);

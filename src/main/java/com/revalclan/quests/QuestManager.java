@@ -20,12 +20,9 @@ public class QuestManager {
 	@Inject private Client client;
 
 	/**
-	 * The RuneLite Quest enum mixes quests and miniquests with no type flag,
-	 * so membership is curated here (names as Quest.getName() returns them).
-	 * Mirrors the wiki miniquest list (19 as of Vale Totems, July 2025) —
-	 * verify against it when new miniquests release. Recipe for Disaster
-	 * subquests are NOT miniquests: they stay in questStates, where the
-	 * backend catalogs them as quests.
+	 * RuneLite's Quest enum has no quest/miniquest flag, so membership is curated
+	 * here (wiki miniquest list, 19 as of July 2025 — update on new releases).
+	 * RFD subquests are NOT miniquests; they stay in questStates.
 	 */
 	private static final Set<String> MINIQUEST_NAMES = Set.of(
 		"Alfred Grimhand's Barcrawl",

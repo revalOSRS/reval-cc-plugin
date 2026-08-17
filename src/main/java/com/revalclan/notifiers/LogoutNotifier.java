@@ -10,10 +10,7 @@ import com.revalclan.session.SessionTracker;
 import com.revalclan.util.SyncStateManager;
 
 /**
- * Handles logout events.
- * Sends the session-boundary payload (full state when changed since the last
- * server ack, slim otherwise) plus the client-side session summary accumulated
- * since login.
+ * Sends the LOGOUT boundary payload plus the session summary accumulated since login.
  */
 @Singleton
 public class LogoutNotifier extends BaseNotifier {
@@ -36,11 +33,7 @@ public class LogoutNotifier extends BaseNotifier {
 		return "LOGOUT";
 	}
 
-	/**
-	 * Called when the player logs out.
-	 *
-	 * @param sessionSummary Finalized session summary from SessionTracker (nullable)
-	 */
+	/** @param sessionSummary Finalized summary from SessionTracker (nullable) */
 	public void onLogout(Map<String, Object> sessionSummary) {
 		Map<String, Object> data = dataCollector.collectBoundaryData();
 		if (sessionSummary != null) {

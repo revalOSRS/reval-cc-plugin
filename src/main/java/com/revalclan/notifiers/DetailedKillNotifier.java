@@ -17,12 +17,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Tracks per-kill combat details (damage, weapons, specs).
- *
- * Kill ACCUMULATION always runs (cheap, in-memory) — it feeds the local
- * SessionTracker with complete kill counts regardless of server filters.
- * Only the DETAILED_KILL webhook send is gated by the server-driven filters:
- * the enabled toggle plus the NPC id/name whitelists derived from active
- * requirements.
+ * Accumulation always runs; only the DETAILED_KILL send is gated by server filters.
  */
 @Singleton
 public class DetailedKillNotifier extends BaseNotifier {
@@ -86,11 +81,7 @@ public class DetailedKillNotifier extends BaseNotifier {
 		data.addHit(damage, weaponName, isSpec);
 	}
 
-	/**
-	 * Every damaged NPC lands in activeKills, so entries whose NPC despawns
-	 * without dying (player ran away, instance teardown) must be dropped here —
-	 * death fires a despawn too, making this the single cleanup point.
-	 */
+	/** Single cleanup point — death fires a despawn too. */
 	public void onNpcDespawned(NpcDespawned event) {
 		activeKills.remove(event.getNpc());
 	}
@@ -103,7 +94,6 @@ public class DetailedKillNotifier extends BaseNotifier {
 		KillData data = activeKills.remove(npc);
 
 		if (data != null && data.totalDamage > 0) {
-			// Session kill counts are complete and local — independent of server filters
 			sessionTracker.addKill(data.npcName);
 
 			if (isEnabled()) {
@@ -163,9 +153,7 @@ public class DetailedKillNotifier extends BaseNotifier {
 		if (npcName != null && !nameWhitelist.isEmpty()) {
 			String lowerName = npcName.toLowerCase();
 			for (String target : nameWhitelist) {
-				// Forward containment only: the NPC's name must contain the whitelist
-				// entry. The reverse direction would let short generic names match any
-				// entry they appear in ("Rat" vs a "brine rat" entry).
+				// Forward containment only — reverse would let "Rat" match a "brine rat" entry
 				if (lowerName.contains(target)) {
 					return true;
 				}

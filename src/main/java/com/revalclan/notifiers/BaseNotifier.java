@@ -63,9 +63,8 @@ public abstract class BaseNotifier {
 	}
 
 	/**
-	 * Send a notification and hand the parsed JSON response to the consumer
-	 * (HTTP thread — must not touch the client). Used by the session-boundary
-	 * notifiers for the sync-fingerprint ack handshake.
+	 * Send and hand the parsed JSON response to the consumer.
+	 * Consumer runs on the HTTP thread — must not touch the client.
 	 */
 	protected void sendNotificationWithResponse(Map<String, Object> data, Consumer<JsonObject> onResponse) {
 		if (!ClanValidator.validateClan(client)) return;
@@ -74,9 +73,8 @@ public abstract class BaseNotifier {
 	}
 
 	/**
-	 * Send WITHOUT the live clan check — for LOGOUT, where the clan channel is
-	 * already torn down when the event fires. Callers must have validated clan
-	 * membership beforehand (RevalClanPlugin gates onLogout on wasInClan).
+	 * Send WITHOUT the live clan check — the clan channel is already torn down
+	 * when LOGOUT fires. Callers must have validated membership beforehand.
 	 */
 	protected void sendNotificationPrevalidated(Map<String, Object> data, Consumer<JsonObject> onResponse) {
 		addEventMetadata(data);

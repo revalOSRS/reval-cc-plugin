@@ -382,26 +382,21 @@ public class CollectionLogManager {
 	}
 
 	/**
-	 * Sync and get collection log data grouped by category (Category > Subcategory > Items).
-	 *
-	 * Slim shape: per entry only OBTAINED items ({id, name, quantity}) plus the
-	 * KC fields — the backend derives per-entry obtained counts from the item
-	 * list, so unobtained rows and per-page totals were pure payload bloat.
+	 * Collection log data grouped Category > Subcategory > Items.
+	 * Per entry: only OBTAINED items ({id, name, quantity}) plus KC fields.
 	 */
 	public Map<String, Object> sync() {
 		Map<String, Object> data = new HashMap<>();
 
-		// The game's own unique-slot counter — authoritative source of truth
-		// for clog counts/tiers on the server going forward.
+		// The game's own unique-slot counter — authoritative for server counts/tiers
 		int uniqueObtained = 0;
 		try {
 			uniqueObtained = client.getVarpValue(VarPlayerID.COLLECTION_COUNT);
 		} catch (Exception ignored) {}
 		data.put("uniqueObtained", uniqueObtained);
 
-		// Same varp as uniqueObtained — kept as a second field for backend
-		// compat. NEVER the scanned-map size: multi-page item IDs inflate it
-		// (a 296 count against the game's true 292).
+		// Same varp, kept for backend compat. NEVER the scanned-map size —
+		// multi-page item IDs inflate it (296 vs the game's true 292).
 		data.put("obtainedItems", uniqueObtained);
 
 		// Obtained items are already keyed by item id with the latest count

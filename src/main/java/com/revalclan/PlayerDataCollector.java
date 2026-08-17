@@ -51,9 +51,7 @@ public class PlayerDataCollector {
 	private SyncStateManager syncStateManager;
 
 	/**
-	 * Collects all player data as a full payload, fingerprint included.
-	 * Only this path (the explicit SYNC) carries the collection log — clog
-	 * truth requires an actual log scan, which only a deliberate sync has.
+	 * Full payload for SYNC — the only path that carries the collection log.
 	 */
 	public Map<String, Object> collectAllData() {
 		Map<String, Object> data = collectFullState();
@@ -63,11 +61,9 @@ public class PlayerDataCollector {
 	}
 
 	/**
-	 * LOGIN/LOGOUT payload: slim (player + fingerprint) when state is
-	 * unchanged since the last acked fingerprint, full otherwise.
-	 * Never includes the collection log: at LOGIN no scan has happened
-	 * (zeros / varp fallback) and at LOGOUT one only exists if the log
-	 * happened to be opened — clog flows exclusively via explicit Sync.
+	 * LOGIN/LOGOUT payload: slim (player + fingerprint) when unchanged since
+	 * the last acked fingerprint, full otherwise. Never carries the collection
+	 * log — no real scan exists at boundaries.
 	 */
 	public Map<String, Object> collectBoundaryData() {
 		Map<String, Object> data = collectFullState();
@@ -98,10 +94,8 @@ public class PlayerDataCollector {
 	}
 
 	/**
-	 * Compute and attach the state fingerprint, returning it (null when not
-	 * attached). Skipped on seasonal (leagues) worlds — leagues state is a
-	 * different character and flows through the leagues pipeline, which does
-	 * not participate in the fingerprint handshake.
+	 * Attach the state fingerprint (null when skipped). Seasonal worlds are
+	 * skipped — leagues state is a different character.
 	 */
 	private String attachFingerprint(Map<String, Object> data) {
 		try {

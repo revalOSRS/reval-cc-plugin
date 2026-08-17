@@ -34,9 +34,8 @@ public class WebhookService {
 	}
 
 	/**
-	 * Sends player data to webhook asynchronously and hands the parsed JSON
-	 * response body to the given consumer on success (HTTP thread — do not touch
-	 * the client from it). Used for the sync-fingerprint ack handshake.
+	 * Async send; hands the parsed JSON response to the consumer on success.
+	 * Consumer runs on the HTTP thread — do not touch the client from it.
 	 */
 	public void sendDataAsync(Map<String, Object> data, Consumer<JsonObject> onResponse) {
 		sendDataAsync(WEBHOOK_URL, data, onResponse);

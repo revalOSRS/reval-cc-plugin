@@ -112,11 +112,7 @@ public class CombatAchievementManager {
 		return total[0];
 	}
 
-	/**
-	 * Single traversal of the game-cache task structs shared by sync() and
-	 * computeCurrentTotalPoints(), keeping the two in lockstep. Cache read
-	 * failures are logged once here, not swallowed at every layer.
-	 */
+	/** Shared task-struct traversal for sync() and computeCurrentTotalPoints(). */
 	private void forEachTaskStruct(BiConsumer<StructComposition, String> visitor) {
 		for (Map.Entry<Integer, String> tierEntry : TIER_ENUMS.entrySet()) {
 			EnumComposition tierEnum;
@@ -240,11 +236,7 @@ public class CombatAchievementManager {
 			.sum();
 	}
 
-	/**
-	 * Calculate current tier based on total points. Thresholds are the in-game
-	 * points required for each tier's rewards (as of the 2026-08 task additions)
-	 * and must be kept in sync with the wiki when Jagex adds tasks.
-	 */
+	/** Tier from total points — thresholds must track the wiki when Jagex adds tasks. */
 	private String calculateCurrentTier(int totalPoints) {
 		// In-game unlock points as of the 2026-08-12 rebalance
 		if (totalPoints >= 2672) return "Grandmaster";
@@ -280,13 +272,7 @@ public class CombatAchievementManager {
 		return tierProgress;
 	}
 
-	/**
-	 * Get completed tasks in the slim sync shape.
-	 *
-	 * Only COMPLETED tasks are sent, each as {name, tier, type} — the backend
-	 * keys CA state on name/tier/completed, so descriptions, ids, points and
-	 * the ~75% incomplete majority were pure payload bloat (~148KB of it).
-	 */
+	/** Only COMPLETED tasks, each as {name, tier, type}. */
 	private List<Map<String, Object>> getAllTasksDetailed() {
 		List<Map<String, Object>> tasksList = new ArrayList<>();
 

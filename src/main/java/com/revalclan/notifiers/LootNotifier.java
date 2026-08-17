@@ -315,7 +315,6 @@ public class LootNotifier extends BaseNotifier {
 			totalGEValue += (long) gePrice * item.getQuantity();
 			totalHAValue += (long) haValue * item.getQuantity();
 
-			// Session loot totals are complete and local — independent of server filters
 			sessionTracker.addLoot(source, itemId, itemName, item.getQuantity(), gePrice);
 
 			// Check for special items

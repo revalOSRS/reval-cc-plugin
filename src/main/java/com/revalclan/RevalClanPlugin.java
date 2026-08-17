@@ -207,8 +207,7 @@ public class RevalClanPlugin extends Plugin {
 		eventBus.unregister(lootNotifier);
 		eventBus.unregister(clogPersonalBestCapture);
 
-		// In-memory reset only: the persisted session (if any) stays on disk and is
-		// replayed as 'recovered' on the next startUp, so no data is lost
+		// In-memory only — a persisted session replays as 'recovered' next startUp
 		sessionTracker.reset();
 
 		announcementService.reset();
@@ -251,7 +250,6 @@ public class RevalClanPlugin extends Plugin {
 
 			if (wasLoggedIn) {
 				if (wasInClan) {
-					// Finalize the client-side session and deliver it inline on LOGOUT
 					logoutNotifier.onLogout(sessionTracker.finalizeSession());
 				}
 				wasLoggedIn = false;
@@ -314,15 +312,13 @@ public class RevalClanPlugin extends Plugin {
 		leaguesSyncNotifier.onGameTick();
 		sessionTracker.onGameTick();
 
-		// Periodic filter refetch: activated events/competitions change the derived
-		// whitelists server-side; without this only a relog would pick them up
+		// Activated events change the server-derived whitelists; refetch so a relog isn't needed
 		if (++filterRefetchTicks >= FILTER_REFETCH_INTERVAL_TICKS) {
 			filterRefetchTicks = 0;
 			eventFilterManager.fetchFiltersAsync();
 		}
 
-		// The server flagged our sync fingerprint as stale — repair with a full sync
-		// (runs here because collecting data requires the client thread)
+		// Server flagged our fingerprint stale — repair with a full sync (needs the client thread)
 		if (syncStateManager.consumeFullSyncRequest()) {
 			syncNotifier.triggerSync();
 		}
@@ -408,9 +404,8 @@ public class RevalClanPlugin extends Plugin {
 
 	@Subscribe
 	public void onNpcDespawned(NpcDespawned event) {
-		// Deliberately not gated on inRequiredClan: this only evicts the NPC's
-		// entry from the kill accumulator, and must run even if clan membership
-		// flipped mid-fight so damaged-but-never-died NPCs don't pin memory
+		// Not gated on inRequiredClan: must always evict the accumulator entry
+		// so damaged-but-never-died NPCs don't pin memory
 		detailedKillNotifier.onNpcDespawned(event);
 	}
 
