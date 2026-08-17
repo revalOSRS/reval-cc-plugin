@@ -281,24 +281,24 @@ public class CombatAchievementManager {
 	}
 
 	/**
-	 * Get all tasks with full details
+	 * Get completed tasks in the slim sync shape.
+	 *
+	 * Only COMPLETED tasks are sent, each as {name, tier, type} — the backend
+	 * keys CA state on name/tier/completed, so descriptions, ids, points and
+	 * the ~75% incomplete majority were pure payload bloat (~148KB of it).
 	 */
 	private List<Map<String, Object>> getAllTasksDetailed() {
 		List<Map<String, Object>> tasksList = new ArrayList<>();
-		
+
 		for (CombatAchievementTask task : allTasks) {
+			if (!task.isCompleted()) continue;
 			tasksList.add(Map.of(
-				"id", task.getId(),
 				"name", task.getName(),
-				"description", task.getDescription(),
 				"tier", task.getTier(),
-				"type", task.getType(),
-				"boss", task.getBoss(),
-				"points", task.getPoints(),
-				"completed", task.isCompleted()
+				"type", task.getType()
 			));
 		}
-		
+
 		return tasksList;
 	}
 }

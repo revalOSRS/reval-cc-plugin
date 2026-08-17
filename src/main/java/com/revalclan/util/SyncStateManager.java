@@ -81,7 +81,9 @@ public class SyncStateManager {
 				}
 			}
 
-			// Combat achievements: sorted completed task names + total points
+			// Combat achievements: sorted completed task names + total points.
+			// allTasks carries ONLY completed tasks (slim shape, no `completed`
+			// flag); a present flag is still honoured for shape tolerance.
 			Map<String, Object> cas = (Map<String, Object>) data.get("combatAchievements");
 			canonical.append("|cas|");
 			if (cas != null) {
@@ -91,7 +93,8 @@ public class SyncStateManager {
 					for (Object taskObj : (List<Object>) allTasks) {
 						if (taskObj instanceof Map) {
 							Map<String, Object> task = (Map<String, Object>) taskObj;
-							if (Boolean.TRUE.equals(task.get("completed"))) {
+							Object completed = task.get("completed");
+							if (completed == null || Boolean.TRUE.equals(completed)) {
 								completedNames.put(String.valueOf(task.get("name")), true);
 							}
 						}
@@ -103,7 +106,9 @@ public class SyncStateManager {
 				canonical.append("pts=").append(cas.get("totalPoints"));
 			}
 
-			// Collection log: obtained count + sorted itemId:quantity of obtained items.
+			// Collection log: obtained count + sorted itemId:quantity of obtained
+			// items. The items lists carry ONLY obtained items (slim shape, no
+			// `obtained` flag); a present flag is still honoured for shape tolerance.
 			// KC attributes are intentionally NOT hashed (see class javadoc).
 			Map<String, Object> clog = (Map<String, Object>) data.get("collectionLog");
 			canonical.append("|clog|");
@@ -121,7 +126,9 @@ public class SyncStateManager {
 							for (Object itemObj : (List<Object>) items) {
 								if (!(itemObj instanceof Map)) continue;
 								Map<String, Object> item = (Map<String, Object>) itemObj;
-								if (Boolean.TRUE.equals(item.get("obtained")) && item.get("id") instanceof Number) {
+								Object obtainedFlag = item.get("obtained");
+								boolean isObtained = obtainedFlag == null || Boolean.TRUE.equals(obtainedFlag);
+								if (isObtained && item.get("id") instanceof Number) {
 									int id = ((Number) item.get("id")).intValue();
 									int qty = item.get("quantity") instanceof Number ? ((Number) item.get("quantity")).intValue() : 1;
 									obtained.merge(id, qty, Integer::sum);

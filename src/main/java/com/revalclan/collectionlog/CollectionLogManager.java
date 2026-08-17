@@ -382,25 +382,22 @@ public class CollectionLogManager {
 	}
 
 	/**
-	 * Sync and get collection log data grouped by category (Category > Subcategory > Items)
+	 * Sync and get collection log data grouped by category (Category > Subcategory > Items).
+	 *
+	 * Slim shape: per entry only OBTAINED items ({id, name, quantity}) plus the
+	 * KC fields — the backend derives per-entry obtained counts from the item
+	 * list, so unobtained rows and per-page totals were pure payload bloat.
 	 */
 	public Map<String, Object> sync() {
 		Map<String, Object> data = new HashMap<>();
-		data.put("totalItems", allCollectionLogItems.size());
-		
-		// Get obtained items count
-		if (!obtainedItems.isEmpty()) {
-			data.put("obtainedItems", obtainedItems.size());
-			data.put("dataSource", "collection_log_opened");
-		} else {
-			try {
-				data.put("obtainedItems", client.getVarpValue(2943));
-				data.put("dataSource", "varbit_2943");
-			} catch (Exception e) {
-				data.put("obtainedItems", 0);
-				data.put("dataSource", "unavailable");
-			}
-		}
+
+		// Observed obtained-item count (falls back to the in-game counter
+		// when the collection log hasn't been opened this session)
+		int observedCount = 0;
+		try {
+			observedCount = obtainedItems.isEmpty() ? client.getVarpValue(2943) : obtainedItems.size();
+		} catch (Exception ignored) {}
+		data.put("obtainedItems", observedCount);
 
 		// Obtained items are already keyed by item id with the latest count
 		Map<Integer, ObtainedCollectionItem> obtainedItemsMap = obtainedItems;
@@ -428,40 +425,25 @@ public class CollectionLogManager {
 	}
 
 	/**
-	 * Build subcategory data including items and KC tracking
+	 * Build subcategory data including items and KC tracking.
+	 * Only obtained items are included — see sync() javadoc.
 	 */
-	private Map<String, Object> buildSubcategoryData(String subcategorySlug, Set<Integer> categoryItems, 
+	private Map<String, Object> buildSubcategoryData(String subcategorySlug, Set<Integer> categoryItems,
 			Map<Integer, ObtainedCollectionItem> obtainedItemsMap) {
 		Map<String, Object> subcategoryData = new HashMap<>();
 		List<Map<String, Object>> itemsList = new ArrayList<>();
-		int obtainedCount = 0;
 
-		// Build items list
 		for (Integer itemId : categoryItems) {
+			ObtainedCollectionItem obtainedItem = obtainedItemsMap.get(itemId);
+			if (obtainedItem == null) continue;
+
 			Map<String, Object> itemData = new HashMap<>();
 			itemData.put("id", itemId);
-			
-			ObtainedCollectionItem obtainedItem = obtainedItemsMap.get(itemId);
-			if (obtainedItem != null) {
-				itemData.put("name", obtainedItem.getName());
-				itemData.put("quantity", obtainedItem.getCount());
-				itemData.put("obtained", true);
-				obtainedCount++;
-			} else {
-				try {
-					itemData.put("name", client.getItemDefinition(itemId).getName());
-				} catch (Exception e) {
-					itemData.put("name", "Unknown");
-				}
-				itemData.put("quantity", 0);
-				itemData.put("obtained", false);
-			}
-			
+			itemData.put("name", obtainedItem.getName());
+			itemData.put("quantity", obtainedItem.getCount());
 			itemsList.add(itemData);
 		}
 
-		subcategoryData.put("total", categoryItems.size());
-		subcategoryData.put("obtained", obtainedCount);
 		subcategoryData.put("items", itemsList);
 
 		// Add primary KC
