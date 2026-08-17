@@ -52,7 +52,7 @@ public class LogoutNotifier extends BaseNotifier {
 		}
 		long accountHash = client.getAccountHash();
 		String sessionId = sessionSummary != null ? (String) sessionSummary.get("sessionId") : null;
-		sendNotificationWithResponse(data, response -> {
+		sendNotificationPrevalidated(data, response -> {
 			syncStateManager.handleSyncAckResponse(response, accountHash);
 			if (sessionId != null) {
 				sessionTracker.confirmDelivered(sessionId);

@@ -74,6 +74,16 @@ public abstract class BaseNotifier {
 	}
 
 	/**
+	 * Send WITHOUT the live clan check — for LOGOUT, where the clan channel is
+	 * already torn down when the event fires. Callers must have validated clan
+	 * membership beforehand (RevalClanPlugin gates onLogout on wasInClan).
+	 */
+	protected void sendNotificationPrevalidated(Map<String, Object> data, Consumer<JsonObject> onResponse) {
+		addEventMetadata(data);
+		webhookService.sendDataAsync(data, onResponse);
+	}
+
+	/**
 	 * Captures a screenshot of the current game frame, attaches it to the data,
 	 * then sends the notification asynchronously.
 	 * @param data The notification data
