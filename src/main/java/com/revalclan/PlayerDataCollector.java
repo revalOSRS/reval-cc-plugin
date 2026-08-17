@@ -52,9 +52,12 @@ public class PlayerDataCollector {
 
 	/**
 	 * Collects all player data as a full payload, fingerprint included.
+	 * Only this path (the explicit SYNC) carries the collection log — clog
+	 * truth requires an actual log scan, which only a deliberate sync has.
 	 */
 	public Map<String, Object> collectAllData() {
 		Map<String, Object> data = collectFullState();
+		data.put("collectionLog", collectionLogManager.sync());
 		attachFingerprint(data);
 		return data;
 	}
@@ -62,6 +65,9 @@ public class PlayerDataCollector {
 	/**
 	 * LOGIN/LOGOUT payload: slim (player + fingerprint) when state is
 	 * unchanged since the last acked fingerprint, full otherwise.
+	 * Never includes the collection log: at LOGIN no scan has happened
+	 * (zeros / varp fallback) and at LOGOUT one only exists if the log
+	 * happened to be opened — clog flows exclusively via explicit Sync.
 	 */
 	public Map<String, Object> collectBoundaryData() {
 		Map<String, Object> data = collectFullState();
@@ -86,7 +92,6 @@ public class PlayerDataCollector {
 		data.put("quests", questManager.sync());
 		data.put("achievementDiaries", achievementDiaryManager.sync());
 		data.put("combatAchievements", combatAchievementManager.sync());
-		data.put("collectionLog", collectionLogManager.sync());
 		data.put("personalBests", personalBestManager.sync());
 		data.put("clogPersonalBests", clogPersonalBestCapture.sync());
 		return data;

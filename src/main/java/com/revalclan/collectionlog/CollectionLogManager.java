@@ -399,9 +399,10 @@ public class CollectionLogManager {
 		} catch (Exception ignored) {}
 		data.put("uniqueObtained", uniqueObtained);
 
-		// Observed obtained-item count (falls back to the in-game counter
-		// when the collection log hasn't been opened this session)
-		data.put("obtainedItems", obtainedItems.isEmpty() ? uniqueObtained : obtainedItems.size());
+		// Same varp as uniqueObtained — kept as a second field for backend
+		// compat. NEVER the scanned-map size: multi-page item IDs inflate it
+		// (a 296 count against the game's true 292).
+		data.put("obtainedItems", uniqueObtained);
 
 		// Obtained items are already keyed by item id with the latest count
 		Map<Integer, ObtainedCollectionItem> obtainedItemsMap = obtainedItems;
