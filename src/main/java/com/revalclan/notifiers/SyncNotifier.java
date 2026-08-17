@@ -1,6 +1,7 @@
 package com.revalclan.notifiers;
 
 import com.revalclan.PlayerDataCollector;
+import com.revalclan.util.PayloadDebugDumper;
 import com.revalclan.util.SyncStateManager;
 
 import javax.inject.Inject;
@@ -20,6 +21,9 @@ public class SyncNotifier extends BaseNotifier {
 
 	@Inject
 	private SyncStateManager syncStateManager;
+
+	@Inject
+	private PayloadDebugDumper payloadDumper;
 
 	@Override
 	public boolean isEnabled() {
@@ -41,5 +45,6 @@ public class SyncNotifier extends BaseNotifier {
 		long accountHash = client.getAccountHash();
 		sendNotificationWithResponse(data, response ->
 			syncStateManager.handleSyncAckResponse(response, accountHash));
+		payloadDumper.dump("sync-sent", data);
 	}
 }

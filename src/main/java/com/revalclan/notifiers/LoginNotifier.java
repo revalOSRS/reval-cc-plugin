@@ -4,6 +4,7 @@ import javax.inject.Singleton;
 
 import com.google.inject.Inject;
 import com.revalclan.PlayerDataCollector;
+import com.revalclan.util.PayloadDebugDumper;
 import com.revalclan.util.SyncStateManager;
 
 import java.util.Map;
@@ -20,6 +21,9 @@ public class LoginNotifier extends BaseNotifier {
 
 	@Inject
 	private SyncStateManager syncStateManager;
+
+	@Inject
+	private PayloadDebugDumper payloadDumper;
 
 	@Override
 	public boolean isEnabled() {
@@ -39,5 +43,6 @@ public class LoginNotifier extends BaseNotifier {
 		long accountHash = client.getAccountHash();
 		sendNotificationWithResponse(data, response ->
 			syncStateManager.handleSyncAckResponse(response, accountHash));
+		payloadDumper.dump("login-sent", data);
 	}
 }

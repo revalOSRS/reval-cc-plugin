@@ -7,6 +7,7 @@ import javax.inject.Singleton;
 
 import com.revalclan.PlayerDataCollector;
 import com.revalclan.session.SessionTracker;
+import com.revalclan.util.PayloadDebugDumper;
 import com.revalclan.util.SyncStateManager;
 
 /**
@@ -25,6 +26,9 @@ public class LogoutNotifier extends BaseNotifier {
 
 	@Inject
 	private SessionTracker sessionTracker;
+
+	@Inject
+	private PayloadDebugDumper payloadDumper;
 
 	@Override
 	public boolean isEnabled() {
@@ -54,5 +58,6 @@ public class LogoutNotifier extends BaseNotifier {
 				sessionTracker.confirmDelivered(sessionId);
 			}
 		});
+		payloadDumper.dump("logout-sent", data);
 	}
 }
