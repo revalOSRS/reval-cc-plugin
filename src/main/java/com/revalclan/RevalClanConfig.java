@@ -222,14 +222,4 @@ public interface RevalClanConfig extends Config {
 	default boolean showAnnouncements() {
 		return true;
 	}
-
-	@ConfigItem(
-		keyName = "debugMode",
-		name = "Debug mode",
-		description = "Write sent SYNC/LOGIN/LOGOUT payloads to .runelite/reval-debug for troubleshooting",
-		position = 99
-	)
-	default boolean debugMode() {
-		return false;
-	}
 }
