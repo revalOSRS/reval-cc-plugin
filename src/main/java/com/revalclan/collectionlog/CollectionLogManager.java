@@ -391,13 +391,17 @@ public class CollectionLogManager {
 	public Map<String, Object> sync() {
 		Map<String, Object> data = new HashMap<>();
 
+		// The game's own unique-slot counter — authoritative source of truth
+		// for clog counts/tiers on the server going forward.
+		int uniqueObtained = 0;
+		try {
+			uniqueObtained = client.getVarpValue(VarPlayerID.COLLECTION_COUNT);
+		} catch (Exception ignored) {}
+		data.put("uniqueObtained", uniqueObtained);
+
 		// Observed obtained-item count (falls back to the in-game counter
 		// when the collection log hasn't been opened this session)
-		int observedCount = 0;
-		try {
-			observedCount = obtainedItems.isEmpty() ? client.getVarpValue(2943) : obtainedItems.size();
-		} catch (Exception ignored) {}
-		data.put("obtainedItems", observedCount);
+		data.put("obtainedItems", obtainedItems.isEmpty() ? uniqueObtained : obtainedItems.size());
 
 		// Obtained items are already keyed by item id with the latest count
 		Map<Integer, ObtainedCollectionItem> obtainedItemsMap = obtainedItems;

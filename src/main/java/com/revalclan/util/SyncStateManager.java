@@ -106,13 +106,18 @@ public class SyncStateManager {
 				canonical.append("pts=").append(cas.get("totalPoints"));
 			}
 
-			// Collection log: obtained count + sorted itemId:quantity of obtained
-			// items. The items lists carry ONLY obtained items (slim shape, no
-			// `obtained` flag); a present flag is still honoured for shape tolerance.
+			// Collection log: in-game unique counter + obtained count + sorted
+			// itemId:quantity of obtained items. The items lists carry ONLY
+			// obtained items (slim shape, no `obtained` flag); a present flag is
+			// still honoured for shape tolerance. Hashing uniqueObtained keeps
+			// the server fresh when uniques drop without the log being opened —
+			// and its introduction changes every fingerprint once post-update,
+			// pushing one full payload that delivers the new counter.
 			// KC attributes are intentionally NOT hashed (see class javadoc).
 			Map<String, Object> clog = (Map<String, Object>) data.get("collectionLog");
 			canonical.append("|clog|");
 			if (clog != null) {
+				canonical.append("unique=").append(clog.get("uniqueObtained")).append(';');
 				canonical.append("count=").append(clog.get("obtainedItems")).append(';');
 				Object categories = clog.get("categories");
 				if (categories instanceof Map) {
