@@ -190,7 +190,7 @@ public class RevalClanPlugin extends Plugin {
 			revalPanel = new RevalPanel();
 			revalPanel.init(revalApiService, client, uiAssetLoader, itemManager, spriteManager, config,
 				rankIconResolver);
-			revalPanel.getProfilePanel().setOnSyncGuide(() -> {
+			revalPanel.setOnSyncGuide(() -> {
 				syncGuide.arm();
 				clientThread.invoke(() -> {
 					if (client.getGameState() == GameState.LOGGED_IN) {
@@ -226,7 +226,7 @@ public class RevalClanPlugin extends Plugin {
 		syncButton.shutDown();
 		overlayManager.remove(syncGuideOverlay);
 		if (revalPanel != null) {
-			revalPanel.getProfilePanel().disposeAlbum();
+			revalPanel.shutDown();
 		}
 
 		eventBus.unregister(lootNotifier);

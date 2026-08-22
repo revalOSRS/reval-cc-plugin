@@ -7,6 +7,7 @@ import com.revalclan.ui.admin.AdminLoginPanel;
 import com.revalclan.ui.admin.AdminManager;
 import com.revalclan.ui.admin.PendingRankupsPanel;
 import com.revalclan.ui.components.AdminButton;
+import com.revalclan.ui.components.Clickable;
 import com.revalclan.ui.components.GradientSeparator;
 import com.revalclan.ui.components.IndicatorTabButton;
 import com.revalclan.ui.components.PanelTitle;
@@ -28,8 +29,6 @@ import net.runelite.client.util.LinkBrowser;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
 
 public class RevalPanel extends PluginPanel {
 	private static final String DISCORD_URL = "https://discord.gg/reval";
@@ -66,7 +65,6 @@ public class RevalPanel extends PluginPanel {
 	private PendingRankupsPanel pendingRankupsPanel;
 	private RevalApiService apiService;
 	private Client client;
-	private SpriteManager spriteManager;
 	private ClanRankIconResolver rankIconResolver;
 	private UIAssetLoader assetLoader;
 
@@ -209,13 +207,7 @@ public class RevalPanel extends PluginPanel {
 		// Info button (left)
 		infoButton = new JLabel();
 		infoButton.setToolTipText("Ranks & Points");
-		infoButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-		infoButton.addMouseListener(new MouseAdapter() {
-			@Override
-			public void mousePressed(MouseEvent e) {
-				if (SwingUtilities.isLeftMouseButton(e)) selectTab("RANKING");
-			}
-		});
+		Clickable.onPress(infoButton, () -> selectTab("RANKING"));
 
 		JPanel leftPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
 		leftPanel.setOpaque(false);
@@ -297,13 +289,7 @@ public class RevalPanel extends PluginPanel {
 	private JLabel createSocialIcon(String url, String tooltip) {
 		JLabel label = new JLabel();
 		label.setToolTipText(tooltip);
-		label.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-		label.addMouseListener(new MouseAdapter() {
-			@Override
-			public void mousePressed(MouseEvent e) {
-				if (SwingUtilities.isLeftMouseButton(e)) LinkBrowser.browse(url);
-			}
-		});
+		Clickable.onPress(label, () -> LinkBrowser.browse(url));
 		return label;
 	}
 
@@ -384,7 +370,6 @@ public class RevalPanel extends PluginPanel {
 		this.apiService = apiService;
 		this.client = client;
 		this.assetLoader = assetLoader;
-		this.spriteManager = spriteManager;
 		this.rankIconResolver = rankIconResolver;
 
 		// Leaderboard tab icon: leagues trophy from the game cache
@@ -452,6 +437,16 @@ public class RevalPanel extends PluginPanel {
 	/**
 	 * Set admin status — call after verifying admin eligibility (e.g. from account data).
 	 */
+	/** Forwarded so the plugin never reaches into child panels. */
+	public void setOnSyncGuide(Runnable onSyncGuide) {
+		profilePanel.setOnSyncGuide(onSyncGuide);
+	}
+
+	/** Tears down anything living outside the panel tree (detached windows). */
+	public void shutDown() {
+		profilePanel.disposeAlbum();
+	}
+
 	public void setAdminEnabled(boolean enabled) {
 		if (adminButton != null) {
 			adminButton.setAdmin(enabled);
