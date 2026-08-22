@@ -167,12 +167,9 @@ public class CollectionLogSyncButton {
 			.filter(w -> w.getText() != null && w.getText().equals(BUTTON_TEXT))
 			.findFirst()
 			.orElse(null);
-		final boolean existingButton = existing != null;
-		if (existingButton) {
+		if (existing != null) {
 			syncGuide.setSyncButtonWidget(existing);
-		}
-
-		if (!existingButton) {
+		} else {
 			// Create background rectangle
 			final Widget background = menu.createChild(WidgetType.RECTANGLE)
 				.setOriginalWidth(lastRectangle.getOriginalWidth())

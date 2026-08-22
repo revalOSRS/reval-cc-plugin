@@ -305,15 +305,6 @@ public class PointsAlbumWindow extends JFrame {
 		for (int i = from; i < to; i++) {
 			gridPanel.add(createEntryCard(filtered.get(i)));
 		}
-		// GridLayout(0, n) re-derives the column count from the row count, so a
-		// partial last row shrinks every column; pad it to keep 4 equal columns
-		int remainder = (to - from) % GRID_COLUMNS;
-		int fillers = (to - from) == 0 ? GRID_COLUMNS : (remainder == 0 ? 0 : GRID_COLUMNS - remainder);
-		for (int i = 0; i < fillers; i++) {
-			JPanel filler = new JPanel();
-			filler.setOpaque(false);
-			gridPanel.add(filler);
-		}
 		gridPanel.revalidate();
 		gridPanel.repaint();
 	}
@@ -378,7 +369,7 @@ public class PointsAlbumWindow extends JFrame {
 		JPanel pointsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
 		pointsPanel.setOpaque(false);
 
-		JLabel points = new JLabel((card.points >= 0 ? "+" : "") + card.points + " pts");
+		JLabel points = new JLabel((card.points >= 0 ? "+" : "") + NumberFmt.group(card.points) + " pts");
 		points.setFont(FontManager.getRunescapeBoldFont());
 		points.setForeground(card.points >= 0 ? UIConstants.ACCENT_GOLD : UIConstants.ERROR_COLOR);
 		pointsPanel.add(points);
@@ -443,17 +434,13 @@ public class PointsAlbumWindow extends JFrame {
 		apply.run();
 	}
 
+	/** Backend timestamps are ISO-8601 UTC, e.g. "2026-08-02T18:00:00.000Z". */
 	private String formatDate(String iso) {
 		if (iso == null || iso.isEmpty()) return "";
 		try {
 			return ZonedDateTime.parse(iso).withZoneSameInstant(ZoneId.systemDefault()).format(DATE_FMT);
 		} catch (Exception e) {
-			try {
-				return java.time.LocalDateTime.parse(iso.replace(" ", "T").replaceAll("Z$", ""))
-					.format(DATE_FMT);
-			} catch (Exception ignored) {
-				return iso.length() > 10 ? iso.substring(0, 10) : iso;
-			}
+			return iso.length() > 10 ? iso.substring(0, 10) : iso;
 		}
 	}
 

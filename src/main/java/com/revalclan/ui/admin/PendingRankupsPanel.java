@@ -148,34 +148,23 @@ public class PendingRankupsPanel extends JPanel {
 		nameLabel.setForeground(UIConstants.TEXT_PRIMARY);
 		nameLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-		String prevRank = rankDisplay(change.getPreviousRank());
-		String newRank = rankDisplay(change.getNewRank());
-		JComponent rankLine;
-		if (rankIconResolver != null) {
-			JPanel rankPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
-			rankPanel.setOpaque(false);
+		JPanel rankLine = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
+		rankLine.setOpaque(false);
 
-			JLabel prevIcon = new JLabel();
-			prevIcon.setPreferredSize(new Dimension(18, 18));
-			rankIconResolver.apply(change.getPreviousRank(), prevIcon, 18);
+		JLabel prevIcon = new JLabel();
+		prevIcon.setPreferredSize(new Dimension(18, 18));
+		rankIconResolver.apply(change.getPreviousRank(), prevIcon, 18);
 
-			JLabel arrow = new JLabel(new ArrowIcon(12, UIConstants.ACCENT_GOLD));
+		JLabel arrow = new JLabel(new ArrowIcon(12, UIConstants.ACCENT_GOLD));
 
-			JLabel newIcon = new JLabel();
-			newIcon.setPreferredSize(new Dimension(18, 18));
-			rankIconResolver.apply(change.getNewRank(), newIcon, 18);
+		JLabel newIcon = new JLabel();
+		newIcon.setPreferredSize(new Dimension(18, 18));
+		rankIconResolver.apply(change.getNewRank(), newIcon, 18);
 
-			rankPanel.add(prevIcon);
-			rankPanel.add(arrow);
-			rankPanel.add(newIcon);
-			rankPanel.setToolTipText(prevRank + " -> " + newRank);
-			rankLine = rankPanel;
-		} else {
-			JLabel rankLabel = new JLabel(prevRank + " -> " + newRank);
-			rankLabel.setFont(FontManager.getRunescapeSmallFont());
-			rankLabel.setForeground(UIConstants.ACCENT_GOLD);
-			rankLine = rankLabel;
-		}
+		rankLine.add(prevIcon);
+		rankLine.add(arrow);
+		rankLine.add(newIcon);
+		rankLine.setToolTipText(RankNames.display(change.getPreviousRank()) + " -> " + RankNames.display(change.getNewRank()));
 		rankLine.setAlignmentX(Component.LEFT_ALIGNMENT);
 
 		left.add(nameLabel);
@@ -251,10 +240,6 @@ public class PendingRankupsPanel extends JPanel {
 		contentPanel.add(lbl);
 		contentPanel.revalidate();
 		contentPanel.repaint();
-	}
-
-	private String rankDisplay(String rank) {
-		return RankNames.display(rank);
 	}
 
 	private String formatTimestamp(String timestamp) {

@@ -29,11 +29,6 @@ public class SyncGuide {
 		return armedAt > 0 && System.currentTimeMillis() - armedAt < TIMEOUT_MS;
 	}
 
-	/** How long the guide has been armed, in milliseconds */
-	public long armedForMs() {
-		return armedAt > 0 ? System.currentTimeMillis() - armedAt : 0;
-	}
-
 	public void setSyncButtonWidget(Widget widget) {
 		this.syncButtonWidget = widget;
 	}

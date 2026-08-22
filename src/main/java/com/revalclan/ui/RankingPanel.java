@@ -217,7 +217,7 @@ public class RankingPanel extends JPanel {
 				Integer itemId = sources.get(0).getMetadata() != null ? sources.get(0).getMetadata().getItemId() : null;
 				if (itemId != null) {
 					loadSectionIcon(itemId, section);
-				} else if (category.toUpperCase().equals("MISC")) {
+				} else if (category.equalsIgnoreCase("MISC")) {
 					// Misc has no item id — use the stats side-tab sprite (total level icon)
 					loadSpriteIcon(SpriteID.TAB_STATS, section);
 				}
@@ -290,8 +290,8 @@ public class RankingPanel extends JPanel {
 		JPanel panel = createVerticalPanel();
 		panel.setBorder(new EmptyBorder(2, 0, 2, 0));
 
-		boolean showIcons = !category.toUpperCase().equals("VALUABLE_PVM_DROPS") 
-			&& !category.toUpperCase().equals("PETS");
+		boolean showIcons = !category.equalsIgnoreCase("VALUABLE_PVM_DROPS")
+			&& !category.equalsIgnoreCase("PETS");
 
 		for (PointsResponse.PointSource source : sources) {
 			PointSourceCard card = showIcons 

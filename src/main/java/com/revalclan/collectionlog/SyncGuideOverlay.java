@@ -32,7 +32,9 @@ public class SyncGuideOverlay extends Overlay {
 	private final Client client;
 	private final SyncGuide guide;
 
-	private String phase;
+	private enum Phase { BANNER, BURGER, MENU }
+
+	private Phase phase;
 	private long phaseStartedAt;
 
 	@Inject
@@ -50,56 +52,45 @@ public class SyncGuideOverlay extends Overlay {
 			return null;
 		}
 
-		g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
 		Widget burger = client.getWidget(InterfaceID.Collection.BURGER_BTN_MENU);
-		if (burger == null || burger.isHidden()) {
-			double fraction = phaseFraction("banner");
-			if (fraction <= 0) {
-				guide.disarm();
-				return null;
-			}
-			drawHint(g, "Open your Collection Log to sync your points", fraction);
-			return null;
-		}
-
 		Widget menuFrame = client.getWidget(InterfaceID.Collection.BURGER_MENU_FRAME);
-		boolean menuOpen = menuFrame != null && !menuFrame.isHidden();
+		boolean logOpen = burger != null && !burger.isHidden();
+		boolean menuOpen = logOpen && menuFrame != null && !menuFrame.isHidden();
+		Phase current = !logOpen ? Phase.BANNER : menuOpen ? Phase.MENU : Phase.BURGER;
 
-		if (menuOpen) {
-			double fraction = phaseFraction("menu");
-			if (fraction <= 0) {
-				guide.disarm();
-				return null;
-			}
-			Widget syncEntry = guide.getSyncButtonWidget();
-			if (syncEntry != null && !syncEntry.isHidden()) {
-				glow(g, syncEntry.getBounds());
-				drawHint(g, "Click Sync Reval", fraction);
-				return null;
-			}
-			drawHint(g, "Click Sync Reval in the menu", fraction);
-			return null;
+		// Each phase gets its own full window; changing phase restarts the clock
+		long now = System.currentTimeMillis();
+		if (current != phase) {
+			phase = current;
+			phaseStartedAt = now;
 		}
-
-		double fraction = phaseFraction("burger");
+		double fraction = (double) (HINT_TIMEOUT_MS - (now - phaseStartedAt)) / HINT_TIMEOUT_MS;
 		if (fraction <= 0) {
 			guide.disarm();
 			return null;
 		}
-		glow(g, burger.getBounds());
-		drawHint(g, "Open this menu, then click Sync Reval", fraction);
-		return null;
-	}
 
-	/** Fraction of the current phase's time left; entering a new phase restarts it. */
-	private double phaseFraction(String newPhase) {
-		long now = System.currentTimeMillis();
-		if (!newPhase.equals(phase)) {
-			phase = newPhase;
-			phaseStartedAt = now;
+		g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+		switch (current) {
+			case BANNER:
+				drawHint(g, "Open your Collection Log to sync your points", fraction);
+				break;
+			case BURGER:
+				glow(g, burger.getBounds());
+				drawHint(g, "Open this menu, then click Sync Reval", fraction);
+				break;
+			case MENU:
+				Widget syncEntry = guide.getSyncButtonWidget();
+				if (syncEntry != null && !syncEntry.isHidden()) {
+					glow(g, syncEntry.getBounds());
+					drawHint(g, "Click Sync Reval", fraction);
+				} else {
+					drawHint(g, "Click Sync Reval in the menu", fraction);
+				}
+				break;
 		}
-		return (double) (HINT_TIMEOUT_MS - (now - phaseStartedAt)) / HINT_TIMEOUT_MS;
+		return null;
 	}
 
 	private void glow(Graphics2D g, Rectangle bounds) {

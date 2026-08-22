@@ -59,7 +59,7 @@ public class ClanRankIconResolver {
 	 * once, possibly on the client thread; it is skipped when no icon is known.
 	 */
 	public void resolve(String rankName, IntConsumer callback) {
-		if (rankName == null || client == null || clientThread == null) {
+		if (rankName == null) {
 			return;
 		}
 		String title = RankNames.display(rankName).toLowerCase(Locale.ROOT);
