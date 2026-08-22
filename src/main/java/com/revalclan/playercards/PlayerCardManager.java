@@ -9,21 +9,23 @@ import net.runelite.api.MenuEntry;
 import net.runelite.api.Player;
 import net.runelite.api.events.MenuOpened;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.game.SpriteManager;
+import net.runelite.client.input.MouseAdapter;
+import net.runelite.client.input.MouseManager;
 import net.runelite.client.util.Text;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
-import javax.swing.SwingUtilities;
-import java.awt.Canvas;
 import java.awt.Color;
-import java.awt.Rectangle;
+import java.awt.event.MouseEvent;
 import java.util.HashSet;
 import java.util.Set;
 
 /**
- * Adds a "View Reval Profile" right-click option on clan members and opens
- * their {@link PlayerCardWindow}. Card data is mocked until the profile
- * endpoint exists.
+ * Adds a "View Reval Profile" right-click option on clan members and shows
+ * their {@link PlayerCardOverlay} in-game. While the card is open, mouse
+ * input is consumed so the game doesn't react; any click closes it. Card
+ * data is mocked until the profile endpoint exists.
  */
 @Singleton
 public class PlayerCardManager {
@@ -32,14 +34,49 @@ public class PlayerCardManager {
 	private final Client client;
 	private final MockTeamColorProvider teamColors;
 	private final ClanRankIconResolver rankIconResolver;
+	private final SpriteManager spriteManager;
+	private final MouseManager mouseManager;
+	private final PlayerCardOverlay overlay;
 
-	private PlayerCardWindow window;
+	private volatile long closedAt;
+
+	private final MouseAdapter clickCloser = new MouseAdapter() {
+		@Override
+		public MouseEvent mousePressed(MouseEvent e) {
+			if (overlay.isOpen()) {
+				e.consume();
+			}
+			return e;
+		}
+
+		@Override
+		public MouseEvent mouseReleased(MouseEvent e) {
+			if (overlay.isOpen()) {
+				e.consume();
+				close();
+			}
+			return e;
+		}
+
+		@Override
+		public MouseEvent mouseClicked(MouseEvent e) {
+			// The click event trails the closing release; swallow it too
+			if (overlay.isOpen() || System.currentTimeMillis() - closedAt < 250) {
+				e.consume();
+			}
+			return e;
+		}
+	};
 
 	@Inject
-	public PlayerCardManager(Client client, MockTeamColorProvider teamColors, ClanRankIconResolver rankIconResolver) {
+	public PlayerCardManager(Client client, MockTeamColorProvider teamColors, ClanRankIconResolver rankIconResolver,
+							 SpriteManager spriteManager, MouseManager mouseManager, PlayerCardOverlay overlay) {
 		this.client = client;
 		this.teamColors = teamColors;
 		this.rankIconResolver = rankIconResolver;
+		this.spriteManager = spriteManager;
+		this.mouseManager = mouseManager;
+		this.overlay = overlay;
 	}
 
 	@Subscribe
@@ -64,34 +101,25 @@ public class PlayerCardManager {
 
 	private void open(String playerName) {
 		Color teamColor = teamColors.teamColorFor(playerName);
-		Color accent = teamColor != null ? teamColor : DEFAULT_ACCENT;
-		SwingUtilities.invokeLater(() -> {
-			if (window != null) {
-				window.dispose();
-			}
-			window = new PlayerCardWindow(PlayerCardData.mock(playerName), accent, rankIconResolver, canvasBounds());
-			window.setVisible(true);
-		});
+		PlayerCardData data = PlayerCardData.mock(playerName);
+		if (!overlay.isOpen()) {
+			mouseManager.registerMouseListener(clickCloser);
+		}
+		overlay.show(data, teamColor != null ? teamColor : DEFAULT_ACCENT);
+		rankIconResolver.resolve(data.getRankName(), spriteId ->
+			spriteManager.getSpriteAsync(spriteId, 0, overlay::setRankSprite));
 	}
 
-	/** Screen bounds of the game canvas, or null if it isn't showing. */
-	private Rectangle canvasBounds() {
-		try {
-			Canvas canvas = client.getCanvas();
-			java.awt.Point location = canvas.getLocationOnScreen();
-			return new Rectangle(location.x, location.y, canvas.getWidth(), canvas.getHeight());
-		} catch (Exception e) {
-			return null;
-		}
+	private void close() {
+		overlay.close();
+		closedAt = System.currentTimeMillis();
+		mouseManager.unregisterMouseListener(clickCloser);
 	}
 
 	/** Closes an open card; called when the plugin shuts down. */
 	public void shutDown() {
-		SwingUtilities.invokeLater(() -> {
-			if (window != null) {
-				window.dispose();
-				window = null;
-			}
-		});
+		if (overlay.isOpen()) {
+			close();
+		}
 	}
 }
