@@ -7,10 +7,13 @@ import com.revalclan.ui.admin.AdminLoginPanel;
 import com.revalclan.ui.admin.AdminManager;
 import com.revalclan.ui.admin.PendingRankupsPanel;
 import com.revalclan.ui.components.AdminButton;
+import com.revalclan.ui.components.Clickable;
 import com.revalclan.ui.components.GradientSeparator;
 import com.revalclan.ui.components.IndicatorTabButton;
 import com.revalclan.ui.components.PanelTitle;
 import com.revalclan.ui.constants.UIConstants;
+import com.revalclan.util.ClanRankIconResolver;
+import com.revalclan.util.SpriteIcons;
 import com.revalclan.util.UIAssetLoader;
 import lombok.Getter;
 import net.runelite.api.Client;
@@ -26,8 +29,6 @@ import net.runelite.client.util.LinkBrowser;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
 
 public class RevalPanel extends PluginPanel {
 	private static final String DISCORD_URL = "https://discord.gg/reval";
@@ -64,6 +65,7 @@ public class RevalPanel extends PluginPanel {
 	private PendingRankupsPanel pendingRankupsPanel;
 	private RevalApiService apiService;
 	private Client client;
+	private ClanRankIconResolver rankIconResolver;
 	private UIAssetLoader assetLoader;
 
 	public RevalPanel() {
@@ -129,7 +131,7 @@ public class RevalPanel extends PluginPanel {
 		row1.add(profileTab);
 		row1.add(achievementsTab);
 
-		// Second row: Events, 🏆 (small), Competitions
+		// Second row: Events, trophy (small), Competitions
 		JPanel row2 = new JPanel();
 		row2.setLayout(new BoxLayout(row2, BoxLayout.X_AXIS));
 		row2.setOpaque(false);
@@ -139,7 +141,9 @@ public class RevalPanel extends PluginPanel {
 		eventsTab.setMaximumSize(new Dimension(Integer.MAX_VALUE, 28));
 		eventsTab.addActionListener(e -> selectTab("EVENTS"));
 
-		leaderboardTab = createTabButton("\uD83C\uDFC6");
+		// Text is a fallback until init() swaps in the trophy sprite — the 🏆
+		// emoji has no glyph in the RuneScape font (missing-glyph box on macOS)
+		leaderboardTab = createTabButton("LB");
 		leaderboardTab.setPreferredSize(new Dimension(36, 28));
 		leaderboardTab.setMinimumSize(new Dimension(36, 28));
 		leaderboardTab.setMaximumSize(new Dimension(36, 28));
@@ -203,13 +207,7 @@ public class RevalPanel extends PluginPanel {
 		// Info button (left)
 		infoButton = new JLabel();
 		infoButton.setToolTipText("Ranks & Points");
-		infoButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-		infoButton.addMouseListener(new MouseAdapter() {
-			@Override
-			public void mousePressed(MouseEvent e) {
-				if (SwingUtilities.isLeftMouseButton(e)) selectTab("RANKING");
-			}
-		});
+		Clickable.onPress(infoButton, () -> selectTab("RANKING"));
 
 		JPanel leftPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
 		leftPanel.setOpaque(false);
@@ -291,13 +289,7 @@ public class RevalPanel extends PluginPanel {
 	private JLabel createSocialIcon(String url, String tooltip) {
 		JLabel label = new JLabel();
 		label.setToolTipText(tooltip);
-		label.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-		label.addMouseListener(new MouseAdapter() {
-			@Override
-			public void mousePressed(MouseEvent e) {
-				if (SwingUtilities.isLeftMouseButton(e)) LinkBrowser.browse(url);
-			}
-		});
+		Clickable.onPress(label, () -> LinkBrowser.browse(url));
 		return label;
 	}
 
@@ -358,7 +350,8 @@ public class RevalPanel extends PluginPanel {
 				if (pendingRankupsPanel == null) {
 					pendingRankupsPanel = new PendingRankupsPanel(
 						apiService, adminManager.getMemberCode(),
-						() -> navigateToAdmin("DASHBOARD"), assetLoader
+						() -> navigateToAdmin("DASHBOARD"), assetLoader,
+						rankIconResolver
 					);
 					contentPanel.add(pendingRankupsPanel, "ADMIN_PENDING_RANKUPS");
 				} else {
@@ -373,10 +366,19 @@ public class RevalPanel extends PluginPanel {
 
 	public void init(RevalApiService apiService, Client client,
 					 UIAssetLoader assetLoader, ItemManager itemManager, SpriteManager spriteManager,
-					 RevalClanConfig config) {
+					 RevalClanConfig config, ClanRankIconResolver rankIconResolver) {
 		this.apiService = apiService;
 		this.client = client;
 		this.assetLoader = assetLoader;
+		this.rankIconResolver = rankIconResolver;
+
+		// Leaderboard tab icon: leagues trophy from the game cache
+		if (leaderboardTab != null) {
+			SpriteIcons.load(spriteManager, net.runelite.api.gameval.SpriteID.LeagueTrophyIcons._5, 16, icon -> {
+				leaderboardTab.setIcon(icon);
+				leaderboardTab.setText("");
+			});
+		}
 
 		if (assetLoader != null) {
 			ImageIcon infoIcon = assetLoader.getIcon("info.png", 16);
@@ -389,9 +391,10 @@ public class RevalPanel extends PluginPanel {
 			if (websiteImg != null && websiteIcon != null) websiteIcon.setIcon(websiteImg);
 		}
 
-		rankingPanel.init(apiService, itemManager, spriteManager);
-		profilePanel.init(apiService, client, assetLoader, config, itemManager);
-		leaderboardPanel.init(apiService, assetLoader, itemManager);
+		rankingPanel.init(apiService, itemManager, spriteManager, rankIconResolver);
+		profilePanel.init(apiService, client, assetLoader, config, itemManager, rankIconResolver);
+		profilePanel.setOnOpenRanks(() -> selectTab("RANKING"));
+		leaderboardPanel.init(apiService, assetLoader, itemManager, rankIconResolver);
 		achievementsPanel.init(apiService, client);
 		competitionsPanel.init(apiService, client);
 		eventsPanel.init(apiService, client);
@@ -434,6 +437,16 @@ public class RevalPanel extends PluginPanel {
 	/**
 	 * Set admin status — call after verifying admin eligibility (e.g. from account data).
 	 */
+	/** Forwarded so the plugin never reaches into child panels. */
+	public void setOnSyncGuide(Runnable onSyncGuide) {
+		profilePanel.setOnSyncGuide(onSyncGuide);
+	}
+
+	/** Tears down anything living outside the panel tree (detached windows). */
+	public void shutDown() {
+		profilePanel.disposeAlbum();
+	}
+
 	public void setAdminEnabled(boolean enabled) {
 		if (adminButton != null) {
 			adminButton.setAdmin(enabled);

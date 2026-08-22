@@ -2,9 +2,13 @@ package com.revalclan.ui.admin;
 
 import com.revalclan.api.RevalApiService;
 import com.revalclan.api.admin.PendingRankChangesResponse;
+import com.revalclan.ui.components.ArrowIcon;
+import com.revalclan.ui.components.CheckIcon;
 import com.revalclan.ui.components.BackButton;
 import com.revalclan.ui.components.PanelTitle;
 import com.revalclan.ui.constants.UIConstants;
+import com.revalclan.util.ClanRankIconResolver;
+import com.revalclan.util.RankNames;
 import com.revalclan.util.UIAssetLoader;
 import net.runelite.client.ui.FontManager;
 
@@ -14,47 +18,27 @@ import java.awt.*;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Map;
 
 public class PendingRankupsPanel extends JPanel {
 	private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("MMM dd, yyyy HH:mm");
-
-	// Map rank names to OSRS Wiki clan icon names
-	private static final Map<String, String> RANK_DISPLAY = Map.ofEntries(
-		Map.entry("member", "Mentor"),
-		Map.entry("advanced", "Prefect"),
-		Map.entry("elite", "Leader"),
-		Map.entry("veteran", "Supervisor"),
-		Map.entry("hero", "Superior"),
-		Map.entry("champion", "Executive"),
-		Map.entry("legend", "Senator"),
-		Map.entry("mythic", "Monarch"),
-		Map.entry("paragon", "Brigadier"),
-		Map.entry("ascended", "Admiral"),
-		Map.entry("eternal", "Marshal"),
-		// Also handle lowercase versions
-		Map.entry("recruit", "Recruit"),
-		Map.entry("corporal", "Corporal"),
-		Map.entry("sergeant", "Sergeant"),
-		Map.entry("lieutenant", "Lieutenant"),
-		Map.entry("captain", "Captain"),
-		Map.entry("general", "General")
-	);
 
 	private final RevalApiService apiService;
 	private final String memberCode;
 	private final Runnable onBack;
 	private final UIAssetLoader assetLoader;
+	private final ClanRankIconResolver rankIconResolver;
 
 	private JPanel contentPanel;
 	private boolean isLoading = false;
 
 	public PendingRankupsPanel(RevalApiService apiService, String memberCode,
-	                           Runnable onBack, UIAssetLoader assetLoader) {
+	                           Runnable onBack, UIAssetLoader assetLoader,
+	                           ClanRankIconResolver rankIconResolver) {
 		this.apiService = apiService;
 		this.memberCode = memberCode;
 		this.onBack = onBack;
 		this.assetLoader = assetLoader;
+		this.rankIconResolver = rankIconResolver;
 
 		setLayout(new BorderLayout());
 		setBackground(UIConstants.BACKGROUND);
@@ -152,7 +136,7 @@ public class PendingRankupsPanel extends JPanel {
 		card.setAlignmentX(Component.LEFT_ALIGNMENT);
 
 		String name = change.getOsrsNickname() != null ? change.getOsrsNickname() : "Unknown";
-		card.setToolTipText(name + " • " + formatTimestamp(change.getChangedAt()));
+		card.setToolTipText(name + " - " + formatTimestamp(change.getChangedAt()));
 
 		// Left: name + rank transition
 		JPanel left = new JPanel();
@@ -164,16 +148,28 @@ public class PendingRankupsPanel extends JPanel {
 		nameLabel.setForeground(UIConstants.TEXT_PRIMARY);
 		nameLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-		String prevRank = rankDisplay(change.getPreviousRank());
-		String newRank = rankDisplay(change.getNewRank());
-		JLabel rankLabel = new JLabel(prevRank + " → " + newRank);
-		rankLabel.setFont(FontManager.getRunescapeSmallFont());
-		rankLabel.setForeground(UIConstants.ACCENT_GOLD);
-		rankLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+		JPanel rankLine = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
+		rankLine.setOpaque(false);
+
+		JLabel prevIcon = new JLabel();
+		prevIcon.setPreferredSize(new Dimension(18, 18));
+		rankIconResolver.apply(change.getPreviousRank(), prevIcon, 18);
+
+		JLabel arrow = new JLabel(new ArrowIcon(12, UIConstants.ACCENT_GOLD));
+
+		JLabel newIcon = new JLabel();
+		newIcon.setPreferredSize(new Dimension(18, 18));
+		rankIconResolver.apply(change.getNewRank(), newIcon, 18);
+
+		rankLine.add(prevIcon);
+		rankLine.add(arrow);
+		rankLine.add(newIcon);
+		rankLine.setToolTipText(RankNames.display(change.getPreviousRank()) + " -> " + RankNames.display(change.getNewRank()));
+		rankLine.setAlignmentX(Component.LEFT_ALIGNMENT);
 
 		left.add(nameLabel);
 		left.add(Box.createRigidArea(new Dimension(0, 2)));
-		left.add(rankLabel);
+		left.add(rankLine);
 
 		// Right: actualize button
 		JPanel right = new JPanel(new GridBagLayout());
@@ -192,12 +188,7 @@ public class PendingRankupsPanel extends JPanel {
 		};
 
 		ImageIcon checkIcon = assetLoader != null ? assetLoader.getIcon("checkmark.png", 14) : null;
-		if (checkIcon != null) {
-			actualizeBtn.setIcon(checkIcon);
-		} else {
-			actualizeBtn.setText("✓");
-			actualizeBtn.setFont(FontManager.getRunescapeSmallFont());
-		}
+		actualizeBtn.setIcon(checkIcon != null ? checkIcon : new CheckIcon(14, Color.WHITE));
 
 		actualizeBtn.setForeground(Color.WHITE);
 		actualizeBtn.setBackground(new Color(70, 70, 70));
@@ -249,12 +240,6 @@ public class PendingRankupsPanel extends JPanel {
 		contentPanel.add(lbl);
 		contentPanel.revalidate();
 		contentPanel.repaint();
-	}
-
-	private String rankDisplay(String rank) {
-		if (rank == null) return "?";
-		String display = RANK_DISPLAY.get(rank.toLowerCase());
-		return display != null ? display : rank;
 	}
 
 	private String formatTimestamp(String timestamp) {

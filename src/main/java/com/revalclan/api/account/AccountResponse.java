@@ -40,7 +40,6 @@ public class AccountResponse extends ApiResponse {
         private Integer activityPoints;
         private Integer maintenancePoints;
         private String clanRank;
-        private Integer prestigeLevel;
         private String lastSyncedAt;
         private String rankUpdatedAt;
     }
@@ -80,7 +79,7 @@ public class AccountResponse extends ApiResponse {
         private String pointType; // 'activity' | 'maintenance'
         private Integer pointsChange;
         private Integer pointsAfter;
-        private String sourceType; // 'drop' | 'pet' | 'milestone' | 'manual' | 'event' | 'prestige' | 'decay' | 'initial'
+        private String sourceType; // 'drop' | 'pet' | 'milestone' | 'manual' | 'event' | 'decay' | 'misc'
         private Integer sourceId;
         private Integer itemId;
         private String sourceDescription;

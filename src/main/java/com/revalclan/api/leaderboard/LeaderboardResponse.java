@@ -29,6 +29,5 @@ public class LeaderboardResponse extends ApiResponse {
         private String osrsNickname;
         private int activityPoints;
         private String clanRank;
-        private int prestigeLevel;
     }
 }

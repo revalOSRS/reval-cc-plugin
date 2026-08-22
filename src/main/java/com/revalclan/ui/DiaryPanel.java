@@ -2,10 +2,14 @@ package com.revalclan.ui;
 
 import com.revalclan.api.RevalApiService;
 import com.revalclan.api.diaries.DiariesResponse;
+import com.revalclan.ui.components.ArrowIcon;
 import com.revalclan.ui.components.BackButton;
+import com.revalclan.ui.components.CheckIcon;
+import com.revalclan.ui.components.Clickable;
 import com.revalclan.ui.components.LoginPrompt;
 import com.revalclan.ui.components.PanelTitle;
 import com.revalclan.ui.components.RefreshButton;
+import com.revalclan.ui.components.TriangleIcon;
 import com.revalclan.ui.constants.UIConstants;
 import com.revalclan.util.UIAssetLoader;
 import lombok.extern.slf4j.Slf4j;
@@ -15,8 +19,6 @@ import net.runelite.client.ui.FontManager;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
 import java.awt.geom.RoundRectangle2D;
 import java.util.*;
 
@@ -193,9 +195,7 @@ public class DiaryPanel extends JPanel {
 		statsLabel.setForeground(UIConstants.ACCENT_GOLD);
 		statsLabel.setAlignmentX(Component.RIGHT_ALIGNMENT);
 
-		JLabel arrowLabel = new JLabel("\u2192");
-		arrowLabel.setFont(FontManager.getRunescapeSmallFont());
-		arrowLabel.setForeground(UIConstants.TEXT_SECONDARY);
+		JLabel arrowLabel = new JLabel(new ArrowIcon(11, UIConstants.TEXT_SECONDARY));
 		arrowLabel.setAlignmentX(Component.RIGHT_ALIGNMENT);
 
 		rightPanel.add(statsLabel);
@@ -205,11 +205,7 @@ public class DiaryPanel extends JPanel {
 		card.add(leftPanel, BorderLayout.WEST);
 		card.add(rightPanel, BorderLayout.EAST);
 
-		card.addMouseListener(new MouseAdapter() {
-			public void mouseEntered(MouseEvent e) { isHovered[0] = true; card.repaint(); }
-			public void mouseExited(MouseEvent e) { isHovered[0] = false; card.repaint(); }
-			public void mouseClicked(MouseEvent e) { showDiaryDetail(diary); }
-		});
+		Clickable.onPress(card, () -> showDiaryDetail(diary), h -> isHovered[0] = h);
 
 		return card;
 	}
@@ -322,7 +318,7 @@ public class DiaryPanel extends JPanel {
 		progressLabel.setFont(FontManager.getRunescapeBoldFont());
 		progressLabel.setForeground(UIConstants.TEXT_PRIMARY);
 
-		JLabel statsLabel = new JLabel(completedTasks + "/" + totalTasks + " tasks \u2022 " + earnedPoints + "/" + totalPoints + " pts");
+		JLabel statsLabel = new JLabel(completedTasks + "/" + totalTasks + " tasks - " + earnedPoints + "/" + totalPoints + " pts");
 		statsLabel.setFont(FontManager.getRunescapeSmallFont());
 		statsLabel.setForeground(UIConstants.TEXT_SECONDARY);
 
@@ -383,23 +379,22 @@ public class DiaryPanel extends JPanel {
 		tierSection.add(headerRef[0]);
 		tierSection.add(tasksContainer);
 
-		headerRef[0].addMouseListener(new MouseAdapter() {
-			public void mouseClicked(MouseEvent e) {
-				expanded[0] = !expanded[0];
-				tasksContainer.setVisible(expanded[0]);
-				if (expanded[0]) expandedTiers.add(tierKey);
-				else expandedTiers.remove(tierKey);
+		Runnable[] toggle = new Runnable[1];
+		toggle[0] = () -> {
+			expanded[0] = !expanded[0];
+			tasksContainer.setVisible(expanded[0]);
+			if (expanded[0]) expandedTiers.add(tierKey);
+			else expandedTiers.remove(tierKey);
 
-				tierSection.remove(headerRef[0]);
-				headerRef[0] = createTierHeader(tier, apiTier, activeTasks, expanded[0]);
-				headerRef[0].setAlignmentX(Component.LEFT_ALIGNMENT);
-				headerRef[0].setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-				headerRef[0].addMouseListener(this);
-				tierSection.add(headerRef[0], 0);
-				tierSection.revalidate();
-				tierSection.repaint();
-			}
-		});
+			tierSection.remove(headerRef[0]);
+			headerRef[0] = createTierHeader(tier, apiTier, activeTasks, expanded[0]);
+			headerRef[0].setAlignmentX(Component.LEFT_ALIGNMENT);
+			Clickable.onPress(headerRef[0], toggle[0]);
+			tierSection.add(headerRef[0], 0);
+			tierSection.revalidate();
+			tierSection.repaint();
+		};
+		Clickable.onPress(headerRef[0], toggle[0]);
 
 		return tierSection;
 	}
@@ -442,11 +437,7 @@ public class DiaryPanel extends JPanel {
 
 		if (tierComplete) {
 			ImageIcon icon = assetLoader != null ? assetLoader.getIcon("checkmark.png", 16) : null;
-			JLabel checkIcon = icon != null ? new JLabel(icon) : new JLabel(" \u2713");
-			if (icon == null) {
-				checkIcon.setFont(FontManager.getRunescapeBoldFont());
-				checkIcon.setForeground(UIConstants.TIER_EASY);
-			}
+			JLabel checkIcon = new JLabel(icon != null ? icon : new CheckIcon(14, UIConstants.TIER_EASY));
 			nameRow.add(Box.createRigidArea(new Dimension(6, 0)));
 			nameRow.add(checkIcon);
 		}
@@ -455,7 +446,7 @@ public class DiaryPanel extends JPanel {
 			? apiTier.getCompletionBonus() + " pts earned"
 			: apiTier.getCompletionBonus() + " pts available";
 
-		JLabel progressText = new JLabel(completed + "/" + total + " tasks \u2022 " + pointsText);
+		JLabel progressText = new JLabel(completed + "/" + total + " tasks - " + pointsText);
 		progressText.setFont(FontManager.getRunescapeSmallFont());
 		progressText.setForeground(UIConstants.TEXT_SECONDARY);
 		progressText.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -464,9 +455,7 @@ public class DiaryPanel extends JPanel {
 		leftPanel.add(Box.createRigidArea(new Dimension(0, 4)));
 		leftPanel.add(progressText);
 
-		JLabel expandArrow = new JLabel(isExpanded ? "\u25B2" : "\u25BC");
-		expandArrow.setFont(FontManager.getRunescapeSmallFont());
-		expandArrow.setForeground(UIConstants.TEXT_SECONDARY);
+		JLabel expandArrow = new JLabel(new TriangleIcon(!isExpanded, 9, UIConstants.TEXT_SECONDARY));
 
 		header.add(leftPanel, BorderLayout.WEST);
 		header.add(expandArrow, BorderLayout.EAST);

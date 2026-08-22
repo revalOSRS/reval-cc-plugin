@@ -29,6 +29,7 @@ public class EventsPanel extends JPanel {
 	private RefreshButton refreshButton;
 
 	private String currentTab = "active";
+	private boolean userSelectedTab = false;
 	private List<EventsResponse.EventSummary> allEvents = new ArrayList<>();
 	private long currentAccountHash = -1;
 	private String currentPlayerName = null;
@@ -192,6 +193,7 @@ public class EventsPanel extends JPanel {
 
 		btn.addActionListener(e -> {
 			currentTab = tabId;
+			userSelectedTab = true;
 			updateTabSelection();
 			displayEvents();
 		});
@@ -220,6 +222,16 @@ public class EventsPanel extends JPanel {
 			if (refreshButton != null) refreshButton.setLoading(false);
 			allEvents = response != null && response.getData() != null && response.getData().getEvents() != null
 				? response.getData().getEvents() : new ArrayList<>();
+
+			// Until the user picks a tab themselves, land on the one with content:
+			// Active when anything is live, otherwise Upcoming when something is scheduled
+			if (!userSelectedTab) {
+				boolean hasActive = allEvents.stream().anyMatch(EventsResponse.EventSummary::isCurrentlyActive);
+				boolean hasUpcoming = allEvents.stream().anyMatch(EventsResponse.EventSummary::isUpcoming);
+				currentTab = (!hasActive && hasUpcoming) ? "upcoming" : "active";
+				updateTabSelection();
+			}
+
 			displayEvents();
 
 			if (onIndicatorUpdate != null) {

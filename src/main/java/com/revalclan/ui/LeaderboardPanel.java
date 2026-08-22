@@ -3,8 +3,11 @@ package com.revalclan.ui;
 import com.revalclan.api.RevalApiService;
 import com.revalclan.api.leaderboard.LeaderboardResponse;
 import com.revalclan.ui.components.BackButton;
+import com.revalclan.ui.components.Clickable;
 import com.revalclan.ui.components.RefreshButton;
 import com.revalclan.ui.constants.UIConstants;
+import com.revalclan.util.ClanRankIconResolver;
+import com.revalclan.util.RankNames;
 import com.revalclan.util.UIAssetLoader;
 
 import net.runelite.client.game.ItemManager;
@@ -15,8 +18,6 @@ import javax.swing.border.EmptyBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import java.awt.*;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -25,6 +26,7 @@ public class LeaderboardPanel extends JPanel {
 	private RevalApiService apiService;
 	private UIAssetLoader assetLoader;
 	private ItemManager itemManager;
+	private ClanRankIconResolver rankIconResolver;
 
 	private final CardLayout cardLayout;
 	private final JPanel cardContainer;
@@ -121,7 +123,9 @@ public class LeaderboardPanel extends JPanel {
 		return header;
 	}
 
-	public void init(RevalApiService apiService, UIAssetLoader assetLoader, ItemManager itemManager) {
+	public void init(RevalApiService apiService, UIAssetLoader assetLoader, ItemManager itemManager,
+					 ClanRankIconResolver rankIconResolver) {
+		this.rankIconResolver = rankIconResolver;
 		this.apiService = apiService;
 		this.assetLoader = assetLoader;
 		this.itemManager = itemManager;
@@ -141,7 +145,7 @@ public class LeaderboardPanel extends JPanel {
 		profileViewPanel.add(createBackHeader(playerName), BorderLayout.NORTH);
 
 		ProfilePanel profile = new ProfilePanel();
-		profile.init(apiService, null, assetLoader, null, itemManager);
+		profile.init(apiService, null, assetLoader, null, itemManager, rankIconResolver);
 		profile.loadAccountById(osrsAccountId);
 
 		profileViewPanel.add(profile, BorderLayout.CENTER);
@@ -255,21 +259,8 @@ public class LeaderboardPanel extends JPanel {
 		row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 44));
 		row.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-		row.addMouseListener(new MouseAdapter() {
-			public void mouseEntered(MouseEvent e) {
-				row.setBackground(UIConstants.CARD_HOVER);
-				row.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-			}
-			public void mouseExited(MouseEvent e) {
-				row.setBackground(UIConstants.CARD_BG);
-				row.setCursor(Cursor.getDefaultCursor());
-			}
-			public void mousePressed(MouseEvent e) {
-				if (SwingUtilities.isLeftMouseButton(e)) {
-					showPlayerProfile(entry.getOsrsAccountId(), entry.getOsrsNickname());
-				}
-			}
-		});
+		Clickable.onPress(row, () -> showPlayerProfile(entry.getOsrsAccountId(), entry.getOsrsNickname()),
+			UIConstants.CARD_HOVER, UIConstants.CARD_BG);
 
 		// Left: Rank + Name
 		JPanel leftPanel = new JPanel();
@@ -289,13 +280,6 @@ public class LeaderboardPanel extends JPanel {
 		leftPanel.add(Box.createRigidArea(new Dimension(6, 0)));
 		leftPanel.add(nameLabel);
 
-		if (entry.getPrestigeLevel() > 0) {
-			JLabel prestigeLabel = new JLabel(" ★" + entry.getPrestigeLevel());
-			prestigeLabel.setFont(FontManager.getRunescapeBoldFont());
-			prestigeLabel.setForeground(UIConstants.ACCENT_PURPLE);
-			leftPanel.add(prestigeLabel);
-		}
-
 		// Right: Points + Rank
 		JPanel rightPanel = new JPanel();
 		rightPanel.setLayout(new BoxLayout(rightPanel, BoxLayout.Y_AXIS));
@@ -306,7 +290,7 @@ public class LeaderboardPanel extends JPanel {
 		pointsLabel.setForeground(UIConstants.ACCENT_GOLD);
 		pointsLabel.setAlignmentX(Component.RIGHT_ALIGNMENT);
 
-		JLabel clanRankLabel = new JLabel(capitalize(entry.getClanRank()));
+		JLabel clanRankLabel = new JLabel(RankNames.display(entry.getClanRank()));
 		clanRankLabel.setFont(FontManager.getRunescapeSmallFont());
 		clanRankLabel.setForeground(UIConstants.TEXT_MUTED);
 		clanRankLabel.setAlignmentX(Component.RIGHT_ALIGNMENT);
@@ -334,8 +318,4 @@ public class LeaderboardPanel extends JPanel {
 		return String.valueOf(points);
 	}
 
-	private String capitalize(String s) {
-		if (s == null || s.isEmpty()) return s;
-		return s.substring(0, 1).toUpperCase() + s.substring(1).toLowerCase();
-	}
 }

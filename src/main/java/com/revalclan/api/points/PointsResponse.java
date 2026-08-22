@@ -26,10 +26,8 @@ public class PointsResponse extends ApiResponse {
     public static class Rank {
         private String name;
         private String displayName;
-        private List<String> ingameRank;
         private int pointsRequired;
         private int maintenancePerMonth;
-        private int prestigeRequired;
         private List<AdditionalRequirement> additionalRequirements;
 
         @Data

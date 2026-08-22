@@ -4,11 +4,14 @@ import com.revalclan.api.RevalApiService;
 import com.revalclan.combat.KillTracker;
 import com.revalclan.collectionlog.CollectionLogManager;
 import com.revalclan.collectionlog.CollectionLogSyncButton;
+import com.revalclan.collectionlog.SyncGuide;
+import com.revalclan.collectionlog.SyncGuideOverlay;
 import com.revalclan.notifiers.*;
 import com.revalclan.pbs.ClogPersonalBestCapture;
 import com.revalclan.session.SessionTracker;
 import com.revalclan.ui.RevalPanel;
 import com.revalclan.util.AnnouncementService;
+import com.revalclan.util.ClanRankIconResolver;
 import com.revalclan.util.ClanValidator;
 import com.revalclan.util.EventFilterManager;
 import com.revalclan.util.SyncStateManager;
@@ -47,6 +50,7 @@ import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.ClientToolbar;
 import net.runelite.client.ui.NavigationButton;
+import net.runelite.client.ui.overlay.OverlayManager;
 
 @Slf4j
 @PluginDescriptor(
@@ -58,6 +62,10 @@ public class RevalClanPlugin extends Plugin {
 	@Inject	private CollectionLogManager collectionLogManager;
 
 	@Inject	private CollectionLogSyncButton syncButton;
+	@Inject	private SyncGuide syncGuide;
+	@Inject	private SyncGuideOverlay syncGuideOverlay;
+	@Inject	private OverlayManager overlayManager;
+	@Inject	private ClanRankIconResolver rankIconResolver;
 
 	@Inject	private LootNotifier lootNotifier;
 
@@ -169,6 +177,7 @@ public class RevalClanPlugin extends Plugin {
 		});
 
 		syncButton.startUp();
+		overlayManager.add(syncGuideOverlay);
 
 		// Replay any session left behind by a crash / X-out as a recovered summary
 		sessionTracker.recoverPersistedSession();
@@ -179,7 +188,17 @@ public class RevalClanPlugin extends Plugin {
 		// Initialize and add the side panel
 		try {
 			revalPanel = new RevalPanel();
-			revalPanel.init(revalApiService, client, uiAssetLoader, itemManager, spriteManager, config);
+			revalPanel.init(revalApiService, client, uiAssetLoader, itemManager, spriteManager, config,
+				rankIconResolver);
+			revalPanel.setOnSyncGuide(() -> {
+				syncGuide.arm();
+				clientThread.invoke(() -> {
+					if (client.getGameState() == GameState.LOGGED_IN) {
+						client.addChatMessage(ChatMessageType.GAMEMESSAGE, "",
+							"Reval: Open your Collection Log - the sync button will be highlighted.", "");
+					}
+				});
+			});
 			
 			BufferedImage icon = uiAssetLoader.getImage("reval.png");
 			
@@ -205,6 +224,10 @@ public class RevalClanPlugin extends Plugin {
 
 		collectionLogManager.clearObtainedItems();
 		syncButton.shutDown();
+		overlayManager.remove(syncGuideOverlay);
+		if (revalPanel != null) {
+			revalPanel.shutDown();
+		}
 
 		eventBus.unregister(lootNotifier);
 		eventBus.unregister(clogPersonalBestCapture);

@@ -6,8 +6,6 @@ import net.runelite.client.ui.FontManager;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
 
 public class CollapsibleSection extends JPanel {
 	private final JPanel contentPanel;
@@ -43,9 +41,7 @@ public class CollapsibleSection extends JPanel {
 		JPanel leftPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
 		leftPanel.setOpaque(false);
 
-		arrowLabel = new JLabel(expanded ? "▼" : "▲");
-		arrowLabel.setFont(FontManager.getRunescapeSmallFont());
-		arrowLabel.setForeground(UIConstants.ACCENT_GOLD);
+		arrowLabel = new JLabel(new TriangleIcon(expanded, 9, UIConstants.ACCENT_GOLD));
 		leftPanel.add(arrowLabel);
 
 		iconLabel = new JLabel();
@@ -77,24 +73,7 @@ public class CollapsibleSection extends JPanel {
 		headerPanel.add(leftPanel, BorderLayout.WEST);
 		headerPanel.add(titlePanel, BorderLayout.CENTER);
 
-		headerPanel.addMouseListener(new MouseAdapter() {
-			@Override
-			public void mousePressed(MouseEvent e) {
-				if (SwingUtilities.isLeftMouseButton(e)) {
-					setExpanded(!expanded);
-				}
-			}
-
-			@Override
-			public void mouseEntered(MouseEvent e) {
-				headerPanel.setBackground(UIConstants.HEADER_HOVER);
-			}
-
-			@Override
-			public void mouseExited(MouseEvent e) {
-				headerPanel.setBackground(UIConstants.HEADER_BG);
-			}
-		});
+		Clickable.onPress(headerPanel, () -> setExpanded(!expanded), UIConstants.HEADER_HOVER, UIConstants.HEADER_BG);
 
 		add(headerPanel, BorderLayout.NORTH);
 		add(contentPanel, BorderLayout.CENTER);
@@ -106,7 +85,7 @@ public class CollapsibleSection extends JPanel {
 
 	public void setExpanded(boolean expanded) {
 		this.expanded = expanded;
-		arrowLabel.setText(expanded ? "▼" : "▲");
+		arrowLabel.setIcon(new TriangleIcon(expanded, 9, UIConstants.ACCENT_GOLD));
 		contentPanel.setVisible(expanded);
 		revalidate();
 	}

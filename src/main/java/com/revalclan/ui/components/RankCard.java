@@ -2,37 +2,20 @@ package com.revalclan.ui.components;
 
 import com.revalclan.api.points.PointsResponse;
 import com.revalclan.ui.constants.UIConstants;
-import net.runelite.client.game.SpriteManager;
+import com.revalclan.util.ClanRankIconResolver;
 import net.runelite.client.ui.FontManager;
-import net.runelite.client.util.ImageUtil;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
-import java.awt.image.BufferedImage;
-import java.util.Map;
 
 public class RankCard extends JPanel {
-	private static final Map<String, Integer> RANK_SPRITES = Map.ofEntries(
-		Map.entry("member", 3137),
-		Map.entry("advanced", 3138),
-		Map.entry("elite", 3139),
-		Map.entry("veteran", 3140),
-		Map.entry("hero", 3141),
-		Map.entry("champion", 3142),
-		Map.entry("legend", 3143),
-		Map.entry("mythic", 3144),
-		Map.entry("paragon", 3109),
-		Map.entry("ascended", 3110),
-		Map.entry("eternal", 3111)
-	);
-
 	private final JLabel iconLabel = new JLabel();
 
-	public RankCard(PointsResponse.Rank rank, SpriteManager spriteManager) {
+	public RankCard(PointsResponse.Rank rank, ClanRankIconResolver iconResolver) {
 		setLayout(new BorderLayout(6, 0));
 		setBackground(UIConstants.CARD_BG);
-		setBorder(new EmptyBorder(8, 10, 8, 10));
+		setBorder(new EmptyBorder(8, 6, 8, 10));
 
 		String displayName = rank.getDisplayName() != null ? rank.getDisplayName() : rank.getName();
 
@@ -68,23 +51,9 @@ public class RankCard extends JPanel {
 			setToolTipText(tooltip.toString());
 		}
 
-		if (spriteManager != null && rank.getName() != null) {
-			Integer spriteId = RANK_SPRITES.get(rank.getName());
-			if (spriteId != null) {
-				loadIcon(spriteId, spriteManager);
-			}
+		if (iconResolver != null && rank.getName() != null) {
+			iconResolver.apply(rank.getName(), iconLabel, 18);
 		}
-	}
-
-	private void loadIcon(int spriteId, SpriteManager spriteManager) {
-		spriteManager.getSpriteAsync(spriteId, 0, sprite -> {
-			if (sprite != null) {
-				SwingUtilities.invokeLater(() -> {
-					BufferedImage scaled = ImageUtil.resizeImage(sprite, 18, 18);
-					iconLabel.setIcon(new ImageIcon(scaled));
-				});
-			}
-		});
 	}
 
 	private String formatPoints(int points) {
