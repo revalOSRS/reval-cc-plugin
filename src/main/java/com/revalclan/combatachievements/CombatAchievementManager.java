@@ -272,7 +272,7 @@ public class CombatAchievementManager {
 		return tierProgress;
 	}
 
-	/** Only COMPLETED tasks, each as {name, tier, type}. */
+	/** Only COMPLETED tasks. The server's storage path filters on the completed flag. */
 	private List<Map<String, Object>> getAllTasksDetailed() {
 		List<Map<String, Object>> tasksList = new ArrayList<>();
 
@@ -281,7 +281,8 @@ public class CombatAchievementManager {
 			tasksList.add(Map.of(
 				"name", task.getName(),
 				"tier", task.getTier(),
-				"type", task.getType()
+				"type", task.getType(),
+				"completed", true
 			));
 		}
 

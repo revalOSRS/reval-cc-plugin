@@ -399,6 +399,10 @@ public class CollectionLogManager {
 		// multi-page item IDs inflate it (296 vs the game's true 292).
 		data.put("obtainedItems", uniqueObtained);
 
+		// Trust marker for the server's clog storage/recovery gate: per-item data
+		// is only real after the player opened the collection log this session
+		data.put("dataSource", obtainedItems.isEmpty() ? "varbit_2943" : "collection_log_opened");
+
 		// Obtained items are already keyed by item id with the latest count
 		Map<Integer, ObtainedCollectionItem> obtainedItemsMap = obtainedItems;
 
@@ -441,6 +445,8 @@ public class CollectionLogManager {
 			itemData.put("id", itemId);
 			itemData.put("name", obtainedItem.getName());
 			itemData.put("quantity", obtainedItem.getCount());
+			// The server's storage path filters on this flag
+			itemData.put("obtained", true);
 			itemsList.add(itemData);
 		}
 
