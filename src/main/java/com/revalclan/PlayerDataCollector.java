@@ -8,9 +8,9 @@ import com.revalclan.pbs.PersonalBestManager;
 import com.revalclan.player.PlayerManager;
 import com.revalclan.quests.QuestManager;
 import com.revalclan.util.SyncStateManager;
+import com.revalclan.util.Worlds;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
-import net.runelite.api.WorldType;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -53,7 +53,7 @@ public class PlayerDataCollector {
 	/**
 	 * Full payload for SYNC — the only path that carries the collection log.
 	 */
-	public Map<String, Object> collectAllData() {
+	public Map<String, Object> collectSyncData() {
 		Map<String, Object> data = collectFullState();
 		data.put("collectionLog", collectionLogManager.sync());
 		attachFingerprint(data);
@@ -98,16 +98,11 @@ public class PlayerDataCollector {
 	 * skipped — leagues state is a different character.
 	 */
 	private String attachFingerprint(Map<String, Object> data) {
-		try {
-			if (client.getWorldType().contains(WorldType.SEASONAL)) return null;
-			String fingerprint = syncStateManager.computeFingerprint(data);
-			if (fingerprint != null) {
-				data.put("syncFingerprint", fingerprint);
-			}
-			return fingerprint;
-		} catch (Exception e) {
-			log.warn("Failed to attach sync fingerprint: {}", e.getMessage());
-			return null;
+		if (Worlds.isSeasonal(client)) return null;
+		String fingerprint = syncStateManager.computeFingerprint(data);
+		if (fingerprint != null) {
+			data.put("syncFingerprint", fingerprint);
 		}
+		return fingerprint;
 	}
 }

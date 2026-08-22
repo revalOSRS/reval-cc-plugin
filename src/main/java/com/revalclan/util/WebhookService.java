@@ -86,20 +86,13 @@ public class WebhookService {
 							log.warn("Webhook returned non-successful status: {}", response.code());
 							return;
 						}
-						if (onResponse != null && response.body() != null) {
-							JsonObject parsed = null;
-							try {
-								parsed = gson.fromJson(response.body().string(), JsonObject.class);
-							} catch (Exception e) {
-								log.warn("Failed to parse webhook response: {}", e.getMessage());
-							}
-							if (parsed != null) {
-								try {
-									onResponse.accept(parsed);
-								} catch (Exception e) {
-									log.warn("Webhook response handler failed: {}", e.getMessage());
-								}
-							}
+						if (onResponse == null || response.body() == null) return;
+						JsonObject parsed = parseJsonOrNull(response);
+						if (parsed == null) return;
+						try {
+							onResponse.accept(parsed);
+						} catch (Exception e) {
+							log.warn("Webhook response handler failed: {}", e.getMessage());
 						}
 					} finally {
 						response.close();
@@ -110,6 +103,15 @@ public class WebhookService {
 			log.error("Failed to prepare webhook data: {}", e.getMessage());
 		} catch (Exception e) {
 			log.error("Unexpected error preparing webhook", e);
+		}
+	}
+
+	private JsonObject parseJsonOrNull(Response response) {
+		try {
+			return gson.fromJson(response.body().string(), JsonObject.class);
+		} catch (Exception e) {
+			log.warn("Failed to parse webhook response: {}", e.getMessage());
+			return null;
 		}
 	}
 }

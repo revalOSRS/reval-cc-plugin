@@ -21,8 +21,9 @@ public class QuestManager {
 
 	/**
 	 * RuneLite's Quest enum has no quest/miniquest flag, so membership is curated
-	 * here (wiki miniquest list, 19 as of July 2025 — update on new releases).
-	 * RFD subquests are NOT miniquests; they stay in questStates.
+	 * here. Mirror of https://oldschool.runescape.wiki/w/Miniquests (19 as of
+	 * July 2025) — update on new releases. RFD subquests are NOT miniquests;
+	 * they stay in questStates.
 	 */
 	private static final Set<String> MINIQUEST_NAMES = Set.of(
 		"Alfred Grimhand's Barcrawl",

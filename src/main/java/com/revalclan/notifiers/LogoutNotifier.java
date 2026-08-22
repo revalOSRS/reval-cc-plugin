@@ -33,6 +33,12 @@ public class LogoutNotifier extends BaseNotifier {
 		return "LOGOUT";
 	}
 
+	/** The clan channel is already torn down when LOGOUT fires; RevalClanPlugin gates on wasInClan. */
+	@Override
+	protected boolean passesClanCheck() {
+		return true;
+	}
+
 	/** @param sessionSummary Finalized summary from SessionTracker (nullable) */
 	public void onLogout(Map<String, Object> sessionSummary) {
 		Map<String, Object> data = dataCollector.collectBoundaryData();
@@ -41,7 +47,7 @@ public class LogoutNotifier extends BaseNotifier {
 		}
 		long accountHash = client.getAccountHash();
 		String sessionId = sessionSummary != null ? (String) sessionSummary.get("sessionId") : null;
-		sendNotificationPrevalidated(data, response -> {
+		sendNotification(data, response -> {
 			syncStateManager.handleSyncAckResponse(response, accountHash);
 			if (sessionId != null) {
 				sessionTracker.confirmDelivered(sessionId);

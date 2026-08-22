@@ -13,6 +13,11 @@ import java.util.List;
 public final class Worlds {
 	private Worlds() {}
 
+	/** Is the client on a seasonal (leagues) world? */
+	public static boolean isSeasonal(Client client) {
+		return client.getWorldType().contains(WorldType.SEASONAL);
+	}
+
 	/** WorldType flag names of the current world. */
 	public static List<String> flagNames(Client client) {
 		List<String> flags = new ArrayList<>();

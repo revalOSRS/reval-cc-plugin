@@ -35,7 +35,7 @@ public class LoginNotifier extends BaseNotifier {
 	public void onLogin() {
 		Map<String, Object> data = dataCollector.collectBoundaryData();
 		long accountHash = client.getAccountHash();
-		sendNotificationWithResponse(data, response ->
+		sendNotification(data, response ->
 			syncStateManager.handleSyncAckResponse(response, accountHash));
 	}
 }

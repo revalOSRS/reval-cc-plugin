@@ -1,7 +1,7 @@
 package com.revalclan.notifiers;
 
+import com.revalclan.util.Worlds;
 import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.WorldType;
 import net.runelite.api.events.WidgetLoaded;
 import net.runelite.api.gameval.VarPlayerID;
 import net.runelite.api.gameval.VarbitID;
@@ -41,7 +41,7 @@ public class LeaguesSyncNotifier extends BaseNotifier {
 
 	@Override
 	public boolean isEnabled() {
-		return client.getWorldType().contains(WorldType.SEASONAL);
+		return Worlds.isSeasonal(client);
 	}
 
 	@Override

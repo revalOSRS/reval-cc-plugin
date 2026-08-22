@@ -52,33 +52,30 @@ public abstract class BaseNotifier {
 	protected abstract String getEventType();
 
 	/**
-	 * Send a notification with the given data (no screenshot).
-	 *
-	 * @param data The notification data
+	 * Live clan-membership gate applied before every send. Notifiers whose
+	 * event fires after the clan channel is torn down (LOGOUT) override this;
+	 * their callers must have validated membership beforehand.
 	 */
+	protected boolean passesClanCheck() {
+		return ClanValidator.validateClan(client);
+	}
+
 	protected void sendNotification(Map<String, Object> data) {
-		if (!ClanValidator.validateClan(client)) return;
-		addEventMetadata(data);
-		webhookService.sendDataAsync(data);
+		sendNotification(data, null);
 	}
 
 	/**
-	 * Send and hand the parsed JSON response to the consumer.
+	 * Send, optionally handing the parsed JSON response to the consumer.
 	 * Consumer runs on the HTTP thread — must not touch the client.
 	 */
-	protected void sendNotificationWithResponse(Map<String, Object> data, Consumer<JsonObject> onResponse) {
-		if (!ClanValidator.validateClan(client)) return;
+	protected void sendNotification(Map<String, Object> data, Consumer<JsonObject> onResponse) {
+		if (!passesClanCheck()) return;
 		addEventMetadata(data);
-		webhookService.sendDataAsync(data, onResponse);
-	}
-
-	/**
-	 * Send WITHOUT the live clan check — the clan channel is already torn down
-	 * when LOGOUT fires. Callers must have validated membership beforehand.
-	 */
-	protected void sendNotificationPrevalidated(Map<String, Object> data, Consumer<JsonObject> onResponse) {
-		addEventMetadata(data);
-		webhookService.sendDataAsync(data, onResponse);
+		if (onResponse != null) {
+			webhookService.sendDataAsync(data, onResponse);
+		} else {
+			webhookService.sendDataAsync(data);
+		}
 	}
 
 	/**
@@ -87,7 +84,7 @@ public abstract class BaseNotifier {
 	 * @param data The notification data
 	 */
 	protected void sendNotificationWithScreenshot(Map<String, Object> data) {
-		if (!ClanValidator.validateClan(client)) return;
+		if (!passesClanCheck()) return;
 		addEventMetadata(data);
 
 		screenshotService.captureScreenshot()

@@ -2,7 +2,7 @@ package com.revalclan.notifiers;
 
 import com.revalclan.api.RevalApiService;
 import com.revalclan.api.leagues.LeaguesConfigResponse;
-import net.runelite.api.WorldType;
+import com.revalclan.util.Worlds;
 import net.runelite.api.gameval.VarPlayerID;
 import net.runelite.api.gameval.VarbitID;
 
@@ -50,7 +50,7 @@ public class LeaguesNotifier extends BaseNotifier {
 	public boolean isEnabled() {
 		return config.notifyLeagues()
 			&& filterManager.getFilters().isLeaguesEnabled()
-			&& client.getWorldType().contains(WorldType.SEASONAL);
+			&& Worlds.isSeasonal(client);
 	}
 
 	private boolean hasConfig() {
@@ -66,7 +66,7 @@ public class LeaguesNotifier extends BaseNotifier {
 
 	public void onGameTick() {
 		if (getLeaguesConfig() != null || configRetryAttempts >= CONFIG_MAX_RETRIES) return;
-		if (!client.getWorldType().contains(WorldType.SEASONAL)) return;
+		if (!Worlds.isSeasonal(client)) return;
 
 		configRetryTicks++;
 		if (configRetryTicks >= CONFIG_RETRY_INTERVAL) {

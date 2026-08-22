@@ -39,13 +39,10 @@ public class CombatAchievementManager {
 		TYPE_MAP.put(6, "Speed");
 	}
 
-	private static final int BOSS_ENUM_ID = 3971;
 
 	private static final int FIELD_NAME = 1308;
-	private static final int FIELD_DESCRIPTION = 1309;
 	private static final int FIELD_TASK_ID = 1306;
 	private static final int FIELD_TYPE_ID = 1311;
-	private static final int FIELD_BOSS_ID = 1312;
 
 	private static final int[] COMPLETION_VARPS = {
 		3116,  // CA_TASK_COMPLETED_0
@@ -84,25 +81,22 @@ public class CombatAchievementManager {
 			if (task != null) allTasks.add(task);
 		});
 
-		// Prefer the game's own CA points varp; fall back to summing completions
-		int totalPoints = readCaPointsVarbit();
-		if (totalPoints <= 0) totalPoints = calculateTotalPoints();
+		int totalPoints = currentTotalPoints();
 
 		Map<String, Object> data = new HashMap<>();
 		data.put("currentTier", calculateCurrentTier(totalPoints));
 		data.put("totalPoints", totalPoints);
 		data.put("tierProgress", getTierProgress());
-		data.put("allTasks", getAllTasksDetailed());
+		data.put("allTasks", getCompletedTasks());
 		data.put("totalTasksLoaded", allTasks.size());
 
 		return data;
 	}
 
-	/**
-	 * Current total CA points from the game cache + varps, without building
-	 * the full task list.
-	 */
-	public int computeCurrentTotalPoints() {
+	/** Current total CA points: the game's own varp, falling back to a task-struct sum. */
+	public int currentTotalPoints() {
+		int varp = readCaPointsVarbit();
+		if (varp > 0) return varp;
 		int[] total = {0};
 		forEachTaskStruct((struct, tierName) -> {
 			if (isTaskCompleted(struct.getIntValue(FIELD_TASK_ID))) {
@@ -112,7 +106,7 @@ public class CombatAchievementManager {
 		return total[0];
 	}
 
-	/** Shared task-struct traversal for sync() and computeCurrentTotalPoints(). */
+	/** Shared task-struct traversal for sync() and currentTotalPoints(). */
 	private void forEachTaskStruct(BiConsumer<StructComposition, String> visitor) {
 		for (Map.Entry<Integer, String> tierEntry : TIER_ENUMS.entrySet()) {
 			EnumComposition tierEnum;
@@ -141,41 +135,12 @@ public class CombatAchievementManager {
 	 * Loads a single task from a struct
 	 */
 	private CombatAchievementTask loadTaskFromStruct(StructComposition struct, String tierName) {
-		String name = struct.getStringValue(FIELD_NAME);
-		String description = struct.getStringValue(FIELD_DESCRIPTION);
-		int taskId = struct.getIntValue(FIELD_TASK_ID);
-		int typeId = struct.getIntValue(FIELD_TYPE_ID);
-		String type = TYPE_MAP.getOrDefault(typeId, "Unknown");
-		int bossId = struct.getIntValue(FIELD_BOSS_ID);
-		String bossName = getBossName(bossId);
-		
-		boolean completed = isTaskCompleted(taskId);
-		
 		CombatAchievementTask task = new CombatAchievementTask();
-		task.setId(taskId);
-		task.setName(name);
-		task.setDescription(description);
+		task.setName(struct.getStringValue(FIELD_NAME));
 		task.setTier(tierName);
-		task.setType(type);
-		task.setBoss(bossName);
-		task.setCompleted(completed);
-		task.setPoints(getPointsForTier(tierName));
-		
+		task.setType(TYPE_MAP.getOrDefault(struct.getIntValue(FIELD_TYPE_ID), "Unknown"));
+		task.setCompleted(isTaskCompleted(struct.getIntValue(FIELD_TASK_ID)));
 		return task;
-	}
-
-	/**
-	 * Gets boss name from boss enum
-	 */
-	private String getBossName(int bossId) {
-		try {
-			EnumComposition bossEnum = client.getEnum(BOSS_ENUM_ID);
-			if (bossEnum != null) {
-				String name = bossEnum.getStringValue(bossId);
-				if (name != null && !name.isEmpty()) return name;
-			}
-		} catch (Exception ignored) {}
-		return "Unknown";
 	}
 
 	/**
@@ -229,13 +194,6 @@ public class CombatAchievementManager {
 	/**
 	 * Calculate total points from completed tasks
 	 */
-	private int calculateTotalPoints() {
-		return allTasks.stream()
-			.filter(CombatAchievementTask::isCompleted)
-			.mapToInt(CombatAchievementTask::getPoints)
-			.sum();
-	}
-
 	/** Tier from total points — thresholds must track the wiki when Jagex adds tasks. */
 	private String calculateCurrentTier(int totalPoints) {
 		// In-game unlock points as of the 2026-08-12 rebalance
@@ -273,7 +231,7 @@ public class CombatAchievementManager {
 	}
 
 	/** Only COMPLETED tasks. The server's storage path filters on the completed flag. */
-	private List<Map<String, Object>> getAllTasksDetailed() {
+	private List<Map<String, Object>> getCompletedTasks() {
 		List<Map<String, Object>> tasksList = new ArrayList<>();
 
 		for (CombatAchievementTask task : allTasks) {

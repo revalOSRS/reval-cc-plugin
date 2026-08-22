@@ -1,6 +1,7 @@
 package com.revalclan;
 
 import com.revalclan.api.RevalApiService;
+import com.revalclan.combat.KillTracker;
 import com.revalclan.collectionlog.CollectionLogManager;
 import com.revalclan.collectionlog.CollectionLogSyncButton;
 import com.revalclan.notifiers.*;
@@ -12,6 +13,7 @@ import com.revalclan.util.ClanValidator;
 import com.revalclan.util.EventFilterManager;
 import com.revalclan.util.SyncStateManager;
 import com.revalclan.util.UIAssetLoader;
+import com.revalclan.util.Worlds;
 import com.google.inject.Provides;
 
 import java.awt.image.BufferedImage;
@@ -22,7 +24,6 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
-import net.runelite.api.WorldType;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.HitsplatApplied;
@@ -81,6 +82,7 @@ public class RevalClanPlugin extends Plugin {
 	@Inject	private DeathNotifier deathNotifier;
 
 	@Inject	private DetailedKillNotifier detailedKillNotifier;
+	@Inject	private KillTracker killTracker;
 
 	@Inject	private EmoteNotifier emoteNotifier;
 
@@ -214,7 +216,7 @@ public class RevalClanPlugin extends Plugin {
 		levelNotifier.reset();
 		clueNotifier.reset();
 		killCountNotifier.reset();
-		detailedKillNotifier.reset();
+		killTracker.reset();
 		leaguesNotifier.reset();
 		leaguesSyncNotifier.reset();
 
@@ -265,7 +267,7 @@ public class RevalClanPlugin extends Plugin {
 		eventFilterManager.fetchFiltersAsync();
 
 		// Fetch leagues config if on a seasonal world
-		if (client.getWorldType().contains(WorldType.SEASONAL)) {
+		if (Worlds.isSeasonal(client)) {
 			leaguesNotifier.fetchConfig();
 			leaguesSyncNotifier.onLogin();
 		}
@@ -304,7 +306,7 @@ public class RevalClanPlugin extends Plugin {
 
 		announcementService.onGameTick();
 		lootNotifier.onGameTick();
-		detailedKillNotifier.onGameTick(gameTick);
+		killTracker.onGameTick(gameTick);
 		killCountNotifier.onTick();
 		diaryNotifier.onGameTick();
 		petNotifier.onGameTick();
@@ -318,7 +320,10 @@ public class RevalClanPlugin extends Plugin {
 			eventFilterManager.fetchFiltersAsync();
 		}
 
-		// Server flagged our fingerprint stale — repair with a full sync (needs the client thread)
+		// Server flagged our fingerprint stale — repair with a full sync. Polled
+		// here (not invokeLater from the ack) because a stale ack can arrive on a
+		// LOGOUT response: GameTick only fires while logged in, so the repair
+		// naturally waits for the next login.
 		if (syncStateManager.consumeFullSyncRequest()) {
 			syncNotifier.triggerSync();
 		}
@@ -393,20 +398,24 @@ public class RevalClanPlugin extends Plugin {
 	public void onActorDeath(ActorDeath event) {
 		if (!inRequiredClan) return;
 		deathNotifier.onActorDeath(event);
-		detailedKillNotifier.onActorDeath(event);
+		KillTracker.KillData kill = killTracker.onActorDeath(event);
+		if (kill != null) {
+			sessionTracker.addKill(kill.npcName);
+			detailedKillNotifier.onKill(kill);
+		}
 	}
 
 	@Subscribe
 	public void onHitsplatApplied(HitsplatApplied event) {
 		if (!inRequiredClan) return;
-		detailedKillNotifier.onHitsplatApplied(event);
+		killTracker.onHitsplatApplied(event);
 	}
 
 	@Subscribe
 	public void onNpcDespawned(NpcDespawned event) {
 		// Not gated on inRequiredClan: must always evict the accumulator entry
 		// so damaged-but-never-died NPCs don't pin memory
-		detailedKillNotifier.onNpcDespawned(event);
+		killTracker.onNpcDespawned(event);
 	}
 
 	@Subscribe

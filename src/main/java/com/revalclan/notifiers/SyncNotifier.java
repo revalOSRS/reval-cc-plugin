@@ -35,9 +35,9 @@ public class SyncNotifier extends BaseNotifier {
 	 * and sends it to the webhook.
 	 */
 	public void triggerSync() {
-		Map<String, Object> data = dataCollector.collectAllData();
+		Map<String, Object> data = dataCollector.collectSyncData();
 		long accountHash = client.getAccountHash();
-		sendNotificationWithResponse(data, response ->
+		sendNotification(data, response ->
 			syncStateManager.handleSyncAckResponse(response, accountHash));
 	}
 }
