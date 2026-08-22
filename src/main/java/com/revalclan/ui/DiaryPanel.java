@@ -5,6 +5,7 @@ import com.revalclan.api.diaries.DiariesResponse;
 import com.revalclan.ui.components.ArrowIcon;
 import com.revalclan.ui.components.BackButton;
 import com.revalclan.ui.components.CheckIcon;
+import com.revalclan.ui.components.Clickable;
 import com.revalclan.ui.components.LoginPrompt;
 import com.revalclan.ui.components.PanelTitle;
 import com.revalclan.ui.components.RefreshButton;
@@ -18,8 +19,6 @@ import net.runelite.client.ui.FontManager;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
 import java.awt.geom.RoundRectangle2D;
 import java.util.*;
 
@@ -206,11 +205,7 @@ public class DiaryPanel extends JPanel {
 		card.add(leftPanel, BorderLayout.WEST);
 		card.add(rightPanel, BorderLayout.EAST);
 
-		card.addMouseListener(new MouseAdapter() {
-			public void mouseEntered(MouseEvent e) { isHovered[0] = true; card.repaint(); }
-			public void mouseExited(MouseEvent e) { isHovered[0] = false; card.repaint(); }
-			public void mousePressed(MouseEvent e) { if (SwingUtilities.isLeftMouseButton(e)) showDiaryDetail(diary); }
-		});
+		Clickable.onPress(card, () -> showDiaryDetail(diary), h -> isHovered[0] = h);
 
 		return card;
 	}
@@ -384,24 +379,22 @@ public class DiaryPanel extends JPanel {
 		tierSection.add(headerRef[0]);
 		tierSection.add(tasksContainer);
 
-		headerRef[0].addMouseListener(new MouseAdapter() {
-			public void mousePressed(MouseEvent e) {
-				if (!SwingUtilities.isLeftMouseButton(e)) return;
-				expanded[0] = !expanded[0];
-				tasksContainer.setVisible(expanded[0]);
-				if (expanded[0]) expandedTiers.add(tierKey);
-				else expandedTiers.remove(tierKey);
+		Runnable[] toggle = new Runnable[1];
+		toggle[0] = () -> {
+			expanded[0] = !expanded[0];
+			tasksContainer.setVisible(expanded[0]);
+			if (expanded[0]) expandedTiers.add(tierKey);
+			else expandedTiers.remove(tierKey);
 
-				tierSection.remove(headerRef[0]);
-				headerRef[0] = createTierHeader(tier, apiTier, activeTasks, expanded[0]);
-				headerRef[0].setAlignmentX(Component.LEFT_ALIGNMENT);
-				headerRef[0].setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-				headerRef[0].addMouseListener(this);
-				tierSection.add(headerRef[0], 0);
-				tierSection.revalidate();
-				tierSection.repaint();
-			}
-		});
+			tierSection.remove(headerRef[0]);
+			headerRef[0] = createTierHeader(tier, apiTier, activeTasks, expanded[0]);
+			headerRef[0].setAlignmentX(Component.LEFT_ALIGNMENT);
+			Clickable.onPress(headerRef[0], toggle[0]);
+			tierSection.add(headerRef[0], 0);
+			tierSection.revalidate();
+			tierSection.repaint();
+		};
+		Clickable.onPress(headerRef[0], toggle[0]);
 
 		return tierSection;
 	}

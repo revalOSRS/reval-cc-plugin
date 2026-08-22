@@ -3,6 +3,7 @@ package com.revalclan.ui;
 import com.revalclan.api.RevalApiService;
 import com.revalclan.api.competitions.*;
 import com.revalclan.ui.components.BackButton;
+import com.revalclan.ui.components.Clickable;
 import com.revalclan.ui.components.PanelTitle;
 import com.revalclan.ui.components.RefreshButton;
 import com.revalclan.ui.constants.UIConstants;
@@ -13,8 +14,6 @@ import net.runelite.client.ui.FontManager;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -260,13 +259,7 @@ public class CompetitionsPanel extends JPanel {
 		row.add(label(option.getVoteCount() + " (" + pct + "%)", FontManager.getRunescapeSmallFont(),
 			UIConstants.ACCENT_BLUE, -1), BorderLayout.EAST);
 
-		row.addMouseListener(new MouseAdapter() {
-			public void mouseEntered(MouseEvent e) { row.setBackground(UIConstants.CARD_HOVER); row.repaint(); }
-			public void mouseExited(MouseEvent e) { row.setBackground(defaultBg); row.repaint(); }
-			public void mousePressed(MouseEvent e) {
-				if (SwingUtilities.isLeftMouseButton(e)) castVote(vote.getId(), option.getId());
-			}
-		});
+		Clickable.onPress(row, () -> castVote(vote.getId(), option.getId()), UIConstants.CARD_HOVER, defaultBg);
 
 		return row;
 	}
@@ -326,13 +319,7 @@ public class CompetitionsPanel extends JPanel {
 			card.add(createRewardsGrid(comp.getRewardConfig()));
 		}
 
-		card.addMouseListener(new MouseAdapter() {
-			public void mouseEntered(MouseEvent e) { card.setBackground(UIConstants.CARD_HOVER); }
-			public void mouseExited(MouseEvent e) { card.setBackground(UIConstants.CARD_BG); }
-			public void mousePressed(MouseEvent e) {
-				if (SwingUtilities.isLeftMouseButton(e)) showCompetitionDetails(comp);
-			}
-		});
+		Clickable.onPress(card, () -> showCompetitionDetails(comp), UIConstants.CARD_HOVER, UIConstants.CARD_BG);
 
 		return roundedWrapper(card);
 	}

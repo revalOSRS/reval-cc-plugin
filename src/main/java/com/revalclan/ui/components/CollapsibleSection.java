@@ -6,8 +6,6 @@ import net.runelite.client.ui.FontManager;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
 
 public class CollapsibleSection extends JPanel {
 	private final JPanel contentPanel;
@@ -75,24 +73,7 @@ public class CollapsibleSection extends JPanel {
 		headerPanel.add(leftPanel, BorderLayout.WEST);
 		headerPanel.add(titlePanel, BorderLayout.CENTER);
 
-		headerPanel.addMouseListener(new MouseAdapter() {
-			@Override
-			public void mousePressed(MouseEvent e) {
-				if (SwingUtilities.isLeftMouseButton(e)) {
-					setExpanded(!expanded);
-				}
-			}
-
-			@Override
-			public void mouseEntered(MouseEvent e) {
-				headerPanel.setBackground(UIConstants.HEADER_HOVER);
-			}
-
-			@Override
-			public void mouseExited(MouseEvent e) {
-				headerPanel.setBackground(UIConstants.HEADER_BG);
-			}
-		});
+		Clickable.onPress(headerPanel, () -> setExpanded(!expanded), UIConstants.HEADER_HOVER, UIConstants.HEADER_BG);
 
 		add(headerPanel, BorderLayout.NORTH);
 		add(contentPanel, BorderLayout.CENTER);
@@ -112,5 +93,4 @@ public class CollapsibleSection extends JPanel {
 	public boolean isExpanded() {
 		return expanded;
 	}
-
 }

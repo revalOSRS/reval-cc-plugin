@@ -4,14 +4,13 @@ import com.revalclan.api.RevalApiService;
 import com.revalclan.api.admin.AdminAuthResponse;
 import com.revalclan.ui.components.PanelTitle;
 import com.revalclan.ui.components.ArrowIcon;
+import com.revalclan.ui.components.Clickable;
 import com.revalclan.ui.constants.UIConstants;
 import net.runelite.client.ui.FontManager;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
 import java.util.function.Consumer;
 
 public class AdminDashboardPanel extends JPanel {
@@ -169,14 +168,7 @@ public class AdminDashboardPanel extends JPanel {
 		btn.add(textPanel, BorderLayout.CENTER);
 		btn.add(arrow, BorderLayout.EAST);
 
-		btn.addMouseListener(new MouseAdapter() {
-			@Override
-			public void mousePressed(MouseEvent e) { if (SwingUtilities.isLeftMouseButton(e)) onClick.run(); }
-			@Override
-			public void mouseEntered(MouseEvent e) { btn.setBackground(UIConstants.CARD_HOVER); btn.repaint(); }
-			@Override
-			public void mouseExited(MouseEvent e) { btn.setBackground(UIConstants.CARD_BG); btn.repaint(); }
-		});
+		Clickable.onPress(btn, onClick, UIConstants.CARD_HOVER, UIConstants.CARD_BG);
 
 		parent.add(btn);
 		parent.add(Box.createRigidArea(new Dimension(0, 6)));

@@ -9,6 +9,7 @@ import com.revalclan.ui.components.LoginPrompt;
 import com.revalclan.ui.constants.UIConstants;
 import com.revalclan.ui.components.ArrowIcon;
 import com.revalclan.ui.components.BlockButton;
+import com.revalclan.ui.components.Clickable;
 import com.revalclan.util.ClanRankIconResolver;
 import com.revalclan.util.NumberFmt;
 import com.revalclan.util.UIAssetLoader;
@@ -20,8 +21,6 @@ import javax.swing.*;
 import javax.swing.Timer;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
 import java.text.DecimalFormat;
 import java.util.*;
 import java.util.List;
@@ -561,16 +560,7 @@ public class ProfilePanel extends JPanel {
 		progressPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, progressPanel.getPreferredSize().height));
 
 		if (onOpenRanks != null) {
-			progressPanel.addMouseListener(new MouseAdapter() {
-				@Override
-				public void mouseEntered(MouseEvent e) { hovered[0] = true; progressPanel.repaint(); }
-				@Override
-				public void mouseExited(MouseEvent e) { hovered[0] = false; progressPanel.repaint(); }
-				@Override
-				public void mousePressed(MouseEvent e) {
-					if (SwingUtilities.isLeftMouseButton(e)) onOpenRanks.run();
-				}
-			});
+			Clickable.onPress(progressPanel, onOpenRanks, h -> hovered[0] = h);
 		}
 
 		return progressPanel;
@@ -832,14 +822,7 @@ public class ProfilePanel extends JPanel {
 				setBorder(new EmptyBorder(8, 8, 8, 8));
 
 				if (sourceType != null) {
-					addMouseListener(new MouseAdapter() {
-						@Override
-						public void mousePressed(MouseEvent e) { if (SwingUtilities.isLeftMouseButton(e)) showPointsBreakdown(sourceType, label); }
-						@Override
-						public void mouseEntered(MouseEvent e) { hovered = true; setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)); repaint(); }
-						@Override
-						public void mouseExited(MouseEvent e) { hovered = false; setCursor(Cursor.getDefaultCursor()); repaint(); }
-					});
+					Clickable.onPress(this, () -> showPointsBreakdown(sourceType, label), h -> hovered = h);
 				}
 			}
 			@Override

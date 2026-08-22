@@ -3,6 +3,7 @@ package com.revalclan.ui;
 import com.revalclan.api.RevalApiService;
 import com.revalclan.api.leaderboard.LeaderboardResponse;
 import com.revalclan.ui.components.BackButton;
+import com.revalclan.ui.components.Clickable;
 import com.revalclan.ui.components.RefreshButton;
 import com.revalclan.ui.constants.UIConstants;
 import com.revalclan.util.ClanRankIconResolver;
@@ -17,8 +18,6 @@ import javax.swing.border.EmptyBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import java.awt.*;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -260,21 +259,8 @@ public class LeaderboardPanel extends JPanel {
 		row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 44));
 		row.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-		row.addMouseListener(new MouseAdapter() {
-			public void mouseEntered(MouseEvent e) {
-				row.setBackground(UIConstants.CARD_HOVER);
-				row.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-			}
-			public void mouseExited(MouseEvent e) {
-				row.setBackground(UIConstants.CARD_BG);
-				row.setCursor(Cursor.getDefaultCursor());
-			}
-			public void mousePressed(MouseEvent e) {
-				if (SwingUtilities.isLeftMouseButton(e)) {
-					showPlayerProfile(entry.getOsrsAccountId(), entry.getOsrsNickname());
-				}
-			}
-		});
+		Clickable.onPress(row, () -> showPlayerProfile(entry.getOsrsAccountId(), entry.getOsrsNickname()),
+			UIConstants.CARD_HOVER, UIConstants.CARD_BG);
 
 		// Left: Rank + Name
 		JPanel leftPanel = new JPanel();
