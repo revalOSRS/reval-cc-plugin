@@ -178,7 +178,7 @@ public class PlayerCardOverlay extends Overlay {
 		cy += 32;
 		centerText(g, NumberFmt.group(card.getPoints()), pointsFont, UIConstants.ACCENT_GOLD, cx, cy);
 		cy += 16;
-		centerText(g, "ACTIVITY POINTS", small, UIConstants.TEXT_MUTED, cx, cy);
+		centerText(g, "REVAL POINTS", small, UIConstants.TEXT_MUTED, cx, cy);
 		cy += 20;
 
 		int barW = CARD_W - 70;
@@ -238,12 +238,14 @@ public class PlayerCardOverlay extends Overlay {
 		}
 		g.setFont(small);
 		FontMetrics fm = g.getFontMetrics();
-		int iconW = Math.min(16, sprite.getWidth());
-		int iconH = Math.min(16, sprite.getHeight());
-		int total = fm.stringWidth(text) + 2 + iconW;
-		int tx = cx - total / 2;
+		// Aspect-fit the icon to 14px and center it on the text's midline
+		double scale = Math.min(1.0, 14.0 / Math.max(sprite.getWidth(), sprite.getHeight()));
+		int iconW = Math.max(1, (int) Math.round(sprite.getWidth() * scale));
+		int iconH = Math.max(1, (int) Math.round(sprite.getHeight() * scale));
+		int textW = fm.stringWidth(text);
+		int tx = cx - (textW + 3 + iconW) / 2;
 		drawShadowed(g, text, tx, baselineY, UIConstants.TEXT_SECONDARY);
-		g.drawImage(sprite, tx + fm.stringWidth(text) + 2, baselineY - iconH + 3, iconW, iconH, null);
+		g.drawImage(sprite, tx + textW + 3, baselineY - 5 - iconH / 2, iconW, iconH, null);
 	}
 
 	/** One star per event win, centered; returns the hovered star's event. */
