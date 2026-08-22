@@ -59,8 +59,15 @@ public class RegistrationMarksOverlay extends Overlay {
 			return null;
 		}
 
+		Rectangle viewport = list.getBounds();
+		if (viewport == null) {
+			return null;
+		}
 		g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-		Rectangle clip = list.getBounds();
+		// Clip to the list like the game does, so half-scrolled rows don't
+		// leak checkmarks outside the box
+		java.awt.Shape prevClip = g.getClip();
+		g.clip(viewport);
 		Point mouse = client.getMouseCanvasPosition();
 
 		for (Widget child : children) {
@@ -74,7 +81,7 @@ public class RegistrationMarksOverlay extends Overlay {
 				continue;
 			}
 			Rectangle bounds = child.getBounds();
-			if (bounds == null || clip == null || !clip.intersects(bounds)) {
+			if (bounds == null || !viewport.intersects(bounds)) {
 				continue;
 			}
 
@@ -82,10 +89,11 @@ public class RegistrationMarksOverlay extends Overlay {
 			int textEnd = bounds.x + (font != null ? font.getTextWidth(plain) : bounds.width);
 			drawCheck(g, textEnd + 4, bounds.y + bounds.height / 2);
 
-			if (bounds.contains(mouse.getX(), mouse.getY())) {
+			if (bounds.contains(mouse.getX(), mouse.getY()) && viewport.contains(mouse.getX(), mouse.getY())) {
 				tooltipManager.add(new Tooltip("Registered: " + ColorUtil.wrapWithColorTag(events, GOLD)));
 			}
 		}
+		g.setClip(prevClip);
 		return null;
 	}
 
