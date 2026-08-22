@@ -14,7 +14,9 @@ import net.runelite.client.util.Text;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import javax.swing.SwingUtilities;
+import java.awt.Canvas;
 import java.awt.Color;
+import java.awt.Rectangle;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -67,9 +69,20 @@ public class PlayerCardManager {
 			if (window != null) {
 				window.dispose();
 			}
-			window = new PlayerCardWindow(PlayerCardData.mock(playerName), accent, rankIconResolver);
+			window = new PlayerCardWindow(PlayerCardData.mock(playerName), accent, rankIconResolver, canvasBounds());
 			window.setVisible(true);
 		});
+	}
+
+	/** Screen bounds of the game canvas, or null if it isn't showing. */
+	private Rectangle canvasBounds() {
+		try {
+			Canvas canvas = client.getCanvas();
+			java.awt.Point location = canvas.getLocationOnScreen();
+			return new Rectangle(location.x, location.y, canvas.getWidth(), canvas.getHeight());
+		} catch (Exception e) {
+			return null;
+		}
 	}
 
 	/** Closes an open card; called when the plugin shuts down. */

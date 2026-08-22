@@ -11,6 +11,7 @@ import javax.swing.JComponent;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.JWindow;
 import javax.swing.KeyStroke;
 import javax.swing.Timer;
 import javax.swing.border.EmptyBorder;
@@ -25,6 +26,7 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.GridLayout;
 import java.awt.Point;
+import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
@@ -42,15 +44,41 @@ public class PlayerCardWindow extends JFrame {
 	private static final int ARC = 20;
 
 	private final Color accent;
+	private final JWindow scrim;
 
-	public PlayerCardWindow(PlayerCardData data, Color accentColor, ClanRankIconResolver rankIconResolver) {
+	/**
+	 * @param anchor screen bounds of the game canvas; the card centers there
+	 *               and a dim scrim covers it. Null falls back to the screen.
+	 */
+	public PlayerCardWindow(PlayerCardData data, Color accentColor, ClanRankIconResolver rankIconResolver, Rectangle anchor) {
 		this.accent = accentColor;
 
 		setUndecorated(true);
 		setBackground(new Color(0, 0, 0, 0));
 		setAlwaysOnTop(true);
 		setSize(CARD_W + GLOW * 2, CARD_H + GLOW * 2);
-		setLocationRelativeTo(null);
+		if (anchor != null) {
+			setLocation(anchor.x + (anchor.width - getWidth()) / 2,
+				anchor.y + (anchor.height - getHeight()) / 2);
+		} else {
+			setLocationRelativeTo(null);
+		}
+
+		// Dim the game behind the card; clicking the scrim closes it
+		if (anchor != null) {
+			scrim = new JWindow();
+			scrim.setBackground(new Color(0, 0, 0, 140));
+			scrim.setBounds(anchor);
+			scrim.setAlwaysOnTop(true);
+			scrim.addMouseListener(new MouseAdapter() {
+				@Override
+				public void mousePressed(MouseEvent e) {
+					dispose();
+				}
+			});
+		} else {
+			scrim = null;
+		}
 
 		JPanel card = buildCard(data, rankIconResolver);
 		setContentPane(card);
@@ -66,6 +94,25 @@ public class PlayerCardWindow extends JFrame {
 		});
 
 		fadeIn();
+	}
+
+	@Override
+	public void setVisible(boolean visible) {
+		if (scrim != null && visible) {
+			scrim.setVisible(true);
+		}
+		super.setVisible(visible);
+		if (visible) {
+			toFront();
+		}
+	}
+
+	@Override
+	public void dispose() {
+		if (scrim != null) {
+			scrim.dispose();
+		}
+		super.dispose();
 	}
 
 	private JPanel buildCard(PlayerCardData data, ClanRankIconResolver rankIconResolver) {
@@ -281,10 +328,16 @@ public class PlayerCardWindow extends JFrame {
 
 	private void fadeIn() {
 		setOpacity(0f);
+		if (scrim != null) {
+			scrim.setOpacity(0f);
+		}
 		Timer fade = new Timer(16, null);
 		fade.addActionListener(e -> {
 			float next = Math.min(1f, getOpacity() + 0.09f);
 			setOpacity(next);
+			if (scrim != null) {
+				scrim.setOpacity(next);
+			}
 			if (next >= 1f) {
 				fade.stop();
 			}
