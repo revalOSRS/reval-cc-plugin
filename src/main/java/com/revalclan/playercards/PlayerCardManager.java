@@ -1,8 +1,8 @@
 package com.revalclan.playercards;
 
-import com.revalclan.teams.MockTeamColorProvider;
 import com.revalclan.ui.constants.UIConstants;
 import com.revalclan.util.ClanRankIconResolver;
+import com.revalclan.util.PlayerNames;
 import net.runelite.api.Client;
 import net.runelite.api.MenuAction;
 import net.runelite.api.MenuEntry;
@@ -12,31 +12,54 @@ import net.runelite.api.gameval.InterfaceID;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.game.SpriteManager;
 import net.runelite.client.input.MouseAdapter;
+import net.runelite.client.input.KeyListener;
+import net.runelite.client.input.KeyManager;
 import net.runelite.client.input.MouseManager;
 import net.runelite.client.util.Text;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.awt.Color;
+import java.awt.event.KeyEvent;
 import java.awt.event.MouseEvent;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 /**
  * Adds a "View Reval Profile" right-click option on clan members and shows
  * their {@link PlayerCardOverlay} in-game. While the card is open, mouse
- * input is consumed so the game doesn't react; any click closes it. Card
- * data is mocked until the profile endpoint exists.
+ * input is consumed so the game doesn't react; a click or Escape closes it.
+ * Card data is mocked until the profile endpoint exists.
  */
 @Singleton
 public class PlayerCardManager {
-	private static final Color DEFAULT_ACCENT = UIConstants.ACCENT_GOLD;
+	/** Card accent per rank, loosely matching each rank icon's color. */
+	private static final Map<String, Color> RANK_COLORS = Map.ofEntries(
+		Map.entry("mentor", new Color(0xB08D57)),
+		Map.entry("prefect", new Color(0xC0C0C8)),
+		Map.entry("leader", new Color(0xE0B84F)),
+		Map.entry("supervisor", new Color(0x7A9CC6)),
+		Map.entry("superior", new Color(0x4FA98F)),
+		Map.entry("executive", new Color(0xD98E3C)),
+		Map.entry("senator", new Color(0x6FA8DC)),
+		Map.entry("monarch", new Color(0x9B59B6)),
+		Map.entry("red topaz", new Color(0xD9663C)),
+		Map.entry("sapphire", new Color(0x3B6FD9)),
+		Map.entry("emerald", new Color(0x2FBF71)),
+		Map.entry("ruby", new Color(0xD93B5A)),
+		Map.entry("diamond", new Color(0xD8D8E8)),
+		Map.entry("dragonstone", new Color(0xB05CD9)),
+		Map.entry("onyx", new Color(0x8E6FC0)),
+		Map.entry("zenyte", new Color(0xE08A3C)),
+		Map.entry("marshal", new Color(0xFFC83C))
+	);
 
 	private final Client client;
-	private final MockTeamColorProvider teamColors;
 	private final ClanRankIconResolver rankIconResolver;
 	private final SpriteManager spriteManager;
 	private final MouseManager mouseManager;
+	private final KeyManager keyManager;
 	private final PlayerCardOverlay overlay;
 
 	/** Ignore the tail of the menu click that opened the card. */
@@ -57,9 +80,7 @@ public class PlayerCardManager {
 		public MouseEvent mouseReleased(MouseEvent e) {
 			if (overlay.openForMs() > OPEN_GRACE_MS) {
 				e.consume();
-				if (!overlay.handleClick(e.getPoint())) {
-					close();
-				}
+				close();
 			}
 			return e;
 		}
@@ -74,14 +95,33 @@ public class PlayerCardManager {
 		}
 	};
 
+	private final KeyListener escCloser = new KeyListener() {
+		@Override
+		public void keyTyped(KeyEvent e) {
+		}
+
+		@Override
+		public void keyPressed(KeyEvent e) {
+			if (e.getKeyCode() == KeyEvent.VK_ESCAPE && overlay.isOpen()) {
+				e.consume();
+				close();
+			}
+		}
+
+		@Override
+		public void keyReleased(KeyEvent e) {
+		}
+	};
+
 	@Inject
-	public PlayerCardManager(Client client, MockTeamColorProvider teamColors, ClanRankIconResolver rankIconResolver,
-							 SpriteManager spriteManager, MouseManager mouseManager, PlayerCardOverlay overlay) {
+	public PlayerCardManager(Client client, ClanRankIconResolver rankIconResolver,
+							 SpriteManager spriteManager, MouseManager mouseManager, KeyManager keyManager,
+							 PlayerCardOverlay overlay) {
 		this.client = client;
-		this.teamColors = teamColors;
 		this.rankIconResolver = rankIconResolver;
 		this.spriteManager = spriteManager;
 		this.mouseManager = mouseManager;
+		this.keyManager = keyManager;
 		this.overlay = overlay;
 	}
 
@@ -117,20 +157,30 @@ public class PlayerCardManager {
 	}
 
 	private void open(String playerName) {
-		Color teamColor = teamColors.teamColorFor(playerName);
 		PlayerCardData data = PlayerCardData.mock(playerName);
 		if (!overlay.isOpen()) {
 			mouseManager.registerMouseListener(clickCloser);
+			keyManager.registerKeyListener(escCloser);
 		}
-		overlay.show(data, teamColor != null ? teamColor : DEFAULT_ACCENT);
+		overlay.show(data, rankColor(data.getRankName()));
 		rankIconResolver.resolve(data.getRankName(), spriteId ->
 			spriteManager.getSpriteAsync(spriteId, 0, overlay::setRankSprite));
+		if (data.getNextRankName() != null) {
+			rankIconResolver.resolve(data.getNextRankName(), spriteId ->
+				spriteManager.getSpriteAsync(spriteId, 0, overlay::setNextRankSprite));
+		}
+	}
+
+	private static Color rankColor(String rankName) {
+		Color color = RANK_COLORS.get(PlayerNames.normalize(rankName));
+		return color != null ? color : UIConstants.ACCENT_GOLD;
 	}
 
 	private void close() {
 		overlay.close();
 		closedAt = System.currentTimeMillis();
 		mouseManager.unregisterMouseListener(clickCloser);
+		keyManager.unregisterKeyListener(escCloser);
 	}
 
 	/** Closes an open card; called when the plugin shuts down. */
