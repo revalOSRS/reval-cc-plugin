@@ -6,6 +6,8 @@ import com.revalclan.collectionlog.CollectionLogManager;
 import com.revalclan.collectionlog.CollectionLogSyncButton;
 import com.revalclan.collectionlog.SyncGuide;
 import com.revalclan.collectionlog.SyncGuideOverlay;
+import com.revalclan.events.RegistrationMarks;
+import com.revalclan.events.RegistrationMarksOverlay;
 import com.revalclan.teams.ClanTeamColors;
 import com.revalclan.notifiers.*;
 import com.revalclan.pbs.ClogPersonalBestCapture;
@@ -66,6 +68,8 @@ public class RevalClanPlugin extends Plugin {
 	@Inject	private SyncGuide syncGuide;
 	@Inject	private SyncGuideOverlay syncGuideOverlay;
 	@Inject	private ClanTeamColors clanTeamColors;
+	@Inject	private RegistrationMarks registrationMarks;
+	@Inject	private RegistrationMarksOverlay registrationMarksOverlay;
 	@Inject	private OverlayManager overlayManager;
 	@Inject	private ClanRankIconResolver rankIconResolver;
 
@@ -188,6 +192,9 @@ public class RevalClanPlugin extends Plugin {
 		eventBus.register(clogPersonalBestCapture);
 		eventBus.register(clanTeamColors);
 		clanTeamColors.startUp();
+		eventBus.register(registrationMarks);
+		registrationMarks.startUp();
+		overlayManager.add(registrationMarksOverlay);
 
 		// Initialize and add the side panel
 		try {
@@ -236,6 +243,8 @@ public class RevalClanPlugin extends Plugin {
 		eventBus.unregister(lootNotifier);
 		eventBus.unregister(clogPersonalBestCapture);
 		eventBus.unregister(clanTeamColors);
+		eventBus.unregister(registrationMarks);
+		overlayManager.remove(registrationMarksOverlay);
 
 		// In-memory only — a persisted session replays as 'recovered' next startUp
 		sessionTracker.reset();

@@ -1,8 +1,9 @@
 package com.revalclan.teams;
 
+import com.revalclan.util.PlayerNames;
+
 import javax.inject.Singleton;
 import java.awt.Color;
-import java.util.Locale;
 
 /**
  * Preview stand-in for the real event roster: deterministically assigns
@@ -24,7 +25,7 @@ public class MockTeamColorProvider implements TeamColorProvider {
 		if (playerName == null || playerName.isEmpty()) {
 			return null;
 		}
-		String key = playerName.replace('\u00A0', ' ').trim().toLowerCase(Locale.ROOT);
+		String key = PlayerNames.normalize(playerName);
 		if (key.isEmpty()) {
 			return null;
 		}
