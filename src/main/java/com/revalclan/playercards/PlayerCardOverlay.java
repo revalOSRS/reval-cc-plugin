@@ -41,7 +41,7 @@ public class PlayerCardOverlay extends Overlay {
 	private static final int CARD_H = 384;
 	private static final int GLOW = 12;
 	private static final long FADE_MS = 200;
-	private static final String[] DESIGNS = {"Classic", "Slate", "Banner"};
+	private static final String[] DESIGNS = {"Classic", "Foil"};
 
 	private final Client client;
 
@@ -135,10 +135,10 @@ public class PlayerCardOverlay extends Overlay {
 	// ==================== Frames ====================
 
 	private void drawFrame(Graphics2D g, Color accent, int x, int y) {
-		switch (design) {
-			case 1: drawSlateFrame(g, accent, x, y); break;
-			case 2: drawBannerFrame(g, accent, x, y); break;
-			default: drawClassicFrame(g, accent, x, y); break;
+		if (design == 1) {
+			drawFoilFrame(g, accent, x, y);
+		} else {
+			drawClassicFrame(g, accent, x, y);
 		}
 	}
 
@@ -160,78 +160,41 @@ public class PlayerCardOverlay extends Overlay {
 		g.drawRoundRect(x, y, CARD_W - 1, CARD_H - 1, arc, arc);
 	}
 
-	/** Flat body with a bold accent header band; squared corners, no sheen. */
-	private void drawSlateFrame(Graphics2D g, Color accent, int x, int y) {
-		int arc = 8;
-		g.setColor(new Color(0x1b1b22));
+	/** Radial glow, double border and corner diamonds - TCG foil frame. */
+	private void drawFoilFrame(Graphics2D g, Color accent, int x, int y) {
+		int arc = 14;
+		glow(g, accent, x, y, arc);
+
+		g.setColor(new Color(0x14141b));
 		g.fillRoundRect(x, y, CARD_W, CARD_H, arc, arc);
 
 		Shape prevClip = g.getClip();
 		g.clip(new RoundRectangle2D.Float(x, y, CARD_W, CARD_H, arc, arc));
-		g.setPaint(new GradientPaint(x, y, withAlpha(accent, 170), x, y + 84, withAlpha(accent.darker(), 90)));
-		g.fillRect(x, y, CARD_W, 84);
-		g.setColor(withAlpha(accent, 230));
-		g.fillRect(x, y + 84, CARD_W, 2);
+		g.setPaint(new RadialGradientPaint(new Point2D.Float(x + CARD_W / 2f, y + 60), CARD_W,
+			new float[]{0f, 1f}, new Color[]{withAlpha(accent, 70), new Color(0, 0, 0, 0)}));
+		g.fillRect(x, y, CARD_W, CARD_H);
+		sheen(g, x, y, arc);
 		g.setClip(prevClip);
 
-		g.setColor(new Color(255, 255, 255, 60));
+		// Double border: outer gold, inner accent
 		g.setStroke(new BasicStroke(1f));
+		g.setColor(withAlpha(UIConstants.ACCENT_GOLD, 190));
 		g.drawRoundRect(x, y, CARD_W - 1, CARD_H - 1, arc, arc);
-	}
+		g.setColor(withAlpha(accent, 190));
+		g.drawRoundRect(x + 4, y + 4, CARD_W - 9, CARD_H - 9, arc - 4, arc - 4);
 
-	/** Hanging clan banner: rod with finials on top, dovetail bottom edge. */
-	private void drawBannerFrame(Graphics2D g, Color accent, int x, int y) {
-		int notch = 30;
-		int rodY = y + 2;
-		int top = y + 12;
-		int bottom = y + CARD_H;
-
-		Path2D.Float body = new Path2D.Float();
-		body.moveTo(x, top);
-		body.lineTo(x + CARD_W, top);
-		body.lineTo(x + CARD_W, bottom);
-		body.lineTo(x + CARD_W / 2f, bottom - notch);
-		body.lineTo(x, bottom);
-		body.closePath();
-
-		// Drop shadow, then cloth
-		Graphics2D shadow = (Graphics2D) g.create();
-		shadow.translate(3, 4);
-		shadow.setColor(new Color(0, 0, 0, 90));
-		shadow.fill(body);
-		shadow.dispose();
-
-		g.setPaint(new GradientPaint(x, top, new Color(0x23232e), x, bottom, new Color(0x13131a)));
-		g.fill(body);
-
-		Shape prevClip = g.getClip();
-		g.clip(body);
-		g.setPaint(new GradientPaint(x, top, withAlpha(accent, 60), x, top + 130, new Color(0, 0, 0, 0)));
-		g.fill(body);
-		// Radial light from the top center, like the banner catches light
-		g.setPaint(new RadialGradientPaint(new Point2D.Float(x + CARD_W / 2f, top + 30), CARD_W,
-			new float[]{0f, 1f}, new Color[]{new Color(255, 255, 255, 16), new Color(0, 0, 0, 0)}));
-		g.fill(body);
-		g.setClip(prevClip);
-
-		// Cloth outline + stitched inner seam
-		g.setColor(withAlpha(accent, 220));
-		g.setStroke(new BasicStroke(2f));
-		g.draw(body);
-		g.setStroke(new BasicStroke(1.2f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER,
-			10f, new float[]{4f, 3f}, 0));
-		g.setColor(withAlpha(accent, 110));
-		g.drawLine(x + 7, top + 7, x + CARD_W - 7, top + 7);
-		g.drawLine(x + 7, top + 7, x + 7, bottom - 12);
-		g.drawLine(x + CARD_W - 7, top + 7, x + CARD_W - 7, bottom - 12);
-
-		// Rod with finials
-		g.setStroke(new BasicStroke(1f));
-		g.setPaint(new GradientPaint(x, rodY, new Color(0xE0B84F), x, rodY + 7, new Color(0x8A6D25)));
-		g.fillRoundRect(x - 10, rodY, CARD_W + 20, 7, 4, 4);
-		g.setColor(withAlpha(accent, 235));
-		g.fillOval(x - 16, rodY - 2, 11, 11);
-		g.fillOval(x + CARD_W + 5, rodY - 2, 11, 11);
+		// Corner diamonds
+		g.setColor(withAlpha(accent, 230));
+		int inset = 11;
+		int[][] corners = {
+			{x + inset, y + inset}, {x + CARD_W - inset, y + inset},
+			{x + inset, y + CARD_H - inset}, {x + CARD_W - inset, y + CARD_H - inset},
+		};
+		for (int[] c : corners) {
+			g.fillPolygon(
+				new int[]{c[0], c[0] + 4, c[0], c[0] - 4},
+				new int[]{c[1] - 4, c[1], c[1] + 4, c[1]}, 4);
+		}
 	}
 
 	private void glow(Graphics2D g, Color accent, int x, int y, int arc) {
@@ -262,9 +225,8 @@ public class PlayerCardOverlay extends Overlay {
 		Font bold = FontManager.getRunescapeBoldFont();
 		Font nameFont = bold.deriveFont(Font.BOLD, 20f);
 		Font pointsFont = bold.deriveFont(Font.BOLD, 24f);
-		// The slate header band carries the rank/name text instead of the accent
-		Color rankColor = design == 1 ? new Color(0, 0, 0, 170) : accent;
-		Color nameColor = design == 1 ? Color.WHITE : UIConstants.TEXT_PRIMARY;
+		Color rankColor = accent;
+		Color nameColor = UIConstants.TEXT_PRIMARY;
 
 		int cx = x + CARD_W / 2;
 		int cy = y + 26;
@@ -398,23 +360,15 @@ public class PlayerCardOverlay extends Overlay {
 	}
 
 	private void drawTile(Graphics2D g, Color accent, int tx, int ty, int w, int h) {
-		switch (design) {
-			case 1:
-				// Divider style: hairline top rule instead of a filled tile
-				g.setColor(new Color(255, 255, 255, 50));
-				g.fillRect(tx, ty, w, 1);
-				break;
-			case 2:
-				g.setColor(withAlpha(accent, 18));
-				g.fillRoundRect(tx, ty, w, h, 10, 10);
-				g.setStroke(new BasicStroke(1f));
-				g.setColor(withAlpha(accent, 60));
-				g.drawRoundRect(tx, ty, w, h, 10, 10);
-				break;
-			default:
-				g.setColor(new Color(255, 255, 255, 14));
-				g.fillRoundRect(tx, ty, w, h, 10, 10);
-				break;
+		if (design == 1) {
+			g.setColor(withAlpha(accent, 18));
+			g.fillRoundRect(tx, ty, w, h, 10, 10);
+			g.setStroke(new BasicStroke(1f));
+			g.setColor(withAlpha(accent, 60));
+			g.drawRoundRect(tx, ty, w, h, 10, 10);
+		} else {
+			g.setColor(new Color(255, 255, 255, 14));
+			g.fillRoundRect(tx, ty, w, h, 10, 10);
 		}
 	}
 
