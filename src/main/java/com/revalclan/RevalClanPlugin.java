@@ -1,15 +1,19 @@
 package com.revalclan;
 
 import com.revalclan.api.RevalApiService;
+import com.revalclan.combat.KillTracker;
 import com.revalclan.collectionlog.CollectionLogManager;
 import com.revalclan.collectionlog.CollectionLogSyncButton;
 import com.revalclan.notifiers.*;
 import com.revalclan.pbs.ClogPersonalBestCapture;
+import com.revalclan.session.SessionTracker;
 import com.revalclan.ui.RevalPanel;
 import com.revalclan.util.AnnouncementService;
 import com.revalclan.util.ClanValidator;
 import com.revalclan.util.EventFilterManager;
+import com.revalclan.util.SyncStateManager;
 import com.revalclan.util.UIAssetLoader;
+import com.revalclan.util.Worlds;
 import com.google.inject.Provides;
 
 import java.awt.image.BufferedImage;
@@ -20,12 +24,12 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
-import net.runelite.api.WorldType;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.HitsplatApplied;
 import net.runelite.api.events.InteractingChanged;
 import net.runelite.api.events.MenuOptionClicked;
+import net.runelite.api.events.NpcDespawned;
 import net.runelite.api.events.ActorDeath;
 import net.runelite.api.events.ChatMessage;
 import net.runelite.api.events.StatChanged;
@@ -78,6 +82,7 @@ public class RevalClanPlugin extends Plugin {
 	@Inject	private DeathNotifier deathNotifier;
 
 	@Inject	private DetailedKillNotifier detailedKillNotifier;
+	@Inject	private KillTracker killTracker;
 
 	@Inject	private EmoteNotifier emoteNotifier;
 
@@ -92,6 +97,12 @@ public class RevalClanPlugin extends Plugin {
 	@Inject	private LoginNotifier loginNotifier;
 
 	@Inject	private LogoutNotifier logoutNotifier;
+
+	@Inject	private SyncNotifier syncNotifier;
+
+	@Inject	private SessionTracker sessionTracker;
+
+	@Inject	private SyncStateManager syncStateManager;
 
 	@Inject	private EventBus eventBus;
 
@@ -127,6 +138,10 @@ public class RevalClanPlugin extends Plugin {
 	private static final int SLOW_VALIDATION_INTERVAL = 5;
 	private static final int MAX_CLAN_VALIDATION_TICKS = 1000;
 
+	/** Refetch event filters every ~10 minutes so activated events propagate without a relog */
+	private static final int FILTER_REFETCH_INTERVAL_TICKS = 1000;
+	private int filterRefetchTicks = 0;
+
 	private static final Pattern COL_OPEN = Pattern.compile("<col=[0-9a-fA-F]+>");
 	private static final Pattern COL_CLOSE = Pattern.compile("</col>");
 
@@ -154,7 +169,10 @@ public class RevalClanPlugin extends Plugin {
 		});
 
 		syncButton.startUp();
-		
+
+		// Replay any session left behind by a crash / X-out as a recovered summary
+		sessionTracker.recoverPersistedSession();
+
 		eventBus.register(lootNotifier);
 		eventBus.register(clogPersonalBestCapture);
 
@@ -187,15 +205,18 @@ public class RevalClanPlugin extends Plugin {
 
 		collectionLogManager.clearObtainedItems();
 		syncButton.shutDown();
-		
+
 		eventBus.unregister(lootNotifier);
 		eventBus.unregister(clogPersonalBestCapture);
+
+		// In-memory only — a persisted session replays as 'recovered' next startUp
+		sessionTracker.reset();
 
 		announcementService.reset();
 		levelNotifier.reset();
 		clueNotifier.reset();
 		killCountNotifier.reset();
-		detailedKillNotifier.reset();
+		killTracker.reset();
 		leaguesNotifier.reset();
 		leaguesSyncNotifier.reset();
 
@@ -231,7 +252,7 @@ public class RevalClanPlugin extends Plugin {
 
 			if (wasLoggedIn) {
 				if (wasInClan) {
-					logoutNotifier.onLogout();
+					logoutNotifier.onLogout(sessionTracker.finalizeSession());
 				}
 				wasLoggedIn = false;
 
@@ -246,13 +267,14 @@ public class RevalClanPlugin extends Plugin {
 		eventFilterManager.fetchFiltersAsync();
 
 		// Fetch leagues config if on a seasonal world
-		if (client.getWorldType().contains(WorldType.SEASONAL)) {
+		if (Worlds.isSeasonal(client)) {
 			leaguesNotifier.fetchConfig();
 			leaguesSyncNotifier.onLogin();
 		}
 
 		if (pendingLoginNotification) {
 			pendingLoginNotification = false;
+			sessionTracker.startSession();
 			loginNotifier.onLogin();
 		}
 
@@ -284,12 +306,27 @@ public class RevalClanPlugin extends Plugin {
 
 		announcementService.onGameTick();
 		lootNotifier.onGameTick();
-		detailedKillNotifier.onGameTick(gameTick);
+		killTracker.onGameTick(gameTick);
 		killCountNotifier.onTick();
 		diaryNotifier.onGameTick();
 		petNotifier.onGameTick();
 		leaguesNotifier.onGameTick();
 		leaguesSyncNotifier.onGameTick();
+		sessionTracker.onGameTick();
+
+		// Activated events change the server-derived whitelists; refetch so a relog isn't needed
+		if (++filterRefetchTicks >= FILTER_REFETCH_INTERVAL_TICKS) {
+			filterRefetchTicks = 0;
+			eventFilterManager.fetchFiltersAsync();
+		}
+
+		// Server flagged our fingerprint stale — repair with a full sync. Polled
+		// here (not invokeLater from the ack) because a stale ack can arrive on a
+		// LOGOUT response: GameTick only fires while logged in, so the repair
+		// naturally waits for the next login.
+		if (syncStateManager.consumeFullSyncRequest()) {
+			syncNotifier.triggerSync();
+		}
 	}
 
 	/**
@@ -361,13 +398,24 @@ public class RevalClanPlugin extends Plugin {
 	public void onActorDeath(ActorDeath event) {
 		if (!inRequiredClan) return;
 		deathNotifier.onActorDeath(event);
-		detailedKillNotifier.onActorDeath(event);
+		KillTracker.KillData kill = killTracker.onActorDeath(event);
+		if (kill != null) {
+			sessionTracker.addKill(kill.npcName);
+			detailedKillNotifier.onKill(kill);
+		}
 	}
 
 	@Subscribe
 	public void onHitsplatApplied(HitsplatApplied event) {
 		if (!inRequiredClan) return;
-		detailedKillNotifier.onHitsplatApplied(event);
+		killTracker.onHitsplatApplied(event);
+	}
+
+	@Subscribe
+	public void onNpcDespawned(NpcDespawned event) {
+		// Not gated on inRequiredClan: must always evict the accumulator entry
+		// so damaged-but-never-died NPCs don't pin memory
+		killTracker.onNpcDespawned(event);
 	}
 
 	@Subscribe

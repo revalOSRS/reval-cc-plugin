@@ -7,6 +7,7 @@
  */
 package com.revalclan.notifiers;
 
+import com.revalclan.session.SessionTracker;
 import net.runelite.api.Actor;
 import net.runelite.api.Item;
 import net.runelite.api.ItemComposition;
@@ -20,6 +21,7 @@ import net.runelite.api.WorldType;
 import net.runelite.api.events.ActorDeath;
 import net.runelite.api.events.InteractingChanged;
 
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
@@ -31,6 +33,9 @@ import java.util.Map;
 
 @Singleton
 public class DeathNotifier extends BaseNotifier {
+	@Inject
+	private SessionTracker sessionTracker;
+
 	private static final String ATTACK_OPTION = "Attack";
 
 	private Actor lastAttacker = null;
@@ -94,21 +99,23 @@ public class DeathNotifier extends BaseNotifier {
 		// Identify killer using sophisticated algorithm
 		Actor killer = identifyKiller();
 
+		String killedBy;
 		if (killer instanceof NPC) {
 			NPC npc = (NPC) killer;
-			deathData.put("killedBy", npc.getName());
+			killedBy = npc.getName();
 			deathData.put("killerType", "NPC");
 			deathData.put("killerId", npc.getId());
 			deathData.put("killerCombatLevel", npc.getCombatLevel());
 		} else if (killer instanceof Player) {
 			Player player = (Player) killer;
-			deathData.put("killedBy", player.getName());
+			killedBy = player.getName();
 			deathData.put("killerType", "PLAYER");
 			deathData.put("killerCombatLevel", player.getCombatLevel());
 		} else {
-			deathData.put("killedBy", "Unknown");
+			killedBy = "Unknown";
 			deathData.put("killerType", "UNKNOWN");
 		}
+		deathData.put("killedBy", killedBy);
 
 		EnumSet<WorldType> worldTypes = client.getWorldType();
 		deathData.put("isPvpWorld", worldTypes.contains(WorldType.PVP));
@@ -137,6 +144,8 @@ public class DeathNotifier extends BaseNotifier {
 		deathData.put("keptItems", keptItems);
 		deathData.put("lostItems", lostItems);
 		deathData.put("totalLostValue", totalLostValue);
+
+		sessionTracker.addDeath(killedBy, totalLostValue);
 
 		sendNotificationWithScreenshot(deathData);
 

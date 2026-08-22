@@ -1,10 +1,12 @@
 package com.revalclan.notifiers;
 
+import com.google.gson.JsonObject;
 import com.revalclan.RevalClanConfig;
 import com.revalclan.util.ClanValidator;
 import com.revalclan.util.EventFilterManager;
 import com.revalclan.util.ScreenshotService;
 import com.revalclan.util.WebhookService;
+import com.revalclan.util.Worlds;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.Item;
@@ -18,6 +20,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 
 /**
  * Base class for all notification types (loot, death, pets, etc.)
@@ -49,14 +52,26 @@ public abstract class BaseNotifier {
 	protected abstract String getEventType();
 
 	/**
-	 * Send a notification with the given data (no screenshot).
-	 * 
-	 * @param data The notification data
+	 * Live clan-membership gate applied before every send. Notifiers whose
+	 * event fires after the clan channel is torn down (LOGOUT) override this;
+	 * their callers must have validated membership beforehand.
 	 */
+	protected boolean passesClanCheck() {
+		return ClanValidator.validateClan(client);
+	}
+
 	protected void sendNotification(Map<String, Object> data) {
-		if (!ClanValidator.validateClan(client)) return;
+		sendNotification(data, null);
+	}
+
+	/**
+	 * Send, optionally handing the parsed JSON response to the consumer.
+	 * Consumer runs on the HTTP thread — must not touch the client.
+	 */
+	protected void sendNotification(Map<String, Object> data, Consumer<JsonObject> onResponse) {
+		if (!passesClanCheck()) return;
 		addEventMetadata(data);
-		webhookService.sendDataAsync(data);
+		webhookService.sendDataAsync(data, onResponse);
 	}
 
 	/**
@@ -65,7 +80,7 @@ public abstract class BaseNotifier {
 	 * @param data The notification data
 	 */
 	protected void sendNotificationWithScreenshot(Map<String, Object> data) {
-		if (!ClanValidator.validateClan(client)) return;
+		if (!passesClanCheck()) return;
 		addEventMetadata(data);
 
 		screenshotService.captureScreenshot()
@@ -73,7 +88,7 @@ public abstract class BaseNotifier {
 				if (base64Screenshot != null) {
 					data.put("screenshot", base64Screenshot);
 				}
-				webhookService.sendDataAsync(data);
+				webhookService.sendDataAsync(data, null);
 			});
 	}
 
@@ -87,6 +102,7 @@ public abstract class BaseNotifier {
 		data.put("accountHash", client.getAccountHash());
 		data.put("username", getPlayerName());
 		data.put("world", client.getWorld());
+		data.put("worldFlags", Worlds.flagNames(client));
 		
 		if (client.getLocalPlayer() != null) {
 			WorldPoint wp = client.getLocalPlayer().getWorldLocation();

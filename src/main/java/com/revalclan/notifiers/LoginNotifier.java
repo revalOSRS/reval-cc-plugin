@@ -4,18 +4,21 @@ import javax.inject.Singleton;
 
 import com.google.inject.Inject;
 import com.revalclan.PlayerDataCollector;
+import com.revalclan.util.SyncStateManager;
 
 import java.util.Map;
 
 /**
- * Notifies when a player logs in.
- * Sends a lightweight LOGIN event with basic player info.
+ * Sends the LOGIN boundary payload (full or slim depending on the fingerprint).
  */
 @Singleton
 public class LoginNotifier extends BaseNotifier {
 	@Inject
 	private PlayerDataCollector dataCollector;
-	
+
+	@Inject
+	private SyncStateManager syncStateManager;
+
 	@Override
 	public boolean isEnabled() {
 		return true;
@@ -30,8 +33,7 @@ public class LoginNotifier extends BaseNotifier {
 	 * Called when the player logs in.
 	 */
 	public void onLogin() {
-		Map<String, Object> data = dataCollector.collectAllData();
-		sendNotification(data);
+		Map<String, Object> data = dataCollector.collectBoundaryData();
+		sendNotification(data, syncStateManager.ackHandler(client.getAccountHash()));
 	}
 }
-

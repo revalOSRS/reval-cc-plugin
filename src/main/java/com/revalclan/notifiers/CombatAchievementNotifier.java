@@ -1,5 +1,8 @@
 package com.revalclan.notifiers;
 
+import com.revalclan.combatachievements.CombatAchievementManager;
+
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.HashMap;
 import java.util.Map;
@@ -8,6 +11,9 @@ import java.util.regex.Pattern;
 
 @Singleton
 public class CombatAchievementNotifier extends BaseNotifier {
+	@Inject
+	private CombatAchievementManager combatAchievementManager;
+
 	private static final Pattern CA_PATTERN = Pattern.compile(
 		"Congratulations, you've completed an? (?<tier>\\w+) combat task: (?<task>.+)\\.",
 		Pattern.CASE_INSENSITIVE
@@ -42,6 +48,12 @@ public class CombatAchievementNotifier extends BaseNotifier {
 		Map<String, Object> caData = new HashMap<>();
 		caData.put("tier", tier);
 		caData.put("task", task);
+
+		// Cache read failures are handled (and logged) inside the manager's traversal
+		int totalPoints = combatAchievementManager.currentTotalPoints();
+		if (totalPoints > 0) {
+			caData.put("totalPoints", totalPoints);
+		}
 
 		sendNotification(caData);
 	}

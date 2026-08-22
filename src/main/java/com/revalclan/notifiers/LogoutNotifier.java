@@ -6,15 +6,22 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 
 import com.revalclan.PlayerDataCollector;
+import com.revalclan.session.SessionTracker;
+import com.revalclan.util.SyncStateManager;
 
 /**
- * Handles logout events.
- * Triggers a full account sync when the player logs out.
+ * Sends the LOGOUT boundary payload plus the session summary accumulated since login.
  */
 @Singleton
 public class LogoutNotifier extends BaseNotifier {
 	@Inject
 	private PlayerDataCollector dataCollector;
+
+	@Inject
+	private SyncStateManager syncStateManager;
+
+	@Inject
+	private SessionTracker sessionTracker;
 
 	@Override
 	public boolean isEnabled() {
@@ -26,13 +33,20 @@ public class LogoutNotifier extends BaseNotifier {
 		return "LOGOUT";
 	}
 
-	/**
-	 * Called when the player logs out.
-	 * Triggers a full account sync.
-	 */
-	public void onLogout() {
-		Map<String, Object> data = dataCollector.collectAllData();
-		sendNotification(data);
+	/** The clan channel is already torn down when LOGOUT fires; RevalClanPlugin gates on wasInClan. */
+	@Override
+	protected boolean passesClanCheck() {
+		return true;
+	}
+
+	/** @param sessionSummary Finalized summary from SessionTracker (nullable) */
+	public void onLogout(Map<String, Object> sessionSummary) {
+		Map<String, Object> data = dataCollector.collectBoundaryData();
+		if (sessionSummary != null) {
+			data.put("sessionSummary", sessionSummary);
+		}
+		String sessionId = sessionSummary != null ? (String) sessionSummary.get("sessionId") : null;
+		sendNotification(data, syncStateManager.ackHandler(client.getAccountHash())
+			.andThen(response -> sessionTracker.confirmDelivered(sessionId)));
 	}
 }
-
