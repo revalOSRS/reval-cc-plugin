@@ -19,23 +19,28 @@ import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.GradientPaint;
 import java.awt.Graphics2D;
+import java.awt.Point;
+import java.awt.RadialGradientPaint;
+import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import java.awt.Shape;
+import java.awt.geom.Point2D;
 import java.awt.geom.RoundRectangle2D;
 import java.awt.image.BufferedImage;
 
 /**
  * Trading-card style profile rendered in-game: the whole client dims and the
- * card draws centered on the canvas (OSRS TCG pack-opening style), fading in
- * over the first frames. Clicks are consumed and close it while it is open.
+ * card draws centered on the canvas (OSRS TCG pack-opening style), fading in.
+ * A switcher row under the card cycles between designs; clicks elsewhere
+ * close it (input is consumed by {@link PlayerCardManager} while open).
  */
 @Singleton
 public class PlayerCardOverlay extends Overlay {
-	private static final int CARD_W = 300;
-	private static final int CARD_H = 440;
-	private static final int ARC = 20;
-	private static final int GLOW = 14;
+	private static final int CARD_W = 250;
+	private static final int CARD_H = 384;
+	private static final int GLOW = 12;
 	private static final long FADE_MS = 200;
+	private static final String[] DESIGNS = {"Classic", "Slate", "Foil"};
 
 	private final Client client;
 
@@ -43,6 +48,10 @@ public class PlayerCardOverlay extends Overlay {
 	private volatile Color accent;
 	private volatile BufferedImage rankSprite;
 	private volatile long openedAt;
+	private volatile int design;
+
+	private Rectangle prevHit = new Rectangle();
+	private Rectangle nextHit = new Rectangle();
 
 	@Inject
 	public PlayerCardOverlay(Client client) {
@@ -75,6 +84,19 @@ public class PlayerCardOverlay extends Overlay {
 		data = null;
 	}
 
+	/** Returns true when the click hit a control (design switcher) and was handled. */
+	boolean handleClick(Point point) {
+		if (prevHit.contains(point)) {
+			design = (design + DESIGNS.length - 1) % DESIGNS.length;
+			return true;
+		}
+		if (nextHit.contains(point)) {
+			design = (design + 1) % DESIGNS.length;
+			return true;
+		}
+		return false;
+	}
+
 	@Override
 	public Dimension render(Graphics2D g) {
 		PlayerCardData card = data;
@@ -98,76 +120,149 @@ public class PlayerCardOverlay extends Overlay {
 
 		int x = (canvasW - CARD_W) / 2;
 		int y = (canvasH - CARD_H) / 2;
-		drawCard(g, card, accent, x, y);
-
-		Font small = FontManager.getRunescapeSmallFont();
-		centerText(g, "Click anywhere to close", small, new Color(255, 255, 255, 120),
-			x + CARD_W / 2, y + CARD_H + 26);
+		drawFrame(g, accent, x, y);
+		drawContent(g, card, accent, x, y);
+		drawSwitcher(g, x, y);
 
 		g.setComposite(prevComposite);
 		return null;
 	}
 
-	private void drawCard(Graphics2D g, PlayerCardData card, Color accent, int x, int y) {
-		// Soft accent glow radiating from the card edge
-		g.setStroke(new BasicStroke(1));
-		for (int i = GLOW; i > 0; i--) {
-			g.setColor(new Color(accent.getRed(), accent.getGreen(), accent.getBlue(),
-				Math.max(1, 26 - i * 2)));
-			g.drawRoundRect(x - i, y - i, CARD_W + i * 2, CARD_H + i * 2, ARC + i, ARC + i);
+	// ==================== Frames ====================
+
+	private void drawFrame(Graphics2D g, Color accent, int x, int y) {
+		switch (design) {
+			case 1: drawSlateFrame(g, accent, x, y); break;
+			case 2: drawFoilFrame(g, accent, x, y); break;
+			default: drawClassicFrame(g, accent, x, y); break;
 		}
+	}
 
-		// Card body
+	/** Glow border, vertical gradient, accent header wash, diagonal sheen. */
+	private void drawClassicFrame(Graphics2D g, Color accent, int x, int y) {
+		int arc = 20;
+		glow(g, accent, x, y, arc);
+
 		g.setPaint(new GradientPaint(x, y, new Color(0x24242f), x, y + CARD_H, new Color(0x121219)));
-		g.fillRoundRect(x, y, CARD_W, CARD_H, ARC, ARC);
+		g.fillRoundRect(x, y, CARD_W, CARD_H, arc, arc);
 
-		// Accent wash behind the header
-		g.setPaint(new GradientPaint(x, y, new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), 46),
-			x, y + 150, new Color(0, 0, 0, 0)));
-		g.fillRoundRect(x, y, CARD_W, CARD_H, ARC, ARC);
+		g.setPaint(new GradientPaint(x, y, withAlpha(accent, 46), x, y + 140, new Color(0, 0, 0, 0)));
+		g.fillRoundRect(x, y, CARD_W, CARD_H, arc, arc);
 
-		// Diagonal holo sheen
+		sheen(g, x, y, arc);
+
+		g.setColor(withAlpha(accent, 210));
+		g.setStroke(new BasicStroke(2f));
+		g.drawRoundRect(x, y, CARD_W - 1, CARD_H - 1, arc, arc);
+	}
+
+	/** Flat body with a bold accent header band; squared corners, no sheen. */
+	private void drawSlateFrame(Graphics2D g, Color accent, int x, int y) {
+		int arc = 8;
+		g.setColor(new Color(0x1b1b22));
+		g.fillRoundRect(x, y, CARD_W, CARD_H, arc, arc);
+
 		Shape prevClip = g.getClip();
-		g.clip(new RoundRectangle2D.Float(x, y, CARD_W, CARD_H, ARC, ARC));
-		g.setPaint(new GradientPaint(x, y + CARD_H, new Color(255, 255, 255, 0),
-			x + CARD_W, y, new Color(255, 255, 255, 18)));
-		int band = 110;
-		g.fillPolygon(
-			new int[]{x + CARD_W - band - 60, x + CARD_W - 60, x + CARD_W, x + CARD_W - band},
-			new int[]{y + CARD_H, y, y, y + CARD_H}, 4);
+		g.clip(new RoundRectangle2D.Float(x, y, CARD_W, CARD_H, arc, arc));
+		g.setPaint(new GradientPaint(x, y, withAlpha(accent, 170), x, y + 84, withAlpha(accent.darker(), 90)));
+		g.fillRect(x, y, CARD_W, 84);
+		g.setColor(withAlpha(accent, 230));
+		g.fillRect(x, y + 84, CARD_W, 2);
 		g.setClip(prevClip);
 
-		// Border
-		g.setColor(new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), 210));
-		g.setStroke(new BasicStroke(2f));
-		g.drawRoundRect(x, y, CARD_W - 1, CARD_H - 1, ARC, ARC);
+		g.setColor(new Color(255, 255, 255, 60));
+		g.setStroke(new BasicStroke(1f));
+		g.drawRoundRect(x, y, CARD_W - 1, CARD_H - 1, arc, arc);
+	}
 
-		// ---- Content ----
+	/** Radial glow, double border and corner diamonds - TCG foil frame. */
+	private void drawFoilFrame(Graphics2D g, Color accent, int x, int y) {
+		int arc = 14;
+		glow(g, accent, x, y, arc);
+
+		g.setColor(new Color(0x14141b));
+		g.fillRoundRect(x, y, CARD_W, CARD_H, arc, arc);
+
+		Shape prevClip = g.getClip();
+		g.clip(new RoundRectangle2D.Float(x, y, CARD_W, CARD_H, arc, arc));
+		g.setPaint(new RadialGradientPaint(new Point2D.Float(x + CARD_W / 2f, y + 60), CARD_W,
+			new float[]{0f, 1f}, new Color[]{withAlpha(accent, 70), new Color(0, 0, 0, 0)}));
+		g.fillRect(x, y, CARD_W, CARD_H);
+		sheen(g, x, y, arc);
+		g.setClip(prevClip);
+
+		// Double border: outer gold, inner accent
+		g.setStroke(new BasicStroke(1f));
+		g.setColor(withAlpha(UIConstants.ACCENT_GOLD, 190));
+		g.drawRoundRect(x, y, CARD_W - 1, CARD_H - 1, arc, arc);
+		g.setColor(withAlpha(accent, 190));
+		g.drawRoundRect(x + 4, y + 4, CARD_W - 9, CARD_H - 9, arc - 4, arc - 4);
+
+		// Corner diamonds
+		g.setColor(withAlpha(accent, 230));
+		int inset = 11;
+		int[][] corners = {
+			{x + inset, y + inset}, {x + CARD_W - inset, y + inset},
+			{x + inset, y + CARD_H - inset}, {x + CARD_W - inset, y + CARD_H - inset},
+		};
+		for (int[] c : corners) {
+			g.fillPolygon(
+				new int[]{c[0], c[0] + 4, c[0], c[0] - 4},
+				new int[]{c[1] - 4, c[1], c[1] + 4, c[1]}, 4);
+		}
+	}
+
+	private void glow(Graphics2D g, Color accent, int x, int y, int arc) {
+		g.setStroke(new BasicStroke(1));
+		for (int i = GLOW; i > 0; i--) {
+			g.setColor(withAlpha(accent, Math.max(1, 24 - i * 2)));
+			g.drawRoundRect(x - i, y - i, CARD_W + i * 2, CARD_H + i * 2, arc + i, arc + i);
+		}
+	}
+
+	private void sheen(Graphics2D g, int x, int y, int arc) {
+		Shape prevClip = g.getClip();
+		g.clip(new RoundRectangle2D.Float(x, y, CARD_W, CARD_H, arc, arc));
+		g.setPaint(new GradientPaint(x, y + CARD_H, new Color(255, 255, 255, 0),
+			x + CARD_W, y, new Color(255, 255, 255, 16)));
+		int band = 90;
+		g.fillPolygon(
+			new int[]{x + CARD_W - band - 50, x + CARD_W - 50, x + CARD_W, x + CARD_W - band},
+			new int[]{y + CARD_H, y, y, y + CARD_H}, 4);
+		g.setClip(prevClip);
+	}
+
+	// ==================== Content ====================
+
+	private void drawContent(Graphics2D g, PlayerCardData card, Color accent, int x, int y) {
 		Font small = FontManager.getRunescapeSmallFont();
 		Font bold = FontManager.getRunescapeBoldFont();
-		Font nameFont = bold.deriveFont(Font.BOLD, 22f);
-		Font pointsFont = bold.deriveFont(Font.BOLD, 26f);
+		Font nameFont = bold.deriveFont(Font.BOLD, 20f);
+		Font pointsFont = bold.deriveFont(Font.BOLD, 24f);
+		// The slate header band carries the rank/name text instead of the accent
+		Color rankColor = design == 1 ? new Color(0, 0, 0, 170) : accent;
+		Color nameColor = design == 1 ? Color.WHITE : UIConstants.TEXT_PRIMARY;
+
 		int cx = x + CARD_W / 2;
-		int cy = y + 30;
+		int cy = y + 26;
 
 		BufferedImage sprite = rankSprite;
 		if (sprite != null) {
-			int sw = Math.min(26, sprite.getWidth());
-			int sh = Math.min(26, sprite.getHeight());
+			int sw = Math.min(24, sprite.getWidth());
+			int sh = Math.min(24, sprite.getHeight());
 			g.drawImage(sprite, cx - sw / 2, cy - sh / 2, sw, sh, null);
 		}
+		cy += 24;
+		centerText(g, card.getRankName().toUpperCase(), small, rankColor, cx, cy);
 		cy += 26;
-		centerText(g, card.getRankName().toUpperCase(), small, accent, cx, cy);
-		cy += 30;
-		centerText(g, card.getPlayerName(), nameFont, UIConstants.TEXT_PRIMARY, cx, cy);
-		cy += 44;
+		centerText(g, card.getPlayerName(), nameFont, nameColor, cx, cy);
+		cy += 38;
 		centerText(g, NumberFmt.group(card.getPoints()), pointsFont, UIConstants.ACCENT_GOLD, cx, cy);
-		cy += 18;
+		cy += 16;
 		centerText(g, "ACTIVITY POINTS", small, UIConstants.TEXT_MUTED, cx, cy);
-		cy += 22;
+		cy += 20;
 
-		// Rank progress
-		int barW = CARD_W - 80;
+		int barW = CARD_W - 70;
 		g.setColor(new Color(255, 255, 255, 26));
 		g.fillRoundRect(cx - barW / 2, cy, barW, 5, 5, 5);
 		int fill = (int) Math.round(barW * Math.min(1.0, Math.max(0.0, card.getRankProgress())));
@@ -175,17 +270,16 @@ public class PlayerCardOverlay extends Overlay {
 			g.setColor(accent);
 			g.fillRoundRect(cx - barW / 2, cy, fill, 5, 5, 5);
 		}
-		cy += 20;
+		cy += 18;
 		String progressText = card.getNextRankName() != null
 			? NumberFmt.group(card.getPointsToNext()) + " pts to " + card.getNextRankName()
 			: "Max rank";
 		centerText(g, progressText, small, UIConstants.TEXT_SECONDARY, cx, cy);
-		cy += 20;
+		cy += 16;
 
-		// Stats grid
-		int gap = 10;
-		int tileW = (CARD_W - 48 - gap) / 2;
-		int tileH = 56;
+		int gap = 8;
+		int tileW = (CARD_W - 40 - gap) / 2;
+		int tileH = 48;
 		String[][] stats = {
 			{String.valueOf(card.getDrops()), "Drops"},
 			{String.valueOf(card.getPets()), "Pets"},
@@ -193,22 +287,69 @@ public class PlayerCardOverlay extends Overlay {
 			{String.valueOf(card.getDiariesDone()), "Diary tasks"},
 		};
 		for (int i = 0; i < stats.length; i++) {
-			int tx = x + 24 + (i % 2) * (tileW + gap);
+			int tx = x + 20 + (i % 2) * (tileW + gap);
 			int ty = cy + (i / 2) * (tileH + gap);
-			g.setColor(new Color(255, 255, 255, 14));
-			g.fillRoundRect(tx, ty, tileW, tileH, 10, 10);
-			centerText(g, stats[i][0], bold, UIConstants.TEXT_PRIMARY, tx + tileW / 2, ty + 26);
-			centerText(g, stats[i][1], small, UIConstants.TEXT_MUTED, tx + tileW / 2, ty + 42);
+			drawTile(g, accent, tx, ty, tileW, tileH);
+			centerText(g, stats[i][0], bold, UIConstants.TEXT_PRIMARY, tx + tileW / 2, ty + 22);
+			centerText(g, stats[i][1], small, UIConstants.TEXT_MUTED, tx + tileW / 2, ty + 38);
 		}
 
-		// Footer
-		int fy = y + CARD_H - 16;
+		int fy = y + CARD_H - 14;
 		g.setFont(bold);
-		drawShadowed(g, "REVAL", x + 24, fy, UIConstants.ACCENT_GOLD);
+		drawShadowed(g, "REVAL", x + 20, fy, UIConstants.ACCENT_GOLD);
 		g.setFont(small);
 		String since = "Member since " + card.getMemberSince();
 		int sinceW = g.getFontMetrics().stringWidth(since);
-		drawShadowed(g, since, x + CARD_W - 24 - sinceW, fy, UIConstants.TEXT_MUTED);
+		drawShadowed(g, since, x + CARD_W - 20 - sinceW, fy, UIConstants.TEXT_MUTED);
+	}
+
+	private void drawTile(Graphics2D g, Color accent, int tx, int ty, int w, int h) {
+		switch (design) {
+			case 1:
+				// Divider style: hairline top rule instead of a filled tile
+				g.setColor(new Color(255, 255, 255, 50));
+				g.fillRect(tx, ty, w, 1);
+				break;
+			case 2:
+				g.setColor(withAlpha(accent, 18));
+				g.fillRoundRect(tx, ty, w, h, 10, 10);
+				g.setStroke(new BasicStroke(1f));
+				g.setColor(withAlpha(accent, 60));
+				g.drawRoundRect(tx, ty, w, h, 10, 10);
+				break;
+			default:
+				g.setColor(new Color(255, 255, 255, 14));
+				g.fillRoundRect(tx, ty, w, h, 10, 10);
+				break;
+		}
+	}
+
+	// ==================== Switcher ====================
+
+	private void drawSwitcher(Graphics2D g, int x, int y) {
+		Font small = FontManager.getRunescapeSmallFont();
+		int cx = x + CARD_W / 2;
+		int sy = y + CARD_H + GLOW + 18;
+
+		String label = DESIGNS[design] + "  " + (design + 1) + "/" + DESIGNS.length;
+		g.setFont(small);
+		FontMetrics fm = g.getFontMetrics();
+		int labelW = fm.stringWidth(label);
+
+		drawShadowed(g, label, cx - labelW / 2, sy, new Color(255, 255, 255, 200));
+		drawShadowed(g, "<", cx - labelW / 2 - 22, sy, UIConstants.ACCENT_GOLD);
+		drawShadowed(g, ">", cx + labelW / 2 + 14, sy, UIConstants.ACCENT_GOLD);
+
+		prevHit = new Rectangle(cx - labelW / 2 - 34, sy - 16, 28, 24);
+		nextHit = new Rectangle(cx + labelW / 2 + 6, sy - 16, 28, 24);
+
+		centerText(g, "Click anywhere to close", small, new Color(255, 255, 255, 110), cx, sy + 20);
+	}
+
+	// ==================== Helpers ====================
+
+	private static Color withAlpha(Color color, int alpha) {
+		return new Color(color.getRed(), color.getGreen(), color.getBlue(), alpha);
 	}
 
 	private void centerText(Graphics2D g, String text, Font font, Color color, int cx, int baselineY) {

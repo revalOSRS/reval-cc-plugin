@@ -56,7 +56,9 @@ public class PlayerCardManager {
 		public MouseEvent mouseReleased(MouseEvent e) {
 			if (overlay.openForMs() > OPEN_GRACE_MS) {
 				e.consume();
-				close();
+				if (!overlay.handleClick(e.getPoint())) {
+					close();
+				}
 			}
 			return e;
 		}
