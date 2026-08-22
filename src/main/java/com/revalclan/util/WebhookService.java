@@ -27,14 +27,8 @@ public class WebhookService {
 	private Gson gson;
 
 	/**
-	 * Sends player data to webhook asynchronously
-	 */
-	public void sendDataAsync(Map<String, Object> data) {
-		sendDataAsync(WEBHOOK_URL, data, null);
-	}
-
-	/**
-	 * Async send; hands the parsed JSON response to the consumer on success.
+	 * Async send; hands the parsed JSON response to the consumer on success
+	 * (null consumer = fire and forget).
 	 * Consumer runs on the HTTP thread — do not touch the client from it.
 	 */
 	public void sendDataAsync(Map<String, Object> data, Consumer<JsonObject> onResponse) {

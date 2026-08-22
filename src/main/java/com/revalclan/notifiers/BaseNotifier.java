@@ -71,11 +71,7 @@ public abstract class BaseNotifier {
 	protected void sendNotification(Map<String, Object> data, Consumer<JsonObject> onResponse) {
 		if (!passesClanCheck()) return;
 		addEventMetadata(data);
-		if (onResponse != null) {
-			webhookService.sendDataAsync(data, onResponse);
-		} else {
-			webhookService.sendDataAsync(data);
-		}
+		webhookService.sendDataAsync(data, onResponse);
 	}
 
 	/**
@@ -92,7 +88,7 @@ public abstract class BaseNotifier {
 				if (base64Screenshot != null) {
 					data.put("screenshot", base64Screenshot);
 				}
-				webhookService.sendDataAsync(data);
+				webhookService.sendDataAsync(data, null);
 			});
 	}
 

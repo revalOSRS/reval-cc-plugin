@@ -36,8 +36,6 @@ public class SyncNotifier extends BaseNotifier {
 	 */
 	public void triggerSync() {
 		Map<String, Object> data = dataCollector.collectSyncData();
-		long accountHash = client.getAccountHash();
-		sendNotification(data, response ->
-			syncStateManager.handleSyncAckResponse(response, accountHash));
+		sendNotification(data, syncStateManager.ackHandler(client.getAccountHash()));
 	}
 }

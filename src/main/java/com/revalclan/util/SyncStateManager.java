@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 
 /**
  * Sync-state fingerprint handshake: hashes quests + miniquests, diaries and
@@ -120,6 +121,11 @@ public class SyncStateManager {
 		try {
 			configManager.unsetConfiguration(CONFIG_GROUP, CONFIG_KEY_PREFIX + accountHash);
 		} catch (Exception ignored) {}
+	}
+
+	/** Response consumer recording the server's fingerprint ack for this account. */
+	public Consumer<JsonObject> ackHandler(long accountHash) {
+		return response -> handleSyncAckResponse(response, accountHash);
 	}
 
 	/** Handles the `sync` object from a webhook response. HTTP thread — never touch the client. */

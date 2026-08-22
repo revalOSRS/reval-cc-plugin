@@ -1,7 +1,6 @@
 package com.revalclan.session;
 
 import com.google.gson.Gson;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.revalclan.util.WebhookService;
 import com.revalclan.util.Worlds;
@@ -33,7 +32,6 @@ public class SessionTracker {
 	private static final String CONFIG_GROUP = "revalclan";
 	/** One config entry per session: activeSession_<sessionId> */
 	private static final String CONFIG_KEY_PREFIX = "activeSession_";
-	private static final String LEGACY_CONFIG_KEY = "activeSessionJson";
 
 	/** Persist at most once per this many ticks (~30s), and only when dirty */
 	private static final int PERSIST_INTERVAL_TICKS = 50;
@@ -72,13 +70,21 @@ public class SessionTracker {
 	private long totalLootValue = 0;
 	private final List<Map<String, Object>> deaths = new ArrayList<>();
 
-	/** Config-store shape; summary stays a JsonObject so numbers survive the round-trip exactly. */
+	/** Config-store shape (written and read); summary stays a JsonObject so numbers survive exactly. */
 	private static class PersistedSession {
 		long accountHash;
 		String username;
-		Integer world;
-		JsonElement worldFlags;
+		int world;
+		List<String> worldFlags;
 		JsonObject summary;
+
+		long startedAt() {
+			try {
+				return summary.get("startedAt").getAsLong();
+			} catch (Exception e) {
+				return 0;
+			}
+		}
 	}
 
 	/**
@@ -111,10 +117,7 @@ public class SessionTracker {
 
 		touch();
 		Map<String, Object> summary = buildSummary("logout", lastUpdateMs);
-
-		configManager.setConfiguration(CONFIG_GROUP, CONFIG_KEY_PREFIX + sessionId,
-			gson.toJson(persistedEnvelope(summary)));
-
+		persist(summary);
 		reset();
 		return summary;
 	}
@@ -130,72 +133,60 @@ public class SessionTracker {
 	/** Replay every persisted-but-unconfirmed session as a recovered SESSION_SUMMARY. */
 	public void recoverPersistedSession() {
 		try {
-			configManager.unsetConfiguration(CONFIG_GROUP, LEGACY_CONFIG_KEY);
-
-			List<String> keys = new ArrayList<>();
+			// Parse once; unparseable copies are useless for recovery — drop them
+			Map<String, PersistedSession> parsed = new LinkedHashMap<>();
 			for (String fullKey : configManager.getConfigurationKeys(CONFIG_GROUP + "." + CONFIG_KEY_PREFIX)) {
-				keys.add(fullKey.substring(CONFIG_GROUP.length() + 1));
+				String key = fullKey.substring(CONFIG_GROUP.length() + 1);
+				PersistedSession session = null;
+				try {
+					session = gson.fromJson(configManager.getConfiguration(CONFIG_GROUP, key), PersistedSession.class);
+				} catch (Exception ignored) {}
+				if (session == null || session.summary == null) {
+					configManager.unsetConfiguration(CONFIG_GROUP, key);
+				} else {
+					parsed.put(key, session);
+				}
 			}
-			if (keys.isEmpty()) return;
+			if (parsed.isEmpty()) return;
 
-			// Newest first (by persisted startedAt); drop anything beyond the cap
-			keys.sort(Comparator.comparingLong(this::persistedStartedAt).reversed());
-			for (String key : keys.subList(Math.min(MAX_PERSISTED_SESSIONS, keys.size()), keys.size())) {
-				configManager.unsetConfiguration(CONFIG_GROUP, key);
+			// Newest first; drop anything beyond the cap
+			List<Map.Entry<String, PersistedSession>> entries = new ArrayList<>(parsed.entrySet());
+			entries.sort(Comparator.comparingLong(
+				(Map.Entry<String, PersistedSession> e) -> e.getValue().startedAt()).reversed());
+			for (Map.Entry<String, PersistedSession> e : entries.subList(
+					Math.min(MAX_PERSISTED_SESSIONS, entries.size()), entries.size())) {
+				configManager.unsetConfiguration(CONFIG_GROUP, e.getKey());
 			}
 
-			for (String key : keys.subList(0, Math.min(MAX_PERSISTED_SESSIONS, keys.size()))) {
-				replayPersisted(key);
+			for (Map.Entry<String, PersistedSession> e : entries.subList(
+					0, Math.min(MAX_PERSISTED_SESSIONS, entries.size()))) {
+				replayPersisted(e.getValue());
 			}
 		} catch (Exception e) {
 			log.warn("Failed to recover persisted sessions: {}", e.getMessage());
 		}
 	}
 
-	private long persistedStartedAt(String key) {
-		try {
-			PersistedSession p = gson.fromJson(configManager.getConfiguration(CONFIG_GROUP, key), PersistedSession.class);
-			return p.summary.get("startedAt").getAsLong();
-		} catch (Exception e) {
-			return 0;
-		}
-	}
-
 	// The only event built outside BaseNotifier — no live client exists at
 	// startup, so the envelope is reassembled from the persisted copy.
-	private void replayPersisted(String key) {
-		try {
-			PersistedSession persisted = gson.fromJson(
-				configManager.getConfiguration(CONFIG_GROUP, key), PersistedSession.class);
-			if (persisted == null || persisted.summary == null) {
-				configManager.unsetConfiguration(CONFIG_GROUP, key);
-				return;
-			}
+	private void replayPersisted(PersistedSession persisted) {
+		Map<String, Object> payload = new HashMap<>();
+		payload.put("eventType", "SESSION_SUMMARY");
+		payload.put("eventTimestamp", System.currentTimeMillis());
+		payload.put("accountHash", persisted.accountHash);
+		payload.put("username", persisted.username);
+		// World flags drive the server's world gate (keeps leagues sessions out)
+		payload.put("world", persisted.world);
+		if (persisted.worldFlags != null) payload.put("worldFlags", persisted.worldFlags);
+		payload.put("sessionSummary", persisted.summary);
 
-			Map<String, Object> payload = new HashMap<>();
-			payload.put("eventType", "SESSION_SUMMARY");
-			payload.put("eventTimestamp", System.currentTimeMillis());
-			payload.put("accountHash", persisted.accountHash);
-			payload.put("username", persisted.username);
-			// World flags drive the server's world gate (keeps leagues sessions out)
-			if (persisted.world != null) payload.put("world", persisted.world);
-			if (persisted.worldFlags != null) payload.put("worldFlags", persisted.worldFlags);
-			payload.put("sessionSummary", persisted.summary);
+		String recoveredSessionId = persisted.summary.has("sessionId")
+			? persisted.summary.get("sessionId").getAsString()
+			: null;
 
-			String recoveredSessionId = persisted.summary.has("sessionId")
-				? persisted.summary.get("sessionId").getAsString()
-				: null;
-
-			// Clear only on server confirm; otherwise retry next startup
-			webhookService.sendDataAsync(payload, response -> confirmDelivered(recoveredSessionId));
-			log.info("Recovered unfinished session, replayed as SESSION_SUMMARY");
-		} catch (Exception e) {
-			log.warn("Failed to replay persisted session: {}", e.getMessage());
-			// Unparseable copy is useless for recovery anyway
-			try {
-				configManager.unsetConfiguration(CONFIG_GROUP, key);
-			} catch (Exception ignored) {}
-		}
+		// Clear only on server confirm; otherwise retry next startup
+		webhookService.sendDataAsync(payload, response -> confirmDelivered(recoveredSessionId));
+		log.info("Recovered unfinished session, replayed as SESSION_SUMMARY");
 	}
 
 	/** Throttled local persistence (client thread). */
@@ -357,18 +348,16 @@ public class SessionTracker {
 
 	private void persist() {
 		// Persisted summaries replay as "recovered"; endedAt = last local update we saw
-		Map<String, Object> persisted = persistedEnvelope(buildSummary("recovered", lastUpdateMs));
-		configManager.setConfiguration(CONFIG_GROUP, CONFIG_KEY_PREFIX + sessionId, gson.toJson(persisted));
+		persist(buildSummary("recovered", lastUpdateMs));
 	}
 
-	/** Envelope written to the config store: identity + world context + summary */
-	private Map<String, Object> persistedEnvelope(Map<String, Object> summary) {
-		Map<String, Object> persisted = new HashMap<>();
-		persisted.put("accountHash", accountHash);
-		persisted.put("username", username);
-		persisted.put("world", world);
-		persisted.put("worldFlags", worldFlags);
-		persisted.put("summary", summary);
-		return persisted;
+	private void persist(Map<String, Object> summary) {
+		PersistedSession persisted = new PersistedSession();
+		persisted.accountHash = accountHash;
+		persisted.username = username;
+		persisted.world = world;
+		persisted.worldFlags = worldFlags;
+		persisted.summary = gson.toJsonTree(summary).getAsJsonObject();
+		configManager.setConfiguration(CONFIG_GROUP, CONFIG_KEY_PREFIX + sessionId, gson.toJson(persisted));
 	}
 }
