@@ -353,7 +353,12 @@ public class CompetitionsPanel extends JPanel {
 			row.setAlignmentX(Component.LEFT_ALIGNMENT);
 			row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 18));
 
-			row.add(label((i + 1) + ". " + entry.getOsrsNickname(), FontManager.getRunescapeSmallFont(), UIConstants.TEXT_PRIMARY, -1), BorderLayout.WEST);
+			JPanel nameCell = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+			nameCell.setOpaque(false);
+			Color placeColor = i == 0 ? MEDAL_GOLD : i == 1 ? MEDAL_SILVER : MEDAL_BRONZE;
+			nameCell.add(label((i + 1) + ". ", FontManager.getRunescapeSmallFont(), placeColor, -1));
+			nameCell.add(label(entry.getOsrsNickname(), FontManager.getRunescapeSmallFont(), UIConstants.TEXT_PRIMARY, -1));
+			row.add(nameCell, BorderLayout.WEST);
 			row.add(label(value != null ? formatValue(value) + suffix : "-", FontManager.getRunescapeBoldFont(), UIConstants.ACCENT_BLUE, -1), BorderLayout.EAST);
 			preview.add(row);
 		}
@@ -457,9 +462,9 @@ public class CompetitionsPanel extends JPanel {
 		row.setAlignmentX(Component.LEFT_ALIGNMENT);
 		row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 32));
 
-		Color rankColor = rank == 1 ? new Color(255, 215, 0)
-			: rank == 2 ? new Color(192, 192, 192)
-			: rank == 3 ? new Color(205, 127, 50)
+		Color rankColor = rank == 1 ? MEDAL_GOLD
+			: rank == 2 ? MEDAL_SILVER
+			: rank == 3 ? MEDAL_BRONZE
 			: UIConstants.TEXT_SECONDARY;
 
 		JLabel rankLabel = label("#" + rank, FontManager.getRunescapeBoldFont(), rankColor, -1);
