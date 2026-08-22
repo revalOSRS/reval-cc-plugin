@@ -66,6 +66,11 @@ public class PlayerCardOverlay extends Overlay {
 		return data != null;
 	}
 
+	/** How long the card has been open, in milliseconds. */
+	long openForMs() {
+		return data != null ? System.currentTimeMillis() - openedAt : 0;
+	}
+
 	void close() {
 		data = null;
 	}

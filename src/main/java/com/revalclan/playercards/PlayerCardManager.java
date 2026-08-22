@@ -38,12 +38,15 @@ public class PlayerCardManager {
 	private final MouseManager mouseManager;
 	private final PlayerCardOverlay overlay;
 
+	/** Ignore the tail of the menu click that opened the card. */
+	private static final long OPEN_GRACE_MS = 250;
+
 	private volatile long closedAt;
 
 	private final MouseAdapter clickCloser = new MouseAdapter() {
 		@Override
 		public MouseEvent mousePressed(MouseEvent e) {
-			if (overlay.isOpen()) {
+			if (overlay.openForMs() > OPEN_GRACE_MS) {
 				e.consume();
 			}
 			return e;
@@ -51,7 +54,7 @@ public class PlayerCardManager {
 
 		@Override
 		public MouseEvent mouseReleased(MouseEvent e) {
-			if (overlay.isOpen()) {
+			if (overlay.openForMs() > OPEN_GRACE_MS) {
 				e.consume();
 				close();
 			}
@@ -61,7 +64,7 @@ public class PlayerCardManager {
 		@Override
 		public MouseEvent mouseClicked(MouseEvent e) {
 			// The click event trails the closing release; swallow it too
-			if (overlay.isOpen() || System.currentTimeMillis() - closedAt < 250) {
+			if (overlay.openForMs() > OPEN_GRACE_MS || System.currentTimeMillis() - closedAt < 250) {
 				e.consume();
 			}
 			return e;
