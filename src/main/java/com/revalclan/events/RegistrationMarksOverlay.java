@@ -2,6 +2,7 @@ package com.revalclan.events;
 
 import com.revalclan.util.PlayerNames;
 import net.runelite.api.Client;
+import net.runelite.api.FontTypeFace;
 import net.runelite.api.Point;
 import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.widgets.Widget;
@@ -14,18 +15,21 @@ import net.runelite.client.util.ColorUtil;
 import net.runelite.client.util.Text;
 
 import javax.inject.Inject;
+import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics2D;
 import java.awt.Rectangle;
+import java.awt.RenderingHints;
 import java.util.Map;
 
 /**
- * Hover tooltip for {@link RegistrationMarks}: shows which upcoming event(s)
- * a checkmarked clan member registered for.
+ * Draws {@link RegistrationMarks}' checkmark after marked names in the clan
+ * sidepanel and shows which upcoming event(s) they registered for on hover.
  */
 public class RegistrationMarksOverlay extends Overlay {
 	private static final Color GOLD = new Color(255, 200, 60);
+	private static final Color CHECK_GREEN = new Color(0x3FBF4A);
 
 	private final Client client;
 	private final RegistrationMarks marks;
@@ -55,22 +59,45 @@ public class RegistrationMarksOverlay extends Overlay {
 			return null;
 		}
 
+		g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+		Rectangle clip = list.getBounds();
 		Point mouse = client.getMouseCanvasPosition();
+
 		for (Widget child : children) {
 			String text = child.getText();
 			if (text == null || text.isEmpty() || text.matches("W\\d+")) {
 				continue;
 			}
-			String events = registrations.get(PlayerNames.normalize(Text.removeTags(text)));
+			String plain = Text.removeTags(text);
+			String events = registrations.get(PlayerNames.normalize(plain));
 			if (events == null) {
 				continue;
 			}
 			Rectangle bounds = child.getBounds();
-			if (bounds != null && bounds.contains(mouse.getX(), mouse.getY())) {
+			if (bounds == null || clip == null || !clip.intersects(bounds)) {
+				continue;
+			}
+
+			FontTypeFace font = child.getFont();
+			int textEnd = bounds.x + (font != null ? font.getTextWidth(plain) : bounds.width);
+			drawCheck(g, textEnd + 4, bounds.y + bounds.height / 2);
+
+			if (bounds.contains(mouse.getX(), mouse.getY())) {
 				tooltipManager.add(new Tooltip("Registered: " + ColorUtil.wrapWithColorTag(events, GOLD)));
-				break;
 			}
 		}
 		return null;
+	}
+
+	private void drawCheck(Graphics2D g, int x, int centerY) {
+		int[] xs = {x, x + 3, x + 8};
+		int[] ys = {centerY, centerY + 3, centerY - 4};
+		g.setStroke(new BasicStroke(2, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+		g.setColor(new Color(0, 0, 0, 160));
+		g.translate(1, 1);
+		g.drawPolyline(xs, ys, 3);
+		g.translate(-1, -1);
+		g.setColor(CHECK_GREEN);
+		g.drawPolyline(xs, ys, 3);
 	}
 }

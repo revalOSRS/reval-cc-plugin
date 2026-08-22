@@ -14,10 +14,10 @@ import java.awt.Color;
 @Singleton
 public class MockTeamColorProvider implements TeamColorProvider {
 	private static final Color[] TEAM_COLORS = {
-		new Color(0xFF6B6B), // red
-		new Color(0x4DA6FF), // blue
-		new Color(0x6BCB77), // green
-		new Color(0xC77DFF), // purple
+		new Color(0xE64545), // red
+		new Color(0x3B8AE0), // blue
+		new Color(0x3FBF4A), // green
+		new Color(0xA85CE0), // purple
 	};
 
 	@Override

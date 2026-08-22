@@ -47,7 +47,7 @@ public class ClanTeamColors {
 		String name = event.getName();
 		Color color = teamColors.teamColorFor(Text.removeTags(name));
 		if (color != null) {
-			event.getMessageNode().setName(ColorUtil.wrapWithColorTag(name, color));
+			event.getMessageNode().setName(ColorUtil.wrapWithColorTag(name, chatTone(color)));
 		}
 	}
 
@@ -56,6 +56,14 @@ public class ClanTeamColors {
 		if (event.getScriptId() == ScriptID.CLAN_SIDEPANEL_DRAW) {
 			recolorSidepanel();
 		}
+	}
+
+	/** Chat draws the same hex noticeably brighter than the sidepanel; deepen it there. */
+	private static Color chatTone(Color color) {
+		return new Color(
+			Math.round(color.getRed() * 0.78f),
+			Math.round(color.getGreen() * 0.78f),
+			Math.round(color.getBlue() * 0.78f));
 	}
 
 	private void recolorSidepanel() {
