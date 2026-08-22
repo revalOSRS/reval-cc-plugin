@@ -3,6 +3,8 @@ package com.revalclan.playercards;
 import com.revalclan.util.PlayerNames;
 import lombok.Value;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 
 /**
@@ -31,6 +33,8 @@ public class PlayerCardData {
 	int eventsPlayed;
 	int diariesDone;
 	String memberSince;
+	/** Names of events this player's team (or the player) has won, one star each. */
+	List<String> eventWins;
 
 	public static PlayerCardData mock(String playerName) {
 		Random rng = new Random(PlayerNames.normalize(playerName).hashCode());
@@ -51,6 +55,14 @@ public class PlayerCardData {
 		String[] months = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
 		String since = months[rng.nextInt(12)] + " " + (2021 + rng.nextInt(5));
 
+		String[] winPool = {"Kevadbingo 2025", "Summer Race 2025", "Boss Blitz 2024",
+			"Skill Week 2025", "Sygisbingo 2024"};
+		int winCount = Math.max(0, rng.nextInt(7) - 2);
+		List<String> wins = new ArrayList<>();
+		for (int i = 0; i < Math.min(winCount, winPool.length); i++) {
+			wins.add(winPool[(rng.nextInt(winPool.length) + i) % winPool.length]);
+		}
+
 		return new PlayerCardData(
 			playerName,
 			RANKS[rankIdx][0],
@@ -62,7 +74,8 @@ public class PlayerCardData {
 			rng.nextInt(10),
 			rng.nextInt(26),
 			rng.nextInt(180),
-			since
+			since,
+			wins
 		);
 	}
 }
