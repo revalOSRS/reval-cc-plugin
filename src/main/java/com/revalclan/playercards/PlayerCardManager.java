@@ -8,6 +8,7 @@ import net.runelite.api.MenuAction;
 import net.runelite.api.MenuEntry;
 import net.runelite.api.Player;
 import net.runelite.api.events.MenuOpened;
+import net.runelite.api.gameval.InterfaceID;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.game.SpriteManager;
 import net.runelite.client.input.MouseAdapter;
@@ -88,20 +89,31 @@ public class PlayerCardManager {
 	public void onMenuOpened(MenuOpened event) {
 		Set<String> seen = new HashSet<>();
 		for (MenuEntry entry : event.getMenuEntries()) {
+			// Players in the world
 			Player player = entry.getPlayer();
-			if (player == null || !player.isClanMember() || player.getName() == null) {
+			if (player != null && player.isClanMember() && player.getName() != null) {
+				addProfileEntry(seen, Text.removeTags(player.getName()), entry.getTarget());
 				continue;
 			}
-			String name = Text.removeTags(player.getName());
-			if (!seen.add(name)) {
-				continue;
+			// Rows in the clan sidepanel member list (the "Hop-to" menu)
+			if (entry.getParam1() == InterfaceID.ClansSidepanel.PLAYERLIST && entry.getTarget() != null) {
+				String name = Text.removeTags(entry.getTarget());
+				if (!name.isEmpty()) {
+					addProfileEntry(seen, name, entry.getTarget());
+				}
 			}
-			client.getMenu().createMenuEntry(-1)
-				.setOption("View Reval Profile")
-				.setTarget(entry.getTarget())
-				.setType(MenuAction.RUNELITE)
-				.onClick(e -> open(name));
 		}
+	}
+
+	private void addProfileEntry(Set<String> seen, String name, String target) {
+		if (!seen.add(name)) {
+			return;
+		}
+		client.getMenu().createMenuEntry(-1)
+			.setOption("View Reval Profile")
+			.setTarget(target)
+			.setType(MenuAction.RUNELITE)
+			.onClick(e -> open(name));
 	}
 
 	private void open(String playerName) {
