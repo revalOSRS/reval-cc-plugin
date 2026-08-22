@@ -43,7 +43,7 @@ public class CollapsibleSection extends JPanel {
 		JPanel leftPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
 		leftPanel.setOpaque(false);
 
-		arrowLabel = new JLabel(new TriangleIcon(expanded));
+		arrowLabel = new JLabel(new TriangleIcon(expanded, 9, UIConstants.ACCENT_GOLD));
 		leftPanel.add(arrowLabel);
 
 		iconLabel = new JLabel();
@@ -104,7 +104,7 @@ public class CollapsibleSection extends JPanel {
 
 	public void setExpanded(boolean expanded) {
 		this.expanded = expanded;
-		arrowLabel.setIcon(new TriangleIcon(expanded));
+		arrowLabel.setIcon(new TriangleIcon(expanded, 9, UIConstants.ACCENT_GOLD));
 		contentPanel.setVisible(expanded);
 		revalidate();
 	}
@@ -113,45 +113,4 @@ public class CollapsibleSection extends JPanel {
 		return expanded;
 	}
 
-	/**
-	 * Expand/collapse indicator drawn in code — the RuneScape font has no
-	 * "▼"/"▲" glyphs, which rendered as a missing-glyph box on macOS.
-	 */
-	private static class TriangleIcon implements Icon {
-		private static final int SIZE = 9;
-		private final boolean down;
-
-		TriangleIcon(boolean down) {
-			this.down = down;
-		}
-
-		@Override
-		public int getIconWidth() {
-			return SIZE;
-		}
-
-		@Override
-		public int getIconHeight() {
-			return SIZE;
-		}
-
-		@Override
-		public void paintIcon(Component c, Graphics g, int x, int y) {
-			Graphics2D g2d = (Graphics2D) g.create();
-			g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-			g2d.setColor(UIConstants.ACCENT_GOLD);
-			Polygon triangle = new Polygon();
-			if (down) {
-				triangle.addPoint(x, y + 2);
-				triangle.addPoint(x + SIZE - 1, y + 2);
-				triangle.addPoint(x + (SIZE - 1) / 2, y + SIZE - 2);
-			} else {
-				triangle.addPoint(x, y + SIZE - 2);
-				triangle.addPoint(x + SIZE - 1, y + SIZE - 2);
-				triangle.addPoint(x + (SIZE - 1) / 2, y + 2);
-			}
-			g2d.fillPolygon(triangle);
-			g2d.dispose();
-		}
-	}
 }

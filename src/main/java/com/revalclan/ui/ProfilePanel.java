@@ -272,8 +272,9 @@ public class ProfilePanel extends JPanel {
 		JPanel placeholder = createCenteredPanel();
 		placeholder.setBorder(new EmptyBorder(30, 20, 20, 20));
 
-		JLabel errorIcon = new JLabel("⚠");
+		JLabel errorIcon = new JLabel("!");
 		errorIcon.setFont(FontManager.getRunescapeBoldFont());
+		errorIcon.setForeground(UIConstants.ERROR_COLOR);
 		errorIcon.setAlignmentX(Component.CENTER_ALIGNMENT);
 
 		JLabel errorLabel = new JLabel(message);

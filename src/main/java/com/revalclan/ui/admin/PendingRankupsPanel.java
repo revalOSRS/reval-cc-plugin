@@ -3,6 +3,7 @@ package com.revalclan.ui.admin;
 import com.revalclan.api.RevalApiService;
 import com.revalclan.api.admin.PendingRankChangesResponse;
 import com.revalclan.ui.components.ArrowIcon;
+import com.revalclan.ui.components.CheckIcon;
 import com.revalclan.ui.components.BackButton;
 import com.revalclan.ui.components.PanelTitle;
 import com.revalclan.ui.constants.UIConstants;
@@ -198,12 +199,7 @@ public class PendingRankupsPanel extends JPanel {
 		};
 
 		ImageIcon checkIcon = assetLoader != null ? assetLoader.getIcon("checkmark.png", 14) : null;
-		if (checkIcon != null) {
-			actualizeBtn.setIcon(checkIcon);
-		} else {
-			actualizeBtn.setText("✓");
-			actualizeBtn.setFont(FontManager.getRunescapeSmallFont());
-		}
+		actualizeBtn.setIcon(checkIcon != null ? checkIcon : new CheckIcon(14, Color.WHITE));
 
 		actualizeBtn.setForeground(Color.WHITE);
 		actualizeBtn.setBackground(new Color(70, 70, 70));
