@@ -5,6 +5,7 @@ import com.revalclan.api.RevalApiService;
 import com.revalclan.api.playercards.ProfileCardResponse;
 import com.revalclan.util.ClanRankIconResolver;
 import com.revalclan.util.RankColors;
+import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.MenuAction;
 import net.runelite.api.MenuEntry;
@@ -32,6 +33,7 @@ import java.util.Set;
  * While the card is open, mouse input is consumed so the game doesn't react;
  * a click or Escape closes it.
  */
+@Slf4j
 @Singleton
 public class PlayerCardManager {
 	/**
@@ -137,12 +139,14 @@ public class PlayerCardManager {
 			// Players in the world
 			Player player = entry.getPlayer();
 			if (player != null && player.isClanMember() && player.getName() != null) {
-				addProfileEntry(seen, Text.removeTags(player.getName()), entry.getTarget());
+				// sanitize, not removeTags: in-game names carry NBSPs that the
+				// backend's nickname lookup would never match
+				addProfileEntry(seen, Text.sanitize(player.getName()), entry.getTarget());
 				continue;
 			}
 			// Rows in the clan sidepanel member list (the "Hop-to" menu)
 			if (entry.getParam1() == InterfaceID.ClansSidepanel.PLAYERLIST && entry.getTarget() != null) {
-				String name = Text.removeTags(entry.getTarget());
+				String name = Text.sanitize(entry.getTarget());
 				if (!name.isEmpty()) {
 					addProfileEntry(seen, name, entry.getTarget());
 				}
@@ -183,9 +187,14 @@ public class PlayerCardManager {
 				showCard(playerName, response.getData());
 			},
 			error -> {
-				if (overlay.isLoadingFor(playerName)) {
-					overlay.showError("Couldn't load the Reval profile");
+				if (!overlay.isLoadingFor(playerName)) {
+					return;
 				}
+				String message = error.getMessage();
+				log.warn("Profile card fetch failed for {}: {}", playerName, message);
+				overlay.showError("Player not found".equals(message)
+					? "No Reval profile found for " + playerName
+					: "Couldn't load the Reval profile" + (message != null ? " (" + message + ")" : ""));
 			});
 	}
 

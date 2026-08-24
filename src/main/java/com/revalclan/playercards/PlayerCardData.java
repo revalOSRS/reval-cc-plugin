@@ -6,6 +6,7 @@ import lombok.Value;
 
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.Locale;
 
 /** Data shown on a clan player card, mapped from the profile-card endpoint. */
@@ -24,6 +25,8 @@ public class PlayerCardData {
 	int clogCount;
 	int diaryTasksDone;
 	int diaryTasksTotal;
+	/** Names of events this player's team won, one star each */
+	List<String> eventWins;
 	String memberSince;    // "Jan 2022", or null
 
 	static PlayerCardData from(ProfileCardResponse.CardData profile) {
@@ -39,6 +42,7 @@ public class PlayerCardData {
 			orZero(profile.getClogCount()),
 			orZero(profile.getDiaryTasksDone()),
 			orZero(profile.getDiaryTasksTotal()),
+			profile.getEventWins() != null ? profile.getEventWins() : List.of(),
 			formatMemberSince(profile.getMemberSince())
 		);
 	}

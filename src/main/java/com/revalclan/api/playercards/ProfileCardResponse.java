@@ -4,6 +4,8 @@ import com.revalclan.api.common.ApiResponse;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+import java.util.List;
+
 /** Response for GET /players/profile-card: minimal data for the profile card. */
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -23,6 +25,8 @@ public class ProfileCardResponse extends ApiResponse {
 		private Integer clogCount;
 		private Integer diaryTasksDone;
 		private Integer diaryTasksTotal;
+		/** Completed events won by the player's team; one star each */
+		private List<String> eventWins;
 		private String memberSince;     // ISO timestamp; may be null
 	}
 }
