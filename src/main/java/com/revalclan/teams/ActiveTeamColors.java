@@ -56,11 +56,6 @@ public class ActiveTeamColors {
 		return team != null ? team.getColor() : null;
 	}
 
-	public String teamNameFor(String playerName) {
-		Team team = teamFor(playerName);
-		return team != null ? team.getName() : null;
-	}
-
 	private Team teamFor(String playerName) {
 		String key = PlayerNames.normalize(playerName);
 		if (key.isEmpty()) {

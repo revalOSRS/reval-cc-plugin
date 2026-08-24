@@ -2,7 +2,6 @@ package com.revalclan.teams;
 
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
-import net.runelite.api.MessageNode;
 import net.runelite.api.ScriptID;
 import net.runelite.api.events.ChatMessage;
 import net.runelite.api.events.ScriptPostFired;
@@ -53,17 +52,7 @@ public class ClanTeamColors {
 		if (color == null) {
 			return;
 		}
-		Color tone = chatTone(color);
-		MessageNode node = event.getMessageNode();
-		node.setName(ColorUtil.wrapWithColorTag(event.getName(), tone));
-
-		// "[Reval] [Team]": the renderer brackets the sender, so close its
-		// bracket ourselves and open one for the team
-		String teamName = activeTeams.teamNameFor(plain);
-		String sender = node.getSender();
-		if (teamName != null && sender != null && !sender.contains("] ")) {
-			node.setSender(sender + "] " + ColorUtil.wrapWithColorTag("[" + teamName, tone));
-		}
+		event.getMessageNode().setName(ColorUtil.wrapWithColorTag(event.getName(), chatTone(color)));
 	}
 
 	@Subscribe
