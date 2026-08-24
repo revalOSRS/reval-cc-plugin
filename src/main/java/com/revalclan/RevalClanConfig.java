@@ -57,16 +57,6 @@ public interface RevalClanConfig extends Config {
 		return true;
 	}
 
-	@ConfigItem(
-		keyName = "registrationCheckmarks",
-		name = "Signup checkmarks (staff)",
-		description = "For Deputy Owner+: checkmark clan-list members registered for an upcoming event",
-		section = clanEventsSection,
-		position = 1
-	)
-	default boolean registrationCheckmarks() {
-		return true;
-	}
 
 	// ── Event Notifications ────────────────────────────────────────────
 	@ConfigSection(

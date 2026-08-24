@@ -1,6 +1,5 @@
 package com.revalclan.events;
 
-import com.revalclan.RevalClanConfig;
 import com.revalclan.api.RevalApiService;
 import com.revalclan.api.events.EventsResponse;
 import com.revalclan.util.ClanRanks;
@@ -29,16 +28,14 @@ import java.util.Map;
 public class RegistrationMarks {
 	private final Client client;
 	private final RevalApiService apiService;
-	private final RevalClanConfig config;
 
 	/** Standardized nickname -> comma-joined upcoming event names */
 	private volatile Map<String, String> registrations = Map.of();
 
 	@Inject
-	public RegistrationMarks(Client client, RevalApiService apiService, RevalClanConfig config) {
+	public RegistrationMarks(Client client, RevalApiService apiService) {
 		this.client = client;
 		this.apiService = apiService;
-		this.config = config;
 	}
 
 	public void startUp() {
@@ -49,9 +46,9 @@ public class RegistrationMarks {
 		return registrations;
 	}
 
-	/** Marks render only for staff viewers with the toggle on. */
+	/** Marks render only for staff viewers. */
 	boolean isActive() {
-		return config.registrationCheckmarks() && ClanRanks.isDeputyOwnerPlus(client);
+		return ClanRanks.isDeputyOwnerPlus(client);
 	}
 
 	@Subscribe
@@ -63,7 +60,7 @@ public class RegistrationMarks {
 
 	@Subscribe
 	public void onScriptPostFired(ScriptPostFired event) {
-		if (event.getScriptId() == ScriptID.CLAN_SIDEPANEL_DRAW && config.registrationCheckmarks()) {
+		if (event.getScriptId() == ScriptID.CLAN_SIDEPANEL_DRAW) {
 			refresh();
 		}
 	}
