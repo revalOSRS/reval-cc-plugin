@@ -13,7 +13,7 @@ public final class RankColors {
 		Map.entry("leader", new Color(0xE0B84F)),
 		Map.entry("supervisor", new Color(0x7A9CC6)),
 		Map.entry("superior", new Color(0x4FA98F)),
-		Map.entry("executive", new Color(0xD98E3C)),
+		Map.entry("executive", new Color(0x4FBF5A)),
 		Map.entry("senator", new Color(0x6FA8DC)),
 		Map.entry("monarch", new Color(0x9B59B6)),
 		Map.entry("red_topaz", new Color(0xD9663C)),
