@@ -51,8 +51,9 @@ public class PlayerCardManager {
 	private final KeyManager keyManager;
 	private final PlayerCardOverlay overlay;
 
-	private ClickPhase clickPhase;
-	private boolean listenersRegistered;
+	// Written on the client thread (open) and the AWT input thread (listeners)
+	private volatile ClickPhase clickPhase;
+	private volatile boolean listenersRegistered;
 
 	private final MouseAdapter clickCloser = new MouseAdapter() {
 		@Override
