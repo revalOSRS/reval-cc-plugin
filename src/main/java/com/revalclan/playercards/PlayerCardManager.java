@@ -139,19 +139,25 @@ public class PlayerCardManager {
 			// Players in the world
 			Player player = entry.getPlayer();
 			if (player != null && player.isClanMember() && player.getName() != null) {
-				// sanitize, not removeTags: in-game names carry NBSPs that the
-				// backend's nickname lookup would never match
-				addProfileEntry(seen, Text.sanitize(player.getName()), entry.getTarget());
+				addProfileEntry(seen, cleanName(player.getName()), entry.getTarget());
 				continue;
 			}
 			// Rows in the clan sidepanel member list (the "Hop-to" menu)
 			if (entry.getParam1() == InterfaceID.ClansSidepanel.PLAYERLIST && entry.getTarget() != null) {
-				String name = Text.sanitize(entry.getTarget());
+				String name = cleanName(entry.getTarget());
 				if (!name.isEmpty()) {
 					addProfileEntry(seen, name, entry.getTarget());
 				}
 			}
 		}
+	}
+
+	/**
+	 * Menu names need both cleanups: sidepanel targets carry color tags,
+	 * in-game names carry NBSPs - the backend lookup matches neither.
+	 */
+	private static String cleanName(String raw) {
+		return Text.removeTags(raw).replace('\u00A0', ' ');
 	}
 
 	private void addProfileEntry(Set<String> seen, String name, String target) {
