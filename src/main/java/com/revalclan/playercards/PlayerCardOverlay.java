@@ -28,7 +28,7 @@ import java.awt.image.BufferedImage;
 
 /**
  * Trading-card style profile rendered in-game: the whole client dims and the
- * card draws centered on the canvas (OSRS TCG pack-opening style), fading in.
+ * card draws centered on the canvas, fading in.
  * The accent color comes from the player's rank. Clicks and Escape close it
  * (input is consumed by {@link PlayerCardManager} while open).
  */

@@ -27,7 +27,7 @@ import java.util.Set;
 
 /**
  * "Album" window for the full points log — a searchable, filterable, paged
- * card grid (inspired by the OSRS TCG collection album). Profile stat cards
+ * card grid. Profile stat cards
  * open it with the matching source filter pre-applied.
  */
 public class PointsAlbumWindow extends JFrame {
