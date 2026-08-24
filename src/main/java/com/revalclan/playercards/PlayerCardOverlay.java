@@ -216,10 +216,10 @@ public class PlayerCardOverlay extends Overlay {
 				g.setColor(accent);
 				g.fillRoundRect(cx - barW / 2, cy, fill, 5, 5, 5);
 			}
-			cy += 18;
+			cy += 22;
 			drawProgressRow(g, card, small, cx, cy);
 		} else {
-			cy += 18;
+			cy += 22;
 		}
 		cy += 16;
 
@@ -240,8 +240,8 @@ public class PlayerCardOverlay extends Overlay {
 			g.setStroke(new BasicStroke(1f));
 			g.setColor(withAlpha(accent, 60));
 			g.drawRoundRect(tx, ty, tileW, tileH, 10, 10);
-			centerText(g, stats[i][0], bold, UIConstants.TEXT_PRIMARY, tx + tileW / 2, ty + 22);
-			centerText(g, stats[i][1], small, UIConstants.TEXT_MUTED, tx + tileW / 2, ty + 38);
+			centerText(g, stats[i][0], bold, UIConstants.TEXT_PRIMARY, tx + tileW / 2, ty + 26);
+			centerText(g, stats[i][1], small, UIConstants.TEXT_MUTED, tx + tileW / 2, ty + 42);
 		}
 
 		int fy = y + CARD_H - 14;
