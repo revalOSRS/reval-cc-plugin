@@ -1,6 +1,9 @@
 package com.revalclan.playercards;
 
 import com.revalclan.RevalClanConfig;
+import com.revalclan.api.RevalApiService;
+import com.revalclan.api.playercards.ProfileCardResponse;
+import com.revalclan.api.points.PointsResponse;
 import com.revalclan.ui.constants.UIConstants;
 import com.revalclan.util.ClanRankIconResolver;
 import com.revalclan.util.PlayerNames;
@@ -58,6 +61,7 @@ public class PlayerCardManager {
 
 	private final Client client;
 	private final RevalClanConfig config;
+	private final RevalApiService apiService;
 	private final ClanRankIconResolver rankIconResolver;
 	private final SpriteManager spriteManager;
 	private final MouseManager mouseManager;
@@ -116,11 +120,13 @@ public class PlayerCardManager {
 	};
 
 	@Inject
-	public PlayerCardManager(Client client, RevalClanConfig config, ClanRankIconResolver rankIconResolver,
+	public PlayerCardManager(Client client, RevalClanConfig config, RevalApiService apiService,
+							 ClanRankIconResolver rankIconResolver,
 							 SpriteManager spriteManager, MouseManager mouseManager, KeyManager keyManager,
 							 PlayerCardOverlay overlay) {
 		this.client = client;
 		this.config = config;
+		this.apiService = apiService;
 		this.rankIconResolver = rankIconResolver;
 		this.spriteManager = spriteManager;
 		this.mouseManager = mouseManager;
@@ -165,11 +171,39 @@ public class PlayerCardManager {
 	}
 
 	private void open(String playerName) {
-		PlayerCardData data = PlayerCardData.mock(playerName);
 		if (!overlay.isOpen()) {
 			mouseManager.registerMouseListener(clickCloser);
 			keyManager.registerKeyListener(escCloser);
 		}
+		overlay.showLoading(playerName);
+		apiService.fetchProfileCard(playerName,
+			response -> {
+				if (!overlay.isLoadingFor(playerName)) {
+					return;
+				}
+				if (response.getData() == null) {
+					overlay.showError("No Reval profile found for " + playerName);
+					return;
+				}
+				// Rank thresholds for the progress bar; show the card either way
+				apiService.fetchPoints(
+					points -> showCard(playerName, response.getData(),
+						points.getData() != null ? points.getData().getRanks() : null),
+					error -> showCard(playerName, response.getData(), null));
+			},
+			error -> {
+				if (overlay.isLoadingFor(playerName)) {
+					overlay.showError("Couldn't load the Reval profile");
+				}
+			});
+	}
+
+	private void showCard(String playerName, ProfileCardResponse.CardData profile,
+						  java.util.List<PointsResponse.Rank> ranks) {
+		if (!overlay.isLoadingFor(playerName)) {
+			return;
+		}
+		PlayerCardData data = PlayerCardData.from(profile, ranks);
 		overlay.show(data, rankColor(data.getRankName()));
 		rankIconResolver.resolve(data.getRankName(), spriteId ->
 			spriteManager.getSpriteAsync(spriteId, 0, overlay::setRankSprite));

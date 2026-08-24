@@ -48,6 +48,8 @@ public class PlayerCardOverlay extends Overlay {
 	private volatile BufferedImage rankSprite;
 	private volatile BufferedImage nextRankSprite;
 	private volatile long openedAt;
+	private volatile String pendingName;
+	private volatile String statusText;
 
 	@Inject
 	public PlayerCardOverlay(Client client) {
@@ -56,11 +58,27 @@ public class PlayerCardOverlay extends Overlay {
 		setLayer(OverlayLayer.ALWAYS_ON_TOP);
 	}
 
-	void show(PlayerCardData data, Color accent) {
+	/** Dim and show a loading message while the profile is fetched. */
+	void showLoading(String playerName) {
+		this.data = null;
 		this.rankSprite = null;
 		this.nextRankSprite = null;
-		this.accent = accent;
+		this.statusText = "Loading Reval profile...";
 		this.openedAt = System.currentTimeMillis();
+		this.pendingName = playerName;
+	}
+
+	/** True while the card is still waiting for this player's profile. */
+	boolean isLoadingFor(String playerName) {
+		return data == null && playerName.equals(pendingName);
+	}
+
+	void showError(String message) {
+		this.statusText = message;
+	}
+
+	void show(PlayerCardData data, Color accent) {
+		this.accent = accent;
 		this.data = data;
 	}
 
@@ -73,25 +91,26 @@ public class PlayerCardOverlay extends Overlay {
 	}
 
 	boolean isOpen() {
-		return data != null;
+		return pendingName != null;
 	}
 
 	/** How long the card has been open, in milliseconds. */
 	long openForMs() {
-		return data != null ? System.currentTimeMillis() - openedAt : 0;
+		return isOpen() ? System.currentTimeMillis() - openedAt : 0;
 	}
 
 	void close() {
 		data = null;
+		pendingName = null;
+		statusText = null;
 	}
 
 	@Override
 	public Dimension render(Graphics2D g) {
-		PlayerCardData card = data;
-		Color accent = this.accent;
-		if (card == null || accent == null) {
+		if (!isOpen()) {
 			return null;
 		}
+		PlayerCardData card = data;
 
 		float fade = Math.min(1f, (System.currentTimeMillis() - openedAt) / (float) FADE_MS);
 		int canvasW = client.getCanvasWidth();
@@ -106,12 +125,24 @@ public class PlayerCardOverlay extends Overlay {
 		Composite prevComposite = g.getComposite();
 		g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, fade));
 
+		Font small = FontManager.getRunescapeSmallFont();
+		int cx = canvasW / 2;
+
+		if (card == null || accent == null) {
+			// Loading or error text instead of the card
+			centerText(g, statusText != null ? statusText : "Loading Reval profile...",
+				FontManager.getRunescapeFont(), UIConstants.ACCENT_GOLD, cx, canvasH / 2);
+			centerText(g, "Click or press Esc to close", small, new Color(255, 255, 255, 110),
+				cx, canvasH / 2 + 22);
+			g.setComposite(prevComposite);
+			return null;
+		}
+
 		int x = (canvasW - CARD_W) / 2;
 		int y = (canvasH - CARD_H) / 2;
 		drawFrame(g, accent, x, y);
 		String hoveredWin = drawContent(g, card, accent, x, y);
 
-		Font small = FontManager.getRunescapeSmallFont();
 		centerText(g, "Click or press Esc to close", small, new Color(255, 255, 255, 110),
 			x + CARD_W / 2, y + CARD_H + GLOW + 16);
 
@@ -181,26 +212,30 @@ public class PlayerCardOverlay extends Overlay {
 		centerText(g, "REVAL POINTS", small, UIConstants.TEXT_MUTED, cx, cy);
 		cy += 20;
 
-		int barW = CARD_W - 70;
-		g.setColor(new Color(255, 255, 255, 26));
-		g.fillRoundRect(cx - barW / 2, cy, barW, 5, 5, 5);
-		int fill = (int) Math.round(barW * Math.min(1.0, Math.max(0.0, card.getRankProgress())));
-		if (fill > 0) {
-			g.setColor(accent);
-			g.fillRoundRect(cx - barW / 2, cy, fill, 5, 5, 5);
+		if (card.getRankProgress() >= 0) {
+			int barW = CARD_W - 70;
+			g.setColor(new Color(255, 255, 255, 26));
+			g.fillRoundRect(cx - barW / 2, cy, barW, 5, 5, 5);
+			int fill = (int) Math.round(barW * Math.min(1.0, Math.max(0.0, card.getRankProgress())));
+			if (fill > 0) {
+				g.setColor(accent);
+				g.fillRoundRect(cx - barW / 2, cy, fill, 5, 5, 5);
+			}
+			cy += 18;
+			drawProgressRow(g, card, small, cx, cy);
+		} else {
+			cy += 18;
 		}
-		cy += 18;
-		drawProgressRow(g, card, small, cx, cy);
 		cy += 16;
 
 		int gap = 8;
 		int tileW = (CARD_W - 40 - gap) / 2;
 		int tileH = 48;
 		String[][] stats = {
-			{String.valueOf(card.getDrops()), "Drops"},
-			{String.valueOf(card.getPets()), "Pets"},
-			{String.valueOf(card.getEventsPlayed()), "Events"},
-			{String.valueOf(card.getDiariesDone()), "Diary tasks"},
+			{NumberFmt.group(card.getDropPoints()) + "M", "GP from drops"},
+			{String.valueOf(card.getPetCount()), "Pets"},
+			{String.valueOf(card.getClogCount()), "Collection log"},
+			{card.getDiaryTasksDone() + "/" + card.getDiaryTasksTotal(), "Reval diary tasks"},
 		};
 		for (int i = 0; i < stats.length; i++) {
 			int tx = x + 20 + (i % 2) * (tileW + gap);
@@ -217,10 +252,12 @@ public class PlayerCardOverlay extends Overlay {
 		int fy = y + CARD_H - 14;
 		g.setFont(bold);
 		drawShadowed(g, "REVAL", x + 20, fy, UIConstants.ACCENT_GOLD);
-		g.setFont(small);
-		String since = "Member since " + card.getMemberSince();
-		int sinceW = g.getFontMetrics().stringWidth(since);
-		drawShadowed(g, since, x + CARD_W - 20 - sinceW, fy, UIConstants.TEXT_MUTED);
+		if (card.getMemberSince() != null) {
+			g.setFont(small);
+			String since = "Member since " + card.getMemberSince();
+			int sinceW = g.getFontMetrics().stringWidth(since);
+			drawShadowed(g, since, x + CARD_W - 20 - sinceW, fy, UIConstants.TEXT_MUTED);
+		}
 		return hoveredWin;
 	}
 

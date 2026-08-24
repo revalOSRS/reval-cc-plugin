@@ -1,81 +1,94 @@
 package com.revalclan.playercards;
 
-import com.revalclan.util.PlayerNames;
+import com.revalclan.api.playercards.ProfileCardResponse;
+import com.revalclan.api.points.PointsResponse;
+import com.revalclan.util.RankNames;
 import lombok.Value;
 
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
-import java.util.Random;
+import java.util.Locale;
 
-/**
- * Data shown on a clan player card. Currently generated deterministically
- * from the player name so the preview is stable; replaced by an API-backed
- * profile fetch once the endpoint exists.
- */
+/** Data shown on a clan player card, assembled from the profile-card endpoint. */
 @Value
 public class PlayerCardData {
-	private static final String[][] RANKS = {
-		{"Mentor", "0"}, {"Prefect", "500"}, {"Leader", "1000"}, {"Supervisor", "2000"},
-		{"Superior", "4000"}, {"Executive", "7500"}, {"Senator", "10000"}, {"Monarch", "15000"},
-		{"Red Topaz", "17500"}, {"Sapphire", "20000"}, {"Emerald", "22500"}, {"Ruby", "25000"},
-		{"Diamond", "27500"}, {"Dragonstone", "30000"}, {"Onyx", "35000"}, {"Zenyte", "40000"},
-		{"Marshal", "50000"},
-	};
+	private static final DateTimeFormatter SINCE_FMT = DateTimeFormatter.ofPattern("MMM yyyy", Locale.ENGLISH);
 
 	String playerName;
-	String rankName;
+	String rankName;       // display form, e.g. "Red Topaz"
 	int points;
-	String nextRankName;   // null at max rank
+	String nextRankName;   // null at max rank or when rank data is unavailable
 	int pointsToNext;
-	double rankProgress;   // 0..1 toward the next rank
-	int drops;
-	int pets;
-	int eventsPlayed;
-	int diariesDone;
-	String memberSince;
-	/** Names of events this player's team (or the player) has won, one star each. */
+	double rankProgress;   // 0..1 toward the next rank; negative hides the row
+	int dropPoints;        // 1 point = 1M gp from tracked drops
+	int petCount;
+	int clogCount;
+	int diaryTasksDone;
+	int diaryTasksTotal;
+	String memberSince;    // "Jan 2022", or null
+	/** Names of events this player has won, one star each; not served yet. */
 	List<String> eventWins;
 
-	public static PlayerCardData mock(String playerName) {
-		Random rng = new Random(PlayerNames.normalize(playerName).hashCode());
-		int points = 300 + rng.nextInt(48_000);
+	static PlayerCardData from(ProfileCardResponse.CardData profile, List<PointsResponse.Rank> ranks) {
+		int points = orZero(profile.getActivityPoints());
 
-		int rankIdx = 0;
-		for (int i = 0; i < RANKS.length; i++) {
-			if (points >= Integer.parseInt(RANKS[i][1])) {
-				rankIdx = i;
+		String nextRank = null;
+		int pointsToNext = 0;
+		double progress = -1;
+		if (ranks != null && !ranks.isEmpty()) {
+			List<PointsResponse.Rank> sorted = new ArrayList<>(ranks);
+			sorted.sort(Comparator.comparingInt(PointsResponse.Rank::getPointsRequired));
+			int floor = 0;
+			PointsResponse.Rank next = null;
+			for (PointsResponse.Rank rank : sorted) {
+				if (rank.getPointsRequired() > points) {
+					next = rank;
+					break;
+				}
+				floor = rank.getPointsRequired();
 			}
-		}
-		String next = rankIdx + 1 < RANKS.length ? RANKS[rankIdx + 1][0] : null;
-		int floor = Integer.parseInt(RANKS[rankIdx][1]);
-		int ceil = next != null ? Integer.parseInt(RANKS[rankIdx + 1][1]) : points;
-		double progress = next != null && ceil > floor
-			? (double) (points - floor) / (ceil - floor) : 1.0;
-
-		String[] months = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
-		String since = months[rng.nextInt(12)] + " " + (2021 + rng.nextInt(5));
-
-		String[] winPool = {"Kevadbingo 2025", "Summer Race 2025", "Boss Blitz 2024",
-			"Skill Week 2025", "Sygisbingo 2024"};
-		int winCount = Math.max(0, rng.nextInt(7) - 2);
-		List<String> wins = new ArrayList<>();
-		for (int i = 0; i < Math.min(winCount, winPool.length); i++) {
-			wins.add(winPool[(rng.nextInt(winPool.length) + i) % winPool.length]);
+			if (next != null) {
+				nextRank = next.getDisplayName() != null ? next.getDisplayName() : next.getName();
+				pointsToNext = next.getPointsRequired() - points;
+				progress = next.getPointsRequired() > floor
+					? (double) (points - floor) / (next.getPointsRequired() - floor) : 0;
+			} else {
+				progress = 1;
+			}
 		}
 
 		return new PlayerCardData(
-			playerName,
-			RANKS[rankIdx][0],
+			profile.getNickname(),
+			RankNames.display(profile.getClanRank()),
 			points,
-			next,
-			next != null ? ceil - points : 0,
+			nextRank,
+			pointsToNext,
 			progress,
-			5 + rng.nextInt(420),
-			rng.nextInt(10),
-			rng.nextInt(26),
-			rng.nextInt(180),
-			since,
-			wins
+			orZero(profile.getDropPoints()),
+			orZero(profile.getPetCount()),
+			orZero(profile.getClogCount()),
+			orZero(profile.getDiaryTasksDone()),
+			orZero(profile.getDiaryTasksTotal()),
+			formatMemberSince(profile.getMemberSince()),
+			List.of()
 		);
+	}
+
+	private static int orZero(Integer value) {
+		return value != null ? value : 0;
+	}
+
+	private static String formatMemberSince(String iso) {
+		if (iso == null || iso.isEmpty()) {
+			return null;
+		}
+		try {
+			return OffsetDateTime.parse(iso).format(SINCE_FMT);
+		} catch (Exception e) {
+			return null;
+		}
 	}
 }

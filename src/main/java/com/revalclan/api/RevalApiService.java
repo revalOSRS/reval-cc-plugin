@@ -18,6 +18,7 @@ import com.revalclan.api.notifications.NotificationAckResponse;
 import com.revalclan.api.notifications.NotificationsResponse;
 import com.revalclan.api.diaries.DiariesResponse;
 import com.revalclan.api.events.ActiveTeamsResponse;
+import com.revalclan.api.playercards.ProfileCardResponse;
 import com.revalclan.api.events.EventsResponse;
 import com.revalclan.api.events.RegistrationResponse;
 import com.revalclan.api.events.RegistrationStatusResponse;
@@ -141,6 +142,11 @@ public class RevalApiService {
 
     public void fetchActiveTeams(Consumer<ActiveTeamsResponse> onSuccess, Consumer<Exception> onError) {
         get(ApiEndpoints.EVENTS_ACTIVE_TEAMS, ActiveTeamsResponse.class, onSuccess, onError);
+    }
+
+    public void fetchProfileCard(String nickname, Consumer<ProfileCardResponse> onSuccess, Consumer<Exception> onError) {
+        String encoded = java.net.URLEncoder.encode(nickname, java.nio.charset.StandardCharsets.UTF_8);
+        get(ApiEndpoints.PLAYER_PROFILE_CARD + "?nickname=" + encoded, ProfileCardResponse.class, onSuccess, onError);
     }
 
     public void registerForEvent(String eventId, long accountHash,
