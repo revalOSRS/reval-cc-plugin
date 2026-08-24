@@ -27,6 +27,8 @@ import okhttp3.*;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
@@ -58,6 +60,8 @@ public class RevalApiService {
     private long lastAccountFetch = 0;
     private EventsResponse cachedEvents;
     private long lastEventsFetch = 0;
+    private ActiveTeamsResponse cachedActiveTeams;
+    private long lastActiveTeamsFetch = 0;
     private AchievementsResponse cachedAchievements;
     private long lastAchievementsFetch = 0;
     private DiariesResponse cachedDiaries;
@@ -141,11 +145,19 @@ public class RevalApiService {
     }
 
     public void fetchActiveTeams(Consumer<ActiveTeamsResponse> onSuccess, Consumer<Exception> onError) {
-        get(ApiEndpoints.EVENTS_ACTIVE_TEAMS, ActiveTeamsResponse.class, onSuccess, onError);
+        if (cachedActiveTeams != null && System.currentTimeMillis() - lastActiveTeamsFetch < CACHE_DURATION_MS) {
+            onSuccess.accept(cachedActiveTeams);
+            return;
+        }
+        get(ApiEndpoints.EVENTS_ACTIVE_TEAMS, ActiveTeamsResponse.class, response -> {
+            cachedActiveTeams = response;
+            lastActiveTeamsFetch = System.currentTimeMillis();
+            onSuccess.accept(response);
+        }, onError);
     }
 
     public void fetchProfileCard(String nickname, Consumer<ProfileCardResponse> onSuccess, Consumer<Exception> onError) {
-        String encoded = java.net.URLEncoder.encode(nickname, java.nio.charset.StandardCharsets.UTF_8);
+        String encoded = URLEncoder.encode(nickname, StandardCharsets.UTF_8);
         get(ApiEndpoints.PLAYER_PROFILE_CARD + "?nickname=" + encoded, ProfileCardResponse.class, onSuccess, onError);
     }
 
@@ -414,6 +426,8 @@ public class RevalApiService {
         lastAccountFetch = 0;
         cachedEvents = null;
         lastEventsFetch = 0;
+        cachedActiveTeams = null;
+        lastActiveTeamsFetch = 0;
         cachedAchievements = null;
         lastAchievementsFetch = 0;
         cachedDiaries = null;

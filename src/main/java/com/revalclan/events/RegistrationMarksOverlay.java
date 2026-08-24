@@ -1,6 +1,6 @@
 package com.revalclan.events;
 
-import com.revalclan.util.PlayerNames;
+import com.revalclan.util.ClanSidepanel;
 import net.runelite.api.Client;
 import net.runelite.api.FontTypeFace;
 import net.runelite.api.Point;
@@ -47,22 +47,18 @@ public class RegistrationMarksOverlay extends Overlay {
 	@Override
 	public Dimension render(Graphics2D g) {
 		Map<String, String> registrations = marks.getRegistrations();
-		if (registrations.isEmpty() || !marks.isAdminViewer()) {
+		if (registrations.isEmpty() || !marks.isActive()) {
 			return null;
 		}
 		Widget list = client.getWidget(InterfaceID.ClansSidepanel.PLAYERLIST);
 		if (list == null || list.isHidden()) {
 			return null;
 		}
-		Widget[] children = list.getDynamicChildren();
-		if (children == null) {
-			return null;
-		}
-
 		Rectangle viewport = list.getBounds();
 		if (viewport == null) {
 			return null;
 		}
+
 		g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 		// Clip to the list like the game does, so half-scrolled rows don't
 		// leak checkmarks outside the box
@@ -70,29 +66,25 @@ public class RegistrationMarksOverlay extends Overlay {
 		g.clip(viewport);
 		Point mouse = client.getMouseCanvasPosition();
 
-		for (Widget child : children) {
-			String text = child.getText();
-			if (text == null || text.isEmpty() || text.matches("W\\d+")) {
-				continue;
-			}
-			String plain = Text.removeTags(text);
-			String events = registrations.get(PlayerNames.normalize(plain));
+		ClanSidepanel.eachNameRow(client, child -> {
+			String events = registrations.get(Text.standardize(child.getText()));
 			if (events == null) {
-				continue;
+				return;
 			}
 			Rectangle bounds = child.getBounds();
 			if (bounds == null || !viewport.intersects(bounds)) {
-				continue;
+				return;
 			}
 
 			FontTypeFace font = child.getFont();
+			String plain = Text.removeTags(child.getText());
 			int textEnd = bounds.x + (font != null ? font.getTextWidth(plain) : bounds.width);
 			drawCheck(g, textEnd + 4, bounds.y + bounds.height / 2);
 
 			if (bounds.contains(mouse.getX(), mouse.getY()) && viewport.contains(mouse.getX(), mouse.getY())) {
 				tooltipManager.add(new Tooltip("Registered: " + ColorUtil.wrapWithColorTag(events, GOLD)));
 			}
-		}
+		});
 		g.setClip(prevClip);
 		return null;
 	}

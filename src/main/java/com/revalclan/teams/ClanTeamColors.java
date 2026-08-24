@@ -1,17 +1,16 @@
 package com.revalclan.teams;
 
 import com.revalclan.RevalClanConfig;
+import com.revalclan.util.ClanSidepanel;
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
 import net.runelite.api.ScriptID;
 import net.runelite.api.events.ChatMessage;
 import net.runelite.api.events.ScriptPostFired;
-import net.runelite.api.gameval.InterfaceID;
-import net.runelite.api.widgets.Widget;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.util.ColorUtil;
-import net.runelite.client.util.Text;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -19,12 +18,14 @@ import java.awt.Color;
 
 /**
  * Colors clan members' names by their active event team, in clan chat and in
- * the clan sidepanel member list, and tags chat lines with the team name
- * after the clan name. Purely cosmetic; does nothing when no event is
- * active.
+ * the clan sidepanel member list. Purely cosmetic; does nothing when no event
+ * is active or the config toggle is off.
  */
 @Singleton
 public class ClanTeamColors {
+	/** The list renders names white by default; used to restore on disable. */
+	private static final int DEFAULT_NAME_COLOR = 0xFFFFFF;
+
 	private final Client client;
 	private final ClientThread clientThread;
 	private final ActiveTeamColors activeTeams;
@@ -43,8 +44,26 @@ public class ClanTeamColors {
 		if (!config.teamNameColors()) {
 			return;
 		}
-		activeTeams.ensureFresh();
+		activeTeams.refresh();
 		clientThread.invoke(this::recolorSidepanel);
+	}
+
+	/** Restore default name colors; chat lines already colored stay as sent. */
+	public void shutDown() {
+		clientThread.invoke(this::resetSidepanel);
+	}
+
+	@Subscribe
+	public void onConfigChanged(ConfigChanged event) {
+		if (!"revalclan".equals(event.getGroup()) || !"teamNameColors".equals(event.getKey())) {
+			return;
+		}
+		if (config.teamNameColors()) {
+			activeTeams.refresh();
+			clientThread.invoke(this::recolorSidepanel);
+		} else {
+			clientThread.invoke(this::resetSidepanel);
+		}
 	}
 
 	@Subscribe
@@ -52,43 +71,32 @@ public class ClanTeamColors {
 		if (event.getType() != ChatMessageType.CLAN_CHAT || !config.teamNameColors()) {
 			return;
 		}
-		activeTeams.ensureFresh();
-		String plain = Text.removeTags(event.getName());
-		Color color = activeTeams.teamColorFor(plain);
-		if (color == null) {
-			return;
+		activeTeams.refresh();
+		Color color = activeTeams.teamColorFor(event.getName());
+		if (color != null) {
+			event.getMessageNode().setName(ColorUtil.wrapWithColorTag(event.getName(), chatTone(color)));
 		}
-		event.getMessageNode().setName(ColorUtil.wrapWithColorTag(event.getName(), chatTone(color)));
 	}
 
 	@Subscribe
 	public void onScriptPostFired(ScriptPostFired event) {
 		if (event.getScriptId() == ScriptID.CLAN_SIDEPANEL_DRAW && config.teamNameColors()) {
-			activeTeams.ensureFresh();
+			activeTeams.refresh();
 			recolorSidepanel();
 		}
 	}
 
 	private void recolorSidepanel() {
-		Widget list = client.getWidget(InterfaceID.ClansSidepanel.PLAYERLIST);
-		if (list == null) {
-			return;
-		}
-		Widget[] children = list.getDynamicChildren();
-		if (children == null) {
-			return;
-		}
-		for (Widget child : children) {
-			String text = child.getText();
-			// Rows hold a name widget and a world widget; skip the worlds
-			if (text == null || text.isEmpty() || text.matches("W\\d+")) {
-				continue;
-			}
-			Color color = activeTeams.teamColorFor(Text.removeTags(text));
+		ClanSidepanel.eachNameRow(client, child -> {
+			Color color = activeTeams.teamColorFor(child.getText());
 			if (color != null) {
 				child.setTextColor(color.getRGB() & 0xFFFFFF);
 			}
-		}
+		});
+	}
+
+	private void resetSidepanel() {
+		ClanSidepanel.eachNameRow(client, child -> child.setTextColor(DEFAULT_NAME_COLOR));
 	}
 
 	/** Chat draws the same hex noticeably brighter than the sidepanel; deepen it there. */

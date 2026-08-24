@@ -13,13 +13,12 @@ import com.revalclan.ui.components.IndicatorTabButton;
 import com.revalclan.ui.components.PanelTitle;
 import com.revalclan.ui.constants.UIConstants;
 import com.revalclan.util.ClanRankIconResolver;
+import com.revalclan.util.ClanRanks;
 import com.revalclan.util.SpriteIcons;
 import com.revalclan.util.UIAssetLoader;
 import lombok.Getter;
 import net.runelite.api.Client;
 import net.runelite.api.clan.ClanChannel;
-import net.runelite.api.clan.ClanChannelMember;
-import net.runelite.api.clan.ClanRank;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.game.SpriteManager;
 import net.runelite.client.ui.FontManager;
@@ -413,8 +412,6 @@ public class RevalPanel extends PluginPanel {
 		});
 	}
 
-	private static final ClanRank ADMIN_MIN_RANK = new ClanRank(125); // Deputy Owner+
-
 	private void checkAdminEligibility(int attempt) {
 		if (attempt > 10) return;
 
@@ -428,8 +425,7 @@ public class RevalPanel extends PluginPanel {
 			return;
 		}
 
-		ClanChannelMember member = clanChannel.findMember(playerName);
-		if (member != null && member.getRank().getRank() >= ADMIN_MIN_RANK.getRank()) {
+		if (ClanRanks.isDeputyOwnerPlus(client)) {
 			setAdminEnabled(true);
 		}
 	}

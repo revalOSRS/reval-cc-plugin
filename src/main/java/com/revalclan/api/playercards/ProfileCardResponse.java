@@ -15,6 +15,9 @@ public class ProfileCardResponse extends ApiResponse {
 		private String nickname;
 		private String clanRank;        // slug, e.g. "red_topaz"; may be null
 		private Integer activityPoints;
+		private String nextRank;        // slug; null at max rank
+		private Integer pointsToNext;
+		private Double rankProgress;    // 0..1 within the current rank band
 		private Integer dropPoints;     // 1 point = 1M gp from tracked drops
 		private Integer petCount;
 		private Integer clogCount;

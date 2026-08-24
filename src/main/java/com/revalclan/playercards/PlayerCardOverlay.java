@@ -22,7 +22,6 @@ import java.awt.Graphics2D;
 import java.awt.RadialGradientPaint;
 import java.awt.RenderingHints;
 import java.awt.Shape;
-import java.awt.geom.Path2D;
 import java.awt.geom.Point2D;
 import java.awt.geom.RoundRectangle2D;
 import java.awt.image.BufferedImage;
@@ -94,11 +93,6 @@ public class PlayerCardOverlay extends Overlay {
 		return pendingName != null;
 	}
 
-	/** How long the card has been open, in milliseconds. */
-	long openForMs() {
-		return isOpen() ? System.currentTimeMillis() - openedAt : 0;
-	}
-
 	void close() {
 		data = null;
 		pendingName = null;
@@ -141,14 +135,10 @@ public class PlayerCardOverlay extends Overlay {
 		int x = (canvasW - CARD_W) / 2;
 		int y = (canvasH - CARD_H) / 2;
 		drawFrame(g, accent, x, y);
-		String hoveredWin = drawContent(g, card, accent, x, y);
+		drawContent(g, card, accent, x, y);
 
 		centerText(g, "Click or press Esc to close", small, new Color(255, 255, 255, 110),
 			x + CARD_W / 2, y + CARD_H + GLOW + 16);
-
-		if (hoveredWin != null) {
-			drawWinTooltip(g, hoveredWin);
-		}
 
 		g.setComposite(prevComposite);
 		return null;
@@ -184,8 +174,7 @@ public class PlayerCardOverlay extends Overlay {
 		g.drawRoundRect(x, y, CARD_W - 1, CARD_H - 1, ARC, ARC);
 	}
 
-	/** Returns the event name of a hovered win star, or null. */
-	private String drawContent(Graphics2D g, PlayerCardData card, Color accent, int x, int y) {
+	private void drawContent(Graphics2D g, PlayerCardData card, Color accent, int x, int y) {
 		Font small = FontManager.getRunescapeSmallFont();
 		Font bold = FontManager.getRunescapeBoldFont();
 		Font nameFont = bold.deriveFont(Font.BOLD, 20f);
@@ -204,9 +193,7 @@ public class PlayerCardOverlay extends Overlay {
 		centerText(g, card.getRankName().toUpperCase(), small, accent, cx, cy);
 		cy += 26;
 		centerText(g, card.getPlayerName(), nameFont, UIConstants.TEXT_PRIMARY, cx, cy);
-		cy += 12;
-		String hoveredWin = drawWinStars(g, card, cx, cy);
-		cy += 32;
+		cy += 44;
 		centerText(g, NumberFmt.group(card.getPoints()), pointsFont, UIConstants.ACCENT_GOLD, cx, cy);
 		cy += 16;
 		centerText(g, "REVAL POINTS", small, UIConstants.TEXT_MUTED, cx, cy);
@@ -258,7 +245,6 @@ public class PlayerCardOverlay extends Overlay {
 			int sinceW = g.getFontMetrics().stringWidth(since);
 			drawShadowed(g, since, x + CARD_W - 20 - sinceW, fy, UIConstants.TEXT_MUTED);
 		}
-		return hoveredWin;
 	}
 
 	/** "N pts to <rank icon>" centered; falls back to the rank name until the sprite loads. */
@@ -283,74 +269,6 @@ public class PlayerCardOverlay extends Overlay {
 		int tx = cx - (textW + 3 + iconW) / 2;
 		drawShadowed(g, text, tx, baselineY, UIConstants.TEXT_SECONDARY);
 		g.drawImage(sprite, tx + textW + 3, baselineY - 5 - iconH / 2, iconW, iconH, null);
-	}
-
-	/** One star per event win, centered; returns the hovered star's event. */
-	private String drawWinStars(Graphics2D g, PlayerCardData card, int cx, int centerY) {
-		java.util.List<String> wins = card.getEventWins();
-		if (wins == null || wins.isEmpty()) {
-			return null;
-		}
-		int spacing = 18;
-		int startX = cx - (wins.size() - 1) * spacing / 2;
-		net.runelite.api.Point mouse = client.getMouseCanvasPosition();
-		String hovered = null;
-
-		for (int i = 0; i < wins.size(); i++) {
-			int sx = startX + i * spacing;
-			boolean hot = Math.abs(mouse.getX() - sx) <= 9 && Math.abs(mouse.getY() - centerY) <= 9;
-			if (hot) {
-				hovered = wins.get(i);
-			}
-			Shape star = star(sx, centerY, hot ? 8 : 7, hot ? 3.6 : 3.2);
-			Graphics2D shadow = (Graphics2D) g.create();
-			shadow.translate(1, 1);
-			shadow.setColor(new Color(0, 0, 0, 160));
-			shadow.fill(star);
-			shadow.dispose();
-			g.setColor(hot ? new Color(0xFFD75E) : UIConstants.ACCENT_GOLD);
-			g.fill(star);
-			g.setColor(new Color(0x8A6D25));
-			g.setStroke(new BasicStroke(1f));
-			g.draw(star);
-		}
-		return hovered;
-	}
-
-	private Shape star(int cx, int cy, double outer, double inner) {
-		Path2D.Double path = new Path2D.Double();
-		for (int i = 0; i < 10; i++) {
-			double r = i % 2 == 0 ? outer : inner;
-			double angle = Math.PI / 5 * i - Math.PI / 2;
-			double px = cx + Math.cos(angle) * r;
-			double py = cy + Math.sin(angle) * r;
-			if (i == 0) {
-				path.moveTo(px, py);
-			} else {
-				path.lineTo(px, py);
-			}
-		}
-		path.closePath();
-		return path;
-	}
-
-	/** Small tooltip near the cursor naming the won event. */
-	private void drawWinTooltip(Graphics2D g, String eventName) {
-		net.runelite.api.Point mouse = client.getMouseCanvasPosition();
-		String text = "Won: " + eventName;
-		g.setFont(FontManager.getRunescapeSmallFont());
-		FontMetrics fm = g.getFontMetrics();
-		int w = fm.stringWidth(text) + 16;
-		int h = fm.getHeight() + 8;
-		int tx = Math.min(mouse.getX() + 12, client.getCanvasWidth() - w - 4);
-		int ty = mouse.getY() - h - 6;
-
-		g.setColor(new Color(0, 0, 0, 210));
-		g.fillRoundRect(tx, ty, w, h, 6, 6);
-		g.setColor(withAlpha(UIConstants.ACCENT_GOLD, 160));
-		g.setStroke(new BasicStroke(1f));
-		g.drawRoundRect(tx, ty, w, h, 6, 6);
-		drawShadowed(g, text, tx + 8, ty + fm.getAscent() + 4, UIConstants.ACCENT_GOLD);
 	}
 
 	private static Color withAlpha(Color color, int alpha) {

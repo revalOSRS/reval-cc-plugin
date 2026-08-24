@@ -3,10 +3,8 @@ package com.revalclan.playercards;
 import com.revalclan.RevalClanConfig;
 import com.revalclan.api.RevalApiService;
 import com.revalclan.api.playercards.ProfileCardResponse;
-import com.revalclan.api.points.PointsResponse;
-import com.revalclan.ui.constants.UIConstants;
 import com.revalclan.util.ClanRankIconResolver;
-import com.revalclan.util.PlayerNames;
+import com.revalclan.util.RankColors;
 import net.runelite.api.Client;
 import net.runelite.api.MenuAction;
 import net.runelite.api.MenuEntry;
@@ -15,49 +13,34 @@ import net.runelite.api.events.MenuOpened;
 import net.runelite.api.gameval.InterfaceID;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.game.SpriteManager;
-import net.runelite.client.input.MouseAdapter;
 import net.runelite.client.input.KeyListener;
 import net.runelite.client.input.KeyManager;
+import net.runelite.client.input.MouseAdapter;
 import net.runelite.client.input.MouseManager;
 import net.runelite.client.util.Text;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
-import java.awt.Color;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseEvent;
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Set;
 
 /**
  * Adds a "View Reval Profile" right-click option on clan members and shows
- * their {@link PlayerCardOverlay} in-game. While the card is open, mouse
- * input is consumed so the game doesn't react; a click or Escape closes it.
- * Card data is mocked until the profile endpoint exists.
+ * their {@link PlayerCardOverlay} in-game, fed by the profile-card endpoint.
+ * While the card is open, mouse input is consumed so the game doesn't react;
+ * a click or Escape closes it.
  */
 @Singleton
 public class PlayerCardManager {
-	/** Card accent per rank, loosely matching each rank icon's color. */
-	private static final Map<String, Color> RANK_COLORS = Map.ofEntries(
-		Map.entry("mentor", new Color(0xB08D57)),
-		Map.entry("prefect", new Color(0xC0C0C8)),
-		Map.entry("leader", new Color(0xE0B84F)),
-		Map.entry("supervisor", new Color(0x7A9CC6)),
-		Map.entry("superior", new Color(0x4FA98F)),
-		Map.entry("executive", new Color(0xD98E3C)),
-		Map.entry("senator", new Color(0x6FA8DC)),
-		Map.entry("monarch", new Color(0x9B59B6)),
-		Map.entry("red topaz", new Color(0xD9663C)),
-		Map.entry("sapphire", new Color(0x3B6FD9)),
-		Map.entry("emerald", new Color(0x2FBF71)),
-		Map.entry("ruby", new Color(0xD93B5A)),
-		Map.entry("diamond", new Color(0xD8D8E8)),
-		Map.entry("dragonstone", new Color(0xB05CD9)),
-		Map.entry("onyx", new Color(0x8E6FC0)),
-		Map.entry("zenyte", new Color(0xE08A3C)),
-		Map.entry("marshal", new Color(0xFFC83C))
-	);
+	/**
+	 * Input phases while the card is up. The menu click that opens the card
+	 * delivers its release (and trailing click) to our listener, so events
+	 * pass through until that first release; the closing click's trailing
+	 * click event must still be consumed after the card closes.
+	 */
+	private enum ClickPhase { OPENING, OPEN, CLOSING }
 
 	private final Client client;
 	private final RevalClanConfig config;
@@ -68,34 +51,42 @@ public class PlayerCardManager {
 	private final KeyManager keyManager;
 	private final PlayerCardOverlay overlay;
 
-	/** Ignore the tail of the menu click that opened the card. */
-	private static final long OPEN_GRACE_MS = 250;
-
-	private volatile long closedAt;
+	private ClickPhase clickPhase;
+	private boolean listenersRegistered;
 
 	private final MouseAdapter clickCloser = new MouseAdapter() {
 		@Override
 		public MouseEvent mousePressed(MouseEvent e) {
-			if (overlay.openForMs() > OPEN_GRACE_MS) {
+			if (clickPhase == ClickPhase.OPEN) {
 				e.consume();
+			} else if (clickPhase == ClickPhase.CLOSING) {
+				// The trailing click never came (e.g. drag); stop listening
+				unregisterListeners();
 			}
 			return e;
 		}
 
 		@Override
 		public MouseEvent mouseReleased(MouseEvent e) {
-			if (overlay.openForMs() > OPEN_GRACE_MS) {
+			if (clickPhase == ClickPhase.OPENING) {
+				// The release of the click that opened the card
+				clickPhase = ClickPhase.OPEN;
+			} else if (clickPhase == ClickPhase.OPEN) {
 				e.consume();
-				close();
+				overlay.close();
+				clickPhase = ClickPhase.CLOSING;
 			}
 			return e;
 		}
 
 		@Override
 		public MouseEvent mouseClicked(MouseEvent e) {
-			// The click event trails the closing release; swallow it too
-			if (overlay.openForMs() > OPEN_GRACE_MS || System.currentTimeMillis() - closedAt < 250) {
+			if (clickPhase == ClickPhase.OPEN) {
 				e.consume();
+			} else if (clickPhase == ClickPhase.CLOSING) {
+				// Swallow the click that trails the closing release
+				e.consume();
+				unregisterListeners();
 			}
 			return e;
 		}
@@ -110,7 +101,8 @@ public class PlayerCardManager {
 		public void keyPressed(KeyEvent e) {
 			if (e.getKeyCode() == KeyEvent.VK_ESCAPE && overlay.isOpen()) {
 				e.consume();
-				close();
+				overlay.close();
+				unregisterListeners();
 			}
 		}
 
@@ -171,10 +163,12 @@ public class PlayerCardManager {
 	}
 
 	private void open(String playerName) {
-		if (!overlay.isOpen()) {
+		if (!listenersRegistered) {
 			mouseManager.registerMouseListener(clickCloser);
 			keyManager.registerKeyListener(escCloser);
+			listenersRegistered = true;
 		}
+		clickPhase = ClickPhase.OPENING;
 		overlay.showLoading(playerName);
 		apiService.fetchProfileCard(playerName,
 			response -> {
@@ -185,11 +179,7 @@ public class PlayerCardManager {
 					overlay.showError("No Reval profile found for " + playerName);
 					return;
 				}
-				// Rank thresholds for the progress bar; show the card either way
-				apiService.fetchPoints(
-					points -> showCard(playerName, response.getData(),
-						points.getData() != null ? points.getData().getRanks() : null),
-					error -> showCard(playerName, response.getData(), null));
+				showCard(playerName, response.getData());
 			},
 			error -> {
 				if (overlay.isLoadingFor(playerName)) {
@@ -198,13 +188,9 @@ public class PlayerCardManager {
 			});
 	}
 
-	private void showCard(String playerName, ProfileCardResponse.CardData profile,
-						  java.util.List<PointsResponse.Rank> ranks) {
-		if (!overlay.isLoadingFor(playerName)) {
-			return;
-		}
-		PlayerCardData data = PlayerCardData.from(profile, ranks);
-		overlay.show(data, rankColor(data.getRankName()));
+	private void showCard(String playerName, ProfileCardResponse.CardData profile) {
+		PlayerCardData data = PlayerCardData.from(profile);
+		overlay.show(data, RankColors.forSlug(profile.getClanRank()));
 		rankIconResolver.resolve(data.getRankName(), spriteId ->
 			spriteManager.getSpriteAsync(spriteId, 0, overlay::setRankSprite));
 		if (data.getNextRankName() != null) {
@@ -213,22 +199,18 @@ public class PlayerCardManager {
 		}
 	}
 
-	private static Color rankColor(String rankName) {
-		Color color = RANK_COLORS.get(PlayerNames.normalize(rankName));
-		return color != null ? color : UIConstants.ACCENT_GOLD;
-	}
-
-	private void close() {
-		overlay.close();
-		closedAt = System.currentTimeMillis();
+	private void unregisterListeners() {
 		mouseManager.unregisterMouseListener(clickCloser);
 		keyManager.unregisterKeyListener(escCloser);
+		listenersRegistered = false;
+		clickPhase = null;
 	}
 
 	/** Closes an open card; called when the plugin shuts down. */
 	public void shutDown() {
-		if (overlay.isOpen()) {
-			close();
+		overlay.close();
+		if (listenersRegistered) {
+			unregisterListeners();
 		}
 	}
 }

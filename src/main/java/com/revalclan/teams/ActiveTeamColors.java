@@ -2,9 +2,8 @@ package com.revalclan.teams;
 
 import com.revalclan.api.RevalApiService;
 import com.revalclan.api.events.ActiveTeamsResponse;
-import com.revalclan.util.PlayerNames;
-import lombok.Value;
 import lombok.extern.slf4j.Slf4j;
+import net.runelite.client.util.Text;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -14,29 +13,20 @@ import java.util.Map;
 
 /**
  * Active event rosters from the backend: maps clan member nicknames to their
- * team's name and hex color. Refreshes lazily at most every five minutes;
- * empty (no coloring) when no event is active or the fetch fails.
+ * team's hex color. Network fetches are cached by {@link RevalApiService};
+ * this class only derives the lookup map. Empty (no coloring) when no event
+ * is active or the fetch fails.
  */
 @Slf4j
 @Singleton
 public class ActiveTeamColors {
-	private static final long REFRESH_MS = 5 * 60_000;
 	/** Teams whose color is unset get the backend's default gray. */
 	private static final Color FALLBACK_COLOR = new Color(0x888888);
 
-
-	@Value
-	static class Team {
-		String name;
-		Color color;
-	}
-
 	private final RevalApiService apiService;
 
-	/** Normalized nickname -> team */
-	private volatile Map<String, Team> teams = Map.of();
-	private volatile long fetchedAt;
-	private volatile boolean fetching;
+	/** Standardized nickname -> team color */
+	private volatile Map<String, Color> colors = Map.of();
 
 	@Inject
 	public ActiveTeamColors(RevalApiService apiService) {
@@ -44,45 +34,29 @@ public class ActiveTeamColors {
 	}
 
 	public Color teamColorFor(String playerName) {
-		Team team = teamFor(playerName);
-		return team != null ? team.getColor() : null;
+		return playerName != null ? colors.get(Text.standardize(playerName)) : null;
 	}
 
-	private Team teamFor(String playerName) {
-		String key = PlayerNames.normalize(playerName);
-		return key.isEmpty() ? null : teams.get(key);
-	}
-
-	/** Cheap to call often; refetches at most once per window. */
-	public void ensureFresh() {
-		if (fetching || System.currentTimeMillis() - fetchedAt < REFRESH_MS) {
-			return;
-		}
-		fetching = true;
+	/** Rebuild the derived roster; the service cache throttles the network. */
+	public void refresh() {
 		apiService.fetchActiveTeams(
 			response -> {
-				fetching = false;
-				fetchedAt = System.currentTimeMillis();
-				Map<String, Team> map = new HashMap<>();
+				Map<String, Color> map = new HashMap<>();
 				if (response.getData() != null && response.getData().getTeams() != null) {
 					for (ActiveTeamsResponse.Team team : response.getData().getTeams()) {
-						if (team.getMembers() == null || team.getName() == null) {
+						if (team.getMembers() == null) {
 							continue;
 						}
-						Team entry = new Team(team.getName(), parseColor(team.getColor()));
+						Color color = parseColor(team.getColor());
 						for (String member : team.getMembers()) {
-							map.putIfAbsent(PlayerNames.normalize(member), entry);
+							// Newest event first in the response; first match wins
+							map.putIfAbsent(Text.standardize(member), color);
 						}
 					}
 				}
-				teams = map;
+				colors = map;
 			},
-			error -> {
-				fetching = false;
-				// Keep the stale roster and back off until the next window
-				fetchedAt = System.currentTimeMillis();
-				log.debug("Failed to fetch active event teams", error);
-			}
+			error -> log.debug("Failed to fetch active event teams", error)
 		);
 	}
 

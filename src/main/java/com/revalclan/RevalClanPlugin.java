@@ -7,9 +7,9 @@ import com.revalclan.collectionlog.CollectionLogSyncButton;
 import com.revalclan.collectionlog.SyncGuide;
 import com.revalclan.collectionlog.SyncGuideOverlay;
 import com.revalclan.events.RegistrationMarks;
+import com.revalclan.events.RegistrationMarksOverlay;
 import com.revalclan.playercards.PlayerCardManager;
 import com.revalclan.playercards.PlayerCardOverlay;
-import com.revalclan.events.RegistrationMarksOverlay;
 import com.revalclan.teams.ClanTeamColors;
 import com.revalclan.notifiers.*;
 import com.revalclan.pbs.ClogPersonalBestCapture;
@@ -249,6 +249,7 @@ public class RevalClanPlugin extends Plugin {
 		eventBus.unregister(lootNotifier);
 		eventBus.unregister(clogPersonalBestCapture);
 		eventBus.unregister(clanTeamColors);
+		clanTeamColors.shutDown();
 		eventBus.unregister(registrationMarks);
 		overlayManager.remove(registrationMarksOverlay);
 		eventBus.unregister(playerCardManager);

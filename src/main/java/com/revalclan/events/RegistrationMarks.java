@@ -1,17 +1,17 @@
 package com.revalclan.events;
 
+import com.revalclan.RevalClanConfig;
 import com.revalclan.api.RevalApiService;
 import com.revalclan.api.events.EventsResponse;
-import com.revalclan.util.PlayerNames;
+import com.revalclan.util.ClanRanks;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.ScriptID;
-import net.runelite.api.clan.ClanChannel;
-import net.runelite.api.clan.ClanChannelMember;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.ScriptPostFired;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.util.Text;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -21,27 +21,24 @@ import java.util.Map;
 /**
  * Admin-only: tracks which clan members have registered for an upcoming
  * event. {@link RegistrationMarksOverlay} draws a checkmark after their name
- * in the clan sidepanel and shows the event(s) on hover.
+ * in the clan sidepanel and shows the event(s) on hover. Fetches go through
+ * the service's events cache; this class only derives the lookup map.
  */
 @Slf4j
 @Singleton
 public class RegistrationMarks {
-	/** Same in-game gate as the side panel's admin button (Deputy Owner+). */
-	private static final int ADMIN_MIN_CLAN_RANK = 125;
-	private static final long REFRESH_MS = 5 * 60_000;
-
 	private final Client client;
 	private final RevalApiService apiService;
+	private final RevalClanConfig config;
 
-	/** Normalized nickname -> comma-joined upcoming event names */
+	/** Standardized nickname -> comma-joined upcoming event names */
 	private volatile Map<String, String> registrations = Map.of();
-	private volatile long fetchedAt;
-	private volatile boolean fetching;
 
 	@Inject
-	public RegistrationMarks(Client client, RevalApiService apiService) {
+	public RegistrationMarks(Client client, RevalApiService apiService, RevalClanConfig config) {
 		this.client = client;
 		this.apiService = apiService;
+		this.config = config;
 	}
 
 	public void startUp() {
@@ -52,17 +49,9 @@ public class RegistrationMarks {
 		return registrations;
 	}
 
-	boolean isAdminViewer() {
-		if (client.getGameState() != GameState.LOGGED_IN) {
-			return false;
-		}
-		ClanChannel clanChannel = client.getClanChannel();
-		String name = client.getLocalPlayer() != null ? client.getLocalPlayer().getName() : null;
-		if (clanChannel == null || name == null) {
-			return false;
-		}
-		ClanChannelMember member = clanChannel.findMember(name);
-		return member != null && member.getRank().getRank() >= ADMIN_MIN_CLAN_RANK;
+	/** Marks render only for staff viewers with the toggle on. */
+	boolean isActive() {
+		return config.registrationCheckmarks() && ClanRanks.isDeputyOwnerPlus(client);
 	}
 
 	@Subscribe
@@ -74,21 +63,14 @@ public class RegistrationMarks {
 
 	@Subscribe
 	public void onScriptPostFired(ScriptPostFired event) {
-		if (event.getScriptId() == ScriptID.CLAN_SIDEPANEL_DRAW
-			&& System.currentTimeMillis() - fetchedAt > REFRESH_MS) {
+		if (event.getScriptId() == ScriptID.CLAN_SIDEPANEL_DRAW && config.registrationCheckmarks()) {
 			refresh();
 		}
 	}
 
 	private void refresh() {
-		if (fetching) {
-			return;
-		}
-		fetching = true;
 		apiService.fetchEvents(
 			response -> {
-				fetching = false;
-				fetchedAt = System.currentTimeMillis();
 				Map<String, String> map = new HashMap<>();
 				if (response.getData() != null && response.getData().getEvents() != null) {
 					for (EventsResponse.EventSummary event : response.getData().getEvents()) {
@@ -96,22 +78,17 @@ public class RegistrationMarks {
 							continue;
 						}
 						for (EventsResponse.EventRegistration reg : event.getRegistrations()) {
-							if (!"registered".equalsIgnoreCase(reg.getStatus()) || reg.getOsrsNickname() == null) {
+							if (!reg.isRegistered() || reg.getOsrsNickname() == null) {
 								continue;
 							}
-							map.merge(PlayerNames.normalize(reg.getOsrsNickname()), event.getName(),
+							map.merge(Text.standardize(reg.getOsrsNickname()), event.getName(),
 								(a, b) -> a + ", " + b);
 						}
 					}
 				}
 				registrations = map;
 			},
-			error -> {
-				fetching = false;
-				// Keep the stale map and back off until the next refresh window
-				fetchedAt = System.currentTimeMillis();
-				log.debug("Failed to fetch event registrations", error);
-			}
+			error -> log.debug("Failed to fetch event registrations", error)
 		);
 	}
 }
