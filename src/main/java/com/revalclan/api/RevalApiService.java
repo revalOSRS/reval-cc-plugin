@@ -17,6 +17,8 @@ import com.revalclan.api.common.ApiResponse;
 import com.revalclan.api.notifications.NotificationAckResponse;
 import com.revalclan.api.notifications.NotificationsResponse;
 import com.revalclan.api.diaries.DiariesResponse;
+import com.revalclan.api.events.ActiveTeamsResponse;
+import com.revalclan.api.playercards.ProfileCardResponse;
 import com.revalclan.api.events.EventsResponse;
 import com.revalclan.api.events.RegistrationResponse;
 import com.revalclan.api.events.RegistrationStatusResponse;
@@ -26,6 +28,7 @@ import okhttp3.*;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.io.IOException;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
@@ -56,6 +59,8 @@ public class RevalApiService {
     private long lastAccountFetch = 0;
     private EventsResponse cachedEvents;
     private long lastEventsFetch = 0;
+    private ActiveTeamsResponse cachedActiveTeams;
+    private long lastActiveTeamsFetch = 0;
     private AchievementsResponse cachedAchievements;
     private long lastAchievementsFetch = 0;
     private DiariesResponse cachedDiaries;
@@ -136,6 +141,23 @@ public class RevalApiService {
         cachedEvents = null;
         lastEventsFetch = 0;
         fetchEvents(onSuccess, onError);
+    }
+
+    public void fetchActiveTeams(Consumer<ActiveTeamsResponse> onSuccess, Consumer<Exception> onError) {
+        if (cachedActiveTeams != null && System.currentTimeMillis() - lastActiveTeamsFetch < CACHE_DURATION_MS) {
+            onSuccess.accept(cachedActiveTeams);
+            return;
+        }
+        get(ApiEndpoints.EVENTS_ACTIVE_TEAMS, ActiveTeamsResponse.class, response -> {
+            cachedActiveTeams = response;
+            lastActiveTeamsFetch = System.currentTimeMillis();
+            onSuccess.accept(response);
+        }, onError);
+    }
+
+    public void fetchProfileCard(String nickname, Consumer<ProfileCardResponse> onSuccess, Consumer<Exception> onError) {
+        String encoded = URLEncoder.encode(nickname, StandardCharsets.UTF_8);
+        get(ApiEndpoints.PLAYER_PROFILE_CARD + "?nickname=" + encoded, ProfileCardResponse.class, onSuccess, onError);
     }
 
     public void registerForEvent(String eventId, long accountHash,
@@ -403,6 +425,8 @@ public class RevalApiService {
         lastAccountFetch = 0;
         cachedEvents = null;
         lastEventsFetch = 0;
+        cachedActiveTeams = null;
+        lastActiveTeamsFetch = 0;
         cachedAchievements = null;
         lastAchievementsFetch = 0;
         cachedDiaries = null;
