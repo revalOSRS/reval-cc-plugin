@@ -27,11 +27,30 @@ public interface RevalClanConfig extends Config {
 		return false;
 	}
 
+	// ── Events ─────────────────────────────────────────────────────────
+	@ConfigSection(
+		name = "Events",
+		description = "Clan event features",
+		position = 1
+	)
+	String clanEventsSection = "clanEventsSection";
+
+	@ConfigItem(
+		keyName = "teamNameColors",
+		name = "Team name colors",
+		description = "During an active event, color clan members' names by their team in the clan list and clan chat",
+		section = clanEventsSection,
+		position = 0
+	)
+	default boolean teamNameColors() {
+		return true;
+	}
+
 	// ── Event Notifications ────────────────────────────────────────────
 	@ConfigSection(
 		name = "Event Notifications",
 		description = "Disabling notifiers will stop the plugin from tracking and sending the corresponding events to Reval. Some features will not work as expected. Disable at your own discretion.",
-		position = 1,
+		position = 2,
 		closedByDefault = true
 	)
 	String eventsSection = "eventsSection";

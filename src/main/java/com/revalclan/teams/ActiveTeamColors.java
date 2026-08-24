@@ -24,14 +24,6 @@ public class ActiveTeamColors {
 	/** Teams whose color is unset get the backend's default gray. */
 	private static final Color FALLBACK_COLOR = new Color(0x888888);
 
-	/** Preview roster until the active-teams endpoint is deployed: flip to false to go live. */
-	private static final boolean MOCK_ROSTER = true;
-	private static final Team[] MOCK_TEAMS = {
-		new Team("Zamorak", new Color(0xE64545)),
-		new Team("Saradomin", new Color(0x3B8AE0)),
-		new Team("Guthix", new Color(0x3FBF4A)),
-		new Team("Zaros", new Color(0xA85CE0)),
-	};
 
 	@Value
 	static class Team {
@@ -58,20 +50,12 @@ public class ActiveTeamColors {
 
 	private Team teamFor(String playerName) {
 		String key = PlayerNames.normalize(playerName);
-		if (key.isEmpty()) {
-			return null;
-		}
-		if (MOCK_ROSTER) {
-			// A third of players stay unassigned, previewing the mixed look
-			int bucket = Math.abs(key.hashCode()) % (MOCK_TEAMS.length + 2);
-			return bucket < MOCK_TEAMS.length ? MOCK_TEAMS[bucket] : null;
-		}
-		return teams.get(key);
+		return key.isEmpty() ? null : teams.get(key);
 	}
 
 	/** Cheap to call often; refetches at most once per window. */
 	public void ensureFresh() {
-		if (MOCK_ROSTER || fetching || System.currentTimeMillis() - fetchedAt < REFRESH_MS) {
+		if (fetching || System.currentTimeMillis() - fetchedAt < REFRESH_MS) {
 			return;
 		}
 		fetching = true;

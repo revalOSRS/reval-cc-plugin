@@ -1,5 +1,6 @@
 package com.revalclan.teams;
 
+import com.revalclan.RevalClanConfig;
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
 import net.runelite.api.ScriptID;
@@ -27,23 +28,28 @@ public class ClanTeamColors {
 	private final Client client;
 	private final ClientThread clientThread;
 	private final ActiveTeamColors activeTeams;
+	private final RevalClanConfig config;
 
 	@Inject
-	public ClanTeamColors(Client client, ClientThread clientThread, ActiveTeamColors activeTeams) {
+	public ClanTeamColors(Client client, ClientThread clientThread, ActiveTeamColors activeTeams, RevalClanConfig config) {
 		this.client = client;
 		this.clientThread = clientThread;
 		this.activeTeams = activeTeams;
+		this.config = config;
 	}
 
 	/** Recolor an already-open sidepanel; rebuilds are caught by the script hook. */
 	public void startUp() {
+		if (!config.teamNameColors()) {
+			return;
+		}
 		activeTeams.ensureFresh();
 		clientThread.invoke(this::recolorSidepanel);
 	}
 
 	@Subscribe
 	public void onChatMessage(ChatMessage event) {
-		if (event.getType() != ChatMessageType.CLAN_CHAT) {
+		if (event.getType() != ChatMessageType.CLAN_CHAT || !config.teamNameColors()) {
 			return;
 		}
 		activeTeams.ensureFresh();
@@ -57,7 +63,7 @@ public class ClanTeamColors {
 
 	@Subscribe
 	public void onScriptPostFired(ScriptPostFired event) {
-		if (event.getScriptId() == ScriptID.CLAN_SIDEPANEL_DRAW) {
+		if (event.getScriptId() == ScriptID.CLAN_SIDEPANEL_DRAW && config.teamNameColors()) {
 			activeTeams.ensureFresh();
 			recolorSidepanel();
 		}
