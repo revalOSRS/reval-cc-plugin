@@ -27,6 +27,17 @@ public interface RevalClanConfig extends Config {
 		return false;
 	}
 
+	@ConfigItem(
+		keyName = "playerProfileCards",
+		name = "Player profile cards",
+		description = "Add a View Reval Profile right-click option on clan members that opens their profile card",
+		section = panelSection,
+		position = 1
+	)
+	default boolean playerProfileCards() {
+		return true;
+	}
+
 	// ── Events ─────────────────────────────────────────────────────────
 	@ConfigSection(
 		name = "Events",

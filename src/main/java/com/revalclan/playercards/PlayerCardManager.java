@@ -1,5 +1,6 @@
 package com.revalclan.playercards;
 
+import com.revalclan.RevalClanConfig;
 import com.revalclan.ui.constants.UIConstants;
 import com.revalclan.util.ClanRankIconResolver;
 import com.revalclan.util.PlayerNames;
@@ -56,6 +57,7 @@ public class PlayerCardManager {
 	);
 
 	private final Client client;
+	private final RevalClanConfig config;
 	private final ClanRankIconResolver rankIconResolver;
 	private final SpriteManager spriteManager;
 	private final MouseManager mouseManager;
@@ -114,10 +116,11 @@ public class PlayerCardManager {
 	};
 
 	@Inject
-	public PlayerCardManager(Client client, ClanRankIconResolver rankIconResolver,
+	public PlayerCardManager(Client client, RevalClanConfig config, ClanRankIconResolver rankIconResolver,
 							 SpriteManager spriteManager, MouseManager mouseManager, KeyManager keyManager,
 							 PlayerCardOverlay overlay) {
 		this.client = client;
+		this.config = config;
 		this.rankIconResolver = rankIconResolver;
 		this.spriteManager = spriteManager;
 		this.mouseManager = mouseManager;
@@ -127,6 +130,9 @@ public class PlayerCardManager {
 
 	@Subscribe
 	public void onMenuOpened(MenuOpened event) {
+		if (!config.playerProfileCards()) {
+			return;
+		}
 		Set<String> seen = new HashSet<>();
 		for (MenuEntry entry : event.getMenuEntries()) {
 			// Players in the world
@@ -149,7 +155,9 @@ public class PlayerCardManager {
 		if (!seen.add(name)) {
 			return;
 		}
-		client.getMenu().createMenuEntry(-1)
+		// Entries render bottom-up: Cancel sits at index 0, so index 1 shows
+		// the option at the bottom of the list, right above Cancel
+		client.getMenu().createMenuEntry(1)
 			.setOption("View Reval Profile")
 			.setTarget(target)
 			.setType(MenuAction.RUNELITE)
