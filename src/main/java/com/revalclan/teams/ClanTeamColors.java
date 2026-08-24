@@ -2,6 +2,7 @@ package com.revalclan.teams;
 
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
+import net.runelite.api.MessageNode;
 import net.runelite.api.ScriptID;
 import net.runelite.api.events.ChatMessage;
 import net.runelite.api.events.ScriptPostFired;
@@ -17,25 +18,27 @@ import javax.inject.Singleton;
 import java.awt.Color;
 
 /**
- * Colors clan members' names by their event team color, in clan chat and in
- * the clan sidepanel member list. Purely cosmetic: chat name tags and widget
- * text colors, nothing else.
+ * Colors clan members' names by their active event team, in clan chat and in
+ * the clan sidepanel member list, and tags chat lines with the team name
+ * after the clan name. Purely cosmetic; does nothing when no event is
+ * active.
  */
 @Singleton
 public class ClanTeamColors {
 	private final Client client;
 	private final ClientThread clientThread;
-	private final TeamColorProvider teamColors;
+	private final ActiveTeamColors activeTeams;
 
 	@Inject
-	public ClanTeamColors(Client client, ClientThread clientThread, MockTeamColorProvider teamColors) {
+	public ClanTeamColors(Client client, ClientThread clientThread, ActiveTeamColors activeTeams) {
 		this.client = client;
 		this.clientThread = clientThread;
-		this.teamColors = teamColors;
+		this.activeTeams = activeTeams;
 	}
 
 	/** Recolor an already-open sidepanel; rebuilds are caught by the script hook. */
 	public void startUp() {
+		activeTeams.ensureFresh();
 		clientThread.invoke(this::recolorSidepanel);
 	}
 
@@ -44,26 +47,31 @@ public class ClanTeamColors {
 		if (event.getType() != ChatMessageType.CLAN_CHAT) {
 			return;
 		}
-		String name = event.getName();
-		Color color = teamColors.teamColorFor(Text.removeTags(name));
-		if (color != null) {
-			event.getMessageNode().setName(ColorUtil.wrapWithColorTag(name, chatTone(color)));
+		activeTeams.ensureFresh();
+		String plain = Text.removeTags(event.getName());
+		Color color = activeTeams.teamColorFor(plain);
+		if (color == null) {
+			return;
+		}
+		Color tone = chatTone(color);
+		MessageNode node = event.getMessageNode();
+		node.setName(ColorUtil.wrapWithColorTag(event.getName(), tone));
+
+		// "[Reval] [Team]": the renderer brackets the sender, so close its
+		// bracket ourselves and open one for the team
+		String teamName = activeTeams.teamNameFor(plain);
+		String sender = node.getSender();
+		if (teamName != null && sender != null && !sender.contains("] ")) {
+			node.setSender(sender + "] " + ColorUtil.wrapWithColorTag("[" + teamName, tone));
 		}
 	}
 
 	@Subscribe
 	public void onScriptPostFired(ScriptPostFired event) {
 		if (event.getScriptId() == ScriptID.CLAN_SIDEPANEL_DRAW) {
+			activeTeams.ensureFresh();
 			recolorSidepanel();
 		}
-	}
-
-	/** Chat draws the same hex noticeably brighter than the sidepanel; deepen it there. */
-	private static Color chatTone(Color color) {
-		return new Color(
-			Math.round(color.getRed() * 0.78f),
-			Math.round(color.getGreen() * 0.78f),
-			Math.round(color.getBlue() * 0.78f));
 	}
 
 	private void recolorSidepanel() {
@@ -81,10 +89,18 @@ public class ClanTeamColors {
 			if (text == null || text.isEmpty() || text.matches("W\\d+")) {
 				continue;
 			}
-			Color color = teamColors.teamColorFor(Text.removeTags(text));
+			Color color = activeTeams.teamColorFor(Text.removeTags(text));
 			if (color != null) {
 				child.setTextColor(color.getRGB() & 0xFFFFFF);
 			}
 		}
+	}
+
+	/** Chat draws the same hex noticeably brighter than the sidepanel; deepen it there. */
+	private static Color chatTone(Color color) {
+		return new Color(
+			Math.round(color.getRed() * 0.78f),
+			Math.round(color.getGreen() * 0.78f),
+			Math.round(color.getBlue() * 0.78f));
 	}
 }

@@ -18,6 +18,7 @@ public final class ApiEndpoints {
 
     // Events
     public static final String EVENTS = "/events";
+    public static final String EVENTS_ACTIVE_TEAMS = "/events/active-teams";
     public static final String EVENT_REGISTER = "/events/%s/register";
     public static final String EVENT_REGISTRATION_STATUS = "/events/%s/registration-status";
 
