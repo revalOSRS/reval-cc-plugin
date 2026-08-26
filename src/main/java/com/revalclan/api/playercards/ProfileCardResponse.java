@@ -13,6 +13,13 @@ public class ProfileCardResponse extends ApiResponse {
 	private CardData data;
 
 	@Data
+	public static class Podiums {
+		private Integer first;
+		private Integer second;
+		private Integer third;
+	}
+
+	@Data
 	public static class CardData {
 		private String nickname;
 		private String clanRank;        // slug, e.g. "red_topaz"; may be null
@@ -27,6 +34,7 @@ public class ProfileCardResponse extends ApiResponse {
 		private Integer diaryTasksTotal;
 		/** Completed events won by the player's team; one star each */
 		private List<String> eventWins;
+		private Podiums competitionPodiums;
 		private String memberSince;     // ISO timestamp; may be null
 	}
 }

@@ -14,6 +14,7 @@ import net.runelite.api.clan.ClanChannel;
 import net.runelite.api.clan.ClanChannelMember;
 import net.runelite.api.events.MenuOpened;
 import net.runelite.api.gameval.InterfaceID;
+import net.runelite.api.widgets.Widget;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.game.SpriteManager;
 import net.runelite.client.input.KeyListener;
@@ -166,6 +167,47 @@ public class PlayerCardManager {
 				}
 			}
 		}
+
+		// The !revalprofile message itself: right-clicking anywhere on the
+		// rewritten chat line offers the card
+		if (config.profileCardsInChat()) {
+			String name = profileLineUnderMouse();
+			if (name != null && !name.isEmpty()) {
+				addProfileEntry(seen, name, name);
+			}
+		}
+	}
+
+	/** Name from a "View X's Reval Profile" chat line under the mouse, or null. */
+	private String profileLineUnderMouse() {
+		Widget scrollArea = client.getWidget(InterfaceID.Chatbox.SCROLLAREA);
+		if (scrollArea == null || scrollArea.isHidden()) {
+			return null;
+		}
+		Widget[] children = scrollArea.getDynamicChildren();
+		if (children == null) {
+			return null;
+		}
+		net.runelite.api.Point mouse = client.getMouseCanvasPosition();
+		for (Widget child : children) {
+			String text = child.getText();
+			if (text == null || text.isEmpty()) {
+				continue;
+			}
+			String plain = cleanName(text);
+			if (!plain.startsWith(ProfileChatCommands.PROFILE_PREFIX)) {
+				continue;
+			}
+			int suffix = plain.indexOf(ProfileChatCommands.PROFILE_SUFFIX);
+			if (suffix <= ProfileChatCommands.PROFILE_PREFIX.length()) {
+				continue;
+			}
+			java.awt.Rectangle bounds = child.getBounds();
+			if (bounds != null && bounds.contains(mouse.getX(), mouse.getY())) {
+				return plain.substring(ProfileChatCommands.PROFILE_PREFIX.length(), suffix);
+			}
+		}
+		return null;
 	}
 
 	private boolean isClanChannelMember(String name) {
