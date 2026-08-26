@@ -13,19 +13,13 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 
 /**
- * Chat commands backed by the profile-card endpoint:
- * !revalprofile replaces the message with a right-clickable "View X's Reval
- * Profile" line (the card opens from its menu), and !revalwins shows the
+ * Chat commands backed by the profile-card endpoint: !revalwins shows the
  * sender's event wins and competition podium counts with trophy icons.
  */
 @Slf4j
 @Singleton
 public class ProfileChatCommands {
-	private static final String PROFILE_COMMAND = "!revalprofile";
 	private static final String WINS_COMMAND = "!revalwins";
-	/** Also parsed by PlayerCardManager's chat-line menu hit test. */
-	static final String PROFILE_PREFIX = "View ";
-	static final String PROFILE_SUFFIX = "'s Reval Profile";
 
 	private final Client client;
 	private final RevalApiService apiService;
@@ -42,23 +36,11 @@ public class ProfileChatCommands {
 	}
 
 	public void startUp() {
-		chatCommandManager.registerCommand(PROFILE_COMMAND, this::profileCommand);
 		chatCommandManager.registerCommandAsync(WINS_COMMAND, this::winsCommand);
 	}
 
 	public void shutDown() {
-		chatCommandManager.unregisterCommand(PROFILE_COMMAND);
 		chatCommandManager.unregisterCommand(WINS_COMMAND);
-	}
-
-	private void profileCommand(ChatMessage chatMessage, String message) {
-		String name = senderName(chatMessage);
-		if (name.isEmpty()) {
-			return;
-		}
-		chatMessage.getMessageNode().setRuneLiteFormatMessage(
-			"<col=ffb83f>" + PROFILE_PREFIX + name + PROFILE_SUFFIX + "</col> <col=9f9f9f>(right-click)</col>");
-		client.refreshChat();
 	}
 
 	private void winsCommand(ChatMessage chatMessage, String message) {
