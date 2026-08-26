@@ -10,6 +10,8 @@ import net.runelite.api.Client;
 import net.runelite.api.MenuAction;
 import net.runelite.api.MenuEntry;
 import net.runelite.api.Player;
+import net.runelite.api.clan.ClanChannel;
+import net.runelite.api.clan.ClanChannelMember;
 import net.runelite.api.events.MenuOpened;
 import net.runelite.api.gameval.InterfaceID;
 import net.runelite.client.eventbus.Subscribe;
@@ -129,27 +131,55 @@ public class PlayerCardManager {
 		this.overlay = overlay;
 	}
 
+	/** Options that mark a player-name chat menu (the Hiscore lookup pattern). */
+	private static final Set<String> CHAT_PLAYER_OPTIONS = Set.of(
+		"Add friend", "Remove friend", "Add ignore", "Message");
+
 	@Subscribe
 	public void onMenuOpened(MenuOpened event) {
-		if (!config.playerProfileCards()) {
-			return;
-		}
 		Set<String> seen = new HashSet<>();
 		for (MenuEntry entry : event.getMenuEntries()) {
 			// Players in the world
 			Player player = entry.getPlayer();
 			if (player != null && player.isClanMember() && player.getName() != null) {
-				addProfileEntry(seen, cleanName(player.getName()), entry.getTarget());
+				if (config.profileCardsOnPlayers()) {
+					addProfileEntry(seen, cleanName(player.getName()), entry.getTarget());
+				}
 				continue;
 			}
 			// Rows in the clan sidepanel member list (the "Hop-to" menu)
 			if (entry.getParam1() == InterfaceID.ClansSidepanel.PLAYERLIST && entry.getTarget() != null) {
+				if (config.profileCardsInClanList()) {
+					String name = cleanName(entry.getTarget());
+					if (!name.isEmpty()) {
+						addProfileEntry(seen, name, entry.getTarget());
+					}
+				}
+				continue;
+			}
+			// Player names in chat lines, restricted to clanmates in the channel
+			if (config.profileCardsInChat() && entry.getTarget() != null && !entry.getTarget().isEmpty()
+				&& CHAT_PLAYER_OPTIONS.contains(entry.getOption())) {
 				String name = cleanName(entry.getTarget());
-				if (!name.isEmpty()) {
+				if (!name.isEmpty() && isClanChannelMember(name)) {
 					addProfileEntry(seen, name, entry.getTarget());
 				}
 			}
 		}
+	}
+
+	private boolean isClanChannelMember(String name) {
+		ClanChannel clanChannel = client.getClanChannel();
+		if (clanChannel == null) {
+			return false;
+		}
+		String standardized = Text.standardize(name);
+		for (ClanChannelMember member : clanChannel.getMembers()) {
+			if (member.getName() != null && Text.standardize(member.getName()).equals(standardized)) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**

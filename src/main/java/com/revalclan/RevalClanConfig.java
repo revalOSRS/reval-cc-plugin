@@ -28,13 +28,35 @@ public interface RevalClanConfig extends Config {
 	}
 
 	@ConfigItem(
-		keyName = "playerProfileCards",
-		name = "Player profile cards",
-		description = "Add a View Reval Profile right-click option on clan members that opens their profile card",
+		keyName = "profileCardsOnPlayers",
+		name = "Profile cards: players",
+		description = "View Reval Profile when right-clicking a clan member in the world",
 		section = panelSection,
 		position = 1
 	)
-	default boolean playerProfileCards() {
+	default boolean profileCardsOnPlayers() {
+		return true;
+	}
+
+	@ConfigItem(
+		keyName = "profileCardsInChat",
+		name = "Profile cards: chat",
+		description = "View Reval Profile when right-clicking a clan member's name in chat",
+		section = panelSection,
+		position = 2
+	)
+	default boolean profileCardsInChat() {
+		return true;
+	}
+
+	@ConfigItem(
+		keyName = "profileCardsInClanList",
+		name = "Profile cards: clan list",
+		description = "View Reval Profile when right-clicking a member in the clan member list",
+		section = panelSection,
+		position = 3
+	)
+	default boolean profileCardsInClanList() {
 		return true;
 	}
 
