@@ -1,5 +1,6 @@
 package com.revalclan.notifiers;
 
+import com.revalclan.util.PlayerNames;
 import com.google.gson.JsonObject;
 import com.revalclan.RevalClanConfig;
 import com.revalclan.util.ClanValidator;
@@ -120,8 +121,7 @@ public abstract class BaseNotifier {
 	 * Get the player's name
 	 */
 	protected String getPlayerName() {
-		if (client.getLocalPlayer() != null) return client.getLocalPlayer().getName();
-		return "Unknown";
+		return PlayerNames.resolve(client);
 	}
 	
 	/**

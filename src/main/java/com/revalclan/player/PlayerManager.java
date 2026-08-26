@@ -1,5 +1,6 @@
 package com.revalclan.player;
 
+import com.revalclan.util.PlayerNames;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.Skill;
@@ -24,11 +25,12 @@ public class PlayerManager {
 	public Map<String, Object> sync() {
 		Map<String, Object> metadata = new HashMap<>();
 		
+		// Falls back to the last name seen for this account when the local player
+		// is null (LOGIN_SCREEN transition, first ticks after login).
+		metadata.put("username", PlayerNames.resolve(client));
 		if (client.getLocalPlayer() != null) {
-			metadata.put("username", client.getLocalPlayer().getName());
 			metadata.put("combatLevel", client.getLocalPlayer().getCombatLevel());
 		} else {
-			metadata.put("username", "Unknown");
 			metadata.put("combatLevel", 0);
 		}
 		

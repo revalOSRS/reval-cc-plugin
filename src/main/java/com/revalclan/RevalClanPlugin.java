@@ -1,5 +1,6 @@
 package com.revalclan;
 
+import com.revalclan.util.PlayerNames;
 import com.revalclan.api.RevalApiService;
 import com.revalclan.combat.KillTracker;
 import com.revalclan.collectionlog.CollectionLogManager;
@@ -332,6 +333,7 @@ public class RevalClanPlugin extends Plugin {
 
 	@Subscribe
 	public void onGameTick(GameTick gameTick) {
+		PlayerNames.remember(client);
 		if (clanValidationAttempt >= 0) {
 			if (clanValidationAttempt > MAX_CLAN_VALIDATION_TICKS) {
 				clanValidationAttempt = -1;
