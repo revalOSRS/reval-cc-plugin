@@ -197,14 +197,6 @@ public class PlayerCardManager {
 			}
 		}
 
-		// Your own chat lines: no friend/message options exist on yourself,
-		// so match the line under the mouse against the local player
-		if (config.profileCardsInChat()) {
-			String self = ownChatLineNameUnderMouse();
-			if (self != null && seen.add(self)) {
-				pending.add(new Pending(1, self, self));
-			}
-		}
 
 		// Insert top-down so earlier recorded indexes stay valid
 		pending.sort((a, b) -> Integer.compare(b.index, a.index));
@@ -232,59 +224,6 @@ public class PlayerCardManager {
 			}
 		});
 		return found[0];
-	}
-
-	/** The local player's name when the mouse is over one of their chat lines. */
-	private String ownChatLineNameUnderMouse() {
-		String self = client.getLocalPlayer() != null ? client.getLocalPlayer().getName() : null;
-		if (self == null) {
-			return null;
-		}
-		self = cleanName(self);
-		Widget chatDisplay = client.getWidget(InterfaceID.Chatbox.CHATDISPLAY);
-		if (chatDisplay == null || chatDisplay.isHidden()) {
-			return null;
-		}
-		Widget[] children = chatDisplay.getDynamicChildren();
-		if (children == null) {
-			return null;
-		}
-		net.runelite.api.Point mouse = client.getMouseCanvasPosition();
-
-		// Find the line under the mouse; a line can be split across widgets
-		// (sender and message), so collect every child on that row
-		int rowY = Integer.MIN_VALUE;
-		for (Widget child : children) {
-			Rectangle bounds = child.getBounds();
-			if (child.getText() != null && !child.getText().isEmpty()
-				&& bounds != null && bounds.contains(mouse.getX(), mouse.getY())) {
-				rowY = bounds.y;
-				break;
-			}
-		}
-		if (rowY == Integer.MIN_VALUE) {
-			return null;
-		}
-		StringBuilder line = new StringBuilder();
-		for (Widget child : children) {
-			String text = child.getText();
-			Rectangle bounds = child.getBounds();
-			if (text != null && !text.isEmpty() && bounds != null && Math.abs(bounds.y - rowY) <= 2) {
-				line.append(text).append(' ');
-			}
-		}
-
-		// "[time] [Reval] Name: message" - sender sits between the last
-		// bracket group and the first colon
-		String plain = cleanName(line.toString());
-		int colon = plain.indexOf(": ");
-		if (colon <= 0) {
-			return null;
-		}
-		String head = plain.substring(0, colon);
-		int bracket = head.lastIndexOf("] ");
-		String sender = (bracket >= 0 ? head.substring(bracket + 2) : head).trim();
-		return sender.equalsIgnoreCase(self) ? self : null;
 	}
 
 	private boolean isClanChannelMember(String name) {
