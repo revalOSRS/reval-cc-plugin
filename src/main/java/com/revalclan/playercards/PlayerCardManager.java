@@ -241,39 +241,50 @@ public class PlayerCardManager {
 			return null;
 		}
 		self = cleanName(self);
-		Widget scrollArea = client.getWidget(InterfaceID.Chatbox.SCROLLAREA);
-		if (scrollArea == null || scrollArea.isHidden()) {
+		Widget chatDisplay = client.getWidget(InterfaceID.Chatbox.CHATDISPLAY);
+		if (chatDisplay == null || chatDisplay.isHidden()) {
 			return null;
 		}
-		Widget[] children = scrollArea.getDynamicChildren();
+		Widget[] children = chatDisplay.getDynamicChildren();
 		if (children == null) {
 			return null;
 		}
 		net.runelite.api.Point mouse = client.getMouseCanvasPosition();
+
+		// Find the line under the mouse; a line can be split across widgets
+		// (sender and message), so collect every child on that row
+		int rowY = Integer.MIN_VALUE;
 		for (Widget child : children) {
-			String text = child.getText();
-			if (text == null || text.isEmpty()) {
-				continue;
-			}
 			Rectangle bounds = child.getBounds();
-			if (bounds == null || !bounds.contains(mouse.getX(), mouse.getY())) {
-				continue;
-			}
-			// "[time] [Reval] Name: message" - sender sits between the last
-			// bracket group and the first colon
-			String plain = cleanName(text);
-			int colon = plain.indexOf(": ");
-			if (colon <= 0) {
-				continue;
-			}
-			String head = plain.substring(0, colon);
-			int bracket = head.lastIndexOf("] ");
-			String sender = (bracket >= 0 ? head.substring(bracket + 2) : head).trim();
-			if (sender.equalsIgnoreCase(self)) {
-				return self;
+			if (child.getText() != null && !child.getText().isEmpty()
+				&& bounds != null && bounds.contains(mouse.getX(), mouse.getY())) {
+				rowY = bounds.y;
+				break;
 			}
 		}
-		return null;
+		if (rowY == Integer.MIN_VALUE) {
+			return null;
+		}
+		StringBuilder line = new StringBuilder();
+		for (Widget child : children) {
+			String text = child.getText();
+			Rectangle bounds = child.getBounds();
+			if (text != null && !text.isEmpty() && bounds != null && Math.abs(bounds.y - rowY) <= 2) {
+				line.append(text).append(' ');
+			}
+		}
+
+		// "[time] [Reval] Name: message" - sender sits between the last
+		// bracket group and the first colon
+		String plain = cleanName(line.toString());
+		int colon = plain.indexOf(": ");
+		if (colon <= 0) {
+			return null;
+		}
+		String head = plain.substring(0, colon);
+		int bracket = head.lastIndexOf("] ");
+		String sender = (bracket >= 0 ? head.substring(bracket + 2) : head).trim();
+		return sender.equalsIgnoreCase(self) ? self : null;
 	}
 
 	private boolean isClanChannelMember(String name) {
