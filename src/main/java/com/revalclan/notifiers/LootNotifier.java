@@ -394,7 +394,8 @@ public class LootNotifier extends BaseNotifier {
 					it.remove();
 					try {
 						boolean newlySuspect = false;
-						boolean hasSuspect = false;
+						List<Map<String, Object>> cleanItems = new ArrayList<>();
+						List<Map<String, Object>> suspectedItems = new ArrayList<>();
 
 						for (Map<String, Object> item : pending.items) {
 							// Re-check provenance at flush: the equipment container
@@ -402,17 +403,13 @@ public class LootNotifier extends BaseNotifier {
 							// clean at receive time may be suspect now. (Such late
 							// detections were already counted by sessionTracker —
 							// acceptable for client-side session stats.)
-							if (!Boolean.TRUE.equals(item.get("suspect"))) {
+							if (item.get("suspectReason") == null) {
 								String reason = suspectReason((Integer) item.get("id"),
 									((Number) item.get("quantity")).intValue(), pending.lootTick);
 								if (reason != null) {
-									item.put("suspect", true);
 									item.put("suspectReason", reason);
 									newlySuspect = true;
 								}
-							}
-							if (Boolean.TRUE.equals(item.get("suspect"))) {
-								hasSuspect = true;
 							}
 
 							String name = String.valueOf(item.get("name")).toLowerCase();
@@ -420,13 +417,23 @@ public class LootNotifier extends BaseNotifier {
 							boolean isNewClogSlot = seenTick != null
 								&& tickCounter - seenTick <= CLOG_MESSAGE_TTL_TICKS;
 							item.put("isNewCollectionLogItem", isNewClogSlot);
+
+							if (item.get("suspectReason") != null) {
+								suspectedItems.add(item);
+							} else {
+								cleanItems.add(item);
+							}
 						}
 
-						if (newlySuspect) {
-							applyCleanTotals(pending.lootData, pending.items);
-						}
-						if (hasSuspect) {
-							pending.lootData.put("hasSuspectItems", true);
+						// Consumers award off items[], so forged loot is excluded by
+						// construction; suspectedItems[] keeps the attempt visible
+						// server-side for auditing and false-positive forensics
+						pending.lootData.put("items", cleanItems);
+						if (!suspectedItems.isEmpty()) {
+							pending.lootData.put("suspectedItems", suspectedItems);
+							if (newlySuspect) {
+								applyCleanTotals(pending.lootData, cleanItems);
+							}
 						}
 
 						sendNotification(pending.lootData);
@@ -453,14 +460,13 @@ public class LootNotifier extends BaseNotifier {
 	}
 
 	/**
-	 * Rewrite the payload totals from non-suspect items only, for payloads whose
+	 * Rewrite the payload totals from clean items only, for payloads whose
 	 * suspects were detected after the receive-time totals were computed.
 	 */
-	private void applyCleanTotals(Map<String, Object> lootData, List<Map<String, Object>> items) {
+	private void applyCleanTotals(Map<String, Object> lootData, List<Map<String, Object>> cleanItems) {
 		long totalGEValue = 0;
 		long totalHAValue = 0;
-		for (Map<String, Object> item : items) {
-			if (Boolean.TRUE.equals(item.get("suspect"))) continue;
+		for (Map<String, Object> item : cleanItems) {
 			long quantity = ((Number) item.get("quantity")).longValue();
 			totalGEValue += ((Number) item.get("gePrice")).longValue() * quantity;
 			totalHAValue += ((Number) item.get("haValue")).longValue() * quantity;
@@ -508,13 +514,12 @@ public class LootNotifier extends BaseNotifier {
 			itemData.put("haValue", haValue);
 			itemData.put("tradeable", isTradeable);
 			if (suspectReason != null) {
-				itemData.put("suspect", true);
 				itemData.put("suspectReason", suspectReason);
 			}
 			itemsList.add(itemData);
 
-			// Suspect items stay in the payload (flagged, so the backend can
-			// quarantine) but never count toward totals, sessions, or triggers
+			// Suspect items are split out of items[] into suspectedItems[] at
+			// flush; here they already skip totals, sessions, and notify triggers
 			if (suspectReason != null) {
 				hasSuspect = true;
 				continue;
