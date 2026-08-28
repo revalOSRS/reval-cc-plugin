@@ -30,12 +30,12 @@ public interface RevalClanConfig extends Config {
 	@ConfigItem(
 		keyName = "profileCardsOnPlayers",
 		name = "Profile cards: players",
-		description = "View Reval Profile when right-clicking a clan member in the world",
+		description = "View Reval Profile when right-clicking a clan member in the world (off by default to keep the menu short)",
 		section = panelSection,
 		position = 1
 	)
 	default boolean profileCardsOnPlayers() {
-		return true;
+		return false;
 	}
 
 	@ConfigItem(

@@ -4,6 +4,7 @@ import com.revalclan.RevalClanConfig;
 import com.revalclan.api.RevalApiService;
 import com.revalclan.api.playercards.ProfileCardResponse;
 import com.revalclan.util.ClanRankIconResolver;
+import com.revalclan.util.ClanSidepanel;
 import com.revalclan.util.RankColors;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
@@ -14,6 +15,7 @@ import net.runelite.api.clan.ClanChannel;
 import net.runelite.api.clan.ClanChannelMember;
 import net.runelite.api.events.MenuOpened;
 import net.runelite.api.gameval.InterfaceID;
+import net.runelite.api.widgets.Widget;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.game.SpriteManager;
 import net.runelite.client.input.KeyListener;
@@ -26,7 +28,10 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseEvent;
+import java.awt.Rectangle;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -135,24 +140,37 @@ public class PlayerCardManager {
 	private static final Set<String> CHAT_PLAYER_OPTIONS = Set.of(
 		"Add friend", "Remove friend", "Add ignore", "Message");
 
+	/** A pending menu insertion: index keeps the entry inside its player's group. */
+	private static class Pending {
+		final int index;
+		final String name;
+		final String target;
+
+		Pending(int index, String name, String target) {
+			this.index = index;
+			this.name = name;
+			this.target = target;
+		}
+	}
+
 	@Subscribe
 	public void onMenuOpened(MenuOpened event) {
 		Set<String> seen = new HashSet<>();
-		for (MenuEntry entry : event.getMenuEntries()) {
+		List<Pending> pending = new ArrayList<>();
+		MenuEntry[] entries = event.getMenuEntries();
+
+		// Entries render bottom-up, so a player's lowest array index is the
+		// visually last option of their group; inserting there keeps our
+		// entry with its player instead of pooling at the menu bottom
+		for (int i = 0; i < entries.length; i++) {
+			MenuEntry entry = entries[i];
 			// Players in the world
 			Player player = entry.getPlayer();
 			if (player != null && player.isClanMember() && player.getName() != null) {
 				if (config.profileCardsOnPlayers()) {
-					addProfileEntry(seen, cleanName(player.getName()), entry.getTarget());
-				}
-				continue;
-			}
-			// Rows in the clan sidepanel member list (the "Hop-to" menu)
-			if (entry.getParam1() == InterfaceID.ClansSidepanel.PLAYERLIST && entry.getTarget() != null) {
-				if (config.profileCardsInClanList()) {
-					String name = cleanName(entry.getTarget());
-					if (!name.isEmpty()) {
-						addProfileEntry(seen, name, entry.getTarget());
+					String name = cleanName(player.getName());
+					if (seen.add(name)) {
+						pending.add(new Pending(i, name, entry.getTarget()));
 					}
 				}
 				continue;
@@ -161,12 +179,51 @@ public class PlayerCardManager {
 			if (config.profileCardsInChat() && entry.getTarget() != null && !entry.getTarget().isEmpty()
 				&& CHAT_PLAYER_OPTIONS.contains(entry.getOption())) {
 				String name = cleanName(entry.getTarget());
-				if (!name.isEmpty() && isClanChannelMember(name)) {
-					addProfileEntry(seen, name, entry.getTarget());
+				if (!name.isEmpty() && isClanChannelMember(name) && seen.add(name)) {
+					pending.add(new Pending(i, name, entry.getTarget()));
 				}
 			}
 		}
 
+		// Clan sidepanel rows by mouse position - the game offers no menu
+		// entries on your own row, so entry-based detection can't see it
+		if (config.profileCardsInClanList()) {
+			Widget row = clanListRowUnderMouse();
+			if (row != null) {
+				String name = cleanName(row.getText());
+				if (!name.isEmpty() && seen.add(name)) {
+					pending.add(new Pending(1, name, row.getText()));
+				}
+			}
+		}
+
+
+		// Insert top-down so earlier recorded indexes stay valid
+		pending.sort((a, b) -> Integer.compare(b.index, a.index));
+		for (Pending p : pending) {
+			addProfileEntry(p.index, p.name, p.target);
+		}
+	}
+
+	/** The clan member list name row under the mouse, or null. */
+	private Widget clanListRowUnderMouse() {
+		Widget list = client.getWidget(InterfaceID.ClansSidepanel.PLAYERLIST);
+		net.runelite.api.Point mouse = client.getMouseCanvasPosition();
+		if (list == null || list.isHidden()) {
+			return null;
+		}
+		Rectangle listBounds = list.getBounds();
+		if (listBounds == null || !listBounds.contains(mouse.getX(), mouse.getY())) {
+			return null;
+		}
+		Widget[] found = new Widget[1];
+		ClanSidepanel.eachNameRow(client, child -> {
+			Rectangle bounds = child.getBounds();
+			if (found[0] == null && bounds != null && bounds.contains(mouse.getX(), mouse.getY())) {
+				found[0] = child;
+			}
+		});
+		return found[0];
 	}
 
 	private boolean isClanChannelMember(String name) {
@@ -191,13 +248,8 @@ public class PlayerCardManager {
 		return Text.removeTags(raw).replace('\u00A0', ' ');
 	}
 
-	private void addProfileEntry(Set<String> seen, String name, String target) {
-		if (!seen.add(name)) {
-			return;
-		}
-		// Entries render bottom-up: Cancel sits at index 0, so index 1 shows
-		// the option at the bottom of the list, right above Cancel
-		client.getMenu().createMenuEntry(1)
+	private void addProfileEntry(int index, String name, String target) {
+		client.getMenu().createMenuEntry(index)
 			.setOption("View Reval Profile")
 			.setTarget(target)
 			.setType(MenuAction.RUNELITE)
