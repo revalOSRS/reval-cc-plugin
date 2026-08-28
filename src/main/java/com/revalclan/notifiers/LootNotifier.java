@@ -2,7 +2,12 @@ package com.revalclan.notifiers;
 
 import com.revalclan.session.SessionTracker;
 import com.revalclan.util.RaidParty;
+import net.runelite.api.Item;
+import net.runelite.api.ItemContainer;
 import net.runelite.api.NPC;
+import net.runelite.api.events.ItemContainerChanged;
+import net.runelite.api.events.MenuOptionClicked;
+import net.runelite.api.gameval.InventoryID;
 import net.runelite.api.gameval.ItemID;
 import net.runelite.api.gameval.NpcID;
 import net.runelite.client.eventbus.Subscribe;
@@ -35,8 +40,23 @@ public class LootNotifier extends BaseNotifier {
 	/** How many ticks a clog announcement stays eligible for matching. */
 	private static final int CLOG_MESSAGE_TTL_TICKS = 10;
 
+	/** Ticks a self-dropped item stays suspect for ground-spawn loot attribution. */
+	private static final int SELF_DROP_SUSPECT_TICKS = 10;
+
+	/** The swap is same-tick with the loot event; slack only absorbs event ordering. */
+	private static final int UNEQUIP_SUSPECT_TICKS = 2;
+
 	/** Lowercased item name → tick the clog announcement was seen on. */
 	private final Map<String, Integer> recentClogItems = new HashMap<>();
+
+	/** Item id → observed self-drop by the local player. */
+	private final Map<Integer, ObservedInflow> recentSelfDrops = new HashMap<>();
+
+	/** Item id → observed removal from the worn container (unequip or 2h/shield swap). */
+	private final Map<Integer, ObservedInflow> recentUnequips = new HashMap<>();
+
+	/** Last observed worn contents (id → quantity), diffed to spot removals. */
+	private final Map<Integer, Integer> equipmentSnapshot = new HashMap<>();
 
 	/** Loot payloads waiting out the correlation window. */
 	private final List<PendingLoot> pendingLoot = new ArrayList<>();
@@ -46,13 +66,41 @@ public class LootNotifier extends BaseNotifier {
 	private static class PendingLoot {
 		final Map<String, Object> lootData;
 		final List<Map<String, Object>> items;
+		final int lootTick;
 		final int sendOnTick;
 
-		PendingLoot(Map<String, Object> lootData, List<Map<String, Object>> items, int sendOnTick) {
+		PendingLoot(Map<String, Object> lootData, List<Map<String, Object>> items, int lootTick, int sendOnTick) {
 			this.lootData = lootData;
 			this.items = items;
+			this.lootTick = lootTick;
 			this.sendOnTick = sendOnTick;
 		}
+	}
+
+	/**
+	 * Observations inside the window accumulate, so a loot stack can match either
+	 * the last single quantity or the window total (three separate 1x drops may
+	 * be attributed as one 3x stack).
+	 */
+	private static class ObservedInflow {
+		int tick;
+		int lastQuantity;
+		int totalQuantity;
+	}
+
+	private static void recordInflow(Map<Integer, ObservedInflow> map, int itemId, int quantity, int tick, int windowTicks) {
+		ObservedInflow entry = map.get(itemId);
+		if (entry == null || tick - entry.tick > windowTicks) {
+			entry = new ObservedInflow();
+			map.put(itemId, entry);
+		}
+		entry.tick = tick;
+		entry.lastQuantity = quantity;
+		entry.totalQuantity += quantity;
+	}
+
+	private static boolean matchesInflow(ObservedInflow entry, int quantity) {
+		return entry != null && (quantity == entry.lastQuantity || quantity == entry.totalQuantity);
 	}
 
 	/**
@@ -212,6 +260,82 @@ public class LootNotifier extends BaseNotifier {
 	}
 
 	/**
+	 * Dropping an item on a death tile inside LootManager's attribution window
+	 * forges a "drop", so remember every Drop click. Never gated on isEnabled:
+	 * tracking state must stay correct.
+	 */
+	@Subscribe
+	public void onMenuOptionClicked(MenuOptionClicked event) {
+		if (!"Drop".equals(event.getMenuOption())) return;
+
+		int itemId = event.getItemId();
+		if (itemId <= 0) return;
+
+		// Dropping ejects the whole clicked stack (param0 = inventory slot)
+		int quantity = 1;
+		ItemContainer inventory = client.getItemContainer(InventoryID.INV);
+		if (inventory != null) {
+			Item slotItem = inventory.getItem(event.getParam0());
+			if (slotItem != null && slotItem.getId() == itemId) {
+				quantity = slotItem.getQuantity();
+			}
+		}
+
+		recordInflow(recentSelfDrops, itemId, quantity, tickCounter, SELF_DROP_SUSPECT_TICKS);
+	}
+
+	/**
+	 * Inventory-diff loot sources (nests, caskets, pickpockets, chest bosses)
+	 * count gear pushed out of the worn container by a same-tick equip swap as
+	 * loot, so remember what left it. Never gated on isEnabled: a missed change
+	 * makes later diffs report phantom removals.
+	 */
+	@Subscribe
+	public void onItemContainerChanged(ItemContainerChanged event) {
+		if (event.getContainerId() != InventoryID.WORN) return;
+
+		Map<Integer, Integer> worn = new HashMap<>();
+		for (Item item : event.getItemContainer().getItems()) {
+			if (item.getId() > 0 && item.getQuantity() > 0) {
+				worn.merge(item.getId(), item.getQuantity(), Integer::sum);
+			}
+		}
+
+		for (Map.Entry<Integer, Integer> was : equipmentSnapshot.entrySet()) {
+			int removed = was.getValue() - worn.getOrDefault(was.getKey(), 0);
+			if (removed > 0) {
+				recordInflow(recentUnequips, was.getKey(), removed, tickCounter, UNEQUIP_SUSPECT_TICKS);
+			}
+		}
+
+		equipmentSnapshot.clear();
+		equipmentSnapshot.putAll(worn);
+	}
+
+	/**
+	 * Reason this loot stack is explained by an observed local action, or null
+	 * when it looks legitimate. Exact id + quantity match, so a legitimate stack
+	 * is never tainted by a near-miss. The drop window is one-sided (the click
+	 * precedes the spawn); the unequip window is two-sided (the container event
+	 * can land either side of the loot event).
+	 */
+	private String suspectReason(int itemId, int quantity, int lootTick) {
+		ObservedInflow drop = recentSelfDrops.get(itemId);
+		if (drop != null && lootTick - drop.tick <= SELF_DROP_SUSPECT_TICKS && drop.tick - lootTick <= 1
+			&& matchesInflow(drop, quantity)) {
+			return "self-drop";
+		}
+
+		ObservedInflow unequip = recentUnequips.get(itemId);
+		if (unequip != null && Math.abs(lootTick - unequip.tick) <= UNEQUIP_SUSPECT_TICKS
+			&& matchesInflow(unequip, quantity)) {
+			return "gear-swap";
+		}
+
+		return null;
+	}
+
+	/**
 	 * Handle game messages for special loot cases that don't fire normal loot events,
 	 * and record collection log announcements for loot correlation
 	 */
@@ -254,13 +378,45 @@ public class LootNotifier extends BaseNotifier {
 					// queue into retrying (and re-throwing) every tick
 					it.remove();
 					try {
+						boolean newlySuspect = false;
+						List<Map<String, Object>> cleanItems = new ArrayList<>();
+						List<Map<String, Object>> suspectedItems = new ArrayList<>();
+
 						for (Map<String, Object> item : pending.items) {
+							// Re-check at flush — the worn-container event can land
+							// a tick after the loot event
+							if (item.get("suspectReason") == null) {
+								String reason = suspectReason((Integer) item.get("id"),
+									((Number) item.get("quantity")).intValue(), pending.lootTick);
+								if (reason != null) {
+									item.put("suspectReason", reason);
+									newlySuspect = true;
+								}
+							}
+
 							String name = String.valueOf(item.get("name")).toLowerCase();
 							Integer seenTick = recentClogItems.get(name);
 							boolean isNewClogSlot = seenTick != null
 								&& tickCounter - seenTick <= CLOG_MESSAGE_TTL_TICKS;
 							item.put("isNewCollectionLogItem", isNewClogSlot);
+
+							if (item.get("suspectReason") != null) {
+								suspectedItems.add(item);
+							} else {
+								cleanItems.add(item);
+							}
 						}
+
+						// Consumers award off items[]; suspectedItems[] keeps the
+						// attempt visible server-side for auditing
+						pending.lootData.put("items", cleanItems);
+						if (!suspectedItems.isEmpty()) {
+							pending.lootData.put("suspectedItems", suspectedItems);
+							if (newlySuspect) {
+								applyCleanTotals(pending.lootData, cleanItems);
+							}
+						}
+
 						sendNotification(pending.lootData);
 					} catch (Exception ignored) {
 						// Never let one payload break the tick dispatch for
@@ -274,6 +430,27 @@ public class LootNotifier extends BaseNotifier {
 		if (!recentClogItems.isEmpty()) {
 			recentClogItems.values().removeIf(tick -> tickCounter - tick > CLOG_MESSAGE_TTL_TICKS);
 		}
+
+		// Expire provenance entries once they can no longer match a buffered payload
+		if (!recentSelfDrops.isEmpty()) {
+			recentSelfDrops.values().removeIf(e -> tickCounter - e.tick > SELF_DROP_SUSPECT_TICKS + LOOT_BUFFER_TICKS);
+		}
+		if (!recentUnequips.isEmpty()) {
+			recentUnequips.values().removeIf(e -> tickCounter - e.tick > UNEQUIP_SUSPECT_TICKS + LOOT_BUFFER_TICKS);
+		}
+	}
+
+	/** Rewrite totals when suspects were detected after receive-time totals were computed. */
+	private void applyCleanTotals(Map<String, Object> lootData, List<Map<String, Object>> cleanItems) {
+		long totalGEValue = 0;
+		long totalHAValue = 0;
+		for (Map<String, Object> item : cleanItems) {
+			long quantity = ((Number) item.get("quantity")).longValue();
+			totalGEValue += ((Number) item.get("gePrice")).longValue() * quantity;
+			totalHAValue += ((Number) item.get("haValue")).longValue() * quantity;
+		}
+		lootData.put("totalGEValue", totalGEValue);
+		lootData.put("totalHAValue", totalHAValue);
 	}
 
 	private void handleLootDrop(Collection<ItemStack> items, String source, String sourceType, Integer sourceId) {
@@ -292,9 +469,11 @@ public class LootNotifier extends BaseNotifier {
 		boolean hasWhitelistedItem = false;
 		boolean hasUntradeable = false;
 
+		boolean hasSuspect = false;
+
 		for (ItemStack item : items) {
 			int itemId = item.getId();
-			
+
 			// Skip blacklisted items
 			if (blacklistItemIds.contains(itemId)) continue;
 
@@ -303,6 +482,8 @@ public class LootNotifier extends BaseNotifier {
 			boolean isTradeable = itemManager.getItemComposition(itemId).isTradeable();
 			String itemName = itemManager.getItemComposition(itemId).getName();
 
+			String suspectReason = suspectReason(itemId, item.getQuantity(), tickCounter);
+
 			Map<String, Object> itemData = new HashMap<>();
 			itemData.put("id", itemId);
 			itemData.put("name", itemName);
@@ -310,7 +491,16 @@ public class LootNotifier extends BaseNotifier {
 			itemData.put("gePrice", gePrice);
 			itemData.put("haValue", haValue);
 			itemData.put("tradeable", isTradeable);
+			if (suspectReason != null) {
+				itemData.put("suspectReason", suspectReason);
+			}
 			itemsList.add(itemData);
+
+			// Suspects skip totals, sessions, and triggers; split out at flush
+			if (suspectReason != null) {
+				hasSuspect = true;
+				continue;
+			}
 
 			totalGEValue += (long) gePrice * item.getQuantity();
 			totalHAValue += (long) haValue * item.getQuantity();
@@ -324,7 +514,8 @@ public class LootNotifier extends BaseNotifier {
 		// 1. Total value >= minLootValue (from API)
 		// 2. Contains a whitelisted item (from API)
 		// 3. Contains an untradeable item
-		boolean shouldNotify = totalGEValue >= minLootValue || hasWhitelistedItem || hasUntradeable;
+		// 4. Contains a suspect item (always report attempted forgeries)
+		boolean shouldNotify = totalGEValue >= minLootValue || hasWhitelistedItem || hasUntradeable || hasSuspect;
 
 		if (!shouldNotify) return;
 
@@ -343,6 +534,6 @@ public class LootNotifier extends BaseNotifier {
 
 		// Buffer for the clog correlation window instead of sending immediately;
 		// onGameTick stamps isNewCollectionLogItem on each item and sends
-		pendingLoot.add(new PendingLoot(lootData, itemsList, tickCounter + LOOT_BUFFER_TICKS));
+		pendingLoot.add(new PendingLoot(lootData, itemsList, tickCounter, tickCounter + LOOT_BUFFER_TICKS));
 	}
 }
