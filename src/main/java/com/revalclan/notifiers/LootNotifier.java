@@ -40,29 +40,22 @@ public class LootNotifier extends BaseNotifier {
 	/** How many ticks a clog announcement stays eligible for matching. */
 	private static final int CLOG_MESSAGE_TTL_TICKS = 10;
 
-	/**
-	 * How long a self-dropped item id can poison ground-spawn loot attribution
-	 * (drop click → item spawn on a death tile within LootManager's window).
-	 */
+	/** Ticks a self-dropped item stays suspect for ground-spawn loot attribution. */
 	private static final int SELF_DROP_SUSPECT_TICKS = 10;
 
-	/**
-	 * How long an unequipped item id can poison inventory-diff loot attribution
-	 * (nests, caskets, pickpockets, chest bosses). The swap lands on the same
-	 * tick as the loot event; the slack only absorbs event-ordering jitter.
-	 */
+	/** The swap is same-tick with the loot event; slack only absorbs event ordering. */
 	private static final int UNEQUIP_SUSPECT_TICKS = 2;
 
 	/** Lowercased item name → tick the clog announcement was seen on. */
 	private final Map<String, Integer> recentClogItems = new HashMap<>();
 
-	/** Item id → observed drop of it by the local player from their inventory. */
+	/** Item id → observed self-drop by the local player. */
 	private final Map<Integer, ObservedInflow> recentSelfDrops = new HashMap<>();
 
-	/** Item id → observed removal of it from the equipment container (unequip or 2h/shield swap). */
+	/** Item id → observed removal from the worn container (unequip or 2h/shield swap). */
 	private final Map<Integer, ObservedInflow> recentUnequips = new HashMap<>();
 
-	/** Last observed equipment contents (id → quantity), diffed to spot removals. */
+	/** Last observed worn contents (id → quantity), diffed to spot removals. */
 	private final Map<Integer, Integer> equipmentSnapshot = new HashMap<>();
 
 	/** Loot payloads waiting out the correlation window. */
@@ -85,10 +78,9 @@ public class LootNotifier extends BaseNotifier {
 	}
 
 	/**
-	 * A quantity of an item id that entered circulation through an observed
-	 * local action. Repeated observations inside the window accumulate, so a
-	 * loot stack can be matched against either the last single observation or
-	 * the window total (e.g. three separate 1x drops attributed as one 3x stack).
+	 * Observations inside the window accumulate, so a loot stack can match either
+	 * the last single quantity or the window total (three separate 1x drops may
+	 * be attributed as one 3x stack).
 	 */
 	private static class ObservedInflow {
 		int tick;
@@ -268,11 +260,9 @@ public class LootNotifier extends BaseNotifier {
 	}
 
 	/**
-	 * RuneLite's LootManager attributes any item spawning on a death tile within
-	 * a few ticks to the kill, so dropping an item there forges a "drop". The
-	 * drop is a visible local action — remember the id and stack quantity so the
-	 * forged loot can be recognised. Not gated on isEnabled: tracking state must
-	 * stay correct.
+	 * Dropping an item on a death tile inside LootManager's attribution window
+	 * forges a "drop", so remember every Drop click. Never gated on isEnabled:
+	 * tracking state must stay correct.
 	 */
 	@Subscribe
 	public void onMenuOptionClicked(MenuOptionClicked event) {
@@ -281,8 +271,7 @@ public class LootNotifier extends BaseNotifier {
 		int itemId = event.getItemId();
 		if (itemId <= 0) return;
 
-		// Dropping ejects the whole clicked stack, so its quantity is whatever
-		// the clicked inventory slot holds right now (param0 = slot index)
+		// Dropping ejects the whole clicked stack (param0 = inventory slot)
 		int quantity = 1;
 		ItemContainer inventory = client.getItemContainer(InventoryID.INV);
 		if (inventory != null) {
@@ -297,10 +286,9 @@ public class LootNotifier extends BaseNotifier {
 
 	/**
 	 * Inventory-diff loot sources (nests, caskets, pickpockets, chest bosses)
-	 * count anything entering the inventory as loot — including gear pushed out
-	 * of the equipment container by a same-tick equip swap. Diff the worn
-	 * container to remember what left it. Not gated on isEnabled: the snapshot
-	 * must track every change or later diffs report phantom removals.
+	 * count gear pushed out of the worn container by a same-tick equip swap as
+	 * loot, so remember what left it. Never gated on isEnabled: a missed change
+	 * makes later diffs report phantom removals.
 	 */
 	@Subscribe
 	public void onItemContainerChanged(ItemContainerChanged event) {
@@ -325,14 +313,11 @@ public class LootNotifier extends BaseNotifier {
 	}
 
 	/**
-	 * Reason this loot stack is explained by an observed local action rather
-	 * than an actual drop, or null when it looks legitimate. Matches on exact
-	 * item id (dose/charge variants have distinct ids, so a planted Stamina
-	 * potion(4) never taints a looted (3)) AND exact stack quantity, so a
-	 * legitimate 100-coin drop is never tainted by 50 self-dropped coins.
-	 * The drop window is one-sided (the click always precedes the spawn, ±1
-	 * tick of ordering slack); the unequip window is two-sided because the
-	 * container event can land just before or after the loot event.
+	 * Reason this loot stack is explained by an observed local action, or null
+	 * when it looks legitimate. Exact id + quantity match, so a legitimate stack
+	 * is never tainted by a near-miss. The drop window is one-sided (the click
+	 * precedes the spawn); the unequip window is two-sided (the container event
+	 * can land either side of the loot event).
 	 */
 	private String suspectReason(int itemId, int quantity, int lootTick) {
 		ObservedInflow drop = recentSelfDrops.get(itemId);
@@ -398,11 +383,8 @@ public class LootNotifier extends BaseNotifier {
 						List<Map<String, Object>> suspectedItems = new ArrayList<>();
 
 						for (Map<String, Object> item : pending.items) {
-							// Re-check provenance at flush: the equipment container
-							// event can land a tick after the loot event, so an item
-							// clean at receive time may be suspect now. (Such late
-							// detections were already counted by sessionTracker —
-							// acceptable for client-side session stats.)
+							// Re-check at flush — the worn-container event can land
+							// a tick after the loot event
 							if (item.get("suspectReason") == null) {
 								String reason = suspectReason((Integer) item.get("id"),
 									((Number) item.get("quantity")).intValue(), pending.lootTick);
@@ -425,9 +407,8 @@ public class LootNotifier extends BaseNotifier {
 							}
 						}
 
-						// Consumers award off items[], so forged loot is excluded by
-						// construction; suspectedItems[] keeps the attempt visible
-						// server-side for auditing and false-positive forensics
+						// Consumers award off items[]; suspectedItems[] keeps the
+						// attempt visible server-side for auditing
 						pending.lootData.put("items", cleanItems);
 						if (!suspectedItems.isEmpty()) {
 							pending.lootData.put("suspectedItems", suspectedItems);
@@ -459,10 +440,7 @@ public class LootNotifier extends BaseNotifier {
 		}
 	}
 
-	/**
-	 * Rewrite the payload totals from clean items only, for payloads whose
-	 * suspects were detected after the receive-time totals were computed.
-	 */
+	/** Rewrite totals when suspects were detected after receive-time totals were computed. */
 	private void applyCleanTotals(Map<String, Object> lootData, List<Map<String, Object>> cleanItems) {
 		long totalGEValue = 0;
 		long totalHAValue = 0;
@@ -518,8 +496,7 @@ public class LootNotifier extends BaseNotifier {
 			}
 			itemsList.add(itemData);
 
-			// Suspect items are split out of items[] into suspectedItems[] at
-			// flush; here they already skip totals, sessions, and notify triggers
+			// Suspects skip totals, sessions, and triggers; split out at flush
 			if (suspectReason != null) {
 				hasSuspect = true;
 				continue;
