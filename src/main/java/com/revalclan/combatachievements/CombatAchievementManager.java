@@ -193,21 +193,6 @@ public class CombatAchievementManager {
 		}
 	}
 
-	/**
-	 * Last ladder verified by hand (2026-08-26: 655 tasks / 2697 pts). Only used
-	 * when neither the varbits nor the task structs can be read;
-	 * {@link #tierThresholds()} is the real source.
-	 */
-	private static final Map<String, Integer> LAST_KNOWN_THRESHOLDS = new LinkedHashMap<>();
-	static {
-		LAST_KNOWN_THRESHOLDS.put("Easy", 41);
-		LAST_KNOWN_THRESHOLDS.put("Medium", 169);
-		LAST_KNOWN_THRESHOLDS.put("Hard", 436);
-		LAST_KNOWN_THRESHOLDS.put("Elite", 1100);
-		LAST_KNOWN_THRESHOLDS.put("Master", 1965);
-		LAST_KNOWN_THRESHOLDS.put("Grandmaster", 2697);
-	}
-
 	/** The game's own per-tier unlock points, in ladder order (packed into varps CA_THRESHOLDS1-3). */
 	private static final int[] THRESHOLD_VARBITS = {
 		VarbitID.CA_THRESHOLD_EASY,
@@ -219,62 +204,25 @@ public class CombatAchievementManager {
 	};
 
 	/**
-	 * Points needed to unlock each tier. Sources, in order of trust:
-	 * <ol>
-	 *   <li>The game's CA_THRESHOLD_* varbits — Jagex's own numbers, sent with the
-	 *       player's varps, so a new task batch is reflected the moment it goes live.</li>
-	 *   <li>A sum over the task structs: every task in a tier is worth a fixed 1-6
-	 *       points, so a tier's unlock point is the total points of that tier and all
-	 *       tiers below it (how the wiki's "points required" column is produced).</li>
-	 *   <li>{@link #LAST_KNOWN_THRESHOLDS}, if the structs can't be read either.</li>
-	 * </ol>
-	 * Each source must be a strictly ascending ladder with no zeros to be accepted;
-	 * a missing tier would understate every threshold above it.
+	 * Points needed to unlock each tier, read from the game's CA_THRESHOLD_* varbits
+	 * so a new task batch is reflected the moment it goes live, with no plugin release.
+	 * Returns an empty map (=> currentTier "None") if the varps haven't arrived, which
+	 * only happens when the rest of the CA varps are missing too and the sync is moot.
 	 */
 	private Map<String, Integer> tierThresholds() {
-		Map<String, Integer> fromVarbits = thresholdsFromVarbits();
-		if (fromVarbits != null) return fromVarbits;
-
-		Map<String, Integer> fromStructs = thresholdsFromStructs();
-		if (fromStructs != null) return fromStructs;
-
-		log.warn("CA tier thresholds unavailable from varbits and structs; using last known ladder");
-		return LAST_KNOWN_THRESHOLDS;
-	}
-
-	private Map<String, Integer> thresholdsFromVarbits() {
 		Map<String, Integer> thresholds = new LinkedHashMap<>();
+		int previous = 0;
 		int i = 0;
 		for (String tier : TIER_ENUMS.values()) {
-			int value;
-			try {
-				value = client.getVarbitValue(THRESHOLD_VARBITS[i++]);
-			} catch (Exception e) {
-				return null;
+			int value = client.getVarbitValue(THRESHOLD_VARBITS[i++]);
+			if (value <= previous) {
+				log.warn("CA tier thresholds not available from varbits ({} = {})", tier, value);
+				return Collections.emptyMap();
 			}
 			thresholds.put(tier, value);
-		}
-		return isAscendingLadder(thresholds) ? thresholds : null;
-	}
-
-	private Map<String, Integer> thresholdsFromStructs() {
-		Map<String, Integer> thresholds = new LinkedHashMap<>();
-		int cumulative = 0;
-		for (String tier : TIER_ENUMS.values()) {
-			long taskCount = allTasks.stream().filter(t -> t.getTier().equals(tier)).count();
-			cumulative += (int) taskCount * getPointsForTier(tier);
-			thresholds.put(tier, cumulative);
-		}
-		return isAscendingLadder(thresholds) ? thresholds : null;
-	}
-
-	private static boolean isAscendingLadder(Map<String, Integer> thresholds) {
-		int previous = 0;
-		for (int value : thresholds.values()) {
-			if (value <= previous) return false;
 			previous = value;
 		}
-		return true;
+		return thresholds;
 	}
 
 	/** Highest tier whose unlock point the player has reached, walking the ladder in order. */
