@@ -1,6 +1,5 @@
 package com.revalclan.api;
 
-import com.revalclan.util.PluginVersion;
 import com.google.gson.Gson;
 import com.revalclan.api.account.AccountResponse;
 import com.revalclan.api.achievements.AchievementsResponse;
@@ -24,6 +23,7 @@ import com.revalclan.api.events.EventsResponse;
 import com.revalclan.api.events.RegistrationResponse;
 import com.revalclan.api.events.RegistrationStatusResponse;
 import com.revalclan.api.points.PointsResponse;
+import com.revalclan.util.PluginVersion;
 import okhttp3.*;
 
 import javax.inject.Inject;
