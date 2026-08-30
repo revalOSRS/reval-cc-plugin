@@ -27,7 +27,14 @@ dependencies {
 }
 
 group = 'com.revalclan'
-version = '2.18.3'
+version = '2.18.4'
+
+processResources {
+	// Stamp the build version into the resource PluginVersion reads at runtime.
+	filesMatching('com/revalclan/version.properties') {
+		expand(version: project.version)
+	}
+}
 
 tasks.withType(JavaCompile).configureEach {
 	options.encoding = 'UTF-8'

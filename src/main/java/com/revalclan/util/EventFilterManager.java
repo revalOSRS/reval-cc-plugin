@@ -77,7 +77,7 @@ public class EventFilterManager{
 			Request request = new Request.Builder()
 				.url(FILTERS_URL)
 				.get()
-				.addHeader("User-Agent", "RuneLite-RevalClan-Plugin")
+				.addHeader("User-Agent", PluginVersion.userAgent())
 				.build();
 			
 			try (Response response = httpClient.newCall(request).execute()) {
@@ -110,7 +110,7 @@ public class EventFilterManager{
 		Request request = new Request.Builder()
 			.url(FILTERS_URL)
 			.get()
-			.addHeader("User-Agent", "RuneLite-RevalClan-Plugin")
+			.addHeader("User-Agent", PluginVersion.userAgent())
 			.build();
 		
 		httpClient.newCall(request).enqueue(new Callback() {

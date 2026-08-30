@@ -1,5 +1,6 @@
 package com.revalclan.api;
 
+import com.revalclan.util.PluginVersion;
 import com.google.gson.Gson;
 import com.revalclan.api.account.AccountResponse;
 import com.revalclan.api.achievements.AchievementsResponse;
@@ -40,7 +41,6 @@ import java.util.function.Consumer;
  */
 @Singleton
 public class RevalApiService {
-    private static final String USER_AGENT = "RuneLite-RevalClan-Plugin";
     private static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
 
     private final Gson gson;
@@ -477,7 +477,7 @@ public class RevalApiService {
         Request.Builder requestBuilder = new Request.Builder()
             .url(ApiEndpoints.BASE_URL + endpoint)
             .addHeader("Accept", "application/json")
-            .addHeader("User-Agent", USER_AGENT)
+            .addHeader("User-Agent", PluginVersion.userAgent())
             .addHeader("Content-Type", "application/json");
 
         if (memberCode != null && !memberCode.isEmpty()) {
