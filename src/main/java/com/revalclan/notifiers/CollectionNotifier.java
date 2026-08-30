@@ -8,10 +8,8 @@
 package com.revalclan.notifiers;
 
 import javax.inject.Singleton;
-import com.revalclan.collectionlog.CollectionLogManager;
 import net.runelite.api.gameval.VarPlayerID;
 
-import javax.inject.Inject;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -19,8 +17,6 @@ import java.util.regex.Pattern;
 
 @Singleton
 public class CollectionNotifier extends BaseNotifier {
-	@Inject private CollectionLogManager collectionLogManager;
-
 	private static final Pattern COLLECTION_PATTERN = Pattern.compile(
 		"New item added to your collection log: (?<item>.+)",
 		Pattern.CASE_INSENSITIVE
@@ -49,14 +45,15 @@ public class CollectionNotifier extends BaseNotifier {
 	private void handleCollectionItem(String itemName) {
 		Map<String, Object> collectionData = new HashMap<>();
 		collectionData.put("item", itemName);
-		// The game's unique-slot counter and rank ladder, so the server judges the
-		// rank milestone by live values instead of stored constants
+		// The game's unique-slot counter and total slot count, so the server judges
+		// the rank milestone (Gilded derives from the total) by live values
 		int uniqueObtained = client.getVarpValue(VarPlayerID.COLLECTION_COUNT);
 		if (uniqueObtained > 0) {
 			collectionData.put("uniqueObtained", uniqueObtained);
 		}
-		if (client.getVarpValue(VarPlayerID.COLLECTION_COUNT_MAX) > 0) {
-			collectionData.put("rankThresholds", collectionLogManager.rankThresholds());
+		int totalSlots = client.getVarpValue(VarPlayerID.COLLECTION_COUNT_MAX);
+		if (totalSlots > 0) {
+			collectionData.put("totalSlots", totalSlots);
 		}
 
 		sendNotification(collectionData);

@@ -341,7 +341,7 @@ public class RevalClanPlugin extends Plugin {
 	public void onGameTick(GameTick gameTick) {
 		if (caThresholdLogTicks >= 0) {
 			boolean caLogged = combatAchievementManager.logTierThresholds();
-			boolean clogLogged = collectionLogManager.logRankThresholds();
+			boolean clogLogged = collectionLogManager.logCollectionCounts();
 			if ((caLogged && clogLogged) || caThresholdLogTicks++ >= MAX_CA_THRESHOLD_LOG_TICKS) {
 				caThresholdLogTicks = -1;
 			}

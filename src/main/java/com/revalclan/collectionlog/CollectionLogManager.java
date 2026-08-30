@@ -386,41 +386,17 @@ public class CollectionLogManager {
 	 * Per entry: only OBTAINED items ({id, name, quantity}) plus KC fields.
 	 */
 	/**
-	 * Collection log rank ladder. Bronze..Dragon are fixed by Jagex; Gilded is
-	 * 90% of the total slot count (varp COLLECTION_COUNT_MAX) rounded down to the
-	 * nearest 25, so it moves whenever new slots are added.
-	 */
-	public Map<String, Integer> rankThresholds() {
-		Map<String, Integer> ladder = new LinkedHashMap<>();
-		ladder.put("bronze", 100);
-		ladder.put("iron", 300);
-		ladder.put("steel", 500);
-		ladder.put("black", 700);
-		ladder.put("mithril", 900);
-		ladder.put("adamant", 1000);
-		ladder.put("rune", 1100);
-		ladder.put("dragon", 1200);
-		int totalSlots = client.getVarpValue(VarPlayerID.COLLECTION_COUNT_MAX);
-		ladder.put("gilded", totalSlots > 0 ? (totalSlots * 9 / 10) / 25 * 25 : 0);
-		return ladder;
-	}
-
-	/**
-	 * Logs the rank ladder and the raw varps it comes from. Called on the first
-	 * ticks after login so a dev-client run shows the current Gilded requirement.
+	 * Logs the two collection log facts the game exposes as varps. Called on the
+	 * first ticks after login so a dev-client run shows them. The rank ladder
+	 * itself is NOT in the game data: Bronze..Dragon are fixed rungs, and Gilded
+	 * is 90% of COLLECTION_COUNT_MAX rounded down to 25 — the server derives it.
 	 * @return true once COLLECTION_COUNT_MAX has arrived
 	 */
-	public boolean logRankThresholds() {
+	public boolean logCollectionCounts() {
 		int obtained = client.getVarpValue(VarPlayerID.COLLECTION_COUNT);
 		int totalSlots = client.getVarpValue(VarPlayerID.COLLECTION_COUNT_MAX);
-		Map<String, Integer> ladder = rankThresholds();
-		String rank = "None";
-		for (Map.Entry<String, Integer> tier : ladder.entrySet()) {
-			if (tier.getValue() <= 0 || obtained < tier.getValue()) break;
-			rank = tier.getKey();
-		}
-		log.info("Collection log rank thresholds: {} | COLLECTION_COUNT={} COLLECTION_COUNT_MAX={} | derived rank={}",
-			totalSlots > 0 ? ladder : "NOT POPULATED (COLLECTION_COUNT_MAX=0)", obtained, totalSlots, rank);
+		log.info("Collection log varps: COLLECTION_COUNT={} COLLECTION_COUNT_MAX={}{}",
+			obtained, totalSlots, totalSlots > 0 ? "" : " (NOT POPULATED)");
 		return totalSlots > 0;
 	}
 
@@ -438,11 +414,10 @@ public class CollectionLogManager {
 		// multi-page item IDs inflate it (296 vs the game's true 292).
 		data.put("obtainedItems", uniqueObtained);
 
-		// The rank ladder as the game defines it (Gilded derives from COLLECTION_COUNT_MAX),
-		// so the server judges this sync by the live ladder instead of stored constants
+		// Total unique slots in the game: the server derives the Gilded rank from it
+		// (90% rounded down to 25) instead of keeping a constant that goes stale
 		int totalSlots = client.getVarpValue(VarPlayerID.COLLECTION_COUNT_MAX);
 		if (totalSlots > 0) {
-			data.put("rankThresholds", rankThresholds());
 			data.put("totalSlots", totalSlots);
 		}
 
