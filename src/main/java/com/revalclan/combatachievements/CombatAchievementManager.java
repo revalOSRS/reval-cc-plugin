@@ -196,12 +196,12 @@ public class CombatAchievementManager {
 	 */
 	/** Tier from total points — thresholds must track the wiki when Jagex adds tasks. */
 	private String calculateCurrentTier(int totalPoints) {
-		// In-game unlock points as of the 2026-08-12 rebalance
-		if (totalPoints >= 2672) return "Grandmaster";
-		if (totalPoints >= 1940) return "Master";
-		if (totalPoints >= 1075) return "Elite";
-		if (totalPoints >= 419) return "Hard";
-		if (totalPoints >= 161) return "Medium";
+		// In-game unlock points as of the 2026-08-26 task additions (655 tasks / 2697 pts)
+		if (totalPoints >= 2697) return "Grandmaster";
+		if (totalPoints >= 1965) return "Master";
+		if (totalPoints >= 1100) return "Elite";
+		if (totalPoints >= 436) return "Hard";
+		if (totalPoints >= 169) return "Medium";
 		if (totalPoints >= 41) return "Easy";
 		return "None";
 	}
