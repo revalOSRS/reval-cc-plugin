@@ -4,7 +4,6 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.EnumComposition;
 import net.runelite.api.StructComposition;
-import net.runelite.api.gameval.VarPlayerID;
 import net.runelite.api.gameval.VarbitID;
 
 import javax.inject.Inject;
@@ -246,10 +245,6 @@ public class CombatAchievementManager {
 		log.info("CA thresholds from varbits: {} | CA_POINTS={} | derived tier={} | CA_TIER_STATUS: {}",
 			thresholds.isEmpty() ? "NOT POPULATED" : lowerCaseKeys(thresholds),
 			points, calculateCurrentTier(points, thresholds), status.toString().trim());
-		int clogCount = client.getVarpValue(VarPlayerID.COLLECTION_COUNT);
-		int clogMax = client.getVarpValue(VarPlayerID.COLLECTION_COUNT_MAX);
-		log.info("Collection log varps: COLLECTION_COUNT={} COLLECTION_COUNT_MAX={} | gilded threshold if 90% rounded down to 25 = {}",
-			clogCount, clogMax, (clogMax * 9 / 10) / 25 * 25);
 		return !thresholds.isEmpty();
 	}
 

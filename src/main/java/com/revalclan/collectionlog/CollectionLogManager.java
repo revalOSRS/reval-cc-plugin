@@ -385,6 +385,45 @@ public class CollectionLogManager {
 	 * Collection log data grouped Category > Subcategory > Items.
 	 * Per entry: only OBTAINED items ({id, name, quantity}) plus KC fields.
 	 */
+	/**
+	 * Collection log rank ladder. Bronze..Dragon are fixed by Jagex; Gilded is
+	 * 90% of the total slot count (varp COLLECTION_COUNT_MAX) rounded down to the
+	 * nearest 25, so it moves whenever new slots are added.
+	 */
+	public Map<String, Integer> rankThresholds() {
+		Map<String, Integer> ladder = new LinkedHashMap<>();
+		ladder.put("bronze", 100);
+		ladder.put("iron", 300);
+		ladder.put("steel", 500);
+		ladder.put("black", 700);
+		ladder.put("mithril", 900);
+		ladder.put("adamant", 1000);
+		ladder.put("rune", 1100);
+		ladder.put("dragon", 1200);
+		int totalSlots = client.getVarpValue(VarPlayerID.COLLECTION_COUNT_MAX);
+		ladder.put("gilded", totalSlots > 0 ? (totalSlots * 9 / 10) / 25 * 25 : 0);
+		return ladder;
+	}
+
+	/**
+	 * Logs the rank ladder and the raw varps it comes from. Called on the first
+	 * ticks after login so a dev-client run shows the current Gilded requirement.
+	 * @return true once COLLECTION_COUNT_MAX has arrived
+	 */
+	public boolean logRankThresholds() {
+		int obtained = client.getVarpValue(VarPlayerID.COLLECTION_COUNT);
+		int totalSlots = client.getVarpValue(VarPlayerID.COLLECTION_COUNT_MAX);
+		Map<String, Integer> ladder = rankThresholds();
+		String rank = "None";
+		for (Map.Entry<String, Integer> tier : ladder.entrySet()) {
+			if (tier.getValue() <= 0 || obtained < tier.getValue()) break;
+			rank = tier.getKey();
+		}
+		log.info("Collection log rank thresholds: {} | COLLECTION_COUNT={} COLLECTION_COUNT_MAX={} | derived rank={}",
+			totalSlots > 0 ? ladder : "NOT POPULATED (COLLECTION_COUNT_MAX=0)", obtained, totalSlots, rank);
+		return totalSlots > 0;
+	}
+
 	public Map<String, Object> sync() {
 		Map<String, Object> data = new HashMap<>();
 
