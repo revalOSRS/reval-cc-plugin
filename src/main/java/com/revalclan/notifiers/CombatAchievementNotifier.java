@@ -54,6 +54,11 @@ public class CombatAchievementNotifier extends BaseNotifier {
 		if (totalPoints > 0) {
 			caData.put("totalPoints", totalPoints);
 		}
+		// The game's tier unlock points, so the server judges this event by the live ladder
+		Map<String, Integer> tierThresholds = combatAchievementManager.tierThresholdsForPayload();
+		if (!tierThresholds.isEmpty()) {
+			caData.put("tierThresholds", tierThresholds);
+		}
 
 		sendNotification(caData);
 	}

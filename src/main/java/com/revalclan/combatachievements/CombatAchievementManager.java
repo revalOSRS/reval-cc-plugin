@@ -248,6 +248,11 @@ public class CombatAchievementManager {
 		return !thresholds.isEmpty();
 	}
 
+	/** The game's tier ladder with lowercase keys, for event payloads; empty if the varps aren't in yet. */
+	public Map<String, Integer> tierThresholdsForPayload() {
+		return lowerCaseKeys(tierThresholds());
+	}
+
 	/** Highest tier whose unlock point the player has reached, walking the ladder in order. */
 	private String calculateCurrentTier(int totalPoints, Map<String, Integer> thresholds) {
 		String current = "None";

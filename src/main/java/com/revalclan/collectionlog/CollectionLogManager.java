@@ -438,6 +438,14 @@ public class CollectionLogManager {
 		// multi-page item IDs inflate it (296 vs the game's true 292).
 		data.put("obtainedItems", uniqueObtained);
 
+		// The rank ladder as the game defines it (Gilded derives from COLLECTION_COUNT_MAX),
+		// so the server judges this sync by the live ladder instead of stored constants
+		int totalSlots = client.getVarpValue(VarPlayerID.COLLECTION_COUNT_MAX);
+		if (totalSlots > 0) {
+			data.put("rankThresholds", rankThresholds());
+			data.put("totalSlots", totalSlots);
+		}
+
 		// Trust marker for the server's clog storage/recovery gate: per-item data
 		// is only real after the player opened the collection log this session
 		data.put("dataSource", obtainedItems.isEmpty() ? "varbit_2943" : "collection_log_opened");
