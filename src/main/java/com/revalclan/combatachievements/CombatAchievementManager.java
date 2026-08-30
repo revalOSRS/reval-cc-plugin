@@ -225,6 +225,29 @@ public class CombatAchievementManager {
 		return thresholds;
 	}
 
+	/**
+	 * Logs the raw CA varbits the tier ladder is built from. Called on the first
+	 * ticks after login so a dev-client run shows whether the game populated them.
+	 * @return true once the threshold varbits form a valid ladder
+	 */
+	public boolean logTierThresholds() {
+		Map<String, Integer> thresholds = tierThresholds();
+		int points = readCaPointsVarbit();
+		StringBuilder status = new StringBuilder();
+		int[] statusVarbits = {
+			VarbitID.CA_TIER_STATUS_EASY, VarbitID.CA_TIER_STATUS_MEDIUM, VarbitID.CA_TIER_STATUS_HARD,
+			VarbitID.CA_TIER_STATUS_ELITE, VarbitID.CA_TIER_STATUS_MASTER, VarbitID.CA_TIER_STATUS_GRANDMASTER
+		};
+		int i = 0;
+		for (String tier : TIER_ENUMS.values()) {
+			status.append(tier.toLowerCase()).append('=').append(client.getVarbitValue(statusVarbits[i++])).append(' ');
+		}
+		log.info("CA thresholds from varbits: {} | CA_POINTS={} | derived tier={} | CA_TIER_STATUS: {}",
+			thresholds.isEmpty() ? "NOT POPULATED" : lowerCaseKeys(thresholds),
+			points, calculateCurrentTier(points, thresholds), status.toString().trim());
+		return !thresholds.isEmpty();
+	}
+
 	/** Highest tier whose unlock point the player has reached, walking the ladder in order. */
 	private String calculateCurrentTier(int totalPoints, Map<String, Integer> thresholds) {
 		String current = "None";

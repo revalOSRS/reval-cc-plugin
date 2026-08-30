@@ -3,6 +3,7 @@ package com.revalclan;
 import com.revalclan.api.RevalApiService;
 import com.revalclan.combat.KillTracker;
 import com.revalclan.collectionlog.CollectionLogManager;
+import com.revalclan.combatachievements.CombatAchievementManager;
 import com.revalclan.collectionlog.CollectionLogSyncButton;
 import com.revalclan.collectionlog.SyncGuide;
 import com.revalclan.collectionlog.SyncGuideOverlay;
@@ -65,6 +66,7 @@ public class RevalClanPlugin extends Plugin {
 	@Inject private Client client;
 
 	@Inject	private CollectionLogManager collectionLogManager;
+	@Inject	private CombatAchievementManager combatAchievementManager;
 
 	@Inject	private CollectionLogSyncButton syncButton;
 	@Inject	private SyncGuide syncGuide;
@@ -285,6 +287,7 @@ public class RevalClanPlugin extends Plugin {
 				collectionLogManager.clearObtainedItems();
 
 				pendingLoginNotification = true;
+				caThresholdLogTicks = 0;
 
 				clanValidationAttempt = 0;
 			}
@@ -330,8 +333,18 @@ public class RevalClanPlugin extends Plugin {
 		}
 	}
 
+	/** Ticks since login spent waiting for the CA threshold varps; -1 when not waiting. */
+	private int caThresholdLogTicks = -1;
+	private static final int MAX_CA_THRESHOLD_LOG_TICKS = 20;
+
 	@Subscribe
 	public void onGameTick(GameTick gameTick) {
+		if (caThresholdLogTicks >= 0) {
+			if (combatAchievementManager.logTierThresholds() || caThresholdLogTicks++ >= MAX_CA_THRESHOLD_LOG_TICKS) {
+				caThresholdLogTicks = -1;
+			}
+		}
+
 		if (clanValidationAttempt >= 0) {
 			if (clanValidationAttempt > MAX_CLAN_VALIDATION_TICKS) {
 				clanValidationAttempt = -1;
