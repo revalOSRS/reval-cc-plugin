@@ -195,8 +195,8 @@ public class CombatAchievementManager {
 
 	/**
 	 * Last ladder verified by hand (2026-08-26: 655 tasks / 2697 pts). Only used
-	 * when the task structs can't be read; {@link #tierThresholds()} is the
-	 * real source.
+	 * when neither the varbits nor the task structs can be read;
+	 * {@link #tierThresholds()} is the real source.
 	 */
 	private static final Map<String, Integer> LAST_KNOWN_THRESHOLDS = new LinkedHashMap<>();
 	static {
@@ -208,31 +208,73 @@ public class CombatAchievementManager {
 		LAST_KNOWN_THRESHOLDS.put("Grandmaster", 2697);
 	}
 
+	/** The game's own per-tier unlock points, in ladder order (packed into varps CA_THRESHOLDS1-3). */
+	private static final int[] THRESHOLD_VARBITS = {
+		VarbitID.CA_THRESHOLD_EASY,
+		VarbitID.CA_THRESHOLD_MEDIUM,
+		VarbitID.CA_THRESHOLD_HARD,
+		VarbitID.CA_THRESHOLD_ELITE,
+		VarbitID.CA_THRESHOLD_MASTER,
+		VarbitID.CA_THRESHOLD_GRANDMASTER
+	};
+
 	/**
-	 * Points needed to unlock each tier, derived from the task structs the game
-	 * ships. Every task in a tier is worth a fixed 1-6 points, so a tier's unlock
-	 * point is the sum of all points in that tier and every tier below it (this is
-	 * exactly how the wiki's "points required for rewards" column is produced).
-	 * Recomputed from {@link #allTasks} on every sync, so Jagex adding a task
-	 * batch is picked up without a plugin release.
-	 * <p>
-	 * Falls back to {@link #LAST_KNOWN_THRESHOLDS} if any tier loaded zero tasks:
-	 * a missing tier would understate every threshold above it and label players
-	 * with tiers they haven't reached.
+	 * Points needed to unlock each tier. Sources, in order of trust:
+	 * <ol>
+	 *   <li>The game's CA_THRESHOLD_* varbits — Jagex's own numbers, sent with the
+	 *       player's varps, so a new task batch is reflected the moment it goes live.</li>
+	 *   <li>A sum over the task structs: every task in a tier is worth a fixed 1-6
+	 *       points, so a tier's unlock point is the total points of that tier and all
+	 *       tiers below it (how the wiki's "points required" column is produced).</li>
+	 *   <li>{@link #LAST_KNOWN_THRESHOLDS}, if the structs can't be read either.</li>
+	 * </ol>
+	 * Each source must be a strictly ascending ladder with no zeros to be accepted;
+	 * a missing tier would understate every threshold above it.
 	 */
 	private Map<String, Integer> tierThresholds() {
+		Map<String, Integer> fromVarbits = thresholdsFromVarbits();
+		if (fromVarbits != null) return fromVarbits;
+
+		Map<String, Integer> fromStructs = thresholdsFromStructs();
+		if (fromStructs != null) return fromStructs;
+
+		log.warn("CA tier thresholds unavailable from varbits and structs; using last known ladder");
+		return LAST_KNOWN_THRESHOLDS;
+	}
+
+	private Map<String, Integer> thresholdsFromVarbits() {
+		Map<String, Integer> thresholds = new LinkedHashMap<>();
+		int i = 0;
+		for (String tier : TIER_ENUMS.values()) {
+			int value;
+			try {
+				value = client.getVarbitValue(THRESHOLD_VARBITS[i++]);
+			} catch (Exception e) {
+				return null;
+			}
+			thresholds.put(tier, value);
+		}
+		return isAscendingLadder(thresholds) ? thresholds : null;
+	}
+
+	private Map<String, Integer> thresholdsFromStructs() {
 		Map<String, Integer> thresholds = new LinkedHashMap<>();
 		int cumulative = 0;
 		for (String tier : TIER_ENUMS.values()) {
 			long taskCount = allTasks.stream().filter(t -> t.getTier().equals(tier)).count();
-			if (taskCount == 0) {
-				log.warn("CA tier {} loaded 0 tasks from structs; using last known thresholds", tier);
-				return LAST_KNOWN_THRESHOLDS;
-			}
 			cumulative += (int) taskCount * getPointsForTier(tier);
 			thresholds.put(tier, cumulative);
 		}
-		return thresholds;
+		return isAscendingLadder(thresholds) ? thresholds : null;
+	}
+
+	private static boolean isAscendingLadder(Map<String, Integer> thresholds) {
+		int previous = 0;
+		for (int value : thresholds.values()) {
+			if (value <= previous) return false;
+			previous = value;
+		}
+		return true;
 	}
 
 	/** Highest tier whose unlock point the player has reached, walking the ladder in order. */
