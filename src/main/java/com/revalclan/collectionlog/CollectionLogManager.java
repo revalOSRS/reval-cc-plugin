@@ -385,21 +385,6 @@ public class CollectionLogManager {
 	 * Collection log data grouped Category > Subcategory > Items.
 	 * Per entry: only OBTAINED items ({id, name, quantity}) plus KC fields.
 	 */
-	/**
-	 * Logs the two collection log facts the game exposes as varps. Called on the
-	 * first ticks after login so a dev-client run shows them. The rank ladder
-	 * itself is NOT in the game data: Bronze..Dragon are fixed rungs, and Gilded
-	 * is 90% of COLLECTION_COUNT_MAX rounded down to 25 — the server derives it.
-	 * @return true once COLLECTION_COUNT_MAX has arrived
-	 */
-	public boolean logCollectionCounts() {
-		int obtained = client.getVarpValue(VarPlayerID.COLLECTION_COUNT);
-		int totalSlots = client.getVarpValue(VarPlayerID.COLLECTION_COUNT_MAX);
-		log.info("Collection log varps: COLLECTION_COUNT={} COLLECTION_COUNT_MAX={}{}",
-			obtained, totalSlots, totalSlots > 0 ? "" : " (NOT POPULATED)");
-		return totalSlots > 0;
-	}
-
 	public Map<String, Object> sync() {
 		Map<String, Object> data = new HashMap<>();
 
