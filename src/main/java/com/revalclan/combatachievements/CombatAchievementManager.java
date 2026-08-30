@@ -82,11 +82,13 @@ public class CombatAchievementManager {
 		});
 
 		int totalPoints = currentTotalPoints();
+		Map<String, Integer> thresholds = tierThresholds();
 
 		Map<String, Object> data = new HashMap<>();
-		data.put("currentTier", calculateCurrentTier(totalPoints));
+		data.put("currentTier", calculateCurrentTier(totalPoints, thresholds));
 		data.put("totalPoints", totalPoints);
 		data.put("tierProgress", getTierProgress());
+		data.put("tierThresholds", lowerCaseKeys(thresholds));
 		data.put("allTasks", getCompletedTasks());
 		data.put("totalTasksLoaded", allTasks.size());
 
@@ -191,19 +193,57 @@ public class CombatAchievementManager {
 		}
 	}
 
+	/** The game's own per-tier unlock points, in ladder order (packed into varps CA_THRESHOLDS1-3). */
+	private static final int[] THRESHOLD_VARBITS = {
+		VarbitID.CA_THRESHOLD_EASY,
+		VarbitID.CA_THRESHOLD_MEDIUM,
+		VarbitID.CA_THRESHOLD_HARD,
+		VarbitID.CA_THRESHOLD_ELITE,
+		VarbitID.CA_THRESHOLD_MASTER,
+		VarbitID.CA_THRESHOLD_GRANDMASTER
+	};
+
 	/**
-	 * Calculate total points from completed tasks
+	 * Points needed to unlock each tier, read from the game's CA_THRESHOLD_* varbits
+	 * so a new task batch is reflected the moment it goes live, with no plugin release.
+	 * Returns an empty map (=> currentTier "None") if the varps haven't arrived, which
+	 * only happens when the rest of the CA varps are missing too and the sync is moot.
 	 */
-	/** Tier from total points — thresholds must track the wiki when Jagex adds tasks. */
-	private String calculateCurrentTier(int totalPoints) {
-		// In-game unlock points as of the 2026-08-12 rebalance
-		if (totalPoints >= 2672) return "Grandmaster";
-		if (totalPoints >= 1940) return "Master";
-		if (totalPoints >= 1075) return "Elite";
-		if (totalPoints >= 419) return "Hard";
-		if (totalPoints >= 161) return "Medium";
-		if (totalPoints >= 41) return "Easy";
-		return "None";
+	private Map<String, Integer> tierThresholds() {
+		Map<String, Integer> thresholds = new LinkedHashMap<>();
+		int previous = 0;
+		int i = 0;
+		for (String tier : TIER_ENUMS.values()) {
+			int value = client.getVarbitValue(THRESHOLD_VARBITS[i++]);
+			if (value <= previous) {
+				log.warn("CA tier thresholds not available from varbits ({} = {})", tier, value);
+				return Collections.emptyMap();
+			}
+			thresholds.put(tier, value);
+			previous = value;
+		}
+		return thresholds;
+	}
+
+	/** The game's tier ladder with lowercase keys, for event payloads; empty if the varps aren't in yet. */
+	public Map<String, Integer> tierThresholdsForPayload() {
+		return lowerCaseKeys(tierThresholds());
+	}
+
+	/** Highest tier whose unlock point the player has reached, walking the ladder in order. */
+	private String calculateCurrentTier(int totalPoints, Map<String, Integer> thresholds) {
+		String current = "None";
+		for (Map.Entry<String, Integer> tier : thresholds.entrySet()) {
+			if (totalPoints < tier.getValue()) break;
+			current = tier.getKey();
+		}
+		return current;
+	}
+
+	private static Map<String, Integer> lowerCaseKeys(Map<String, Integer> map) {
+		Map<String, Integer> out = new LinkedHashMap<>();
+		map.forEach((k, v) -> out.put(k.toLowerCase(), v));
+		return out;
 	}
 
 	/**

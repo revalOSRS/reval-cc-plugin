@@ -8,6 +8,8 @@
 package com.revalclan.notifiers;
 
 import javax.inject.Singleton;
+import net.runelite.api.gameval.VarPlayerID;
+
 import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -43,6 +45,12 @@ public class CollectionNotifier extends BaseNotifier {
 	private void handleCollectionItem(String itemName) {
 		Map<String, Object> collectionData = new HashMap<>();
 		collectionData.put("item", itemName);
+		// Total slot count, so the server derives the Gilded rung from live data
+		// when judging this drop for a rank milestone
+		int totalSlots = client.getVarpValue(VarPlayerID.COLLECTION_COUNT_MAX);
+		if (totalSlots > 0) {
+			collectionData.put("totalSlots", totalSlots);
+		}
 
 		sendNotification(collectionData);
 	}

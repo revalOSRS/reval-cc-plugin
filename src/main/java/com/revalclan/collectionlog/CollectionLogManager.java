@@ -399,6 +399,13 @@ public class CollectionLogManager {
 		// multi-page item IDs inflate it (296 vs the game's true 292).
 		data.put("obtainedItems", uniqueObtained);
 
+		// Total unique slots in the game: the server derives the Gilded rank from it
+		// (90% rounded down to 25) instead of keeping a constant that goes stale
+		int totalSlots = client.getVarpValue(VarPlayerID.COLLECTION_COUNT_MAX);
+		if (totalSlots > 0) {
+			data.put("totalSlots", totalSlots);
+		}
+
 		// Trust marker for the server's clog storage/recovery gate: per-item data
 		// is only real after the player opened the collection log this session
 		data.put("dataSource", obtainedItems.isEmpty() ? "varbit_2943" : "collection_log_opened");
