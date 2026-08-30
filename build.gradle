@@ -27,7 +27,17 @@ dependencies {
 }
 
 group = 'com.revalclan'
-version = '2.18.3'
+// runelite-plugin.properties is the single source of truth for the plugin version:
+// the jar is named after it and PluginVersion reads it at runtime (User-Agent).
+def pluginProperties = new Properties()
+file('runelite-plugin.properties').withInputStream { pluginProperties.load(it) }
+version = pluginProperties.getProperty('version')
+
+processResources {
+	// Ship the properties file so PluginVersion can read the version at runtime.
+	// A real task input, so bumping the version re-stamps the jar without a clean.
+	from('runelite-plugin.properties') { into 'com/revalclan' }
+}
 
 tasks.withType(JavaCompile).configureEach {
 	options.encoding = 'UTF-8'

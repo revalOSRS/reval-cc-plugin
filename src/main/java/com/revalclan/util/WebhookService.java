@@ -18,7 +18,6 @@ import java.util.zip.GZIPOutputStream;
 public class WebhookService {
 	private static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
 	private static final String WEBHOOK_URL = "https://api.revalosrs.ee/reval-webhook";
-	private static final String PLUGIN_VERSION = "2.18";
 
 	@Inject
 	private OkHttpClient httpClient;
@@ -64,7 +63,7 @@ public class WebhookService {
 				.post(body)
 				.addHeader("Content-Type", "application/json")
 				.addHeader("Content-Encoding", "gzip")
-				.addHeader("User-Agent", "RuneLite-RevalClan-Plugin/" + PLUGIN_VERSION)
+				.addHeader("User-Agent", PluginVersion.userAgent())
 				.build();
 
 			httpClient.newCall(request).enqueue(new Callback() {
