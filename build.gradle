@@ -78,4 +78,12 @@ tasks.register('runClient', JavaExec) {
 	mainClass.set('com.revalclan.RevalClanPluginTest')
 	args '--developer-mode'
 	jvmArgs '-ea'
+	if (System.getProperty('os.name').toLowerCase().contains('mac')) {
+		// RuneLite's OSX adapters extend com.apple.eawt classes that java.desktop
+		// doesn't export on JDK 17+; the official launcher passes the same flags.
+		jvmArgs '--add-exports', 'java.desktop/com.apple.eawt=ALL-UNNAMED',
+			'--add-exports', 'java.desktop/com.apple.eawt.event=ALL-UNNAMED',
+			'--add-opens', 'java.desktop/com.apple.eawt=ALL-UNNAMED',
+			'--add-opens', 'java.desktop/sun.awt=ALL-UNNAMED'
+	}
 }
