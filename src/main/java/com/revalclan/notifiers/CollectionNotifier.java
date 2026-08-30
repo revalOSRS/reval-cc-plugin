@@ -45,12 +45,8 @@ public class CollectionNotifier extends BaseNotifier {
 	private void handleCollectionItem(String itemName) {
 		Map<String, Object> collectionData = new HashMap<>();
 		collectionData.put("item", itemName);
-		// The game's unique-slot counter and total slot count, so the server judges
-		// the rank milestone (Gilded derives from the total) by live values
-		int uniqueObtained = client.getVarpValue(VarPlayerID.COLLECTION_COUNT);
-		if (uniqueObtained > 0) {
-			collectionData.put("uniqueObtained", uniqueObtained);
-		}
+		// Total slot count, so the server derives the Gilded rung from live data
+		// when judging this drop for a rank milestone
 		int totalSlots = client.getVarpValue(VarPlayerID.COLLECTION_COUNT_MAX);
 		if (totalSlots > 0) {
 			collectionData.put("totalSlots", totalSlots);

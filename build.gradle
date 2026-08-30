@@ -69,21 +69,3 @@ tasks.register('shadowJar', Jar) {
 	archiveClassifier.set('shadow')
 	archiveFileName.set("${rootProject.name}-${project.version}-all.jar")
 }
-
-// Dev client: ./gradlew runClient  (JDK 21). Loads the plugin as a builtin via RevalClanPluginTest.
-tasks.register('runClient', JavaExec) {
-	group = 'application'
-	description = 'Launches the RuneLite dev client with the Reval plugin loaded'
-	classpath = sourceSets.test.runtimeClasspath
-	mainClass.set('com.revalclan.RevalClanPluginTest')
-	args '--developer-mode'
-	jvmArgs '-ea'
-	if (System.getProperty('os.name').toLowerCase().contains('mac')) {
-		// RuneLite's OSX adapters extend com.apple.eawt classes that java.desktop
-		// doesn't export on JDK 17+; the official launcher passes the same flags.
-		jvmArgs '--add-exports', 'java.desktop/com.apple.eawt=ALL-UNNAMED',
-			'--add-exports', 'java.desktop/com.apple.eawt.event=ALL-UNNAMED',
-			'--add-opens', 'java.desktop/com.apple.eawt=ALL-UNNAMED',
-			'--add-opens', 'java.desktop/sun.awt=ALL-UNNAMED'
-	}
-}
