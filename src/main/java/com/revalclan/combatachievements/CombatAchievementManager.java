@@ -82,11 +82,13 @@ public class CombatAchievementManager {
 		});
 
 		int totalPoints = currentTotalPoints();
+		Map<String, Integer> thresholds = tierThresholds();
 
 		Map<String, Object> data = new HashMap<>();
-		data.put("currentTier", calculateCurrentTier(totalPoints));
+		data.put("currentTier", calculateCurrentTier(totalPoints, thresholds));
 		data.put("totalPoints", totalPoints);
 		data.put("tierProgress", getTierProgress());
+		data.put("tierThresholds", lowerCaseKeys(thresholds));
 		data.put("allTasks", getCompletedTasks());
 		data.put("totalTasksLoaded", allTasks.size());
 
@@ -192,18 +194,61 @@ public class CombatAchievementManager {
 	}
 
 	/**
-	 * Calculate total points from completed tasks
+	 * Last ladder verified by hand (2026-08-26: 655 tasks / 2697 pts). Only used
+	 * when the task structs can't be read; {@link #tierThresholds()} is the
+	 * real source.
 	 */
-	/** Tier from total points — thresholds must track the wiki when Jagex adds tasks. */
-	private String calculateCurrentTier(int totalPoints) {
-		// In-game unlock points as of the 2026-08-26 task additions (655 tasks / 2697 pts)
-		if (totalPoints >= 2697) return "Grandmaster";
-		if (totalPoints >= 1965) return "Master";
-		if (totalPoints >= 1100) return "Elite";
-		if (totalPoints >= 436) return "Hard";
-		if (totalPoints >= 169) return "Medium";
-		if (totalPoints >= 41) return "Easy";
-		return "None";
+	private static final Map<String, Integer> LAST_KNOWN_THRESHOLDS = new LinkedHashMap<>();
+	static {
+		LAST_KNOWN_THRESHOLDS.put("Easy", 41);
+		LAST_KNOWN_THRESHOLDS.put("Medium", 169);
+		LAST_KNOWN_THRESHOLDS.put("Hard", 436);
+		LAST_KNOWN_THRESHOLDS.put("Elite", 1100);
+		LAST_KNOWN_THRESHOLDS.put("Master", 1965);
+		LAST_KNOWN_THRESHOLDS.put("Grandmaster", 2697);
+	}
+
+	/**
+	 * Points needed to unlock each tier, derived from the task structs the game
+	 * ships. Every task in a tier is worth a fixed 1-6 points, so a tier's unlock
+	 * point is the sum of all points in that tier and every tier below it (this is
+	 * exactly how the wiki's "points required for rewards" column is produced).
+	 * Recomputed from {@link #allTasks} on every sync, so Jagex adding a task
+	 * batch is picked up without a plugin release.
+	 * <p>
+	 * Falls back to {@link #LAST_KNOWN_THRESHOLDS} if any tier loaded zero tasks:
+	 * a missing tier would understate every threshold above it and label players
+	 * with tiers they haven't reached.
+	 */
+	private Map<String, Integer> tierThresholds() {
+		Map<String, Integer> thresholds = new LinkedHashMap<>();
+		int cumulative = 0;
+		for (String tier : TIER_ENUMS.values()) {
+			long taskCount = allTasks.stream().filter(t -> t.getTier().equals(tier)).count();
+			if (taskCount == 0) {
+				log.warn("CA tier {} loaded 0 tasks from structs; using last known thresholds", tier);
+				return LAST_KNOWN_THRESHOLDS;
+			}
+			cumulative += (int) taskCount * getPointsForTier(tier);
+			thresholds.put(tier, cumulative);
+		}
+		return thresholds;
+	}
+
+	/** Highest tier whose unlock point the player has reached, walking the ladder in order. */
+	private String calculateCurrentTier(int totalPoints, Map<String, Integer> thresholds) {
+		String current = "None";
+		for (Map.Entry<String, Integer> tier : thresholds.entrySet()) {
+			if (totalPoints < tier.getValue()) break;
+			current = tier.getKey();
+		}
+		return current;
+	}
+
+	private static Map<String, Integer> lowerCaseKeys(Map<String, Integer> map) {
+		Map<String, Integer> out = new LinkedHashMap<>();
+		map.forEach((k, v) -> out.put(k.toLowerCase(), v));
+		return out;
 	}
 
 	/**
