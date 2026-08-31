@@ -481,21 +481,12 @@ public class LootNotifier extends BaseNotifier {
 
 			String suspectReason = suspectReason(itemId, item.getQuantity(), tickCounter);
 
-			// The session total covers everything the player actually received, so it is
-			// tracked before the forwarding filter below. Suspects are excluded:
-			// they are forgeries, not loot.
+			// Sessions count everything received, so track before filtering
 			if (suspectReason == null) {
 				sessionTracker.addLoot(source, itemId, itemName, item.getQuantity(), gePrice);
 			}
 
-			// Forward only what a consumer can act on: a single item worth at least
-			// the served threshold, or an item some active requirement asked for
-			// (the whitelist covers the clan clog, point sources and every active
-			// event tile). The comparison is against the unit price, not the stack:
-			// two 700k items are not a 1M drop. Everything else is dropped here —
-			// the backend has no use for it and each forwarded drop costs a full
-			// ingestion pipeline. A served threshold of 0 (an active loot-value
-			// competition) keeps every item, which is what that competition needs.
+			// Unit price, not stack: two 700k items are not a 1M drop
 			if (gePrice < minLootValue && !whitelistItemIds.contains(itemId)) continue;
 
 			Map<String, Object> itemData = new HashMap<>();
@@ -510,15 +501,13 @@ public class LootNotifier extends BaseNotifier {
 			}
 			itemsList.add(itemData);
 
-			// Suspects are split out of items[] at flush, so they must not count
-			// toward the totals consumers award off
+			// Split out of items[] at flush, so they must not count toward totals
 			if (suspectReason != null) continue;
 
 			totalGEValue += stackValue;
 			totalHAValue += (long) haValue * item.getQuantity();
 		}
 
-		// Nothing in this drop is individually notable or asked for by name
 		if (itemsList.isEmpty()) return;
 
 		Map<String, Object> lootData = new HashMap<>();

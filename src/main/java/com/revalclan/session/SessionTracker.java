@@ -218,11 +218,7 @@ public class SessionTracker {
 		dirty = true;
 	}
 
-	/**
-	 * Accumulate the session's loot value. Only the total is reported — the
-	 * backend has no consumer for the per-item breakdown, so it is not kept.
-	 * itemName and source stay in the signature for callers and future use.
-	 */
+	/** Only the total is reported; the per-item breakdown has no consumer. */
 	public void addLoot(String source, int itemId, String itemName, int quantity, long gePriceEach) {
 		if (!active) return;
 		totalLootValue += gePriceEach * quantity;
