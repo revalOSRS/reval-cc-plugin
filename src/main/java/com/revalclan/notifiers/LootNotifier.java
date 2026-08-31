@@ -488,14 +488,15 @@ public class LootNotifier extends BaseNotifier {
 				sessionTracker.addLoot(source, itemId, itemName, item.getQuantity(), gePrice);
 			}
 
-			// Forward only what a consumer can act on: a stack worth at least the
-			// served threshold on its own, or an item some active requirement asked
-			// for (the whitelist covers the clan clog, point sources and every
-			// active event tile). Everything else is dropped here — the backend has
-			// no use for it and each forwarded drop costs a full ingestion pipeline.
-			// A served threshold of 0 (an active loot-value competition) keeps
-			// every item, which is exactly what that competition needs.
-			if (stackValue < minLootValue && !whitelistItemIds.contains(itemId)) continue;
+			// Forward only what a consumer can act on: a single item worth at least
+			// the served threshold, or an item some active requirement asked for
+			// (the whitelist covers the clan clog, point sources and every active
+			// event tile). The comparison is against the unit price, not the stack:
+			// two 700k items are not a 1M drop. Everything else is dropped here —
+			// the backend has no use for it and each forwarded drop costs a full
+			// ingestion pipeline. A served threshold of 0 (an active loot-value
+			// competition) keeps every item, which is what that competition needs.
+			if (gePrice < minLootValue && !whitelistItemIds.contains(itemId)) continue;
 
 			Map<String, Object> itemData = new HashMap<>();
 			itemData.put("id", itemId);
