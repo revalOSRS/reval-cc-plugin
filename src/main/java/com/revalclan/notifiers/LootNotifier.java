@@ -466,10 +466,6 @@ public class LootNotifier extends BaseNotifier {
 		List<Map<String, Object>> itemsList = new ArrayList<>();
 		long totalGEValue = 0;
 		long totalHAValue = 0;
-		boolean hasWhitelistedItem = false;
-		boolean hasUntradeable = false;
-
-		boolean hasSuspect = false;
 
 		for (ItemStack item : items) {
 			int itemId = item.getId();
@@ -481,8 +477,17 @@ public class LootNotifier extends BaseNotifier {
 			int haValue = itemManager.getItemComposition(itemId).getPrice();
 			boolean isTradeable = itemManager.getItemComposition(itemId).isTradeable();
 			String itemName = itemManager.getItemComposition(itemId).getName();
+			long stackValue = (long) gePrice * item.getQuantity();
 
 			String suspectReason = suspectReason(itemId, item.getQuantity(), tickCounter);
+
+			// Sessions count everything received, so track before filtering
+			if (suspectReason == null) {
+				sessionTracker.addLoot(source, itemId, itemName, item.getQuantity(), gePrice);
+			}
+
+			// Unit price, not stack: two 700k items are not a 1M drop
+			if (gePrice < minLootValue && !whitelistItemIds.contains(itemId)) continue;
 
 			Map<String, Object> itemData = new HashMap<>();
 			itemData.put("id", itemId);
@@ -496,28 +501,14 @@ public class LootNotifier extends BaseNotifier {
 			}
 			itemsList.add(itemData);
 
-			// Suspects skip totals, sessions, and triggers; split out at flush
-			if (suspectReason != null) {
-				hasSuspect = true;
-				continue;
-			}
+			// Split out of items[] at flush, so they must not count toward totals
+			if (suspectReason != null) continue;
 
-			totalGEValue += (long) gePrice * item.getQuantity();
+			totalGEValue += stackValue;
 			totalHAValue += (long) haValue * item.getQuantity();
-
-			sessionTracker.addLoot(source, itemId, itemName, item.getQuantity(), gePrice);
-
-			// Check for special items
-			if (whitelistItemIds.contains(itemId)) hasWhitelistedItem = true;
-			if (!isTradeable) hasUntradeable = true;
 		}
-		// 1. Total value >= minLootValue (from API)
-		// 2. Contains a whitelisted item (from API)
-		// 3. Contains an untradeable item
-		// 4. Contains a suspect item (always report attempted forgeries)
-		boolean shouldNotify = totalGEValue >= minLootValue || hasWhitelistedItem || hasUntradeable || hasSuspect;
 
-		if (!shouldNotify) return;
+		if (itemsList.isEmpty()) return;
 
 		Map<String, Object> lootData = new HashMap<>();
 		lootData.put("source", source);

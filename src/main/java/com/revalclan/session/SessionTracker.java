@@ -40,7 +40,6 @@ public class SessionTracker {
 	private static final int MAX_PERSISTED_SESSIONS = 5;
 
 	/** Malfunction guard — totals stay exact even past the cap */
-	private static final int MAX_LOOT_ENTRIES = 5000;
 
 	/** Malfunction guard (deaths) */
 	private static final int MAX_LIST_ENTRIES = 1000;
@@ -65,8 +64,6 @@ public class SessionTracker {
 	private Map<String, Object> endSnapshot;
 	private final Map<String, Integer> kills = new HashMap<>();
 	private final Map<String, Integer> clues = new HashMap<>();
-	/** key: itemId + "|" + source → aggregated loot entry */
-	private final Map<String, Map<String, Object>> loot = new LinkedHashMap<>();
 	private long totalLootValue = 0;
 	private final List<Map<String, Object>> deaths = new ArrayList<>();
 
@@ -221,23 +218,10 @@ public class SessionTracker {
 		dirty = true;
 	}
 
+	/** Only the total is reported; the per-item breakdown has no consumer. */
 	public void addLoot(String source, int itemId, String itemName, int quantity, long gePriceEach) {
 		if (!active) return;
 		totalLootValue += gePriceEach * quantity;
-
-		String key = itemId + "|" + source;
-		Map<String, Object> entry = loot.get(key);
-		if (entry != null) {
-			entry.put("quantity", ((Number) entry.get("quantity")).intValue() + quantity);
-		} else if (loot.size() < MAX_LOOT_ENTRIES) {
-			entry = new HashMap<>();
-			entry.put("itemId", itemId);
-			entry.put("itemName", itemName);
-			entry.put("quantity", quantity);
-			entry.put("gePrice", gePriceEach);
-			entry.put("source", source);
-			loot.put(key, entry);
-		}
 		dirty = true;
 	}
 
@@ -273,7 +257,6 @@ public class SessionTracker {
 		endSnapshot = null;
 		kills.clear();
 		clues.clear();
-		loot.clear();
 		totalLootValue = 0;
 		deaths.clear();
 		dirty = false;
@@ -341,7 +324,6 @@ public class SessionTracker {
 		summary.put("kills", new HashMap<>(kills));
 		summary.put("clues", new HashMap<>(clues));
 		summary.put("totalLootValue", totalLootValue);
-		summary.put("lootItems", new ArrayList<>(loot.values()));
 		summary.put("deaths", new ArrayList<>(deaths));
 		return summary;
 	}
