@@ -466,10 +466,6 @@ public class LootNotifier extends BaseNotifier {
 		List<Map<String, Object>> itemsList = new ArrayList<>();
 		long totalGEValue = 0;
 		long totalHAValue = 0;
-		boolean hasWhitelistedItem = false;
-		boolean hasUntradeable = false;
-
-		boolean hasSuspect = false;
 
 		for (ItemStack item : items) {
 			int itemId = item.getId();
@@ -481,8 +477,25 @@ public class LootNotifier extends BaseNotifier {
 			int haValue = itemManager.getItemComposition(itemId).getPrice();
 			boolean isTradeable = itemManager.getItemComposition(itemId).isTradeable();
 			String itemName = itemManager.getItemComposition(itemId).getName();
+			long stackValue = (long) gePrice * item.getQuantity();
 
 			String suspectReason = suspectReason(itemId, item.getQuantity(), tickCounter);
+
+			// The session total covers everything the player actually received, so it is
+			// tracked before the forwarding filter below. Suspects are excluded:
+			// they are forgeries, not loot.
+			if (suspectReason == null) {
+				sessionTracker.addLoot(source, itemId, itemName, item.getQuantity(), gePrice);
+			}
+
+			// Forward only what a consumer can act on: a stack worth at least the
+			// served threshold on its own, or an item some active requirement asked
+			// for (the whitelist covers the clan clog, point sources and every
+			// active event tile). Everything else is dropped here — the backend has
+			// no use for it and each forwarded drop costs a full ingestion pipeline.
+			// A served threshold of 0 (an active loot-value competition) keeps
+			// every item, which is exactly what that competition needs.
+			if (stackValue < minLootValue && !whitelistItemIds.contains(itemId)) continue;
 
 			Map<String, Object> itemData = new HashMap<>();
 			itemData.put("id", itemId);
@@ -496,28 +509,16 @@ public class LootNotifier extends BaseNotifier {
 			}
 			itemsList.add(itemData);
 
-			// Suspects skip totals, sessions, and triggers; split out at flush
-			if (suspectReason != null) {
-				hasSuspect = true;
-				continue;
-			}
+			// Suspects are split out of items[] at flush, so they must not count
+			// toward the totals consumers award off
+			if (suspectReason != null) continue;
 
-			totalGEValue += (long) gePrice * item.getQuantity();
+			totalGEValue += stackValue;
 			totalHAValue += (long) haValue * item.getQuantity();
-
-			sessionTracker.addLoot(source, itemId, itemName, item.getQuantity(), gePrice);
-
-			// Check for special items
-			if (whitelistItemIds.contains(itemId)) hasWhitelistedItem = true;
-			if (!isTradeable) hasUntradeable = true;
 		}
-		// 1. Total value >= minLootValue (from API)
-		// 2. Contains a whitelisted item (from API)
-		// 3. Contains an untradeable item
-		// 4. Contains a suspect item (always report attempted forgeries)
-		boolean shouldNotify = totalGEValue >= minLootValue || hasWhitelistedItem || hasUntradeable || hasSuspect;
 
-		if (!shouldNotify) return;
+		// Nothing in this drop is individually notable or asked for by name
+		if (itemsList.isEmpty()) return;
 
 		Map<String, Object> lootData = new HashMap<>();
 		lootData.put("source", source);
