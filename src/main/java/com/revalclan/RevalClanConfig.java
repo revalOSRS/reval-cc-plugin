@@ -68,17 +68,32 @@ public interface RevalClanConfig extends Config {
 	)
 	String clanEventsSection = "clanEventsSection";
 
+	/**
+	 * Keeps the old "teamNameColors" key on purpose: this used to be the single
+	 * toggle for both surfaces, so anyone who had already switched colors off
+	 * stays switched off for the clan list instead of having them reappear.
+	 */
 	@ConfigItem(
 		keyName = "teamNameColors",
-		name = "Team name colors",
-		description = "During an active event, color clan members' names by their team in the clan list and clan chat",
+		name = "Team colors: clan list",
+		description = "Color clan members' names by their event team in the clan member list",
 		section = clanEventsSection,
 		position = 0
 	)
-	default boolean teamNameColors() {
+	default boolean teamColorsInClanList() {
 		return true;
 	}
 
+	@ConfigItem(
+		keyName = "teamColorsInChat",
+		name = "Team colors: chat",
+		description = "Color clan members' names by their event team in clan chat (off by default - chat is busy enough)",
+		section = clanEventsSection,
+		position = 1
+	)
+	default boolean teamColorsInChat() {
+		return false;
+	}
 
 	// ── Event Notifications ────────────────────────────────────────────
 	@ConfigSection(
