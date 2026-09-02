@@ -12,10 +12,13 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Active event rosters from the backend: maps clan member nicknames to their
- * team's hex color. Network fetches are cached by {@link RevalApiService};
- * this class only derives the lookup map. Empty (no coloring) when no event
- * is active or the fetch fails.
+ * Event rosters from the backend: maps clan member nicknames to their team's
+ * hex color. Network fetches are cached by {@link RevalApiService}; this class
+ * only derives the lookup map.
+ *
+ * The endpoint serves teams for events that are running or being planned, so
+ * rosters are colorable from the draft onward rather than only once the event
+ * starts. Empty (no coloring) when no event has teams yet or the fetch fails.
  */
 @Slf4j
 @Singleton
