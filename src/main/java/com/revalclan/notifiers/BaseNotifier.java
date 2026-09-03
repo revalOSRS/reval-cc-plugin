@@ -72,11 +72,8 @@ public abstract class BaseNotifier {
 		sendNotification(getEventType(), data, onResponse);
 	}
 
-	/**
-	 * The one send primitive. eventType is explicit because a notifier can
-	 * report more than one kind of thing (LootNotifier also sends ITEM_CONSUMED).
-	 */
-	protected void sendNotification(String eventType, Map<String, Object> data, Consumer<JsonObject> onResponse) {
+	/** The one send primitive behind the two overloads above. */
+	private void sendNotification(String eventType, Map<String, Object> data, Consumer<JsonObject> onResponse) {
 		if (!passesClanCheck()) return;
 		addEventMetadata(eventType, data, true);
 		webhookService.sendDataAsync(data, onResponse);
