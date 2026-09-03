@@ -236,6 +236,7 @@ public class EventFilterManager{
 						}
 					});
 				}
+				log.info("[Reval] watching varbits {}", newFilters.varbitWatch);
 			}
 
 			// Parse chat filters

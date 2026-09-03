@@ -49,7 +49,8 @@ public class VarbitNotifier extends BaseNotifier {
 
 		int value = event.getValue();
 		Integer previous = latest.put(id, value);
-		log.debug("[Reval] watched varbit {} -> {} (was {})", id, value, previous);
+		// Testing aid: every change of a watched varbit, whether or not it is sent.
+		log.info("[Reval] watched varbit {} -> {} (was {})", id, value, previous);
 
 		if (previous != null && value < previous) {
 			flush(id, previous);
