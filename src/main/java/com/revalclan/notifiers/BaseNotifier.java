@@ -61,7 +61,7 @@ public abstract class BaseNotifier {
 	}
 
 	protected void sendNotification(Map<String, Object> data) {
-		sendNotification(data, null);
+		sendNotification(getEventType(), data, null);
 	}
 
 	/**
@@ -69,8 +69,16 @@ public abstract class BaseNotifier {
 	 * Consumer runs on the HTTP thread — must not touch the client.
 	 */
 	protected void sendNotification(Map<String, Object> data, Consumer<JsonObject> onResponse) {
+		sendNotification(getEventType(), data, onResponse);
+	}
+
+	/**
+	 * The one send primitive. eventType is explicit because a notifier can
+	 * report more than one kind of thing (LootNotifier also sends ITEM_CONSUMED).
+	 */
+	protected void sendNotification(String eventType, Map<String, Object> data, Consumer<JsonObject> onResponse) {
 		if (!passesClanCheck()) return;
-		addEventMetadata(data);
+		addEventMetadata(eventType, data);
 		webhookService.sendDataAsync(data, onResponse);
 	}
 
@@ -81,7 +89,7 @@ public abstract class BaseNotifier {
 	 */
 	protected void sendNotificationWithScreenshot(Map<String, Object> data) {
 		if (!passesClanCheck()) return;
-		addEventMetadata(data);
+		addEventMetadata(getEventType(), data);
 
 		screenshotService.captureScreenshot()
 			.thenAccept(base64Screenshot -> {
@@ -96,8 +104,8 @@ public abstract class BaseNotifier {
 	 * Adds standard event metadata (type, timestamp, location, inventory, etc.) to the data map.
 	 * Must be called on the game thread where client access is safe.
 	 */
-	private void addEventMetadata(Map<String, Object> data) {
-		data.put("eventType", getEventType());
+	private void addEventMetadata(String eventType, Map<String, Object> data) {
+		data.put("eventType", eventType);
 		data.put("eventTimestamp", System.currentTimeMillis());
 		data.put("accountHash", client.getAccountHash());
 		data.put("username", getPlayerName());

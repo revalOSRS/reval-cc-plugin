@@ -44,6 +44,13 @@ public class EventFilterManager{
 		
 		// Chat filter settings
 		@Getter private List<String> chatPatterns = new ArrayList<>(); // Empty by default = no patterns, all messages pass
+
+		/**
+		 * Item names (lowercase) whose silent consumption is reported. Derived by
+		 * the backend from live tile requirements; nothing is built into the
+		 * plugin, and empty means watch nothing.
+		 */
+		@Getter private Set<String> inventoryWatchItems = new HashSet<>();
 		
 		// Event toggles
 		@Getter private boolean lootEnabled = true;
@@ -202,6 +209,19 @@ public class EventFilterManager{
 				}
 			}
 			
+			// Parse inventory watches
+			if (json.has("inventory")) {
+				JsonObject inventory = json.getAsJsonObject("inventory");
+
+				newFilters.inventoryWatchItems.clear();
+				if (inventory.has("watchItems") && inventory.get("watchItems").isJsonArray()) {
+					inventory.getAsJsonArray("watchItems").forEach(item -> {
+						String name = item.getAsString().trim().toLowerCase();
+						if (!name.isEmpty()) newFilters.inventoryWatchItems.add(name);
+					});
+				}
+			}
+
 			// Parse chat filters
 			if (json.has("chat")) {
 				JsonObject chat = json.getAsJsonObject("chat");
