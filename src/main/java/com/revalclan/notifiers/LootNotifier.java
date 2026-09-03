@@ -3,10 +3,13 @@ package com.revalclan.notifiers;
 import com.revalclan.session.SessionTracker;
 import com.revalclan.util.RaidParty;
 import net.runelite.api.Item;
+import net.runelite.api.ItemComposition;
 import net.runelite.api.ItemContainer;
 import net.runelite.api.NPC;
+import net.runelite.api.events.ActorDeath;
 import net.runelite.api.events.ItemContainerChanged;
 import net.runelite.api.events.MenuOptionClicked;
+import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.gameval.InventoryID;
 import net.runelite.api.gameval.ItemID;
 import net.runelite.api.gameval.NpcID;
@@ -60,6 +63,47 @@ public class LootNotifier extends BaseNotifier {
 
 	/** Loot payloads waiting out the correlation window. */
 	private final List<PendingLoot> pendingLoot = new ArrayList<>();
+
+	/** A real loot event this recently for the same source means: do not synthesise. */
+	private static final int REAL_LOOT_GUARD_TICKS = 3;
+
+	/** A watched item vanishing this soon after the local player died is the death, not a spend. */
+	private static final int DEATH_GUARD_TICKS = 5;
+
+	/**
+	 * Interfaces through which an item can leave the inventory without being
+	 * spent. A watched item vanishing while any of these is open is storage or
+	 * transfer, never consumption — reporting it would mint prep-gate allowance
+	 * for work nobody did, which is the one thing this feature must not do.
+	 */
+	private static final int[] NON_CONSUMPTION_INTERFACES = {
+		InterfaceID.BANKMAIN,
+		InterfaceID.BANK_DEPOSITBOX,
+		InterfaceID.GE_OFFERS,
+		InterfaceID.GE_OFFERS_SIDE,
+		InterfaceID.TRADEMAIN,
+		InterfaceID.TRADECONFIRM,
+		InterfaceID.SHOPMAIN,
+		InterfaceID.SHOPSIDE,
+	};
+
+	/**
+	 * Source name (lowercase) → tick of the last loot event the GAME reported.
+	 * Only genuine reports belong here: recording our own synthesised events
+	 * makes each one suppress the next.
+	 */
+	private final Map<String, Integer> recentRealLootSources = new HashMap<>();
+
+	/**
+	 * Inventory as of the previous change (id → quantity). Every silent
+	 * consumption is a watched item's count dropping between two changes, so the
+	 * previous state is the only "before" needed — no click has to arm anything,
+	 * which matters because Tithe fruit is deposited by clicking the sack.
+	 */
+	private final Map<Integer, Integer> lastInventory = new HashMap<>();
+	private boolean lastInventoryKnown = false;
+
+	private int lastLocalDeathTick = Integer.MIN_VALUE;
 
 	private int tickCounter = 0;
 
@@ -212,12 +256,20 @@ public class LootNotifier extends BaseNotifier {
 		handleLootDrop(event.getItems(), comp.getName(), "NPC", comp.getId());
 	}
 
+	/** Note that the game reported loot for this source, for the diff's duplicate guard. */
+	private void recordRealLootSource(String source) {
+		if (source != null && !source.isEmpty()) {
+			recentRealLootSources.put(source.toLowerCase(), tickCounter);
+		}
+	}
+
 	@Subscribe
 	public void onNpcLootReceived(NpcLootReceived event){
 		if (!isEnabled()) return;
 
 		NPC npc = event.getNpc();
 		int npcId = npc.getId();
+		recordRealLootSource(npc.getName());
 
 		// Skip NPCs that fire LootReceived or ServerNpcLoot instead (to avoid duplicates)
 		if (SPECIAL_LOOT_NPC_IDS.contains(npcId) || MAD_ANGEL_IDS.contains(npcId) || SAILING_NPC_IDS.contains(npcId)) return;
@@ -232,6 +284,7 @@ public class LootNotifier extends BaseNotifier {
 
 		String playerName = event.getPlayer().getName();
 		Collection<ItemStack> items = event.getItems();
+		recordRealLootSource(playerName);
 
 		handleLootDrop(items, playerName, "PLAYER", null);
 	}
@@ -239,6 +292,9 @@ public class LootNotifier extends BaseNotifier {
 	@Subscribe
 	public void onLootReceived(LootReceived event) {
 		if (!isEnabled()) return;
+
+		// Any loot the tracker itself reports makes an armed diff stand down.
+		recordRealLootSource(event.getName());
 
 		// Handle EVENT and PICKPOCKET types
 		// EVENT type includes: raids (Chambers of Xeric, Theatre of Blood, Tombs of Amascut),
@@ -284,6 +340,121 @@ public class LootNotifier extends BaseNotifier {
 		recordInflow(recentSelfDrops, itemId, quantity, tickCounter, SELF_DROP_SUSPECT_TICKS);
 	}
 
+	/** Current inventory as id → total quantity. Empty when there is no inventory. */
+	private Map<Integer, Integer> snapshotInventory() {
+		Map<Integer, Integer> counts = new HashMap<>();
+		ItemContainer inventory = client.getItemContainer(InventoryID.INV);
+		if (inventory == null) return counts;
+		for (Item item : inventory.getItems()) {
+			if (item.getId() > 0 && item.getQuantity() > 0) {
+				counts.merge(item.getId(), item.getQuantity(), Integer::sum);
+			}
+		}
+		return counts;
+	}
+
+	private String itemName(int itemId) {
+		try {
+			ItemComposition composition = itemManager.getItemComposition(itemId);
+			return composition != null ? composition.getName() : null;
+		} catch (Exception e) {
+			return null;
+		}
+	}
+
+	/**
+	 * Report watched items that left the inventory in this change.
+	 *
+	 * If exactly one watched item dropped and other items rose, the gain is that
+	 * item's contents: sent as loot with the item's own name as the source, which
+	 * is what lets the backend tell a jumbo squid dissect from a swordtip one.
+	 * Otherwise each lost item is a consumption with nothing given back — Tithe
+	 * fruit into the sack. Each dissect is its own container change, so a whole
+	 * stack processed from one click is reported one item at a time.
+	 */
+	private void reportWatchedConsumption(Map<Integer, Integer> before, Map<Integer, Integer> after) {
+		if (!isEnabled()) return;
+
+		Set<String> watched = filterManager.getFilters().getInventoryWatchItems();
+		if (watched.isEmpty()) return;
+
+		Map<Integer, Integer> lost = new HashMap<>();
+		for (Map.Entry<Integer, Integer> was : before.entrySet()) {
+			int delta = was.getValue() - after.getOrDefault(was.getKey(), 0);
+			if (delta <= 0) continue;
+			String name = itemName(was.getKey());
+			if (name != null && watched.contains(name.toLowerCase()) && !isNonConsumption(was.getKey())) {
+				lost.put(was.getKey(), delta);
+			}
+		}
+		if (lost.isEmpty()) return;
+
+		Map<Integer, Integer> gained = new HashMap<>();
+		for (Map.Entry<Integer, Integer> now : after.entrySet()) {
+			int delta = now.getValue() - before.getOrDefault(now.getKey(), 0);
+			if (delta > 0 && !lost.containsKey(now.getKey())) gained.put(now.getKey(), delta);
+		}
+
+		if (lost.size() == 1 && !gained.isEmpty()) {
+			int itemId = lost.keySet().iterator().next();
+			String source = itemName(itemId);
+			// The loot tracker already reported this source; ours would be a duplicate.
+			Integer realTick = recentRealLootSources.get(source.toLowerCase());
+			if (realTick != null && tickCounter - realTick <= REAL_LOOT_GUARD_TICKS) return;
+
+			List<ItemStack> stacks = new ArrayList<>();
+			for (Map.Entry<Integer, Integer> g : gained.entrySet()) stacks.add(new ItemStack(g.getKey(), g.getValue()));
+			// No sourceId: that field is an NPC id everywhere else and the backend
+			// filters on it. The source name is the contract here.
+			handleLootDrop(stacks, source, "EVENT", null);
+			return;
+		}
+
+		for (Map.Entry<Integer, Integer> l : lost.entrySet()) {
+			sendItemConsumed(l.getKey(), itemName(l.getKey()), l.getValue());
+		}
+	}
+
+	/** Storage, transfer, death or a deliberate drop — the item left, but nothing was spent. */
+	private boolean isNonConsumption(int itemId) {
+		if (tickCounter - lastLocalDeathTick <= DEATH_GUARD_TICKS) return true;
+		for (int interfaceId : NON_CONSUMPTION_INTERFACES) {
+			if (client.getWidget(interfaceId) != null) return true;
+		}
+		ObservedInflow dropped = recentSelfDrops.get(itemId);
+		return dropped != null && tickCounter - dropped.tick <= SELF_DROP_SUSPECT_TICKS;
+	}
+
+	/**
+	 * Report an item that gave nothing back. Not routed through handleLootDrop:
+	 * there is no loot, so the value filters would discard it.
+	 */
+	private void sendItemConsumed(int itemId, String itemName, int quantity) {
+		if (quantity <= 0 || itemName == null) return;
+
+		Map<String, Object> data = new HashMap<>();
+		data.put("itemId", itemId);
+		data.put("itemName", itemName);
+		data.put("quantity", quantity);
+		data.put("source", itemName);
+		sendNotification("ITEM_CONSUMED", data, null);
+	}
+
+	/** The local player died: whatever leaves the inventory next is the death, not a spend. */
+	public void onActorDeath(ActorDeath event) {
+		if (event.getActor() == client.getLocalPlayer()) {
+			lastLocalDeathTick = tickCounter;
+		}
+	}
+
+	/** Forget everything tied to the session that just ended. */
+	public void reset() {
+		lastInventory.clear();
+		lastInventoryKnown = false;
+		recentRealLootSources.clear();
+		lastLocalDeathTick = Integer.MIN_VALUE;
+	}
+
 	/**
 	 * Inventory-diff loot sources (nests, caskets, pickpockets, chest bosses)
 	 * count gear pushed out of the worn container by a same-tick equip swap as
@@ -292,6 +463,17 @@ public class LootNotifier extends BaseNotifier {
 	 */
 	@Subscribe
 	public void onItemContainerChanged(ItemContainerChanged event) {
+		if (event.getContainerId() == InventoryID.INV) {
+			Map<Integer, Integer> after = snapshotInventory();
+			if (lastInventoryKnown) {
+				reportWatchedConsumption(lastInventory, after);
+			}
+			lastInventory.clear();
+			lastInventory.putAll(after);
+			lastInventoryKnown = true;
+			return;
+		}
+
 		if (event.getContainerId() != InventoryID.WORN) return;
 
 		Map<Integer, Integer> worn = new HashMap<>();
@@ -437,6 +619,9 @@ public class LootNotifier extends BaseNotifier {
 		}
 		if (!recentUnequips.isEmpty()) {
 			recentUnequips.values().removeIf(e -> tickCounter - e.tick > UNEQUIP_SUSPECT_TICKS + LOOT_BUFFER_TICKS);
+		}
+		if (!recentRealLootSources.isEmpty()) {
+			recentRealLootSources.values().removeIf(tick -> tickCounter - tick > REAL_LOOT_GUARD_TICKS + LOOT_BUFFER_TICKS);
 		}
 	}
 

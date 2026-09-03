@@ -296,6 +296,7 @@ public class RevalClanPlugin extends Plugin {
 			announcementService.reset();
 			leaguesNotifier.reset();
 			leaguesSyncNotifier.reset();
+			lootNotifier.reset();
 
 			if (wasLoggedIn) {
 				if (wasInClan) {
@@ -443,6 +444,7 @@ public class RevalClanPlugin extends Plugin {
 
 	@Subscribe
 	public void onActorDeath(ActorDeath event) {
+		lootNotifier.onActorDeath(event);
 		if (!inRequiredClan) return;
 		deathNotifier.onActorDeath(event);
 		KillTracker.KillData kill = killTracker.onActorDeath(event);
