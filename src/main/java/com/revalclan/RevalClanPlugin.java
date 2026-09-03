@@ -78,6 +78,7 @@ public class RevalClanPlugin extends Plugin {
 	@Inject	private ClanRankIconResolver rankIconResolver;
 
 	@Inject	private LootNotifier lootNotifier;
+	@Inject	private VarbitNotifier varbitNotifier;
 
 	@Inject	private ClogPersonalBestCapture clogPersonalBestCapture;
 
@@ -297,6 +298,7 @@ public class RevalClanPlugin extends Plugin {
 			leaguesNotifier.reset();
 			leaguesSyncNotifier.reset();
 			lootNotifier.reset();
+			varbitNotifier.reset();
 
 			if (wasLoggedIn) {
 				if (wasInClan) {
@@ -354,6 +356,7 @@ public class RevalClanPlugin extends Plugin {
 
 		announcementService.onGameTick();
 		lootNotifier.onGameTick();
+		varbitNotifier.onGameTick();
 		killTracker.onGameTick(gameTick);
 		killCountNotifier.onTick();
 		diaryNotifier.onGameTick();
@@ -484,6 +487,7 @@ public class RevalClanPlugin extends Plugin {
 	public void onVarbitChanged(VarbitChanged event) {
 		if (!inRequiredClan) return;
 		diaryNotifier.onVarbitChanged(event);
+		varbitNotifier.onVarbitChanged(event);
 	}
 
 	@Subscribe

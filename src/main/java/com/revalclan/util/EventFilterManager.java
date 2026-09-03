@@ -51,6 +51,9 @@ public class EventFilterManager{
 		 * plugin, and empty means watch nothing.
 		 */
 		@Getter private Set<String> inventoryWatchItems = new HashSet<>();
+
+		/** Varbit ids whose value the plugin reports (varbits.watch). Empty by default. */
+		@Getter private Set<Integer> varbitWatch = new HashSet<>();
 		
 		// Event toggles
 		@Getter private boolean lootEnabled = true;
@@ -218,6 +221,19 @@ public class EventFilterManager{
 					inventory.getAsJsonArray("watchItems").forEach(item -> {
 						String name = item.getAsString().trim().toLowerCase();
 						if (!name.isEmpty()) newFilters.inventoryWatchItems.add(name);
+					});
+				}
+			}
+
+			if (json.has("varbits")) {
+				JsonObject varbits = json.getAsJsonObject("varbits");
+
+				newFilters.varbitWatch.clear();
+				if (varbits.has("watch") && varbits.get("watch").isJsonArray()) {
+					varbits.getAsJsonArray("watch").forEach(id -> {
+						if (id.isJsonPrimitive() && id.getAsJsonPrimitive().isNumber()) {
+							newFilters.varbitWatch.add(id.getAsInt());
+						}
 					});
 				}
 			}
