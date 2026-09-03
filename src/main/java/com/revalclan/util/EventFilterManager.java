@@ -3,6 +3,7 @@ package com.revalclan.util;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.*;
 
@@ -25,6 +26,9 @@ public class EventFilterManager{
 	@Inject private Gson gson;
 	
 	@Getter private EventFilters filters;
+
+	/** Runs after every successful fetch, once the new filters are in place. */
+	@Setter private Runnable onFiltersApplied;
 	
 	/**
 	 * Holds all filter configurations
@@ -274,6 +278,7 @@ public class EventFilterManager{
 			
 			// Atomically replace filters
 			this.filters = newFilters;
+			if (onFiltersApplied != null) onFiltersApplied.run();
 		} catch (Exception e) {
 			log.error("Error parsing filters JSON", e);
 		}

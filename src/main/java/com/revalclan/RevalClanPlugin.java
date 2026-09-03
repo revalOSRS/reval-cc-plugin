@@ -314,6 +314,7 @@ public class RevalClanPlugin extends Plugin {
 	}
 
 	private void onClanValidated() {
+		eventFilterManager.setOnFiltersApplied(varbitNotifier::syncBaselines);
 		eventFilterManager.fetchFiltersAsync();
 
 		// Fetch leagues config if on a seasonal world

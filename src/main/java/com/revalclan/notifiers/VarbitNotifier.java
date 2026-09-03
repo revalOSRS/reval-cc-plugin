@@ -1,8 +1,11 @@
 package com.revalclan.notifiers;
 
 import lombok.extern.slf4j.Slf4j;
+import net.runelite.api.GameState;
 import net.runelite.api.events.VarbitChanged;
+import net.runelite.client.callback.ClientThread;
 
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.HashMap;
 import java.util.Map;
@@ -30,6 +33,32 @@ public class VarbitNotifier extends BaseNotifier {
 	/** Last value the backend was told per watched varbit. */
 	private final Map<Integer, Integer> sent = new HashMap<>();
 	private int ticksSinceFlush = 0;
+
+	@Inject private ClientThread clientThread;
+
+	/**
+	 * Send the current value of every watched varbit. A varbit only raises an
+	 * event when it changes, so without this the backend's first sighting would
+	 * be the value AFTER a player's first deposit, and that deposit would be
+	 * lost to the baseline. Called after every filter fetch (login and every
+	 * ~10 minutes), unconditionally: the fetch that turns an event live is what
+	 * has to establish the pre-event balance.
+	 */
+	public void syncBaselines() {
+		clientThread.invokeLater(() -> {
+			if (client.getGameState() != GameState.LOGGED_IN || !isEnabled()) return;
+			for (int id : filterManager.getFilters().getVarbitWatch()) {
+				int value = client.getVarbitValue(id);
+				latest.put(id, value);
+				sent.put(id, value);
+				log.info("[Reval] varbit baseline {} = {}", id, value);
+				Map<String, Object> data = new HashMap<>();
+				data.put("varbitId", id);
+				data.put("value", value);
+				sendNotification("VARBIT_CHANGED", data, null);
+			}
+		});
+	}
 
 	@Override
 	public boolean isEnabled() {
