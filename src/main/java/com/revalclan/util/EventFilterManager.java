@@ -55,6 +55,8 @@ public class EventFilterManager{
 		 * plugin, and empty means watch nothing.
 		 */
 		@Getter private Set<String> inventoryWatchItems = new HashSet<>();
+		/** Watched item names as the backend spelled them, keyed lowercased. */
+		@Getter private Map<String, String> inventoryWatchItemNames = new HashMap<>();
 
 		/** Varbit ids whose value the plugin reports (varbits.watch). Empty by default. */
 		@Getter private Set<Integer> varbitWatch = new HashSet<>();
@@ -221,10 +223,14 @@ public class EventFilterManager{
 				JsonObject inventory = json.getAsJsonObject("inventory");
 
 				newFilters.inventoryWatchItems.clear();
+				newFilters.inventoryWatchItemNames.clear();
 				if (inventory.has("watchItems") && inventory.get("watchItems").isJsonArray()) {
 					inventory.getAsJsonArray("watchItems").forEach(item -> {
 						String name = item.getAsString().trim().toLowerCase();
-						if (!name.isEmpty()) newFilters.inventoryWatchItems.add(name);
+						if (!name.isEmpty()) {
+							newFilters.inventoryWatchItems.add(name);
+							newFilters.inventoryWatchItemNames.put(name, item.getAsString().trim());
+						}
 					});
 				}
 			}

@@ -257,6 +257,22 @@ public class LootNotifier extends BaseNotifier {
 	}
 
 	/** Note that the game reported loot for this source, for the diff's duplicate guard. */
+	/**
+	 * The backend's name for a watched item this loot source refers to, or null.
+	 * The tracker names some containers with a suffix ("Ore Pack (Volcanic
+	 * Mine)" for the item "Ore pack"), so a prefix match up to an opening
+	 * parenthesis counts as well as an exact one.
+	 */
+	private String watchedContainer(String source) {
+		if (source == null) return null;
+		String lower = source.toLowerCase();
+		for (Map.Entry<String, String> watched : filterManager.getFilters().getInventoryWatchItemNames().entrySet()) {
+			String name = watched.getKey();
+			if (lower.equals(name) || lower.startsWith(name + " (")) return watched.getValue();
+		}
+		return null;
+	}
+
 	private void recordRealLootSource(String source) {
 		if (source != null && !source.isEmpty()) {
 			recentRealLootSources.put(source.toLowerCase(), tickCounter);
@@ -295,6 +311,17 @@ public class LootNotifier extends BaseNotifier {
 
 		// Any loot the tracker itself reports makes an armed diff stand down.
 		recordRealLootSource(event.getName());
+
+		// The tracker reports some watched containers itself ("Seed pack",
+		// "Ore Pack (Volcanic Mine)"). Report those under the backend's own name
+		// for the item, with everything they yielded, and stand the diff down
+		// under that name too so the opening is never reported twice.
+		String container = watchedContainer(event.getName());
+		if (container != null) {
+			recordRealLootSource(container);
+			handleLootDrop(event.getItems(), container, "EVENT", null, null, true);
+			return;
+		}
 
 		// Handle EVENT and PICKPOCKET types
 		// EVENT type includes: raids (Chambers of Xeric, Theatre of Blood, Tombs of Amascut),
