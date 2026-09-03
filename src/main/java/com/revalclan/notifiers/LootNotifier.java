@@ -405,8 +405,10 @@ public class LootNotifier extends BaseNotifier {
 			List<ItemStack> stacks = new ArrayList<>();
 			for (Map.Entry<Integer, Integer> g : gained.entrySet()) stacks.add(new ItemStack(g.getKey(), g.getValue()));
 			// No sourceId: that field is an NPC id everywhere else and the backend
-			// filters on it. The source name is the contract here.
-			handleLootDrop(stacks, source, "EVENT", null);
+			// filters on it. The source name is the contract here. Everything the
+			// container yielded is sent: a prep gate charges the opening itself,
+			// so a pack of cheap seeds must reach the backend as much as a good one.
+			handleLootDrop(stacks, source, "EVENT", null, null, true);
 			return;
 		}
 
@@ -639,10 +641,18 @@ public class LootNotifier extends BaseNotifier {
 	}
 
 	private void handleLootDrop(Collection<ItemStack> items, String source, String sourceType, Integer sourceId) {
-		handleLootDrop(items, source, sourceType, sourceId, null);
+		handleLootDrop(items, source, sourceType, sourceId, null, false);
 	}
 
 	private void handleLootDrop(Collection<ItemStack> items, String source, String sourceType, Integer sourceId, List<String> partyMembers) {
+		handleLootDrop(items, source, sourceType, sourceId, partyMembers, false);
+	}
+
+	/**
+	 * @param keepAll send every item regardless of value: the backend asked to watch
+	 *                the container this came out of, so it wants the whole yield.
+	 */
+	private void handleLootDrop(Collection<ItemStack> items, String source, String sourceType, Integer sourceId, List<String> partyMembers, boolean keepAll) {
 		// Get dynamic filters
 		long minLootValue = filterManager.getFilters().getLootMinValue();
 		Set<Integer> whitelistItemIds = filterManager.getFilters().getLootWhitelist();
@@ -672,7 +682,7 @@ public class LootNotifier extends BaseNotifier {
 			}
 
 			// Unit price, not stack: two 700k items are not a 1M drop
-			if (gePrice < minLootValue && !whitelistItemIds.contains(itemId)) continue;
+			if (!keepAll && gePrice < minLootValue && !whitelistItemIds.contains(itemId)) continue;
 
 			Map<String, Object> itemData = new HashMap<>();
 			itemData.put("id", itemId);
