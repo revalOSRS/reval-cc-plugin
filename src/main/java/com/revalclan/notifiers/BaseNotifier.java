@@ -78,8 +78,20 @@ public abstract class BaseNotifier {
 	 */
 	protected void sendNotification(String eventType, Map<String, Object> data, Consumer<JsonObject> onResponse) {
 		if (!passesClanCheck()) return;
-		addEventMetadata(eventType, data);
+		addEventMetadata(eventType, data, true);
 		webhookService.sendDataAsync(data, onResponse);
+	}
+
+	/**
+	 * Send without the inventory and equipment snapshots. For events that are a
+	 * number or a name rather than a thing the player is holding (a varbit
+	 * value, an item that was used up), the containers are dead weight — and a
+	 * varbit can tick every 30 seconds for the length of a game.
+	 */
+	protected void sendCompactNotification(String eventType, Map<String, Object> data) {
+		if (!passesClanCheck()) return;
+		addEventMetadata(eventType, data, false);
+		webhookService.sendDataAsync(data, null);
 	}
 
 	/**
@@ -89,7 +101,7 @@ public abstract class BaseNotifier {
 	 */
 	protected void sendNotificationWithScreenshot(Map<String, Object> data) {
 		if (!passesClanCheck()) return;
-		addEventMetadata(getEventType(), data);
+		addEventMetadata(getEventType(), data, true);
 
 		screenshotService.captureScreenshot()
 			.thenAccept(base64Screenshot -> {
@@ -104,7 +116,7 @@ public abstract class BaseNotifier {
 	 * Adds standard event metadata (type, timestamp, location, inventory, etc.) to the data map.
 	 * Must be called on the game thread where client access is safe.
 	 */
-	private void addEventMetadata(String eventType, Map<String, Object> data) {
+	private void addEventMetadata(String eventType, Map<String, Object> data, boolean includeContainers) {
 		data.put("eventType", eventType);
 		data.put("eventTimestamp", System.currentTimeMillis());
 		data.put("accountHash", client.getAccountHash());
@@ -120,8 +132,10 @@ public abstract class BaseNotifier {
 			data.put("regionId", wp.getRegionID());
 		}
 		
-		data.put("inventory", getInventoryData());
-		data.put("equipment", getEquippedItems());
+		if (includeContainers) {
+			data.put("inventory", getInventoryData());
+			data.put("equipment", getEquippedItems());
+		}
 	}
 
 	/**

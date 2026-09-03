@@ -55,7 +55,7 @@ public class VarbitNotifier extends BaseNotifier {
 				Map<String, Object> data = new HashMap<>();
 				data.put("varbitId", id);
 				data.put("value", value);
-				sendNotification("VARBIT_CHANGED", data, null);
+				sendCompactNotification("VARBIT_CHANGED", data);
 			}
 		});
 	}
@@ -106,7 +106,7 @@ public class VarbitNotifier extends BaseNotifier {
 		data.put("value", value);
 		if (last != null) data.put("previous", last);
 		log.info("[Reval] VARBIT_CHANGED {} = {} (previous {})", id, value, last);
-		sendNotification("VARBIT_CHANGED", data, null);
+		sendCompactNotification("VARBIT_CHANGED", data);
 	}
 
 	/** Logged out or hopped: whatever we knew belongs to a session that is over. */

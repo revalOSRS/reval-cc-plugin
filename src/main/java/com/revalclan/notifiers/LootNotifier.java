@@ -439,7 +439,7 @@ public class LootNotifier extends BaseNotifier {
 		data.put("itemName", itemName);
 		data.put("quantity", quantity);
 		data.put("source", itemName);
-		sendNotification("ITEM_CONSUMED", data, null);
+		sendCompactNotification("ITEM_CONSUMED", data);
 	}
 
 	/** The local player died: whatever leaves the inventory next is the death, not a spend. */
