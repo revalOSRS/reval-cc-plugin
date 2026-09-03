@@ -103,7 +103,8 @@ public class LootNotifier extends BaseNotifier {
 	private final Map<Integer, Integer> lastInventory = new HashMap<>();
 	private boolean lastInventoryKnown = false;
 
-	private int lastLocalDeathTick = Integer.MIN_VALUE;
+	/** Tick of the local player's last death, or -1 when there has been none this session. */
+	private int lastLocalDeathTick = -1;
 
 	private int tickCounter = 0;
 
@@ -446,7 +447,9 @@ public class LootNotifier extends BaseNotifier {
 
 	/** Storage, transfer, death or a deliberate drop — the item left, but nothing was spent. */
 	private boolean isNonConsumption(int itemId) {
-		if (tickCounter - lastLocalDeathTick <= DEATH_GUARD_TICKS) return true;
+		// Guarded on -1: subtracting Integer.MIN_VALUE overflowed negative and made
+		// every watched-item loss read as a death until the player actually died.
+		if (lastLocalDeathTick >= 0 && tickCounter - lastLocalDeathTick <= DEATH_GUARD_TICKS) return true;
 		for (int interfaceId : NON_CONSUMPTION_INTERFACES) {
 			if (client.getWidget(interfaceId) != null) return true;
 		}
@@ -481,7 +484,7 @@ public class LootNotifier extends BaseNotifier {
 		lastInventory.clear();
 		lastInventoryKnown = false;
 		recentRealLootSources.clear();
-		lastLocalDeathTick = Integer.MIN_VALUE;
+		lastLocalDeathTick = -1;
 	}
 
 	/**
