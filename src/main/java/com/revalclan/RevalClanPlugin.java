@@ -207,7 +207,7 @@ public class RevalClanPlugin extends Plugin {
 		try {
 			revalPanel = new RevalPanel();
 			revalPanel.init(revalApiService, client, uiAssetLoader, itemManager, spriteManager, config,
-				rankIconResolver);
+				rankIconResolver, clientThread);
 			revalPanel.setOnSyncGuide(() -> {
 				syncGuide.arm();
 				clientThread.invoke(() -> {

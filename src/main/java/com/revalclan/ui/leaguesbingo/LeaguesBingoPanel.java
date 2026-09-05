@@ -69,6 +69,7 @@ public class LeaguesBingoPanel extends JPanel {
 	private final Client client;
 	private final Runnable onClose;
 	private final ItemManager itemManager;
+	private final ItemNameIndex itemNames;
 	/** Tile icon name -> game item id; null entries mark names we could not resolve. */
 	private final Map<String, Integer> iconItemIds = new HashMap<>();
 
@@ -92,10 +93,11 @@ public class LeaguesBingoPanel extends JPanel {
 	private JPanel tileDetailHolder;
 	private final List<TileCell> cells = new ArrayList<>();
 
-	public LeaguesBingoPanel(RevalApiService api, Client client, ItemManager itemManager, Runnable onClose) {
+	public LeaguesBingoPanel(RevalApiService api, Client client, ItemManager itemManager, ItemNameIndex itemNames, Runnable onClose) {
 		this.api = api;
 		this.client = client;
 		this.itemManager = itemManager;
+		this.itemNames = itemNames;
 		this.onClose = onClose;
 
 		setLayout(new BorderLayout());
@@ -548,35 +550,57 @@ public class LeaguesBingoPanel extends JPanel {
 	 */
 	private void loadTileIcon(Tile tile, TileCell cell) {
 		if (itemManager == null) return;
-		Integer itemId = resolveItemId(tile);
-		if (itemId == null) return;
-		try {
-			AsyncBufferedImage image = itemManager.getImage(itemId);
-			cell.setIcon(image);
-			image.onLoaded(() -> SwingUtilities.invokeLater(cell::repaint));
-		} catch (Exception ignored) {
-			// A bad id must never break the grid.
-		}
+		resolveItemId(tile, itemId -> {
+			if (itemId == null) return;
+			try {
+				AsyncBufferedImage image = itemManager.getImage(itemId);
+				cell.setIcon(image);
+				image.onLoaded(() -> SwingUtilities.invokeLater(cell::repaint));
+			} catch (Exception ignored) {
+				// A bad id must never break the grid.
+			}
+		});
 	}
 
-	private Integer resolveItemId(Tile tile) {
+	private void resolveItemId(Tile tile, java.util.function.Consumer<Integer> callback) {
 		String icon = tile.getIcon() != null ? tile.getIcon().replace('_', ' ').trim() : "";
-		if (!icon.isEmpty()) {
-			if (iconItemIds.containsKey(icon)) {
-				Integer cached = iconItemIds.get(icon);
-				if (cached != null) return cached;
-			} else {
-				Integer found = requirementItemNamed(tile, icon);
-				if (found == null) found = searchItem(icon);
-				if (found == null) {
-					String bare = icon.replaceAll("\\s*\\([^)]*\\)$", "").replaceAll("\\s+\\d+$", "").trim();
-					if (!bare.equals(icon)) found = searchItem(bare);
-				}
-				iconItemIds.put(icon, found);
-				if (found != null) return found;
-			}
+		if (icon.isEmpty()) {
+			callback.accept(firstRequirementItem(tile));
+			return;
 		}
-		return firstRequirementItem(tile);
+		if (iconItemIds.containsKey(icon)) {
+			Integer cached = iconItemIds.get(icon);
+			callback.accept(cached != null ? cached : firstRequirementItem(tile));
+			return;
+		}
+
+		Integer found = requirementItemNamed(tile, icon);
+		if (found == null) found = searchItem(icon);
+		String bare = icon.replaceAll("\\s*\\([^)]*\\)$", "").replaceAll("\\s+\\d+$", "").trim();
+		if (found == null && !bare.equals(icon)) found = searchItem(bare);
+		if (found != null) {
+			iconItemIds.put(icon, found);
+			callback.accept(found);
+			return;
+		}
+
+		// Untradeables are absent from the price list: ask the game cache.
+		if (itemNames == null) {
+			iconItemIds.put(icon, null);
+			callback.accept(firstRequirementItem(tile));
+			return;
+		}
+		itemNames.resolve(icon, id -> {
+			if (id == null && !bare.equals(icon)) {
+				itemNames.resolve(bare, id2 -> {
+					iconItemIds.put(icon, id2);
+					callback.accept(id2 != null ? id2 : firstRequirementItem(tile));
+				});
+				return;
+			}
+			iconItemIds.put(icon, id);
+			callback.accept(id != null ? id : firstRequirementItem(tile));
+		});
 	}
 
 	private Integer searchItem(String name) {
@@ -700,9 +724,15 @@ public class LeaguesBingoPanel extends JPanel {
 				? ("any".equalsIgnoreCase(reqs.getMatchType()) ? "  (any)" : "  (all)") : "";
 			card.add(label("Requirements" + match, FontManager.getRunescapeSmallFont(), UIConstants.TEXT_SECONDARY));
 			TileProgress progress = team.progressFor(tile.getBoardTileId());
+			boolean anyMatch = "any".equalsIgnoreCase(reqs.getMatchType());
 			for (int i = 0; i < list.size(); i++) {
+				LeaguesBingoResponse.RequirementProgress rp = progress != null ? progress.requirement(i) : null;
+				// 'any' tiles finish on one requirement, so only rows the
+				// progress data flags count as done; 'all' tiles finish only
+				// when every row is done.
+				boolean rowDone = rp != null && rp.isCompleted() || (completed && !anyMatch);
 				card.add(Box.createVerticalStrut(5));
-				card.add(buildRequirementRow(list.get(i), progress != null ? progress.requirement(i) : null, completed));
+				card.add(buildRequirementRow(list.get(i), rp, rowDone));
 			}
 		}
 
@@ -713,16 +743,23 @@ public class LeaguesBingoPanel extends JPanel {
 		return card;
 	}
 
-	private JComponent buildRequirementRow(JsonObject requirement, LeaguesBingoResponse.RequirementProgress rp, boolean tileDone) {
-		boolean done = tileDone || (rp != null && rp.isCompleted());
+	private JComponent buildRequirementRow(JsonObject requirement, LeaguesBingoResponse.RequirementProgress rp, boolean done) {
 		JPanel rowPanel = new JPanel(new BorderLayout(6, 0));
 		rowPanel.setOpaque(false);
 		rowPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-		JPanel markHolder = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 3));
+		// Center the dot on the first text line: HTML labels pad the top by a
+		// pixel or two, so aim for the middle of the font's ascent.
+		java.awt.FontMetrics fm = new JLabel().getFontMetrics(FontManager.getRunescapeSmallFont());
+		int dotTop = Math.max(0, fm.getAscent() / 2 - 2);
+		JPanel markHolder = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
 		markHolder.setOpaque(false);
+		markHolder.setBorder(new EmptyBorder(dotTop, 0, 0, 0));
 		markHolder.add(new StatusDot(done));
-		rowPanel.add(markHolder, BorderLayout.WEST);
+		JPanel markTop = new JPanel(new BorderLayout());
+		markTop.setOpaque(false);
+		markTop.add(markHolder, BorderLayout.NORTH);
+		rowPanel.add(markTop, BorderLayout.WEST);
 
 		JPanel text = new JPanel();
 		text.setLayout(new BoxLayout(text, BoxLayout.Y_AXIS));
@@ -739,7 +776,7 @@ public class LeaguesBingoPanel extends JPanel {
 				if (i > 0) html.append(", ");
 				String name = items.get(i);
 				String escaped = escapeHtml(name);
-				if (done || obtained.contains(name.toLowerCase())) {
+				if (obtained.contains(name.toLowerCase())) {
 					html.append("<span style='color:#4caf50'>").append(escaped).append("</span>");
 				} else {
 					html.append(escaped);

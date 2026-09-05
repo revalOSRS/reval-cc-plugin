@@ -19,6 +19,7 @@ import com.revalclan.util.UIAssetLoader;
 import lombok.Getter;
 import net.runelite.api.Client;
 import net.runelite.api.clan.ClanChannel;
+import net.runelite.client.callback.ClientThread;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.game.SpriteManager;
 import net.runelite.client.ui.FontManager;
@@ -365,7 +366,7 @@ public class RevalPanel extends PluginPanel {
 
 	public void init(RevalApiService apiService, Client client,
 					 UIAssetLoader assetLoader, ItemManager itemManager, SpriteManager spriteManager,
-					 RevalClanConfig config, ClanRankIconResolver rankIconResolver) {
+					 RevalClanConfig config, ClanRankIconResolver rankIconResolver, ClientThread clientThread) {
 		this.apiService = apiService;
 		this.client = client;
 		this.assetLoader = assetLoader;
@@ -396,7 +397,7 @@ public class RevalPanel extends PluginPanel {
 		leaderboardPanel.init(apiService, assetLoader, itemManager, rankIconResolver);
 		achievementsPanel.init(apiService, client);
 		competitionsPanel.init(apiService, client);
-		eventsPanel.init(apiService, client, itemManager);
+		eventsPanel.init(apiService, client, itemManager, clientThread);
 		diaryPanel.init(apiService, client, assetLoader);
 		// Wire up tab indicator callbacks
 		eventsPanel.setOnIndicatorUpdate(this::setEventsIndicator);
