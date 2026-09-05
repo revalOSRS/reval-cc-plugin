@@ -1,5 +1,6 @@
 package com.revalclan.session;
 
+import com.revalclan.util.PlayerNames;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.revalclan.util.WebhookService;
@@ -93,7 +94,7 @@ public class SessionTracker {
 		sessionId = UUID.randomUUID().toString();
 		startedAtMs = System.currentTimeMillis();
 		lastUpdateMs = startedAtMs;
-		username = client.getLocalPlayer() != null ? client.getLocalPlayer().getName() : "Unknown";
+		username = PlayerNames.resolve(client);
 		accountHash = client.getAccountHash();
 		world = client.getWorld();
 		worldFlags = Worlds.flagNames(client);
