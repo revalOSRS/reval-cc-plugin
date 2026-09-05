@@ -18,7 +18,7 @@ public class LevelNotifier extends BaseNotifier {
 
 	@Override
 	public boolean isEnabled() {
-		return config.notifyLevel() && filterManager.getFilters().isLevelEnabled();
+		return filterManager.getFilters().isLevelEnabled();
 	}
 
 	@Override

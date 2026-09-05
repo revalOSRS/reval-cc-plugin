@@ -16,7 +16,7 @@ import java.util.Map;
 public class QuestNotifier extends BaseNotifier {
 	@Override
 	public boolean isEnabled() {
-		return config.notifyQuest() && filterManager.getFilters().isQuestEnabled();
+		return filterManager.getFilters().isQuestEnabled();
 	}
 
 	@Override
