@@ -767,14 +767,18 @@ public class LeaguesBingoPanel extends JPanel {
 		text.add(wrapped(RequirementText.describe(requirement), FontManager.getRunescapeSmallFont(),
 			done ? UIConstants.TEXT_PRIMARY : UIConstants.TEXT_SECONDARY, TEXT_WIDTH - 16));
 
-		List<String> items = RequirementText.itemNames(requirement);
-		if (items.size() > 1) {
-			java.util.Set<String> obtained = obtainedItemNames(rp != null ? rp.getProgressMetadata() : null);
+		List<String> options = RequirementText.optionNames(requirement);
+		if (options.size() > 1) {
+			java.util.Set<String> obtained = obtainedNames(rp != null ? rp.getProgressMetadata() : null);
+			// Obtained names first so they survive the cap on long lists (49 pets...).
+			List<String> ordered = new ArrayList<>();
+			for (String n : options) if (obtained.contains(n.toLowerCase())) ordered.add(n);
+			for (String n : options) if (!obtained.contains(n.toLowerCase())) ordered.add(n);
 			StringBuilder html = new StringBuilder();
-			int shown = Math.min(items.size(), 8);
+			int shown = Math.min(ordered.size(), 8);
 			for (int i = 0; i < shown; i++) {
 				if (i > 0) html.append(", ");
-				String name = items.get(i);
+				String name = ordered.get(i);
 				String escaped = escapeHtml(name);
 				if (obtained.contains(name.toLowerCase())) {
 					html.append("<span style='color:#4caf50'>").append(escaped).append("</span>");
@@ -782,7 +786,7 @@ public class LeaguesBingoPanel extends JPanel {
 					html.append(escaped);
 				}
 			}
-			if (items.size() > shown) html.append(" +").append(items.size() - shown).append(" more");
+			if (ordered.size() > shown) html.append(" +").append(ordered.size() - shown).append(" more");
 			text.add(wrappedHtml(html.toString(), FontManager.getRunescapeSmallFont(), UIConstants.TEXT_MUTED, TEXT_WIDTH - 16));
 		}
 
@@ -809,25 +813,28 @@ public class LeaguesBingoPanel extends JPanel {
 		return rowPanel;
 	}
 
-	/** Item names (lowercased) the team has already turned in for this requirement. */
-	private static java.util.Set<String> obtainedItemNames(JsonObject meta) {
+	/** Item and pet names (lowercased) the team has already turned in for this requirement. */
+	private static java.util.Set<String> obtainedNames(JsonObject meta) {
 		java.util.Set<String> names = new java.util.HashSet<>();
 		if (meta == null) return names;
-		collectItemNames(meta.get("lastItemsObtained"), names);
+		collectNames(meta.get("lastItemsObtained"), names);
 		JsonElement contributions = meta.get("playerContributions");
 		if (contributions != null && contributions.isJsonArray()) {
 			for (JsonElement c : contributions.getAsJsonArray()) {
-				if (c.isJsonObject()) collectItemNames(c.getAsJsonObject().get("items"), names);
+				if (!c.isJsonObject()) continue;
+				collectNames(c.getAsJsonObject().get("items"), names);
+				collectNames(c.getAsJsonObject().get("pets"), names);
 			}
 		}
 		return names;
 	}
 
-	private static void collectItemNames(JsonElement array, java.util.Set<String> into) {
+	private static void collectNames(JsonElement array, java.util.Set<String> into) {
 		if (array == null || !array.isJsonArray()) return;
 		for (JsonElement e : array.getAsJsonArray()) {
 			if (!e.isJsonObject()) continue;
 			String n = RequirementText.str(e.getAsJsonObject(), "itemName", null);
+			if (n == null) n = RequirementText.str(e.getAsJsonObject(), "petName", null);
 			if (n != null) into.add(n.toLowerCase());
 		}
 	}

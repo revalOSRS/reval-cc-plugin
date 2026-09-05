@@ -44,14 +44,12 @@ public final class RequirementText {
 			case "KILL_COUNT": return numOr(r, "count") + "x " + str(r, "target", str(r, "npcName", "?")) + " KC";
 			case "DETAILED_KILL": return num(r, "count", 1) + "x " + str(r, "target", "?");
 			case "PET": {
-				JsonArray pets = r.has("pets") && r.get("pets").isJsonArray() ? r.getAsJsonArray("pets") : null;
-				if (pets != null && pets.size() > 0) {
-					List<String> names = new ArrayList<>();
-					for (JsonElement p : pets) {
-						if (p.isJsonObject()) names.add(str(p.getAsJsonObject(), "petName", "?"));
-					}
-					return "Pet (" + num(r, "anyCount", 1) + " of " + pets.size() + "): " + String.join(", ", names);
+				List<String> pets = petNames(r);
+				if (pets.size() > 1) {
+					int wanted = num(r, "anyCount", num(r, "totalAmount", 1));
+					return wanted + " unique of " + pets.size() + " pets";
 				}
+				if (pets.size() == 1) return "Pet: " + pets.get(0);
 				return "Pet: " + str(r, "petName", "?");
 			}
 			case "ALPHABET_KILL": return "Kill a boss for each letter";
@@ -101,6 +99,25 @@ public final class RequirementText {
 			case "SCHEDULED": return "Scheduled (time window)";
 			default: return type.isEmpty() ? "Requirement" : type;
 		}
+	}
+
+	/** Pet names for PET requirements, in order. */
+	public static List<String> petNames(JsonObject r) {
+		List<String> names = new ArrayList<>();
+		if (r == null || !r.has("pets") || !r.get("pets").isJsonArray()) return names;
+		for (JsonElement e : r.getAsJsonArray("pets")) {
+			if (!e.isJsonObject()) continue;
+			String n = str(e.getAsJsonObject(), "petName", null);
+			if (n != null) names.add(n);
+		}
+		return names;
+	}
+
+	/** Everything a requirement lets the team choose from: items, then pets. */
+	public static List<String> optionNames(JsonObject r) {
+		List<String> names = itemNames(r);
+		names.addAll(petNames(r));
+		return names;
 	}
 
 	/** Item names for ITEM_DROP style requirements, in order. */
