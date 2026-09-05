@@ -15,7 +15,7 @@ public class MusicNotifier extends BaseNotifier {
 
 	@Override
 	public boolean isEnabled() {
-		return config.notifyMusic() && filterManager.getFilters().isMusicEnabled();
+		return filterManager.getFilters().isMusicEnabled();
 	}
 
 	@Override

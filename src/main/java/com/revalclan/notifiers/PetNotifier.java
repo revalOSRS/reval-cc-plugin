@@ -83,7 +83,7 @@ public class PetNotifier extends BaseNotifier {
 
 	@Override
 	public boolean isEnabled() {
-		return config.notifyPet() && filterManager.getFilters().isPetEnabled();
+		return filterManager.getFilters().isPetEnabled();
 	}
 
 	@Override

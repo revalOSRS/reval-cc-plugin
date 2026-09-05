@@ -16,7 +16,7 @@ import java.util.Set;
 public class DetailedKillNotifier extends BaseNotifier {
 	@Override
 	public boolean isEnabled() {
-		return config.notifyDetailedKill() && filterManager.getFilters().isDetailedKillEnabled();
+		return filterManager.getFilters().isDetailedKillEnabled();
 	}
 
 	@Override

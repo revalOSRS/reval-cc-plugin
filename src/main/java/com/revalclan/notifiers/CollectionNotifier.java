@@ -24,7 +24,7 @@ public class CollectionNotifier extends BaseNotifier {
 
 	@Override
 	public boolean isEnabled() {
-		return config.notifyCollection() && filterManager.getFilters().isCollectionEnabled();
+		return filterManager.getFilters().isCollectionEnabled();
 	}
 
 	@Override

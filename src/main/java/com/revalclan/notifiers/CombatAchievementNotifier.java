@@ -22,7 +22,7 @@ public class CombatAchievementNotifier extends BaseNotifier {
 
 	@Override 
 	public boolean isEnabled() {
-		return config.notifyCombatAchievement() && filterManager.getFilters().isCombatAchievementEnabled();
+		return filterManager.getFilters().isCombatAchievementEnabled();
 	}
 
 	@Override

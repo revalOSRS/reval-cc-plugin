@@ -43,7 +43,7 @@ public class ChatNotifier extends BaseNotifier {
 	
 	@Override
 	public boolean isEnabled() {
-		return config.notifyChat() && filterManager.getFilters().isChatEnabled();
+		return filterManager.getFilters().isChatEnabled();
 	}
 	
 	@Override

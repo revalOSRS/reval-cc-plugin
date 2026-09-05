@@ -231,7 +231,7 @@ public class LootNotifier extends BaseNotifier {
 
 	@Override
 	public boolean isEnabled() {
-		return config.notifyLoot() && filterManager.getFilters().isLootEnabled();
+		return filterManager.getFilters().isLootEnabled();
 	}
 
 	@Override

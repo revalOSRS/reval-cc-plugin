@@ -60,22 +60,14 @@ Configure the plugin in the RuneLite settings panel:
 - **Enable Webhook**: Master toggle for all webhook notifications
 - **Save Local JSON**: Save collected data to local JSON files on logout
 
-### Event Notification Toggles
-Each event type can be individually enabled/disabled:
-- Loot Drops
-- Pet Drops
-- Level Ups
-- Quest Completions
-- Kill Counts
-- Clue Scrolls
-- Achievement Diaries
-- Combat Achievements
-- Collection Log
-- Player Deaths
-- Detailed Kills
-- Emote Usage
-- Music Played
-- System Chat Messages
+### Notifications
+Which game events are tracked is decided by the Reval backend, not per player, so the plugin stays in sync with what the clan systems expect. The per-player switches are:
+- **Show clan notifications**: Reval announcements and notifications in chat
+- **Send player deaths to Discord**: post your deaths (and who killed you) to the clan Discord
+- **Leagues Events**: Leagues task, relic, area and combat mastery tracking
+
+### Profile cards
+Choose where the "View Reval Profile" right-click option appears: on players in the world, in chat, or in the clan member list.
 
 ## Usage
 

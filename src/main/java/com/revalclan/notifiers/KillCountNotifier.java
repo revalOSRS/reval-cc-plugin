@@ -46,7 +46,7 @@ public class KillCountNotifier extends BaseNotifier {
 
 	@Override
 	public boolean isEnabled() {
-		return config.notifyKillCount() && filterManager.getFilters().isKillCountEnabled();
+		return filterManager.getFilters().isKillCountEnabled();
 	}
 
 	@Override

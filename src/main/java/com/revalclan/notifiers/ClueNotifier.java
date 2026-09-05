@@ -37,7 +37,7 @@ public class ClueNotifier extends BaseNotifier {
 
 	@Override
 	public boolean isEnabled() {
-		return config.notifyClue() && filterManager.getFilters().isClueEnabled();
+		return filterManager.getFilters().isClueEnabled();
 	}
 
 	@Override

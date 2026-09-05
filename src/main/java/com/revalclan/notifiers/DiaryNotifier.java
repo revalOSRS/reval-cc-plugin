@@ -40,7 +40,7 @@ public class DiaryNotifier extends BaseNotifier {
 
 	@Override
 	public boolean isEnabled() {
-		return config.notifyDiary() && filterManager.getFilters().isDiaryEnabled();
+		return filterManager.getFilters().isDiaryEnabled();
 	}
 
 	@Override

@@ -10,7 +10,7 @@ import java.util.Map;
 public class EmoteNotifier extends BaseNotifier {
 	@Override
 	public boolean isEnabled() {
-		return config.notifyEmote() && filterManager.getFilters().isEmoteEnabled();
+		return filterManager.getFilters().isEmoteEnabled();
 	}
 
 	@Override
