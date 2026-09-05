@@ -66,6 +66,9 @@ Which game events are tracked is decided by the Reval backend, not per player, s
 - **Send player deaths to Discord**: post your deaths (and who killed you) to the clan Discord
 - **Leagues Events**: Leagues task, relic, area and combat mastery tracking
 
+### Leagues Bingo boards
+Active Leagues Bingo events on the Events tab open in the side panel: pick a team from the standings, pick one of its region boards (completion, points and x2 status per board), then browse the tile grid. Clicking a tile shows the task, its requirements, progress and who contributed.
+
 ### Profile cards
 Choose where the "View Reval Profile" right-click option appears: on players in the world, in chat, or in the clan member list.
 

@@ -6,6 +6,9 @@ package com.revalclan.api.common;
 public final class ApiEndpoints {
     public static final String BASE_URL = "https://api.revalosrs.ee/plugin";
 
+    /** Root of the public (no-auth) API the homepage reads; absolute URLs bypass the /plugin prefix. */
+    public static final String PUBLIC_BASE_URL = "https://api.revalosrs.ee";
+
     // Points (includes ranks)
     public static final String POINTS = "/points";
 
@@ -22,6 +25,7 @@ public final class ApiEndpoints {
     public static final String PLAYER_PROFILE_CARD = "/players/profile-card";
     public static final String EVENT_REGISTER = "/events/%s/register";
     public static final String EVENT_REGISTRATION_STATUS = "/events/%s/registration-status";
+    public static final String LEAGUES_BINGO_EVENT = PUBLIC_BASE_URL + "/leagues-bingo/events/%s";
 
     // Achievements
     public static final String ACHIEVEMENTS = "/achievements";
@@ -78,6 +82,13 @@ public final class ApiEndpoints {
      */
     public static String eventRegister(String eventId) {
         return String.format(EVENT_REGISTER, eventId);
+    }
+
+    /**
+     * Build the public Leagues Bingo payload URL (boards, tiles, teams, progress) for an event
+     */
+    public static String leaguesBingoEvent(String eventId) {
+        return String.format(LEAGUES_BINGO_EVENT, eventId);
     }
 
     /**

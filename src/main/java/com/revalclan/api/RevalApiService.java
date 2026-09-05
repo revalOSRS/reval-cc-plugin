@@ -23,6 +23,7 @@ import com.revalclan.api.events.EventsResponse;
 import com.revalclan.api.events.RegistrationResponse;
 import com.revalclan.api.events.RegistrationStatusResponse;
 import com.revalclan.api.points.PointsResponse;
+import com.revalclan.api.leaguesbingo.LeaguesBingoResponse;
 import com.revalclan.util.PluginVersion;
 import okhttp3.*;
 
@@ -153,6 +154,19 @@ public class RevalApiService {
             lastActiveTeamsFetch = System.currentTimeMillis();
             onSuccess.accept(response);
         }, onError);
+    }
+
+    /**
+     * Full Leagues Bingo payload for an event: every region board with tiles,
+     * every team with unlocks, completions and per-tile progress. Not cached:
+     * the caller decides when a refresh is worth a round-trip.
+     */
+    public void fetchLeaguesBingoEvent(String eventId, Consumer<LeaguesBingoResponse> onSuccess, Consumer<Exception> onError) {
+        get(ApiEndpoints.leaguesBingoEvent(eventId), LeaguesBingoResponse.class, onSuccess, onError);
+    }
+
+    public OkHttpClient getHttpClient() {
+        return httpClient;
     }
 
     public void fetchProfileCard(String nickname, Consumer<ProfileCardResponse> onSuccess, Consumer<Exception> onError) {
@@ -474,8 +488,10 @@ public class RevalApiService {
     private <T extends ApiResponse> void request(String endpoint, String method, String body,
                                                  String memberCode, Class<T> responseClass,
                                                  Consumer<T> onSuccess, Consumer<Exception> onError) {
+        // Absolute URLs address the public API root; everything else lives under /plugin.
+        String url = endpoint.startsWith("http") ? endpoint : ApiEndpoints.BASE_URL + endpoint;
         Request.Builder requestBuilder = new Request.Builder()
-            .url(ApiEndpoints.BASE_URL + endpoint)
+            .url(url)
             .addHeader("Accept", "application/json")
             .addHeader("User-Agent", PluginVersion.userAgent())
             .addHeader("Content-Type", "application/json");

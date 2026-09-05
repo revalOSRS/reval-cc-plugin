@@ -49,6 +49,15 @@ public class EventsResponse extends ApiResponse {
         public boolean isUpcoming() {
             return "scheduled".equals(status);
         }
+
+        public boolean isLeaguesBingo() {
+            return "leagues_bingo".equalsIgnoreCase(eventType);
+        }
+
+        /** Boards exist once the event has left the scheduled stage. */
+        public boolean hasOpenableBoards() {
+            return isLeaguesBingo() && !isUpcoming();
+        }
         
         public String getFormattedStartDate() {
             try {
@@ -121,6 +130,7 @@ public class EventsResponse extends ApiResponse {
             switch (eventType.toLowerCase()) {
                 case "bingo": return "Bingo";
                 case "battleship_bingo": return "Battleship Bingo";
+                case "leagues_bingo": return "Leagues Bingo";
                 case "skilling": return "Skilling Competition";
                 case "boss": return "Boss Competition";
                 case "pvp": return "PvP Event";

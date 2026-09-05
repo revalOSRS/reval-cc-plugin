@@ -16,13 +16,24 @@ public class EventCard extends JPanel {
 	private final EventsResponse.EventSummary event;
 	private final boolean isActive;
 	private final String registrationStatus;
+	private final boolean openable;
 	private boolean isHovered = false;
 
 	public EventCard(EventsResponse.EventSummary event, boolean isActive, String currentPlayerName,
 					 BiConsumer<String, Boolean> onRegisterAction) {
+		this(event, isActive, currentPlayerName, onRegisterAction, null);
+	}
+
+	/**
+	 * @param onOpen when non-null the whole card is clickable and opens the
+	 *               event's detail view (boards for Leagues Bingo)
+	 */
+	public EventCard(EventsResponse.EventSummary event, boolean isActive, String currentPlayerName,
+					 BiConsumer<String, Boolean> onRegisterAction, Runnable onOpen) {
 		this.event = event;
 		this.isActive = isActive;
 		this.registrationStatus = findRegistrationStatus(currentPlayerName);
+		this.openable = onOpen != null;
 
 		setLayout(new BorderLayout());
 		setOpaque(false);
@@ -34,6 +45,12 @@ public class EventCard extends JPanel {
 			public void mouseEntered(MouseEvent e) { isHovered = true; repaint(); }
 			public void mouseExited(MouseEvent e) { isHovered = false; repaint(); }
 		});
+
+		// Press on the outer panel: inner labels have no listeners, so clicks
+		// fall through to us and the hover state never flickers.
+		if (onOpen != null) {
+			Clickable.onPress(this, onOpen);
+		}
 	}
 
 	private String findRegistrationStatus(String playerName) {
@@ -78,6 +95,10 @@ public class EventCard extends JPanel {
 
 		if (!isActive) {
 			card.add(buildFooter(onRegisterAction));
+		}
+
+		if (openable) {
+			card.add(buildOpenHint());
 		}
 
 		add(card, BorderLayout.CENTER);
@@ -152,6 +173,20 @@ public class EventCard extends JPanel {
 		content.add(dates);
 
 		return content;
+	}
+
+	private JPanel buildOpenHint() {
+		JPanel hint = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
+		hint.setOpaque(false);
+		hint.setAlignmentX(Component.LEFT_ALIGNMENT);
+		hint.setBorder(new EmptyBorder(8, 0, 0, 0));
+		hint.setMaximumSize(new Dimension(Integer.MAX_VALUE, 24));
+
+		JLabel open = new JLabel("View boards  >");
+		open.setFont(FontManager.getRunescapeSmallFont());
+		open.setForeground(getAccentColor());
+		hint.add(open);
+		return hint;
 	}
 
 	private JPanel buildFooter(BiConsumer<String, Boolean> onRegisterAction) {
