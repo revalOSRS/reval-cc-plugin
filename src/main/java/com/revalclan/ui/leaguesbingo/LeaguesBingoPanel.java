@@ -743,29 +743,34 @@ public class LeaguesBingoPanel extends JPanel {
 		return card;
 	}
 
+	private static final int DOT_SIZE = 9;
+	private static final int DOT_GAP = 6;
+	private static final int REQ_INDENT = DOT_SIZE + DOT_GAP;
+
 	private JComponent buildRequirementRow(JsonObject requirement, LeaguesBingoResponse.RequirementProgress rp, boolean done) {
-		JPanel rowPanel = new JPanel(new BorderLayout(6, 0));
-		rowPanel.setOpaque(false);
-		rowPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
-
-		// Center the dot on the first text line: HTML labels pad the top by a
-		// pixel or two, so aim for the middle of the font's ascent.
-		java.awt.FontMetrics fm = new JLabel().getFontMetrics(FontManager.getRunescapeSmallFont());
-		int dotTop = Math.max(0, fm.getAscent() / 2 - 2);
-		JPanel markHolder = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
-		markHolder.setOpaque(false);
-		markHolder.setBorder(new EmptyBorder(dotTop, 0, 0, 0));
-		markHolder.add(new StatusDot(done));
-		JPanel markTop = new JPanel(new BorderLayout());
-		markTop.setOpaque(false);
-		markTop.add(markHolder, BorderLayout.NORTH);
-		rowPanel.add(markTop, BorderLayout.WEST);
-
 		JPanel text = new JPanel();
 		text.setLayout(new BoxLayout(text, BoxLayout.Y_AXIS));
 		text.setOpaque(false);
-		text.add(wrapped(RequirementText.describe(requirement), FontManager.getRunescapeSmallFont(),
-			done ? UIConstants.TEXT_PRIMARY : UIConstants.TEXT_SECONDARY, TEXT_WIDTH - 16));
+		text.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+		// The first line is a plain label carrying the dot as its icon, so
+		// Swing centers the two on one line; wrapped continuation lines hang
+		// under the text. HTML wrapping would put the dot at the block's top.
+		Font font = FontManager.getRunescapeSmallFont();
+		Color color = done ? UIConstants.TEXT_PRIMARY : UIConstants.TEXT_SECONDARY;
+		java.awt.FontMetrics fm = new JLabel().getFontMetrics(font);
+		List<String> lines = wrapLines(RequirementText.describe(requirement), fm, TEXT_WIDTH - REQ_INDENT);
+		JLabel first = new JLabel(lines.isEmpty() ? "" : lines.get(0), new DotIcon(done), JLabel.LEFT);
+		first.setFont(font);
+		first.setForeground(color);
+		first.setIconTextGap(DOT_GAP);
+		first.setAlignmentX(Component.LEFT_ALIGNMENT);
+		text.add(first);
+		for (int i = 1; i < lines.size(); i++) {
+			JLabel more = label(lines.get(i), font, color);
+			more.setBorder(new EmptyBorder(0, REQ_INDENT, 0, 0));
+			text.add(more);
+		}
 
 		List<String> options = RequirementText.optionNames(requirement);
 		if (options.size() > 1) {
@@ -787,7 +792,9 @@ public class LeaguesBingoPanel extends JPanel {
 				}
 			}
 			if (ordered.size() > shown) html.append(" +").append(ordered.size() - shown).append(" more");
-			text.add(wrappedHtml(html.toString(), FontManager.getRunescapeSmallFont(), UIConstants.TEXT_MUTED, TEXT_WIDTH - 16));
+			JLabel optionsLabel = wrappedHtml(html.toString(), FontManager.getRunescapeSmallFont(), UIConstants.TEXT_MUTED, TEXT_WIDTH - REQ_INDENT);
+			optionsLabel.setBorder(new EmptyBorder(0, REQ_INDENT, 0, 0));
+			text.add(optionsLabel);
 		}
 
 		if (rp != null) {
@@ -805,12 +812,33 @@ public class LeaguesBingoPanel extends JPanel {
 				sub.append("by ").append(who);
 			}
 			if (sub.length() > 0) {
-				text.add(wrapped(sub.toString(), FontManager.getRunescapeSmallFont(), done ? TileCell.COMPLETED : TileCell.IN_PROGRESS, TEXT_WIDTH - 16));
+				JLabel subLabel = wrapped(sub.toString(), FontManager.getRunescapeSmallFont(), done ? TileCell.COMPLETED : TileCell.IN_PROGRESS, TEXT_WIDTH - REQ_INDENT);
+				subLabel.setBorder(new EmptyBorder(0, REQ_INDENT, 0, 0));
+				text.add(subLabel);
 			}
 		}
 
-		rowPanel.add(text, BorderLayout.CENTER);
-		return rowPanel;
+		return text;
+	}
+
+	/** Greedy word wrap measured with the real font, for plain (non-HTML) labels. */
+	private static List<String> wrapLines(String text, java.awt.FontMetrics fm, int width) {
+		List<String> lines = new ArrayList<>();
+		if (text == null || text.trim().isEmpty()) return lines;
+		StringBuilder line = new StringBuilder();
+		for (String word : text.trim().split("\\s+")) {
+			String candidate = line.length() == 0 ? word : line + " " + word;
+			if (fm.stringWidth(candidate) <= width || line.length() == 0) {
+				line.setLength(0);
+				line.append(candidate);
+			} else {
+				lines.add(line.toString());
+				line.setLength(0);
+				line.append(word);
+			}
+		}
+		if (line.length() > 0) lines.add(line.toString());
+		return lines;
 	}
 
 	/** Item and pet names (lowercased) the team has already turned in for this requirement. */
@@ -1098,31 +1126,37 @@ public class LeaguesBingoPanel extends JPanel {
 		}
 	}
 
-	/** Filled green dot when done, hollow muted ring otherwise. */
-	private static final class StatusDot extends JComponent {
+	/** Filled green dot when done, hollow muted ring otherwise; an Icon so a label centers it with its text. */
+	private static final class DotIcon implements javax.swing.Icon {
 		private final boolean done;
 
-		StatusDot(boolean done) {
+		DotIcon(boolean done) {
 			this.done = done;
-			Dimension d = new Dimension(9, 9);
-			setPreferredSize(d);
-			setMinimumSize(d);
-			setMaximumSize(d);
 		}
 
 		@Override
-		protected void paintComponent(Graphics g) {
+		public void paintIcon(Component c, Graphics g, int x, int y) {
 			Graphics2D g2 = (Graphics2D) g.create();
 			g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 			if (done) {
 				g2.setColor(TileCell.COMPLETED);
-				g2.fillOval(0, 0, getWidth(), getHeight());
+				g2.fillOval(x, y, DOT_SIZE, DOT_SIZE);
 			} else {
 				g2.setColor(UIConstants.TEXT_MUTED);
 				g2.setStroke(new BasicStroke(1.5f));
-				g2.drawOval(1, 1, getWidth() - 2, getHeight() - 2);
+				g2.drawOval(x + 1, y + 1, DOT_SIZE - 2, DOT_SIZE - 2);
 			}
 			g2.dispose();
+		}
+
+		@Override
+		public int getIconWidth() {
+			return DOT_SIZE;
+		}
+
+		@Override
+		public int getIconHeight() {
+			return DOT_SIZE;
 		}
 	}
 
