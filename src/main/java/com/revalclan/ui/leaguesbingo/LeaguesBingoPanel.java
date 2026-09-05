@@ -18,7 +18,10 @@ import com.revalclan.ui.components.RefreshButton;
 import com.revalclan.ui.constants.UIConstants;
 import com.revalclan.util.DateTimeUtil;
 import net.runelite.api.Client;
+import net.runelite.client.game.ItemManager;
 import net.runelite.client.ui.FontManager;
+import net.runelite.client.util.AsyncBufferedImage;
+import net.runelite.http.api.item.ItemPrice;
 
 import javax.swing.BorderFactory;
 import javax.swing.Box;
@@ -65,7 +68,9 @@ public class LeaguesBingoPanel extends JPanel {
 	private final RevalApiService api;
 	private final Client client;
 	private final Runnable onClose;
-	private final WikiIconCache icons;
+	private final ItemManager itemManager;
+	/** Tile icon name -> game item id; null entries mark names we could not resolve. */
+	private final Map<String, Integer> iconItemIds = new HashMap<>();
 
 	private final BackButton backButton;
 	private final JLabel titleLabel;
@@ -87,11 +92,11 @@ public class LeaguesBingoPanel extends JPanel {
 	private JPanel tileDetailHolder;
 	private final List<TileCell> cells = new ArrayList<>();
 
-	public LeaguesBingoPanel(RevalApiService api, Client client, Runnable onClose) {
+	public LeaguesBingoPanel(RevalApiService api, Client client, ItemManager itemManager, Runnable onClose) {
 		this.api = api;
 		this.client = client;
+		this.itemManager = itemManager;
 		this.onClose = onClose;
-		this.icons = new WikiIconCache(api.getHttpClient());
 
 		setLayout(new BorderLayout());
 		setBackground(UIConstants.BACKGROUND);
@@ -520,9 +525,7 @@ public class LeaguesBingoPanel extends JPanel {
 					cells.add(cell);
 					final TileCell target = cell;
 					Clickable.onPress(cell, () -> selectTile(team, board, stats, target), cell::setHovered);
-					if (tile.getIcon() != null) {
-						icons.load(tile.getIcon(), target::setIcon);
-					}
+					loadTileIcon(tile, target);
 				}
 				grid.add(cell, c);
 			}
@@ -533,6 +536,86 @@ public class LeaguesBingoPanel extends JPanel {
 		holder.setAlignmentX(Component.LEFT_ALIGNMENT);
 		holder.add(grid);
 		return holder;
+	}
+
+	// ==================== Tile icons (game cache) ====================
+
+	/**
+	 * Tile icons come from the RuneLite item cache, never the wiki. The tile's
+	 * icon name is matched against the item price list first (it is the
+	 * representative item the admin picked), then against the items the tile's
+	 * own requirements name, and finally the first required item.
+	 */
+	private void loadTileIcon(Tile tile, TileCell cell) {
+		if (itemManager == null) return;
+		Integer itemId = resolveItemId(tile);
+		if (itemId == null) return;
+		try {
+			AsyncBufferedImage image = itemManager.getImage(itemId);
+			cell.setIcon(image);
+			image.onLoaded(() -> SwingUtilities.invokeLater(cell::repaint));
+		} catch (Exception ignored) {
+			// A bad id must never break the grid.
+		}
+	}
+
+	private Integer resolveItemId(Tile tile) {
+		String icon = tile.getIcon() != null ? tile.getIcon().replace('_', ' ').trim() : "";
+		if (!icon.isEmpty()) {
+			if (iconItemIds.containsKey(icon)) {
+				Integer cached = iconItemIds.get(icon);
+				if (cached != null) return cached;
+			} else {
+				Integer found = requirementItemNamed(tile, icon);
+				if (found == null) found = searchItem(icon);
+				if (found == null) {
+					String bare = icon.replaceAll("\\s*\\([^)]*\\)$", "").replaceAll("\\s+\\d+$", "").trim();
+					if (!bare.equals(icon)) found = searchItem(bare);
+				}
+				iconItemIds.put(icon, found);
+				if (found != null) return found;
+			}
+		}
+		return firstRequirementItem(tile);
+	}
+
+	private Integer searchItem(String name) {
+		try {
+			List<ItemPrice> results = itemManager.search(name);
+			for (ItemPrice p : results) {
+				if (p.getName() != null && p.getName().equalsIgnoreCase(name)) return p.getId();
+			}
+		} catch (Exception ignored) {
+		}
+		return null;
+	}
+
+	private static Integer requirementItemNamed(Tile tile, String name) {
+		if (tile.getRequirements() == null) return null;
+		for (JsonObject r : tile.getRequirements().getRequirements()) {
+			if (!r.has("items") || !r.get("items").isJsonArray()) continue;
+			for (JsonElement e : r.getAsJsonArray("items")) {
+				if (!e.isJsonObject()) continue;
+				JsonObject item = e.getAsJsonObject();
+				String itemName = RequirementText.str(item, "itemName", "");
+				Double id = RequirementText.number(item, "itemId");
+				if (id != null && itemName.equalsIgnoreCase(name)) return id.intValue();
+			}
+		}
+		return null;
+	}
+
+	private static Integer firstRequirementItem(Tile tile) {
+		if (tile.getRequirements() == null) return null;
+		for (JsonObject r : tile.getRequirements().getRequirements()) {
+			if (!r.has("items") || !r.get("items").isJsonArray()) continue;
+			for (JsonElement e : r.getAsJsonArray("items")) {
+				if (!e.isJsonObject()) continue;
+				Double id = RequirementText.number(e.getAsJsonObject(), "itemId");
+				if (id != null) return id.intValue();
+			}
+		}
+		return null;
 	}
 
 	private void selectTile(Team team, Board board, BoardStats stats, TileCell cell) {
@@ -649,10 +732,21 @@ public class LeaguesBingoPanel extends JPanel {
 
 		List<String> items = RequirementText.itemNames(requirement);
 		if (items.size() > 1) {
-			String names = items.size() > 8
-				? String.join(", ", items.subList(0, 8)) + " +" + (items.size() - 8) + " more"
-				: String.join(", ", items);
-			text.add(wrapped(names, FontManager.getRunescapeSmallFont(), UIConstants.TEXT_MUTED, TEXT_WIDTH - 16));
+			java.util.Set<String> obtained = obtainedItemNames(rp != null ? rp.getProgressMetadata() : null);
+			StringBuilder html = new StringBuilder();
+			int shown = Math.min(items.size(), 8);
+			for (int i = 0; i < shown; i++) {
+				if (i > 0) html.append(", ");
+				String name = items.get(i);
+				String escaped = escapeHtml(name);
+				if (done || obtained.contains(name.toLowerCase())) {
+					html.append("<span style='color:#4caf50'>").append(escaped).append("</span>");
+				} else {
+					html.append(escaped);
+				}
+			}
+			if (items.size() > shown) html.append(" +").append(items.size() - shown).append(" more");
+			text.add(wrappedHtml(html.toString(), FontManager.getRunescapeSmallFont(), UIConstants.TEXT_MUTED, TEXT_WIDTH - 16));
 		}
 
 		if (rp != null) {
@@ -676,6 +770,29 @@ public class LeaguesBingoPanel extends JPanel {
 
 		rowPanel.add(text, BorderLayout.CENTER);
 		return rowPanel;
+	}
+
+	/** Item names (lowercased) the team has already turned in for this requirement. */
+	private static java.util.Set<String> obtainedItemNames(JsonObject meta) {
+		java.util.Set<String> names = new java.util.HashSet<>();
+		if (meta == null) return names;
+		collectItemNames(meta.get("lastItemsObtained"), names);
+		JsonElement contributions = meta.get("playerContributions");
+		if (contributions != null && contributions.isJsonArray()) {
+			for (JsonElement c : contributions.getAsJsonArray()) {
+				if (c.isJsonObject()) collectItemNames(c.getAsJsonObject().get("items"), names);
+			}
+		}
+		return names;
+	}
+
+	private static void collectItemNames(JsonElement array, java.util.Set<String> into) {
+		if (array == null || !array.isJsonArray()) return;
+		for (JsonElement e : array.getAsJsonArray()) {
+			if (!e.isJsonObject()) continue;
+			String n = RequirementText.str(e.getAsJsonObject(), "itemName", null);
+			if (n != null) into.add(n.toLowerCase());
+		}
 	}
 
 	private static String contributors(JsonObject meta) {
@@ -811,12 +928,19 @@ public class LeaguesBingoPanel extends JPanel {
 	}
 
 	private static JLabel wrapped(String text, Font font, Color color, int width) {
-		String safe = text == null ? "" : text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
-		JLabel l = new JLabel("<html><div style='width:" + width + "px'>" + safe + "</div></html>");
+		return wrappedHtml(escapeHtml(text), font, color, width);
+	}
+
+	private static JLabel wrappedHtml(String html, Font font, Color color, int width) {
+		JLabel l = new JLabel("<html><div style='width:" + width + "px'>" + html + "</div></html>");
 		l.setFont(font);
 		l.setForeground(color);
 		l.setAlignmentX(Component.LEFT_ALIGNMENT);
 		return l;
+	}
+
+	private static String escapeHtml(String text) {
+		return text == null ? "" : text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
 	}
 
 	private static JLabel sectionTitle(String text) {

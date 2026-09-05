@@ -14,7 +14,7 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.geom.RoundRectangle2D;
-import java.awt.image.BufferedImage;
+import java.awt.Image;
 
 /**
  * One square of a Leagues Bingo board. Paints the same states the homepage
@@ -33,7 +33,7 @@ public class TileCell extends JComponent {
 	private final Color accent;
 	private final int size;
 
-	private BufferedImage icon;
+	private Image icon;
 	private boolean hovered;
 	private boolean selected;
 	private boolean dimmed;
@@ -58,7 +58,7 @@ public class TileCell extends JComponent {
 		return tile;
 	}
 
-	public void setIcon(BufferedImage icon) {
+	public void setIcon(Image icon) {
 		this.icon = icon;
 		repaint();
 	}
@@ -150,10 +150,14 @@ public class TileCell extends JComponent {
 	}
 
 	private void paintIcon(Graphics2D g2, int w, int h) {
-		int box = (int) Math.round(Math.min(w, h) * 0.66);
-		double scale = Math.min((double) box / icon.getWidth(), (double) box / icon.getHeight());
-		int iw = Math.max(1, (int) Math.round(icon.getWidth() * scale));
-		int ih = Math.max(1, (int) Math.round(icon.getHeight() * scale));
+		int box = (int) Math.round(Math.min(w, h) * 0.72);
+		// Item sprites from the game cache are 36x32 pixel art: keep them 1:1
+		// whenever they fit, and only shrink them on tiny boards.
+		int srcW = Math.max(1, icon.getWidth(null));
+		int srcH = Math.max(1, icon.getHeight(null));
+		double scale = Math.min(1d, Math.min((double) box / srcW, (double) box / srcH));
+		int iw = Math.max(1, (int) Math.round(srcW * scale));
+		int ih = Math.max(1, (int) Math.round(srcH * scale));
 		int x = (w - iw) / 2;
 		int y = (h - ih) / 2 - (state == State.IN_PROGRESS ? 2 : 0);
 		g2.drawImage(icon, x, y, iw, ih, null);

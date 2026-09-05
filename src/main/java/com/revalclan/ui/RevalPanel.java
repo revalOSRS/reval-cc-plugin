@@ -396,7 +396,7 @@ public class RevalPanel extends PluginPanel {
 		leaderboardPanel.init(apiService, assetLoader, itemManager, rankIconResolver);
 		achievementsPanel.init(apiService, client);
 		competitionsPanel.init(apiService, client);
-		eventsPanel.init(apiService, client);
+		eventsPanel.init(apiService, client, itemManager);
 		diaryPanel.init(apiService, client, assetLoader);
 		// Wire up tab indicator callbacks
 		eventsPanel.setOnIndicatorUpdate(this::setEventsIndicator);

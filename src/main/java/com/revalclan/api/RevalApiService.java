@@ -165,10 +165,6 @@ public class RevalApiService {
         get(ApiEndpoints.leaguesBingoEvent(eventId), LeaguesBingoResponse.class, onSuccess, onError);
     }
 
-    public OkHttpClient getHttpClient() {
-        return httpClient;
-    }
-
     public void fetchProfileCard(String nickname, Consumer<ProfileCardResponse> onSuccess, Consumer<Exception> onError) {
         String encoded = URLEncoder.encode(nickname, StandardCharsets.UTF_8);
         get(ApiEndpoints.PLAYER_PROFILE_CARD + "?nickname=" + encoded, ProfileCardResponse.class, onSuccess, onError);

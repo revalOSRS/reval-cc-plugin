@@ -16,6 +16,13 @@ public final class RequirementText {
 	}
 
 	public static String describe(JsonObject r) {
+		// Admins can attach their own wording; it beats anything we derive.
+		String custom = str(r, "description", "").trim();
+		if (!custom.isEmpty()) return custom;
+		return derive(r);
+	}
+
+	private static String derive(JsonObject r) {
 		String type = str(r, "type", "");
 		switch (type) {
 			case "ITEM_DROP": {
@@ -67,7 +74,12 @@ public final class RequirementText {
 			}
 			case "BA_GAMBLES": return numOr(r, "count") + " BA high gambles";
 			case "MINIGAME_SCORE": return str(r, "minigame", "?") + ": " + num(r, "score", 0) + " score";
-			case "CHAT_MESSAGE": return "Message: \"" + str(r, "message", "?") + "\"";
+			case "CHAT_MESSAGE": {
+				String message = str(r, "message", str(r, "pattern", ""));
+				int count = num(r, "count", 1);
+				if (message.isEmpty()) return count > 1 ? count + "x game message" : "Game message";
+				return (count > 1 ? count + "x " : "") + "\"" + message + "\"";
+			}
 			case "EMOTE": return "Emote: " + str(r, "emoteName", "?");
 			case "MUSIC_PLAYED": return "Play track: " + str(r, "trackName", "?");
 			case "MANUAL": {
