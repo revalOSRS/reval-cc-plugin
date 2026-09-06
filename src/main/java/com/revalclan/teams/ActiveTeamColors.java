@@ -1,6 +1,7 @@
 package com.revalclan.teams;
 
 import com.revalclan.api.RevalApiService;
+import com.revalclan.util.TeamColor;
 import com.revalclan.api.events.ActiveTeamsResponse;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.client.util.Text;
@@ -23,9 +24,6 @@ import java.util.Map;
 @Slf4j
 @Singleton
 public class ActiveTeamColors {
-	/** Teams whose color is unset get the backend's default gray. */
-	private static final Color FALLBACK_COLOR = new Color(0x888888);
-
 	private final RevalApiService apiService;
 
 	/** Standardized nickname -> team color */
@@ -50,7 +48,7 @@ public class ActiveTeamColors {
 						if (team.getMembers() == null) {
 							continue;
 						}
-						Color color = parseColor(team.getColor());
+						Color color = TeamColor.parse(team.getColor());
 						for (String member : team.getMembers()) {
 							// Newest event first in the response; first match wins
 							map.putIfAbsent(Text.standardize(member), color);
@@ -63,14 +61,4 @@ public class ActiveTeamColors {
 		);
 	}
 
-	private static Color parseColor(String hex) {
-		if (hex == null || hex.isEmpty()) {
-			return FALLBACK_COLOR;
-		}
-		try {
-			return Color.decode(hex);
-		} catch (NumberFormatException e) {
-			return FALLBACK_COLOR;
-		}
-	}
 }

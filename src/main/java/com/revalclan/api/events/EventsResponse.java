@@ -8,7 +8,6 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.time.Instant;
-import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 
@@ -49,23 +48,22 @@ public class EventsResponse extends ApiResponse {
         public boolean isUpcoming() {
             return "scheduled".equals(status);
         }
+
+        public boolean isLeaguesBingo() {
+            return "leagues_bingo".equalsIgnoreCase(eventType);
+        }
+
+        /** Boards exist once the event has left the scheduled stage. */
+        public boolean hasOpenableBoards() {
+            return isLeaguesBingo() && !isUpcoming();
+        }
         
         public String getFormattedStartDate() {
-            try {
-                return DateTimeUtil.parseToLocal(startDate)
-                    .format(DateTimeFormatter.ofPattern("MMM d HH:mm"));
-            } catch (Exception e) {
-                return startDate;
-            }
+            return DateTimeUtil.formatShort(startDate);
         }
 
         public String getFormattedEndDate() {
-            try {
-                return DateTimeUtil.parseToLocal(endDate)
-                    .format(DateTimeFormatter.ofPattern("MMM d HH:mm"));
-            } catch (Exception e) {
-                return endDate;
-            }
+            return DateTimeUtil.formatShort(endDate);
         }
 
         public String getDuration() {
@@ -121,6 +119,7 @@ public class EventsResponse extends ApiResponse {
             switch (eventType.toLowerCase()) {
                 case "bingo": return "Bingo";
                 case "battleship_bingo": return "Battleship Bingo";
+                case "leagues_bingo": return "Leagues Bingo";
                 case "skilling": return "Skilling Competition";
                 case "boss": return "Boss Competition";
                 case "pvp": return "PvP Event";

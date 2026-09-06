@@ -23,6 +23,11 @@ import com.revalclan.api.events.EventsResponse;
 import com.revalclan.api.events.RegistrationResponse;
 import com.revalclan.api.events.RegistrationStatusResponse;
 import com.revalclan.api.points.PointsResponse;
+import com.revalclan.api.common.ApiEnvelope;
+import com.revalclan.api.common.PublicApiResponse;
+import com.revalclan.api.leaguesbingo.LeaguesBingoMeResponse;
+import com.revalclan.api.leaguesbingo.LeaguesBingoPickResponse;
+import com.revalclan.api.leaguesbingo.LeaguesBingoResponse;
 import com.revalclan.util.PluginVersion;
 import okhttp3.*;
 
@@ -153,6 +158,34 @@ public class RevalApiService {
             lastActiveTeamsFetch = System.currentTimeMillis();
             onSuccess.accept(response);
         }, onError);
+    }
+
+    /**
+     * Full Leagues Bingo payload for an event: every region board with tiles,
+     * every team with unlocks, completions and per-tile progress. Not cached:
+     * the caller decides when a refresh is worth a round-trip.
+     */
+    public void fetchLeaguesBingoEvent(String eventId, Consumer<LeaguesBingoResponse> onSuccess, Consumer<Exception> onError) {
+        getPublic(ApiEndpoints.leaguesBingoEventUrl(eventId), LeaguesBingoResponse.class, onSuccess, onError);
+    }
+
+    /** What this account may do in a Leagues Bingo event (team, role, may pick). */
+    public void fetchLeaguesBingoMe(String eventId, long accountHash,
+                                    Consumer<LeaguesBingoMeResponse> onSuccess, Consumer<Exception> onError) {
+        get(ApiEndpoints.leaguesBingoMe(eventId, accountHash), LeaguesBingoMeResponse.class, onSuccess, onError);
+    }
+
+    /**
+     * Spend one pick token on a region. teamId is only honoured for
+     * superadmins; pickers always act for their own team.
+     */
+    public void pickLeaguesBingoRegion(String eventId, long accountHash, String region, String teamId,
+                                       Consumer<LeaguesBingoPickResponse> onSuccess, Consumer<Exception> onError) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("accountHash", String.valueOf(accountHash));
+        body.put("region", region);
+        if (teamId != null) body.put("teamId", teamId);
+        post(ApiEndpoints.leaguesBingoPick(eventId), gson.toJson(body), LeaguesBingoPickResponse.class, onSuccess, onError);
     }
 
     public void fetchProfileCard(String nickname, Consumer<ProfileCardResponse> onSuccess, Consumer<Exception> onError) {
@@ -448,34 +481,41 @@ public class RevalApiService {
 
     private <T extends ApiResponse> void get(String endpoint, Class<T> responseClass,
                                              Consumer<T> onSuccess, Consumer<Exception> onError) {
-        request(endpoint, "GET", null, null, responseClass, onSuccess, onError);
+        request(ApiEndpoints.url(endpoint), "GET", null, null, responseClass, onSuccess, onError);
+    }
+
+    /** GET against the public API (full URL, {success, data} envelope). */
+    private <T extends PublicApiResponse> void getPublic(String url, Class<T> responseClass,
+                                                         Consumer<T> onSuccess, Consumer<Exception> onError) {
+        request(url, "GET", null, null, responseClass, onSuccess, onError);
     }
 
     private <T extends ApiResponse> void getAdmin(String endpoint, String memberCode, Class<T> responseClass,
                                                   Consumer<T> onSuccess, Consumer<Exception> onError) {
-        request(endpoint, "GET", null, memberCode, responseClass, onSuccess, onError);
+        request(ApiEndpoints.url(endpoint), "GET", null, memberCode, responseClass, onSuccess, onError);
     }
 
     private <T extends ApiResponse> void post(String endpoint, String body, Class<T> responseClass,
                                               Consumer<T> onSuccess, Consumer<Exception> onError) {
-        request(endpoint, "POST", body, null, responseClass, onSuccess, onError);
+        request(ApiEndpoints.url(endpoint), "POST", body, null, responseClass, onSuccess, onError);
     }
 
     private <T extends ApiResponse> void postAdmin(String endpoint, String body, String memberCode,
                                                    Class<T> responseClass, Consumer<T> onSuccess, Consumer<Exception> onError) {
-        request(endpoint, "POST", body, memberCode, responseClass, onSuccess, onError);
+        request(ApiEndpoints.url(endpoint), "POST", body, memberCode, responseClass, onSuccess, onError);
     }
 
     private <T extends ApiResponse> void delete(String endpoint, String body, Class<T> responseClass,
                                                 Consumer<T> onSuccess, Consumer<Exception> onError) {
-        request(endpoint, "DELETE", body, null, responseClass, onSuccess, onError);
+        request(ApiEndpoints.url(endpoint), "DELETE", body, null, responseClass, onSuccess, onError);
     }
 
-    private <T extends ApiResponse> void request(String endpoint, String method, String body,
+    /** One HTTP round-trip; callers pass a full URL and the envelope type they expect. */
+    private <T extends ApiEnvelope> void request(String url, String method, String body,
                                                  String memberCode, Class<T> responseClass,
                                                  Consumer<T> onSuccess, Consumer<Exception> onError) {
         Request.Builder requestBuilder = new Request.Builder()
-            .url(ApiEndpoints.BASE_URL + endpoint)
+            .url(url)
             .addHeader("Accept", "application/json")
             .addHeader("User-Agent", PluginVersion.userAgent())
             .addHeader("Content-Type", "application/json");
@@ -518,8 +558,8 @@ public class RevalApiService {
                                 errorResponse = gson.fromJson(errorBody, responseClass);
                             } catch (Exception ignored) {}
                         }
-                        onError.accept(new Exception(errorResponse != null && errorResponse.getMessage() != null 
-                            ? errorResponse.getMessage() : "HTTP " + response.code()));
+                        onError.accept(new Exception(errorResponse != null && errorResponse.getErrorMessage() != null
+                            ? errorResponse.getErrorMessage() : "HTTP " + response.code()));
                         return;
                     }
 
@@ -534,8 +574,8 @@ public class RevalApiService {
                     if (parsedResponse == null) {
                         onError.accept(new Exception("Failed to parse response"));
                     } else if (!parsedResponse.isSuccess()) {
-                        onError.accept(new Exception(parsedResponse.getMessage() != null 
-                            ? parsedResponse.getMessage() : "Request failed"));
+                        onError.accept(new Exception(parsedResponse.getErrorMessage() != null
+                            ? parsedResponse.getErrorMessage() : "Request failed"));
                     } else {
                         onSuccess.accept(parsedResponse);
                     }

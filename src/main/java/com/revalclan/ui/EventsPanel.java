@@ -6,7 +6,9 @@ import com.revalclan.ui.components.EventCard;
 import com.revalclan.ui.components.LoginPrompt;
 import com.revalclan.ui.components.PanelTitle;
 import com.revalclan.ui.components.RefreshButton;
+import com.revalclan.ui.components.ScrollWrap;
 import com.revalclan.ui.constants.UIConstants;
+import com.revalclan.ui.leaguesbingo.LeaguesBingoPanel;
 import net.runelite.api.Client;
 import net.runelite.client.ui.FontManager;
 
@@ -24,9 +26,12 @@ public class EventsPanel extends JPanel {
 	private RevalApiService apiService;
 	private Client client;
 
+	private final CardLayout cardLayout;
+	private final JPanel cardContainer;
 	private JPanel contentPanel;
 	private JPanel eventsListPanel;
 	private RefreshButton refreshButton;
+	private LeaguesBingoPanel leaguesBingoPanel;
 
 	private String currentTab = "active";
 	private boolean userSelectedTab = false;
@@ -48,31 +53,37 @@ public class EventsPanel extends JPanel {
 		contentPanel.setBackground(UIConstants.BACKGROUND);
 		contentPanel.setBorder(new EmptyBorder(12, 10, 10, 10));
 
-		JPanel wrapper = new JPanel(new BorderLayout()) {
-			@Override
-			public Dimension getPreferredSize() {
-				Dimension size = super.getPreferredSize();
-				if (getParent() != null) size.width = getParent().getWidth();
-				return size;
-			}
-		};
-		wrapper.setBackground(UIConstants.BACKGROUND);
-		wrapper.add(contentPanel, BorderLayout.NORTH);
-
-		JScrollPane scrollPane = new JScrollPane(wrapper);
-		scrollPane.setBackground(UIConstants.BACKGROUND);
-		scrollPane.setBorder(null);
-		scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
-		scrollPane.getVerticalScrollBar().setUnitIncrement(16);
-		scrollPane.getViewport().setBackground(UIConstants.BACKGROUND);
+		JScrollPane scrollPane = ScrollWrap.of(contentPanel);
 
 		showNotLoggedIn();
-		add(scrollPane, BorderLayout.CENTER);
+
+		cardLayout = new CardLayout();
+		cardContainer = new JPanel(cardLayout);
+		cardContainer.setBackground(UIConstants.BACKGROUND);
+		cardContainer.add(scrollPane, "LIST");
+		add(cardContainer, BorderLayout.CENTER);
 	}
 
 	public void init(RevalApiService apiService, Client client) {
 		this.apiService = apiService;
 		this.client = client;
+	}
+
+	/** The injector-built board browser; shown when a Leagues Bingo card is opened. */
+	public void setLeaguesBingoPanel(LeaguesBingoPanel panel) {
+		leaguesBingoPanel = panel;
+		panel.setOnClose(this::showList);
+		cardContainer.add(panel, "LEAGUES_BINGO");
+	}
+
+	private void showList() {
+		cardLayout.show(cardContainer, "LIST");
+	}
+
+	private void openLeaguesBingo(EventsResponse.EventSummary event) {
+		if (leaguesBingoPanel == null) return;
+		leaguesBingoPanel.open(event);
+		cardLayout.show(cardContainer, "LEAGUES_BINGO");
 	}
 
 	public void setOnIndicatorUpdate(Consumer<Boolean> callback) {
@@ -86,7 +97,11 @@ public class EventsPanel extends JPanel {
 	}
 
 	public void onLoggedOut() {
-		SwingUtilities.invokeLater(this::showNotLoggedIn);
+		SwingUtilities.invokeLater(() -> {
+			if (leaguesBingoPanel != null) leaguesBingoPanel.reset();
+			showList();
+			showNotLoggedIn();
+		});
 	}
 
 	public void refresh() {
@@ -267,7 +282,8 @@ public class EventsPanel extends JPanel {
 			showEmptyState();
 		} else {
 			for (EventsResponse.EventSummary event : filtered) {
-				EventCard card = new EventCard(event, event.isCurrentlyActive(), currentPlayerName, this::handleRegistration);
+				Runnable onOpen = event.hasOpenableBoards() ? () -> openLeaguesBingo(event) : null;
+				EventCard card = new EventCard(event, event.isCurrentlyActive(), currentPlayerName, this::handleRegistration, onOpen);
 				card.setAlignmentX(Component.LEFT_ALIGNMENT);
 				card.setMaximumSize(new Dimension(Integer.MAX_VALUE, card.getPreferredSize().height));
 				eventsListPanel.add(card);

@@ -2,6 +2,7 @@ package com.revalclan.ui;
 
 import com.revalclan.api.account.AccountResponse;
 import com.revalclan.ui.constants.UIConstants;
+import com.revalclan.util.TextWrap;
 import com.revalclan.util.NumberFmt;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.ui.FontManager;
@@ -493,23 +494,8 @@ public class PointsAlbumWindow extends JFrame {
 		}
 
 		private void wrap(String text, FontMetrics fm) {
-			if (text.isEmpty()) {
-				lines.add(" ");
-				return;
-			}
-			StringBuilder line = new StringBuilder();
-			for (String word : text.split(" ")) {
-				String candidate = line.length() == 0 ? word : line + " " + word;
-				if (fm.stringWidth(candidate) <= wrapWidth || line.length() == 0) {
-					line = new StringBuilder(candidate);
-				} else {
-					lines.add(line.toString());
-					line = new StringBuilder(word);
-				}
-			}
-			if (line.length() > 0) {
-				lines.add(line.toString());
-			}
+			lines.addAll(TextWrap.wrap(text, fm, wrapWidth));
+			if (lines.isEmpty()) lines.add(" ");
 		}
 
 		@Override

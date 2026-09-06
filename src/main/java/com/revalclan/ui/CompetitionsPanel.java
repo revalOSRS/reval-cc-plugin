@@ -6,6 +6,7 @@ import com.revalclan.ui.components.BackButton;
 import com.revalclan.ui.components.Clickable;
 import com.revalclan.ui.components.PanelTitle;
 import com.revalclan.ui.components.RefreshButton;
+import com.revalclan.ui.components.ScrollWrap;
 import com.revalclan.ui.constants.UIConstants;
 import com.revalclan.util.DateTimeUtil;
 import net.runelite.api.Client;
@@ -61,7 +62,7 @@ public class CompetitionsPanel extends JPanel {
 		contentPanel.setBackground(UIConstants.BACKGROUND);
 		contentPanel.setBorder(new EmptyBorder(8, 8, 8, 8));
 
-		listViewPanel.add(wrapScrollable(contentPanel), BorderLayout.CENTER);
+		listViewPanel.add(ScrollWrap.of(contentPanel), BorderLayout.CENTER);
 
 		// Detail view
 		detailViewPanel = new JPanel(new BorderLayout());
@@ -370,7 +371,7 @@ public class CompetitionsPanel extends JPanel {
 		content.add(Box.createVerticalStrut(20));
 		content.add(label("Loading leaderboard...", FontManager.getRunescapeSmallFont(), UIConstants.TEXT_SECONDARY, Component.CENTER_ALIGNMENT));
 
-		detailViewPanel.add(wrapScrollable(content), BorderLayout.CENTER);
+		detailViewPanel.add(ScrollWrap.of(content), BorderLayout.CENTER);
 		detailViewPanel.revalidate();
 		detailViewPanel.repaint();
 		cardLayout.show(cardContainer, "DETAIL");
@@ -562,19 +563,6 @@ public class CompetitionsPanel extends JPanel {
 	}
 
 	/** Wraps a content panel in a scroll pane pinned to the top. */
-	private JScrollPane wrapScrollable(JPanel content) {
-		JPanel wrapper = new JPanel(new BorderLayout());
-		wrapper.setBackground(UIConstants.BACKGROUND);
-		wrapper.add(content, BorderLayout.NORTH);
-
-		JScrollPane scroll = new JScrollPane(wrapper);
-		scroll.setBackground(UIConstants.BACKGROUND);
-		scroll.setBorder(null);
-		scroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
-		scroll.getVerticalScrollBar().setUnitIncrement(16);
-		scroll.getViewport().setBackground(UIConstants.BACKGROUND);
-		return scroll;
-	}
 
 	// ── Formatting ──────────────────────────────────────────────────────
 
