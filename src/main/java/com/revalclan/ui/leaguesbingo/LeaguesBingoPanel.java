@@ -366,14 +366,22 @@ public class LeaguesBingoPanel extends JPanel {
 		body.add(sectionTitle("Boards"));
 		body.add(Box.createVerticalStrut(6));
 
+		// Unlocked boards in the order the team unlocked them, locked ones after.
 		List<Board> boards = new ArrayList<>(payload.getBoards());
 		boards.sort(Comparator.comparing((Board b) -> team.hasUnlocked(b.getRegion()) ? 0 : 1)
+			.thenComparing(b -> unlockInstant(team, b.getRegion()))
 			.thenComparingInt(b -> LeaguesRegions.order(b.getRegion())));
 
 		for (Board board : boards) {
 			body.add(buildBoardRow(team, board));
 			body.add(Box.createVerticalStrut(6));
 		}
+	}
+
+	private static String unlockInstant(Team team, String region) {
+		UnlockedRegion u = team.unlockFor(region);
+		// ISO-8601 timestamps sort correctly as strings; missing ones sort last.
+		return u != null && u.getUnlockedAt() != null ? u.getUnlockedAt() : "~";
 	}
 
 	private JComponent buildTeamChip(Team team, boolean detailed) {
@@ -810,19 +818,33 @@ public class LeaguesBingoPanel extends JPanel {
 		text.setOpaque(false);
 		text.setAlignmentX(Component.LEFT_ALIGNMENT);
 
+		Font font = FontManager.getRunescapeSmallFont();
+		Color color = done ? TileCell.COMPLETED : UIConstants.TEXT_SECONDARY;
+		java.awt.FontMetrics fm = new JLabel().getFontMetrics(font);
+
+		// Count ("5/5") sits at the end of the first line, next to the task.
+		String count = progressCount(rp);
+		int countWidth = count != null ? fm.stringWidth(count) + 8 : 0;
+
 		// The first line is a plain label carrying the dot as its icon, so
 		// Swing centers the two on one line; wrapped continuation lines hang
 		// under the text. HTML wrapping would put the dot at the block's top.
-		Font font = FontManager.getRunescapeSmallFont();
-		Color color = done ? UIConstants.TEXT_PRIMARY : UIConstants.TEXT_SECONDARY;
-		java.awt.FontMetrics fm = new JLabel().getFontMetrics(font);
-		List<String> lines = wrapLines(RequirementText.describe(requirement), fm, TEXT_WIDTH - REQ_INDENT);
+		List<String> lines = wrapLines(RequirementText.describe(requirement), fm, TEXT_WIDTH - REQ_INDENT - countWidth);
 		JLabel first = new JLabel(lines.isEmpty() ? "" : lines.get(0), new DotIcon(done), JLabel.LEFT);
 		first.setFont(font);
 		first.setForeground(color);
 		first.setIconTextGap(DOT_GAP);
-		first.setAlignmentX(Component.LEFT_ALIGNMENT);
-		text.add(first);
+
+		JPanel firstLine = new JPanel(new BorderLayout(8, 0));
+		firstLine.setOpaque(false);
+		firstLine.setAlignmentX(Component.LEFT_ALIGNMENT);
+		firstLine.add(first, BorderLayout.CENTER);
+		if (count != null) {
+			JLabel countLabel = label(count, font, done ? TileCell.COMPLETED : TileCell.IN_PROGRESS);
+			firstLine.add(countLabel, BorderLayout.EAST);
+		}
+		firstLine.setMaximumSize(new Dimension(Integer.MAX_VALUE, firstLine.getPreferredSize().height));
+		text.add(firstLine);
 		for (int i = 1; i < lines.size(); i++) {
 			JLabel more = label(lines.get(i), font, color);
 			more.setBorder(new EmptyBorder(0, REQ_INDENT, 0, 0));
@@ -849,33 +871,30 @@ public class LeaguesBingoPanel extends JPanel {
 				}
 			}
 			if (ordered.size() > shown) html.append(" +").append(ordered.size() - shown).append(" more");
-			JLabel optionsLabel = wrappedHtml(html.toString(), FontManager.getRunescapeSmallFont(), UIConstants.TEXT_MUTED, TEXT_WIDTH - REQ_INDENT);
+			JLabel optionsLabel = wrappedHtml(html.toString(), font, UIConstants.TEXT_MUTED, TEXT_WIDTH - REQ_INDENT);
 			optionsLabel.setBorder(new EmptyBorder(0, REQ_INDENT, 0, 0));
 			text.add(optionsLabel);
 		}
 
-		if (rp != null) {
-			JsonObject meta = rp.getProgressMetadata();
-			Double target = RequirementText.number(meta, "targetValue");
-			Double current = RequirementText.number(meta, "currentTotalCount");
-			if (current == null) current = rp.getProgressValue();
-			StringBuilder sub = new StringBuilder();
-			if (target != null && target > 1 && current != null) {
-				sub.append(RequirementText.fmt(Math.round(current))).append("/").append(RequirementText.fmt(Math.round(target)));
-			}
-			String who = contributors(meta);
-			if (!who.isEmpty()) {
-				if (sub.length() > 0) sub.append("  |  ");
-				sub.append("by ").append(who);
-			}
-			if (sub.length() > 0) {
-				JLabel subLabel = wrapped(sub.toString(), FontManager.getRunescapeSmallFont(), done ? TileCell.COMPLETED : TileCell.IN_PROGRESS, TEXT_WIDTH - REQ_INDENT);
-				subLabel.setBorder(new EmptyBorder(0, REQ_INDENT, 0, 0));
-				text.add(subLabel);
-			}
+		String who = rp != null ? contributors(rp.getProgressMetadata()) : "";
+		if (!who.isEmpty()) {
+			JLabel subLabel = wrapped("by " + who, font, done ? TileCell.COMPLETED : TileCell.IN_PROGRESS, TEXT_WIDTH - REQ_INDENT);
+			subLabel.setBorder(new EmptyBorder(0, REQ_INDENT, 0, 0));
+			text.add(subLabel);
 		}
 
 		return text;
+	}
+
+	/** "current/target" when the requirement counts past one, else null. */
+	private static String progressCount(LeaguesBingoResponse.RequirementProgress rp) {
+		if (rp == null) return null;
+		JsonObject meta = rp.getProgressMetadata();
+		Double target = RequirementText.number(meta, "targetValue");
+		Double current = RequirementText.number(meta, "currentTotalCount");
+		if (current == null) current = rp.getProgressValue();
+		if (target == null || target <= 1 || current == null) return null;
+		return RequirementText.fmt(Math.round(current)) + "/" + RequirementText.fmt(Math.round(target));
 	}
 
 	/** Greedy word wrap measured with the real font, for plain (non-HTML) labels. */
