@@ -51,7 +51,7 @@ public class VarbitNotifier extends BaseNotifier {
 				int value = client.getVarbitValue(id);
 				latest.put(id, value);
 				sent.put(id, value);
-				log.info("[Reval] varbit baseline {} = {}", id, value);
+				log.debug("[Reval] varbit baseline {} = {}", id, value);
 				Map<String, Object> data = new HashMap<>();
 				data.put("varbitId", id);
 				data.put("value", value);
@@ -104,7 +104,7 @@ public class VarbitNotifier extends BaseNotifier {
 		data.put("varbitId", id);
 		data.put("value", value);
 		if (last != null) data.put("previous", last);
-		log.info("[Reval] VARBIT_CHANGED {} = {} (previous {})", id, value, last);
+		log.debug("[Reval] VARBIT_CHANGED {} = {} (previous {})", id, value, last);
 		sendCompactNotification("VARBIT_CHANGED", data);
 	}
 
