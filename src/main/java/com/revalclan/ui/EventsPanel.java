@@ -12,6 +12,7 @@ import com.revalclan.ui.leaguesbingo.LeaguesBingoPanel;
 import net.runelite.api.Client;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.game.ItemManager;
+import net.runelite.client.game.SpriteManager;
 import net.runelite.client.ui.FontManager;
 
 import javax.swing.*;
@@ -82,10 +83,11 @@ public class EventsPanel extends JPanel {
 		add(cardContainer, BorderLayout.CENTER);
 	}
 
-	public void init(RevalApiService apiService, Client client, ItemManager itemManager, ClientThread clientThread) {
+	public void init(RevalApiService apiService, Client client, ItemManager itemManager, SpriteManager spriteManager,
+					 ClientThread clientThread) {
 		this.apiService = apiService;
 		this.client = client;
-		leaguesBingoPanel = new LeaguesBingoPanel(apiService, client, itemManager,
+		leaguesBingoPanel = new LeaguesBingoPanel(apiService, client, itemManager, spriteManager,
 			new ItemNameIndex(client, clientThread), this::showList);
 		cardContainer.add(leaguesBingoPanel, "LEAGUES_BINGO");
 	}

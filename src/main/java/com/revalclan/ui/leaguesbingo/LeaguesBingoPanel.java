@@ -19,6 +19,8 @@ import com.revalclan.ui.constants.UIConstants;
 import com.revalclan.util.DateTimeUtil;
 import net.runelite.api.Client;
 import net.runelite.client.game.ItemManager;
+import net.runelite.client.game.SpriteManager;
+import com.revalclan.util.SpriteIcons;
 import net.runelite.client.ui.FontManager;
 import net.runelite.client.util.AsyncBufferedImage;
 import net.runelite.http.api.item.ItemPrice;
@@ -69,6 +71,7 @@ public class LeaguesBingoPanel extends JPanel {
 	private final Client client;
 	private final Runnable onClose;
 	private final ItemManager itemManager;
+	private final SpriteManager spriteManager;
 	private final ItemNameIndex itemNames;
 	/** Tile icon name -> game item id; null entries mark names we could not resolve. */
 	private final Map<String, Integer> iconItemIds = new HashMap<>();
@@ -93,10 +96,12 @@ public class LeaguesBingoPanel extends JPanel {
 	private JPanel tileDetailHolder;
 	private final List<TileCell> cells = new ArrayList<>();
 
-	public LeaguesBingoPanel(RevalApiService api, Client client, ItemManager itemManager, ItemNameIndex itemNames, Runnable onClose) {
+	public LeaguesBingoPanel(RevalApiService api, Client client, ItemManager itemManager, SpriteManager spriteManager,
+							 ItemNameIndex itemNames, Runnable onClose) {
 		this.api = api;
 		this.client = client;
 		this.itemManager = itemManager;
+		this.spriteManager = spriteManager;
 		this.itemNames = itemNames;
 		this.onClose = onClose;
 
@@ -407,16 +412,62 @@ public class LeaguesBingoPanel extends JPanel {
 		if (stats.locked) left.add(badge("LOCKED", UIConstants.TEXT_MUTED));
 		if (stats.boardComplete) left.add(badge("x2", UIConstants.ACCENT_GOLD));
 		top.add(left, BorderLayout.WEST);
-		top.add(label(stats.percent() + "%", FontManager.getRunescapeSmallFont(), stats.completed == stats.total && stats.total > 0 ? TileCell.COMPLETED : UIConstants.TEXT_SECONDARY), BorderLayout.EAST);
-		card.add(top);
+		if (!stats.locked) {
+			top.add(label(stats.percent() + "%", FontManager.getRunescapeSmallFont(), stats.completed == stats.total && stats.total > 0 ? TileCell.COMPLETED : UIConstants.TEXT_SECONDARY), BorderLayout.EAST);
+		}
 
-		card.add(Box.createVerticalStrut(4));
-		card.add(label(stats.line(board), FontManager.getRunescapeSmallFont(), UIConstants.TEXT_SECONDARY));
-		card.add(Box.createVerticalStrut(6));
-		card.add(new ProgressBar(stats.percent(), meta.accent));
+		JPanel lines = new JPanel();
+		lines.setLayout(new BoxLayout(lines, BoxLayout.Y_AXIS));
+		lines.setOpaque(false);
+		lines.add(top);
+		lines.add(Box.createVerticalStrut(4));
+		lines.add(label(stats.line(board), FontManager.getRunescapeSmallFont(), UIConstants.TEXT_SECONDARY));
+		lines.add(Box.createVerticalStrut(6));
+		lines.add(new ProgressBar(stats.percent(), meta.accent));
+
+		card.add(withBanner(meta, stats, lines));
 
 		Clickable.onPress(card, () -> showBoard(board.getRegion()), card::setHovered);
 		return card;
+	}
+
+	private static final int BANNER_SIZE = 32;
+
+	/**
+	 * Region banner (game-cache shield) beside the given content. The banner
+	 * arrives asynchronously from the sprite cache; the slot is reserved so
+	 * the row does not jump when it lands.
+	 */
+	private JComponent withBanner(LeaguesRegions.Region meta, BoardStats stats, JComponent content) {
+		JPanel wrap = new JPanel(new BorderLayout(10, 0));
+		wrap.setOpaque(false);
+		wrap.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+		JLabel banner = new JLabel();
+		banner.setPreferredSize(new Dimension(BANNER_SIZE, BANNER_SIZE));
+		banner.setHorizontalAlignment(JLabel.CENTER);
+		banner.setVerticalAlignment(JLabel.CENTER);
+		int spriteId = stats.boardComplete && meta.bannerHighlightSprite >= 0 ? meta.bannerHighlightSprite : meta.bannerSprite;
+		if (spriteManager != null && spriteId >= 0) {
+			boolean dim = stats.locked;
+			SpriteIcons.load(spriteManager, spriteId, BANNER_SIZE, icon -> banner.setIcon(dim ? dimmed(icon) : icon));
+		}
+		JPanel bannerBox = new JPanel(new BorderLayout());
+		bannerBox.setOpaque(false);
+		bannerBox.add(banner, BorderLayout.NORTH);
+
+		wrap.add(bannerBox, BorderLayout.WEST);
+		wrap.add(content, BorderLayout.CENTER);
+		return wrap;
+	}
+
+	private static javax.swing.ImageIcon dimmed(javax.swing.ImageIcon icon) {
+		java.awt.image.BufferedImage out = new java.awt.image.BufferedImage(icon.getIconWidth(), icon.getIconHeight(), java.awt.image.BufferedImage.TYPE_INT_ARGB);
+		Graphics2D g2 = out.createGraphics();
+		g2.setComposite(java.awt.AlphaComposite.getInstance(java.awt.AlphaComposite.SRC_OVER, 0.4f));
+		icon.paintIcon(null, g2, 0, 0);
+		g2.dispose();
+		return new javax.swing.ImageIcon(out);
 	}
 
 	// ---------- Board ----------
@@ -444,12 +495,18 @@ public class LeaguesBingoPanel extends JPanel {
 		if (stats.locked) left.add(badge("LOCKED", UIConstants.TEXT_MUTED));
 		if (stats.boardComplete) left.add(badge("x2", UIConstants.ACCENT_GOLD));
 		top.add(left, BorderLayout.WEST);
-		top.add(label(stats.percent() + "%", FontManager.getRunescapeSmallFont(), UIConstants.TEXT_SECONDARY), BorderLayout.EAST);
-		header.add(top);
-		header.add(Box.createVerticalStrut(4));
-		header.add(label(stats.line(board), FontManager.getRunescapeSmallFont(), UIConstants.TEXT_SECONDARY));
-		header.add(Box.createVerticalStrut(6));
-		header.add(new ProgressBar(stats.percent(), meta.accent));
+		if (!stats.locked) {
+			top.add(label(stats.percent() + "%", FontManager.getRunescapeSmallFont(), UIConstants.TEXT_SECONDARY), BorderLayout.EAST);
+		}
+		JPanel headerLines = new JPanel();
+		headerLines.setLayout(new BoxLayout(headerLines, BoxLayout.Y_AXIS));
+		headerLines.setOpaque(false);
+		headerLines.add(top);
+		headerLines.add(Box.createVerticalStrut(4));
+		headerLines.add(label(stats.line(board), FontManager.getRunescapeSmallFont(), UIConstants.TEXT_SECONDARY));
+		headerLines.add(Box.createVerticalStrut(6));
+		headerLines.add(new ProgressBar(stats.percent(), meta.accent));
+		header.add(withBanner(meta, stats, headerLines));
 		body.add(header);
 		body.add(Box.createVerticalStrut(10));
 
