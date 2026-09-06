@@ -66,7 +66,7 @@ final class TileDetailView {
 		JPanel meta = Labels.flow();
 		meta.setAlignmentX(Component.LEFT_ALIGNMENT);
 		if (tile.getDifficulty() != null) meta.add(Badge.difficulty(tile.getDifficulty()));
-		if (tile.getCategory() != null) meta.add(new Badge(tile.getCategory().toUpperCase(), UIConstants.TEXT_SECONDARY));
+		if (tile.getCategory() != null) meta.add(Badge.category(tile.getCategory()));
 		card.add(meta);
 
 		card.add(Box.createVerticalStrut(8));

@@ -23,6 +23,11 @@ public class Badge extends JLabel {
 		return new Badge(capitalize(difficulty), getDifficultyColor(difficulty));
 	}
 
+	/** Neutral badge for a category name ("pvm" -> "Pvm"), same casing as the difficulty badge. */
+	public static Badge category(String category) {
+		return new Badge(capitalize(category), UIConstants.TEXT_SECONDARY);
+	}
+
 	public static Badge rarity(String rarity) {
 		return new Badge(capitalize(rarity), getRarityColor(rarity));
 	}
