@@ -6,13 +6,10 @@ import com.revalclan.ui.components.EventCard;
 import com.revalclan.ui.components.LoginPrompt;
 import com.revalclan.ui.components.PanelTitle;
 import com.revalclan.ui.components.RefreshButton;
+import com.revalclan.ui.components.ScrollWrap;
 import com.revalclan.ui.constants.UIConstants;
-import com.revalclan.ui.leaguesbingo.ItemNameIndex;
 import com.revalclan.ui.leaguesbingo.LeaguesBingoPanel;
 import net.runelite.api.Client;
-import net.runelite.client.callback.ClientThread;
-import net.runelite.client.game.ItemManager;
-import net.runelite.client.game.SpriteManager;
 import net.runelite.client.ui.FontManager;
 
 import javax.swing.*;
@@ -56,23 +53,7 @@ public class EventsPanel extends JPanel {
 		contentPanel.setBackground(UIConstants.BACKGROUND);
 		contentPanel.setBorder(new EmptyBorder(12, 10, 10, 10));
 
-		JPanel wrapper = new JPanel(new BorderLayout()) {
-			@Override
-			public Dimension getPreferredSize() {
-				Dimension size = super.getPreferredSize();
-				if (getParent() != null) size.width = getParent().getWidth();
-				return size;
-			}
-		};
-		wrapper.setBackground(UIConstants.BACKGROUND);
-		wrapper.add(contentPanel, BorderLayout.NORTH);
-
-		JScrollPane scrollPane = new JScrollPane(wrapper);
-		scrollPane.setBackground(UIConstants.BACKGROUND);
-		scrollPane.setBorder(null);
-		scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
-		scrollPane.getVerticalScrollBar().setUnitIncrement(16);
-		scrollPane.getViewport().setBackground(UIConstants.BACKGROUND);
+		JScrollPane scrollPane = ScrollWrap.of(contentPanel);
 
 		showNotLoggedIn();
 
@@ -83,13 +64,16 @@ public class EventsPanel extends JPanel {
 		add(cardContainer, BorderLayout.CENTER);
 	}
 
-	public void init(RevalApiService apiService, Client client, ItemManager itemManager, SpriteManager spriteManager,
-					 ClientThread clientThread) {
+	public void init(RevalApiService apiService, Client client) {
 		this.apiService = apiService;
 		this.client = client;
-		leaguesBingoPanel = new LeaguesBingoPanel(apiService, client, itemManager, spriteManager,
-			new ItemNameIndex(client, clientThread), this::showList);
-		cardContainer.add(leaguesBingoPanel, "LEAGUES_BINGO");
+	}
+
+	/** The injector-built board browser; shown when a Leagues Bingo card is opened. */
+	public void setLeaguesBingoPanel(LeaguesBingoPanel panel) {
+		leaguesBingoPanel = panel;
+		panel.setOnClose(this::showList);
+		cardContainer.add(panel, "LEAGUES_BINGO");
 	}
 
 	private void showList() {
@@ -114,6 +98,7 @@ public class EventsPanel extends JPanel {
 
 	public void onLoggedOut() {
 		SwingUtilities.invokeLater(() -> {
+			if (leaguesBingoPanel != null) leaguesBingoPanel.reset();
 			showList();
 			showNotLoggedIn();
 		});

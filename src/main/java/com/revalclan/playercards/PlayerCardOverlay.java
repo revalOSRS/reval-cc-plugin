@@ -1,5 +1,6 @@
 package com.revalclan.playercards;
 
+import com.revalclan.util.Colors;
 import com.revalclan.ui.constants.UIConstants;
 import com.revalclan.util.NumberFmt;
 import net.runelite.api.Client;
@@ -153,7 +154,7 @@ public class PlayerCardOverlay extends Overlay {
 	private void drawFrame(Graphics2D g, Color accent, int x, int y) {
 		g.setStroke(new BasicStroke(1));
 		for (int i = GLOW; i > 0; i--) {
-			g.setColor(withAlpha(accent, Math.max(1, 24 - i * 2)));
+			g.setColor(Colors.withAlpha(accent, Math.max(1, 24 - i * 2)));
 			g.drawRoundRect(x - i, y - i, CARD_W + i * 2, CARD_H + i * 2, ARC + i, ARC + i);
 		}
 
@@ -163,7 +164,7 @@ public class PlayerCardOverlay extends Overlay {
 		Shape prevClip = g.getClip();
 		g.clip(new RoundRectangle2D.Float(x, y, CARD_W, CARD_H, ARC, ARC));
 		g.setPaint(new RadialGradientPaint(new Point2D.Float(x + CARD_W / 2f, y + 60), CARD_W,
-			new float[]{0f, 1f}, new Color[]{withAlpha(accent, 78), new Color(0, 0, 0, 0)}));
+			new float[]{0f, 1f}, new Color[]{Colors.withAlpha(accent, 78), new Color(0, 0, 0, 0)}));
 		g.fillRect(x, y, CARD_W, CARD_H);
 
 		g.setPaint(new GradientPaint(x, y + CARD_H, new Color(255, 255, 255, 0),
@@ -174,7 +175,7 @@ public class PlayerCardOverlay extends Overlay {
 			new int[]{y + CARD_H, y, y, y + CARD_H}, 4);
 		g.setClip(prevClip);
 
-		g.setColor(withAlpha(accent, 210));
+		g.setColor(Colors.withAlpha(accent, 210));
 		g.setStroke(new BasicStroke(2f));
 		g.drawRoundRect(x, y, CARD_W - 1, CARD_H - 1, ARC, ARC);
 	}
@@ -235,10 +236,10 @@ public class PlayerCardOverlay extends Overlay {
 		for (int i = 0; i < stats.length; i++) {
 			int tx = x + 20 + (i % 2) * (tileW + gap);
 			int ty = cy + (i / 2) * (tileH + gap);
-			g.setColor(withAlpha(accent, 18));
+			g.setColor(Colors.withAlpha(accent, 18));
 			g.fillRoundRect(tx, ty, tileW, tileH, 10, 10);
 			g.setStroke(new BasicStroke(1f));
-			g.setColor(withAlpha(accent, 60));
+			g.setColor(Colors.withAlpha(accent, 60));
 			g.drawRoundRect(tx, ty, tileW, tileH, 10, 10);
 			centerText(g, stats[i][0], bold, UIConstants.TEXT_PRIMARY, tx + tileW / 2, ty + 26);
 			centerText(g, stats[i][1], small, UIConstants.TEXT_MUTED, tx + tileW / 2, ty + 42);
@@ -318,7 +319,7 @@ public class PlayerCardOverlay extends Overlay {
 
 		g.setColor(new Color(0, 0, 0, 210));
 		g.fillRoundRect(tx, ty, w, h, 6, 6);
-		g.setColor(withAlpha(UIConstants.ACCENT_GOLD, 160));
+		g.setColor(Colors.withAlpha(UIConstants.ACCENT_GOLD, 160));
 		g.setStroke(new BasicStroke(1f));
 		g.drawRoundRect(tx, ty, w, h, 6, 6);
 		drawShadowed(g, text, tx + 8, ty + fm.getAscent() + 4, UIConstants.ACCENT_GOLD);
@@ -348,9 +349,6 @@ public class PlayerCardOverlay extends Overlay {
 		g.drawImage(sprite, tx + textW + 3, baselineY - 5 - iconH / 2, iconW, iconH, null);
 	}
 
-	private static Color withAlpha(Color color, int alpha) {
-		return new Color(color.getRed(), color.getGreen(), color.getBlue(), alpha);
-	}
 
 	private void centerText(Graphics2D g, String text, Font font, Color color, int cx, int baselineY) {
 		g.setFont(font);

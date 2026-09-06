@@ -8,7 +8,6 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.time.Instant;
-import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 
@@ -60,21 +59,11 @@ public class EventsResponse extends ApiResponse {
         }
         
         public String getFormattedStartDate() {
-            try {
-                return DateTimeUtil.parseToLocal(startDate)
-                    .format(DateTimeFormatter.ofPattern("MMM d HH:mm"));
-            } catch (Exception e) {
-                return startDate;
-            }
+            return DateTimeUtil.formatShort(startDate);
         }
 
         public String getFormattedEndDate() {
-            try {
-                return DateTimeUtil.parseToLocal(endDate)
-                    .format(DateTimeFormatter.ofPattern("MMM d HH:mm"));
-            } catch (Exception e) {
-                return endDate;
-            }
+            return DateTimeUtil.formatShort(endDate);
         }
 
         public String getDuration() {

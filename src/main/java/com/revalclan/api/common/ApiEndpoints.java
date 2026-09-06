@@ -6,8 +6,9 @@ package com.revalclan.api.common;
 public final class ApiEndpoints {
     public static final String BASE_URL = "https://api.revalosrs.ee/plugin";
 
-    /** Root of the public (no-auth) API the homepage reads; absolute URLs bypass the /plugin prefix. */
+    // ── Public API (no auth, no /plugin prefix) — build with publicUrl() ──
     public static final String PUBLIC_BASE_URL = "https://api.revalosrs.ee";
+    public static final String PUBLIC_LEAGUES_BINGO_EVENT = "/leagues-bingo/events/%s";
 
     // Points (includes ranks)
     public static final String POINTS = "/points";
@@ -25,7 +26,6 @@ public final class ApiEndpoints {
     public static final String PLAYER_PROFILE_CARD = "/players/profile-card";
     public static final String EVENT_REGISTER = "/events/%s/register";
     public static final String EVENT_REGISTRATION_STATUS = "/events/%s/registration-status";
-    public static final String LEAGUES_BINGO_EVENT = PUBLIC_BASE_URL + "/leagues-bingo/events/%s";
     public static final String LEAGUES_BINGO_ME = "/events/%s/leagues-bingo/me?accountHash=%s";
     public static final String LEAGUES_BINGO_PICK = "/events/%s/leagues-bingo/pick";
 
@@ -87,10 +87,17 @@ public final class ApiEndpoints {
     }
 
     /**
-     * Build the public Leagues Bingo payload URL (boards, tiles, teams, progress) for an event
+     * Build full URL for a public (no-auth) endpoint
      */
-    public static String leaguesBingoEvent(String eventId) {
-        return String.format(LEAGUES_BINGO_EVENT, eventId);
+    public static String publicUrl(String endpoint) {
+        return PUBLIC_BASE_URL + endpoint;
+    }
+
+    /**
+     * Full URL of the public Leagues Bingo payload (boards, tiles, teams, progress) for an event
+     */
+    public static String leaguesBingoEventUrl(String eventId) {
+        return publicUrl(String.format(PUBLIC_LEAGUES_BINGO_EVENT, eventId));
     }
 
     public static String leaguesBingoMe(String eventId, long accountHash) {

@@ -1,7 +1,9 @@
 package com.revalclan.ui.leaguesbingo;
 
-import com.revalclan.api.leaguesbingo.LeaguesBingoResponse;
+import com.revalclan.api.leaguesbingo.LeaguesBingoResponse.Tile;
+import com.revalclan.ui.components.CheckIcon;
 import com.revalclan.ui.constants.UIConstants;
+import com.revalclan.util.Colors;
 import net.runelite.client.ui.FontManager;
 
 import javax.swing.JComponent;
@@ -12,9 +14,9 @@ import java.awt.Dimension;
 import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.Image;
 import java.awt.RenderingHints;
 import java.awt.geom.RoundRectangle2D;
-import java.awt.Image;
 
 /**
  * One square of a Leagues Bingo board. Paints the same states the homepage
@@ -24,10 +26,10 @@ import java.awt.Image;
 public class TileCell extends JComponent {
 	public enum State { COMPLETED, IN_PROGRESS, NOT_STARTED, FILLER, HIDDEN }
 
-	static final Color COMPLETED = new Color(76, 175, 80);
-	static final Color IN_PROGRESS = new Color(245, 158, 11);
+	public static final Color COMPLETED = new Color(76, 175, 80);
+	public static final Color IN_PROGRESS = new Color(245, 158, 11);
 
-	private final LeaguesBingoResponse.Tile tile;
+	private final Tile tile;
 	private final State state;
 	private final int percent;
 	private final Color accent;
@@ -38,7 +40,7 @@ public class TileCell extends JComponent {
 	private boolean selected;
 	private boolean dimmed;
 
-	public TileCell(LeaguesBingoResponse.Tile tile, State state, int percent, Color accent, int size) {
+	public TileCell(Tile tile, State state, int percent, Color accent, int size) {
 		this.tile = tile;
 		this.state = state;
 		this.percent = percent;
@@ -54,7 +56,7 @@ public class TileCell extends JComponent {
 		}
 	}
 
-	public LeaguesBingoResponse.Tile getTile() {
+	public Tile getTile() {
 		return tile;
 	}
 
@@ -96,16 +98,16 @@ public class TileCell extends JComponent {
 		Color border;
 		switch (state) {
 			case COMPLETED:
-				fill = withAlpha(COMPLETED, hovered ? 70 : 45);
-				border = withAlpha(COMPLETED, 150);
+				fill = Colors.withAlpha(COMPLETED, hovered ? 70 : 45);
+				border = Colors.withAlpha(COMPLETED, 150);
 				break;
 			case IN_PROGRESS:
-				fill = withAlpha(IN_PROGRESS, hovered ? 55 : 30);
-				border = withAlpha(IN_PROGRESS, 130);
+				fill = Colors.withAlpha(IN_PROGRESS, hovered ? 55 : 30);
+				border = Colors.withAlpha(IN_PROGRESS, 130);
 				break;
 			case FILLER:
 				fill = UIConstants.ROW_BG;
-				border = withAlpha(UIConstants.BORDER_COLOR, 90);
+				border = Colors.withAlpha(UIConstants.BORDER_COLOR, 90);
 				break;
 			case HIDDEN:
 				fill = UIConstants.ROW_BG;
@@ -131,8 +133,8 @@ public class TileCell extends JComponent {
 
 		if (state == State.IN_PROGRESS) {
 			int barH = Math.max(3, size / 14);
-			int barW = (int) Math.round((w - 6) * Math.max(percent, 8) / 100d);
-			g2.setColor(withAlpha(IN_PROGRESS, 60));
+			int barW = (int) Math.round((w - 6) * Math.max(percent, BoardStats.MIN_VISIBLE_PERCENT) / 100d);
+			g2.setColor(Colors.withAlpha(IN_PROGRESS, 60));
 			g2.fillRoundRect(3, h - barH - 3, w - 6, barH, barH, barH);
 			g2.setColor(IN_PROGRESS);
 			g2.fillRoundRect(3, h - barH - 3, barW, barH, barH, barH);
@@ -143,7 +145,7 @@ public class TileCell extends JComponent {
 		g2.draw(shape);
 
 		if (state == State.COMPLETED) {
-			paintCheck(g2, w);
+			paintCheckBadge(g2, w);
 		}
 
 		g2.dispose();
@@ -173,7 +175,7 @@ public class TileCell extends JComponent {
 
 	private void paintWeave(Graphics2D g2, int w, int h, int arc) {
 		g2.setClip(new RoundRectangle2D.Float(1, 1, w - 2, h - 2, arc, arc));
-		g2.setColor(withAlpha(accent, 22));
+		g2.setColor(Colors.withAlpha(accent, 22));
 		g2.setStroke(new BasicStroke(1f));
 		for (int i = -h; i < w + h; i += 6) {
 			g2.drawLine(i, h, i + h, 0);
@@ -193,22 +195,15 @@ public class TileCell extends JComponent {
 		g2.drawArc(x + 1, y - r, bw - 2, r * 2, 0, 180);
 	}
 
-	private void paintCheck(Graphics2D g2, int w) {
+	/** Green disc in the top-right corner carrying the shared check mark. */
+	private void paintCheckBadge(Graphics2D g2, int w) {
 		int d = Math.max(10, size / 4);
 		int x = w - d - 2;
 		int y = 2;
 		g2.setComposite(AlphaComposite.SrcOver);
 		g2.setColor(COMPLETED);
 		g2.fillOval(x, y, d, d);
-		g2.setColor(Color.WHITE);
-		g2.setStroke(new BasicStroke(Math.max(1.5f, d / 7f), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-		int cx = x + d / 2;
-		int cy = y + d / 2;
-		g2.drawLine(cx - d / 4, cy, cx - d / 12, cy + d / 4);
-		g2.drawLine(cx - d / 12, cy + d / 4, cx + d / 4, cy - d / 4);
-	}
-
-	static Color withAlpha(Color c, int alpha) {
-		return new Color(c.getRed(), c.getGreen(), c.getBlue(), alpha);
+		int inset = Math.max(2, d / 5);
+		new CheckIcon(d - inset * 2, Color.WHITE).paintIcon(this, g2, x + inset, y + inset);
 	}
 }

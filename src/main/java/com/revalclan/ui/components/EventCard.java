@@ -2,6 +2,7 @@ package com.revalclan.ui.components;
 
 import com.revalclan.api.events.EventsResponse;
 import com.revalclan.ui.constants.UIConstants;
+import com.revalclan.util.Colors;
 import net.runelite.client.ui.FontManager;
 
 import javax.swing.*;
@@ -18,11 +19,6 @@ public class EventCard extends JPanel {
 	private final String registrationStatus;
 	private final boolean openable;
 	private boolean isHovered = false;
-
-	public EventCard(EventsResponse.EventSummary event, boolean isActive, String currentPlayerName,
-					 BiConsumer<String, Boolean> onRegisterAction) {
-		this(event, isActive, currentPlayerName, onRegisterAction, null);
-	}
 
 	/**
 	 * @param onOpen when non-null the whole card is clickable and opens the
@@ -226,7 +222,7 @@ public class EventCard extends JPanel {
 			protected void paintComponent(Graphics g) {
 				Graphics2D g2d = (Graphics2D) g.create();
 				g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-				g2d.setColor(new Color(color.getRed(), color.getGreen(), color.getBlue(), 30));
+				g2d.setColor(Colors.withAlpha(color, 30));
 				g2d.fillRoundRect(0, 0, getWidth(), getHeight(), 8, 8);
 				g2d.dispose();
 				super.paintComponent(g);
@@ -240,30 +236,8 @@ public class EventCard extends JPanel {
 	}
 
 	private JButton createButton(String text, Color color) {
-		JButton btn = new JButton(text) {
-			@Override
-			protected void paintComponent(Graphics g) {
-				Graphics2D g2d = (Graphics2D) g.create();
-				g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-				Color bg = !isEnabled() ? new Color(color.getRed(), color.getGreen(), color.getBlue(), 100)
-					: getModel().isPressed() ? color.darker()
-					: getModel().isRollover() ? color.brighter()
-					: color;
-
-				g2d.setColor(bg);
-				g2d.fillRoundRect(0, 0, getWidth(), getHeight(), 8, 8);
-				g2d.dispose();
-				super.paintComponent(g);
-			}
-		};
-		btn.setFont(FontManager.getRunescapeSmallFont());
-		btn.setForeground(UIConstants.TEXT_PRIMARY);
-		btn.setBorderPainted(false);
-		btn.setContentAreaFilled(false);
-		btn.setFocusPainted(false);
+		JButton btn = new AccentButton(text, color);
 		btn.setPreferredSize(new Dimension(110, 28));
-		btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 		return btn;
 	}
 }

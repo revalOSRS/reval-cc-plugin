@@ -4,7 +4,7 @@ import com.revalclan.api.common.ApiResponse;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
-/** Response for POST /plugin/events/{id}/leagues-bingo/pick. */
+/** Response for POST /plugin/events/{id}/leagues-bingo/pick: the viewer's refreshed rights. */
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class LeaguesBingoPickResponse extends ApiResponse {
@@ -12,7 +12,6 @@ public class LeaguesBingoPickResponse extends ApiResponse {
 
 	@Data
 	public static class PickData {
-		private LeaguesBingoResponse.UnlockedRegion unlock;
 		private LeaguesBingoMeResponse.Viewer me;
 	}
 }

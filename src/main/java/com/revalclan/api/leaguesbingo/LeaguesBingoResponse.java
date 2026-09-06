@@ -1,31 +1,24 @@
 package com.revalclan.api.leaguesbingo;
 
 import com.google.gson.JsonObject;
-import com.revalclan.api.common.ApiResponse;
+import com.revalclan.api.common.PublicApiResponse;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import net.runelite.client.util.Text;
 
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
 /**
- * Response for GET https://api.revalosrs.ee/leagues-bingo/events/{id}.
- * This is the same public payload the homepage renders: every region board
- * with its tiles, and every team with its unlocks, completions and progress.
- * The public routes answer with {"success": true, "data": ...} rather than
- * the plugin routes' {"status": "success"}, hence the extra flag here.
+ * Response for the public GET /leagues-bingo/events/{id}: the payload the
+ * homepage renders, trimmed to the fields the side panel reads. Gson ignores
+ * everything else.
  */
 @Data
 @EqualsAndHashCode(callSuper = true)
-public class LeaguesBingoResponse extends ApiResponse {
-	private Boolean success;
+public class LeaguesBingoResponse extends PublicApiResponse {
 	private Payload data;
-
-	@Override
-	public boolean isSuccess() {
-		return Boolean.TRUE.equals(success) || super.isSuccess();
-	}
 
 	@Data
 	public static class Payload {
@@ -57,24 +50,22 @@ public class LeaguesBingoResponse extends ApiResponse {
 			}
 			return null;
 		}
+
+		/** Regions every team starts with; these are never pickable. */
+		public boolean isDefaultRegion(String region) {
+			return config != null && config.getDefaultRegions() != null && config.getDefaultRegions().contains(region);
+		}
 	}
 
 	@Data
 	public static class EventInfo {
-		private String id;
-		private String name;
-		private String description;
 		private String status;
-		private String startDate;
 		private String endDate;
 	}
 
 	@Data
 	public static class Config {
 		private List<String> defaultRegions;
-		private int initialPickTokens;
-		private List<Integer> unlockThresholds;
-		private String tileRevealAt;
 	}
 
 	@Data
@@ -108,23 +99,11 @@ public class LeaguesBingoResponse extends ApiResponse {
 		private String description;
 		private String category;
 		private String difficulty;
-		/** OSRS wiki image name, without the _detail.png suffix. */
+		/** OSRS wiki image name, kept for the one client-side fallback. */
 		private String icon;
+		/** Game item id behind the icon, resolved by the backend; null when it could not. */
+		private Integer iconItemId;
 		private Requirements requirements;
-
-		public int column() {
-			if (position == null || position.isEmpty()) return 0;
-			return Character.toUpperCase(position.charAt(0)) - 'A';
-		}
-
-		public int row() {
-			if (position == null || position.length() < 2) return 0;
-			try {
-				return Integer.parseInt(position.substring(1)) - 1;
-			} catch (NumberFormatException e) {
-				return 0;
-			}
-		}
 	}
 
 	@Data
@@ -132,10 +111,13 @@ public class LeaguesBingoResponse extends ApiResponse {
 		private String matchType;
 		/** Kept loose: each requirement type carries its own fields. */
 		private List<JsonObject> requirements;
-		private List<JsonObject> tiers;
 
 		public List<JsonObject> getRequirements() {
 			return requirements != null ? requirements : Collections.emptyList();
+		}
+
+		public boolean isAnyMatch() {
+			return "any".equalsIgnoreCase(matchType);
 		}
 	}
 
@@ -144,7 +126,6 @@ public class LeaguesBingoResponse extends ApiResponse {
 		private String id;
 		private String name;
 		private String color;
-		private String icon;
 		private int score;
 		private List<Member> members;
 		private List<UnlockedRegion> unlockedRegions;
@@ -152,12 +133,8 @@ public class LeaguesBingoResponse extends ApiResponse {
 		private PickTokens pickTokens;
 		/** Keyed by boardTileId. */
 		private Map<String, Completion> completions;
-		/** Keyed by boardTileId; may be absent while tiles are hidden. */
+		/** Keyed by boardTileId; absent while tiles are hidden. */
 		private Map<String, TileProgress> progress;
-
-		public List<Member> getMembers() {
-			return members != null ? members : Collections.emptyList();
-		}
 
 		public List<UnlockedRegion> getUnlockedRegions() {
 			return unlockedRegions != null ? unlockedRegions : Collections.emptyList();
@@ -174,6 +151,10 @@ public class LeaguesBingoResponse extends ApiResponse {
 			return unlockFor(region) != null;
 		}
 
+		public int availableTokens() {
+			return pickTokens != null ? pickTokens.getAvailable() : 0;
+		}
+
 		public Completion completionFor(String boardTileId) {
 			return completions != null && boardTileId != null ? completions.get(boardTileId) : null;
 		}
@@ -183,30 +164,23 @@ public class LeaguesBingoResponse extends ApiResponse {
 		}
 
 		public boolean hasMember(String playerName) {
-			if (playerName == null) return false;
-			String wanted = normalizeName(playerName);
-			for (Member m : getMembers()) {
-				if (m.getDisplayName() != null && wanted.equals(normalizeName(m.getDisplayName()))) return true;
+			if (playerName == null || members == null) return false;
+			String wanted = Text.standardize(playerName);
+			for (Member m : members) {
+				if (m.getDisplayName() != null && wanted.equals(Text.standardize(m.getDisplayName()))) return true;
 			}
 			return false;
-		}
-
-		private static String normalizeName(String s) {
-			return s.replace('\u00A0', ' ').replace('_', ' ').trim().toLowerCase();
 		}
 	}
 
 	@Data
 	public static class Member {
-		private int osrsAccountId;
 		private String displayName;
-		private String role;
 	}
 
 	@Data
 	public static class UnlockedRegion {
 		private String region;
-		private String unlockType;
 		private String unlockedAt;
 		private String boardCompletedAt;
 		private Integer bonusPoints;
@@ -214,8 +188,6 @@ public class LeaguesBingoResponse extends ApiResponse {
 
 	@Data
 	public static class PickTokens {
-		private int earned;
-		private int spent;
 		private int available;
 	}
 

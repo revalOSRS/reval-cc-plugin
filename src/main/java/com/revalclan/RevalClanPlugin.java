@@ -11,6 +11,7 @@ import com.revalclan.events.RegistrationMarksOverlay;
 import com.revalclan.playercards.PlayerCardManager;
 import com.revalclan.playercards.PlayerCardOverlay;
 import com.revalclan.teams.ClanTeamColors;
+import com.revalclan.ui.leaguesbingo.LeaguesBingoPanel;
 import com.revalclan.notifiers.*;
 import com.revalclan.pbs.ClogPersonalBestCapture;
 import com.revalclan.session.SessionTracker;
@@ -207,7 +208,8 @@ public class RevalClanPlugin extends Plugin {
 		try {
 			revalPanel = new RevalPanel();
 			revalPanel.init(revalApiService, client, uiAssetLoader, itemManager, spriteManager, config,
-				rankIconResolver, clientThread);
+				rankIconResolver);
+			revalPanel.getEventsPanel().setLeaguesBingoPanel(injector.getInstance(LeaguesBingoPanel.class));
 			revalPanel.setOnSyncGuide(() -> {
 				syncGuide.arm();
 				clientThread.invoke(() -> {

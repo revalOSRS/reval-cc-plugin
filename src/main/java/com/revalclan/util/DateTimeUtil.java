@@ -5,9 +5,21 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 
 public class DateTimeUtil {
+	private static final DateTimeFormatter SHORT = DateTimeFormatter.ofPattern("MMM d HH:mm");
+
+	/** "Sep 4 21:59" in the user's zone; the raw string when it does not parse. */
+	public static String formatShort(String iso) {
+		try {
+			return parseToLocal(iso).format(SHORT);
+		} catch (RuntimeException e) {
+			return iso;
+		}
+	}
+
 
 	/**
 	 * Parses an ISO 8601 timestamp (with or without zone) as UTC,
