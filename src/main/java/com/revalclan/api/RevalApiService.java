@@ -23,6 +23,8 @@ import com.revalclan.api.events.EventsResponse;
 import com.revalclan.api.events.RegistrationResponse;
 import com.revalclan.api.events.RegistrationStatusResponse;
 import com.revalclan.api.points.PointsResponse;
+import com.revalclan.api.leaguesbingo.LeaguesBingoMeResponse;
+import com.revalclan.api.leaguesbingo.LeaguesBingoPickResponse;
 import com.revalclan.api.leaguesbingo.LeaguesBingoResponse;
 import com.revalclan.util.PluginVersion;
 import okhttp3.*;
@@ -163,6 +165,25 @@ public class RevalApiService {
      */
     public void fetchLeaguesBingoEvent(String eventId, Consumer<LeaguesBingoResponse> onSuccess, Consumer<Exception> onError) {
         get(ApiEndpoints.leaguesBingoEvent(eventId), LeaguesBingoResponse.class, onSuccess, onError);
+    }
+
+    /** What this account may do in a Leagues Bingo event (team, role, may pick). */
+    public void fetchLeaguesBingoMe(String eventId, long accountHash,
+                                    Consumer<LeaguesBingoMeResponse> onSuccess, Consumer<Exception> onError) {
+        get(ApiEndpoints.leaguesBingoMe(eventId, accountHash), LeaguesBingoMeResponse.class, onSuccess, onError);
+    }
+
+    /**
+     * Spend one pick token on a region. teamId is only honoured for
+     * superadmins; pickers always act for their own team.
+     */
+    public void pickLeaguesBingoRegion(String eventId, long accountHash, String region, String teamId,
+                                       Consumer<LeaguesBingoPickResponse> onSuccess, Consumer<Exception> onError) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("accountHash", String.valueOf(accountHash));
+        body.put("region", region);
+        if (teamId != null) body.put("teamId", teamId);
+        post(ApiEndpoints.leaguesBingoPick(eventId), gson.toJson(body), LeaguesBingoPickResponse.class, onSuccess, onError);
     }
 
     public void fetchProfileCard(String nickname, Consumer<ProfileCardResponse> onSuccess, Consumer<Exception> onError) {

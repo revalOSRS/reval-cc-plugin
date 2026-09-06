@@ -5,6 +5,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.revalclan.api.RevalApiService;
 import com.revalclan.api.events.EventsResponse;
+import com.revalclan.api.leaguesbingo.LeaguesBingoMeResponse;
 import com.revalclan.api.leaguesbingo.LeaguesBingoResponse;
 import com.revalclan.api.leaguesbingo.LeaguesBingoResponse.Board;
 import com.revalclan.api.leaguesbingo.LeaguesBingoResponse.Payload;
@@ -28,6 +29,7 @@ import net.runelite.http.api.item.ItemPrice;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
+import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
@@ -40,6 +42,7 @@ import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
+import java.awt.Cursor;
 import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
@@ -84,6 +87,9 @@ public class LeaguesBingoPanel extends JPanel {
 
 	private EventsResponse.EventSummary event;
 	private Payload payload;
+	/** What the backend says this account may do here; null until answered. */
+	private LeaguesBingoMeResponse.Viewer me;
+	private boolean picking;
 	private long loadedAt;
 	private boolean loading;
 	private String loadError;
@@ -155,6 +161,7 @@ public class LeaguesBingoPanel extends JPanel {
 		this.event = event;
 		if (!sameEvent) {
 			payload = null;
+			me = null;
 			teamId = null;
 			region = null;
 			tileId = null;
@@ -208,6 +215,7 @@ public class LeaguesBingoPanel extends JPanel {
 		loading = true;
 		loadError = null;
 		refreshButton.setLoading(true);
+		loadViewer();
 		api.fetchLeaguesBingoEvent(event.getId(),
 			response -> SwingUtilities.invokeLater(() -> {
 				loading = false;
@@ -221,6 +229,95 @@ public class LeaguesBingoPanel extends JPanel {
 				refreshButton.setLoading(false);
 				loadError = error.getMessage();
 				render(false);
+			}));
+	}
+
+	/** Ask the backend what this account may do; a failure just hides the pick buttons. */
+	private void loadViewer() {
+		long accountHash = client != null ? client.getAccountHash() : -1;
+		if (accountHash == -1) return;
+		api.fetchLeaguesBingoMe(event.getId(), accountHash,
+			response -> SwingUtilities.invokeLater(() -> {
+				me = response.getData();
+				if (view == View.BOARDS || view == View.BOARD) render(false);
+			}),
+			error -> SwingUtilities.invokeLater(() -> me = null));
+	}
+
+	// ==================== Region picks ====================
+
+	/** A locked board this viewer could unlock right now for the given team. */
+	private boolean canUnlock(Team team, Board board, BoardStats stats) {
+		if (me == null || !me.canPickFor(team.getId()) || !stats.locked) return false;
+		if (board.getTiles().isEmpty() && !payload.isTilesHidden()) return false;
+		if (payload.getConfig() != null && payload.getConfig().getDefaultRegions() != null
+			&& payload.getConfig().getDefaultRegions().contains(board.getRegion())) return false;
+		return team.getPickTokens() != null && team.getPickTokens().getAvailable() > 0;
+	}
+
+	private JComponent unlockButton(Team team, Board board) {
+		JButton button = new JButton("Unlock board") {
+			@Override
+			protected void paintComponent(Graphics g) {
+				Graphics2D g2 = (Graphics2D) g.create();
+				g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+				Color base = UIConstants.ACCENT_GOLD;
+				g2.setColor(!isEnabled() ? TileCell.withAlpha(base, 90) : getModel().isPressed() ? base.darker() : getModel().isRollover() ? base.brighter() : base);
+				g2.fillRoundRect(0, 0, getWidth(), getHeight(), 8, 8);
+				g2.dispose();
+				super.paintComponent(g);
+			}
+		};
+		button.setFont(FontManager.getRunescapeSmallFont());
+		button.setForeground(UIConstants.BACKGROUND);
+		button.setBorderPainted(false);
+		button.setContentAreaFilled(false);
+		button.setFocusPainted(false);
+		button.setPreferredSize(new Dimension(100, 22));
+		button.setMaximumSize(new Dimension(Integer.MAX_VALUE, 22));
+		button.setAlignmentX(Component.LEFT_ALIGNMENT);
+		button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+		button.setToolTipText("Spend one pick token to unlock this board");
+		button.setEnabled(!picking);
+		button.addActionListener(e -> confirmUnlock(team, board));
+		return button;
+	}
+
+	private void confirmUnlock(Team team, Board board) {
+		if (picking || me == null) return;
+		LeaguesRegions.Region meta = LeaguesRegions.byId(board.getRegion());
+		int tokens = team.getPickTokens() != null ? team.getPickTokens().getAvailable() : 0;
+		String summary = "<html><body style='width:230px'>"
+			+ "<b>Unlock " + escapeHtml(meta.displayName) + " for " + escapeHtml(team.getName()) + "?</b><br><br>"
+			+ board.getRows() + "x" + board.getColumns() + " board, " + board.getTiles().size() + " tiles, "
+			+ board.getTotalPoints() + " points.<br>"
+			+ "This spends 1 of " + tokens + " pick token" + (tokens != 1 ? "s" : "") + " and cannot be undone."
+			+ (me.isSuperadmin() && !team.getId().equals(me.getTeamId()) ? "<br><br><i>You are unlocking as a superadmin.</i>" : "")
+			+ "</body></html>";
+		int choice = javax.swing.JOptionPane.showConfirmDialog(this, summary, "Unlock region",
+			javax.swing.JOptionPane.OK_CANCEL_OPTION, javax.swing.JOptionPane.QUESTION_MESSAGE);
+		if (choice != javax.swing.JOptionPane.OK_OPTION) return;
+
+		long accountHash = client != null ? client.getAccountHash() : -1;
+		if (accountHash == -1) return;
+		picking = true;
+		render(false);
+		// Pickers act for their own team; only a superadmin names another team.
+		String targetTeam = team.getId().equals(me.getTeamId()) ? null : team.getId();
+		api.pickLeaguesBingoRegion(event.getId(), accountHash, board.getRegion(), targetTeam,
+			response -> SwingUtilities.invokeLater(() -> {
+				picking = false;
+				if (response.getData() != null && response.getData().getMe() != null) me = response.getData().getMe();
+				load();
+				javax.swing.JOptionPane.showMessageDialog(this,
+					meta.displayName + " unlocked for " + team.getName() + ".", "Region unlocked",
+					javax.swing.JOptionPane.INFORMATION_MESSAGE);
+			}),
+			error -> SwingUtilities.invokeLater(() -> {
+				picking = false;
+				render(false);
+				javax.swing.JOptionPane.showMessageDialog(this,
+					"Could not unlock: " + error.getMessage(), "Unlock failed", javax.swing.JOptionPane.WARNING_MESSAGE);
 			}));
 	}
 
@@ -431,7 +528,11 @@ public class LeaguesBingoPanel extends JPanel {
 		lines.add(Box.createVerticalStrut(4));
 		lines.add(label(stats.line(board), FontManager.getRunescapeSmallFont(), UIConstants.TEXT_SECONDARY));
 		lines.add(Box.createVerticalStrut(6));
-		lines.add(new ProgressBar(stats.percent(), meta.accent));
+		if (canUnlock(team, board, stats)) {
+			lines.add(unlockButton(team, board));
+		} else {
+			lines.add(new ProgressBar(stats.percent(), meta.accent));
+		}
 
 		card.add(withBanner(meta, stats, lines));
 
@@ -462,7 +563,7 @@ public class LeaguesBingoPanel extends JPanel {
 		}
 		JPanel bannerBox = new JPanel(new BorderLayout());
 		bannerBox.setOpaque(false);
-		bannerBox.add(banner, BorderLayout.NORTH);
+		bannerBox.add(banner, BorderLayout.CENTER);
 
 		wrap.add(bannerBox, BorderLayout.WEST);
 		wrap.add(content, BorderLayout.CENTER);
@@ -513,7 +614,11 @@ public class LeaguesBingoPanel extends JPanel {
 		headerLines.add(Box.createVerticalStrut(4));
 		headerLines.add(label(stats.line(board), FontManager.getRunescapeSmallFont(), UIConstants.TEXT_SECONDARY));
 		headerLines.add(Box.createVerticalStrut(6));
-		headerLines.add(new ProgressBar(stats.percent(), meta.accent));
+		if (canUnlock(team, board, stats)) {
+			headerLines.add(unlockButton(team, board));
+		} else {
+			headerLines.add(new ProgressBar(stats.percent(), meta.accent));
+		}
 		header.add(withBanner(meta, stats, headerLines));
 		body.add(header);
 		body.add(Box.createVerticalStrut(10));

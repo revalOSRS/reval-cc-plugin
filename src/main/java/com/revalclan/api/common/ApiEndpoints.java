@@ -26,6 +26,8 @@ public final class ApiEndpoints {
     public static final String EVENT_REGISTER = "/events/%s/register";
     public static final String EVENT_REGISTRATION_STATUS = "/events/%s/registration-status";
     public static final String LEAGUES_BINGO_EVENT = PUBLIC_BASE_URL + "/leagues-bingo/events/%s";
+    public static final String LEAGUES_BINGO_ME = "/events/%s/leagues-bingo/me?accountHash=%s";
+    public static final String LEAGUES_BINGO_PICK = "/events/%s/leagues-bingo/pick";
 
     // Achievements
     public static final String ACHIEVEMENTS = "/achievements";
@@ -89,6 +91,14 @@ public final class ApiEndpoints {
      */
     public static String leaguesBingoEvent(String eventId) {
         return String.format(LEAGUES_BINGO_EVENT, eventId);
+    }
+
+    public static String leaguesBingoMe(String eventId, long accountHash) {
+        return String.format(LEAGUES_BINGO_ME, eventId, accountHash);
+    }
+
+    public static String leaguesBingoPick(String eventId) {
+        return String.format(LEAGUES_BINGO_PICK, eventId);
     }
 
     /**
