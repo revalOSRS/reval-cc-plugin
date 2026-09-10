@@ -69,3 +69,13 @@ tasks.register('shadowJar', Jar) {
 	archiveClassifier.set('shadow')
 	archiveFileName.set("${rootProject.name}-${project.version}-all.jar")
 }
+
+// Dev client: JAVA_HOME=$(/usr/libexec/java_home -v 21) ./gradlew runClient
+tasks.register('runClient', JavaExec) {
+	group = 'application'
+	description = 'Launch RuneLite with the plugin loaded (developer mode)'
+	classpath = sourceSets.test.runtimeClasspath
+	mainClass = 'com.revalclan.RevalClanPluginTest'
+	jvmArgs = ['-ea', '-Xmx1g', '--add-exports=java.desktop/com.apple.eawt=ALL-UNNAMED', '--add-opens=java.desktop/com.apple.eawt=ALL-UNNAMED']
+	args = ['--developer-mode']
+}

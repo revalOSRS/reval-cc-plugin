@@ -2,56 +2,78 @@ package com.revalclan.session;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
+import com.revalclan.session.SessionStore.PersistedSession;
+import com.revalclan.util.ClanMembership;
 import com.revalclan.util.WebhookService;
 import com.revalclan.util.Worlds;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.Skill;
-import net.runelite.client.config.ConfigManager;
+import net.runelite.api.gameval.VarClientID;
+import net.runelite.api.gameval.VarPlayerID;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
- * Accumulates the play session client-side and delivers ONE summary: attached
- * to LOGOUT on a clean logout, or replayed as a recovered SESSION_SUMMARY on
- * next startup after a crash/X-out (periodically persisted to the config
- * store). Server dedupes on sessionId, so a replay can never double-store.
+ * Accumulates the play session client-side and delivers it three ways:
+ * <ul>
+ *   <li><b>SESSION_HEARTBEAT</b> every ~10 minutes while playing, so the session
+ *       exists on the server before it ends (live admin view; a crash costs at
+ *       most one interval).</li>
+ *   <li>The final summary attached to <b>LOGOUT</b>, or sent as a standalone
+ *       <b>SESSION_SUMMARY</b> when a world hop cuts the session.</li>
+ *   <li>A <b>SESSION_SUMMARY</b> replay of any session whose final summary the
+ *       server never acknowledged — at startup and at every login.</li>
+ * </ul>
+ * Every persist goes straight to disk ({@link SessionStore}); the local copy is
+ * deleted only when the server answers {@code sessionStored} = stored, duplicate
+ * or rejected. The server dedupes on sessionId, so a replay can never double-store.
+ *
+ * A session starts the moment the player is logged in — before clan membership
+ * is known — and accumulates regardless; only SENDING is gated on membership.
  */
 @Slf4j
 @Singleton
 public class SessionTracker {
-	private static final String CONFIG_GROUP = "revalclan";
-	/** One config entry per session: activeSession_<sessionId> */
-	private static final String CONFIG_KEY_PREFIX = "activeSession_";
-
 	/** Persist at most once per this many ticks (~30s), and only when dirty */
 	private static final int PERSIST_INTERVAL_TICKS = 50;
-
-	/** Oldest persisted sessions beyond this are dropped at recovery */
-	private static final int MAX_PERSISTED_SESSIONS = 5;
-
-	/** Malfunction guard — totals stay exact even past the cap */
-
+	/** Running summary to the server every ~10 minutes */
+	private static final int HEARTBEAT_INTERVAL_TICKS = 1000;
 	/** Malfunction guard (deaths) */
 	private static final int MAX_LIST_ENTRIES = 1000;
 
+	/** Character Summary tab counters (Jagex varps) → summary key */
+	private static final Map<String, Integer> COUNTER_VARPS = new LinkedHashMap<>();
+	static {
+		COUNTER_VARPS.put("monstersKilled", VarPlayerID.TRACKING_MONSTERS_KILLED);
+		COUNTER_VARPS.put("bossesKilled", VarPlayerID.TRACKING_BOSSES_KILLED);
+		COUNTER_VARPS.put("deaths", VarPlayerID.TRACKING_DEATHS);
+		COUNTER_VARPS.put("cluesCompleted", VarPlayerID.TRACKING_CLUES_COMPLETED);
+		COUNTER_VARPS.put("coinsGained", VarPlayerID.TRACKING_COINS_GAINED);
+		COUNTER_VARPS.put("coinsLost", VarPlayerID.TRACKING_COINS_LOST);
+	}
+
 	@Inject private Client client;
-	@Inject private ConfigManager configManager;
 	@Inject private Gson gson;
 	@Inject private WebhookService webhookService;
+	@Inject private SessionStore store;
+	@Inject private ClanMembership membership;
 
 	private boolean active = false;
 	private boolean dirty = false;
 	private int ticksSincePersist = 0;
+	private int ticksSinceHeartbeat = 0;
+	private boolean heartbeatRejected = false;
 
 	private String sessionId;
 	private long startedAtMs;
@@ -66,151 +88,131 @@ public class SessionTracker {
 	private final Map<String, Integer> clues = new HashMap<>();
 	private long totalLootValue = 0;
 	private final List<Map<String, Object>> deaths = new ArrayList<>();
+	private int playtimeMinutes = 0;
+	private Map<String, Integer> countersStart;
+	private Map<String, Integer> countersEnd;
 
-	/** Config-store shape (written and read); summary stays a JsonObject so numbers survive exactly. */
-	private static class PersistedSession {
-		long accountHash;
-		String username;
-		int world;
-		List<String> worldFlags;
-		JsonObject summary;
+	/** Latest Jagex "Time played" snapshot seen this process — survives session cuts for LOGIN/LOGOUT */
+	private int lastKnownPlaytimeMinutes = 0;
+	/** Replays already in flight this process — a login right after startup must not send them twice */
+	private final Set<String> replaying = new HashSet<>();
 
-		long startedAt() {
-			try {
-				return summary.get("startedAt").getAsLong();
-			} catch (Exception e) {
-				return 0;
-			}
-		}
-	}
+	// ------------------------------------------------------------------ lifecycle
 
 	/**
-	 * Start a new session (client thread, logged in). Any world — the backend
-	 * gates on the worldFlags captured here.
+	 * Start a new session (client thread, logged in). Any world, any clan state —
+	 * the backend gates on the worldFlags captured here and membership gates sending.
 	 */
 	public void startSession() {
+		if (active) {
+			log.debug("startSession while active — cutting {} first", sessionId);
+			persistFinal("logout");
+			reset();
+		}
 		resetState();
 		sessionId = UUID.randomUUID().toString();
 		startedAtMs = System.currentTimeMillis();
 		lastUpdateMs = startedAtMs;
-		username = client.getLocalPlayer() != null ? client.getLocalPlayer().getName() : "Unknown";
+		username = currentPlayerName();
 		accountHash = client.getAccountHash();
 		world = client.getWorld();
 		worldFlags = Worlds.flagNames(client);
 		startSnapshot = buildSnapshot();
 		endSnapshot = startSnapshot;
+		readPlaytime();
 		active = true;
 		dirty = true;
-		log.debug("Session started: {}", sessionId);
+		log.info("Session started: {} world={} flags={}", sessionId, world, worldFlags);
 	}
 
 	/**
 	 * Finalize (clean logout) and return the summary for the LOGOUT payload, or
-	 * null. The persisted copy is kept until confirmDelivered — a client closed
-	 * mid-send replays it next startup.
+	 * null. The persisted copy is kept until the server acks it.
 	 */
 	public Map<String, Object> finalizeSession() {
 		if (!active) return null;
-
-		touch();
-		Map<String, Object> summary = buildSummary("logout", lastUpdateMs);
-		persist(summary);
+		Map<String, Object> summary = persistFinal("logout");
 		reset();
 		return summary;
 	}
 
-	/** Server confirmed receipt — drop that session's persisted copy. */
-	public void confirmDelivered(String deliveredSessionId) {
-		if (deliveredSessionId == null) return;
-		try {
-			configManager.unsetConfiguration(CONFIG_GROUP, CONFIG_KEY_PREFIX + deliveredSessionId);
-		} catch (Exception ignored) {}
-	}
-
-	/** Replay every persisted-but-unconfirmed session as a recovered SESSION_SUMMARY. */
-	public void recoverPersistedSession() {
-		try {
-			// Parse once; unparseable copies are useless for recovery — drop them
-			Map<String, PersistedSession> parsed = new LinkedHashMap<>();
-			for (String fullKey : configManager.getConfigurationKeys(CONFIG_GROUP + "." + CONFIG_KEY_PREFIX)) {
-				String key = fullKey.substring(CONFIG_GROUP.length() + 1);
-				PersistedSession session = null;
-				try {
-					session = gson.fromJson(configManager.getConfiguration(CONFIG_GROUP, key), PersistedSession.class);
-				} catch (Exception ignored) {}
-				if (session == null || session.summary == null) {
-					configManager.unsetConfiguration(CONFIG_GROUP, key);
-				} else {
-					parsed.put(key, session);
-				}
-			}
-			if (parsed.isEmpty()) return;
-
-			// Newest first; drop anything beyond the cap
-			List<Map.Entry<String, PersistedSession>> entries = new ArrayList<>(parsed.entrySet());
-			entries.sort(Comparator.comparingLong(
-				(Map.Entry<String, PersistedSession> e) -> e.getValue().startedAt()).reversed());
-			for (Map.Entry<String, PersistedSession> e : entries.subList(
-					Math.min(MAX_PERSISTED_SESSIONS, entries.size()), entries.size())) {
-				configManager.unsetConfiguration(CONFIG_GROUP, e.getKey());
-			}
-
-			for (Map.Entry<String, PersistedSession> e : entries.subList(
-					0, Math.min(MAX_PERSISTED_SESSIONS, entries.size()))) {
-				replayPersisted(e.getValue());
-			}
-		} catch (Exception e) {
-			log.warn("Failed to recover persisted sessions: {}", e.getMessage());
+	/**
+	 * A world hop ends this session (each row is one world). The summary goes
+	 * out now as a standalone SESSION_SUMMARY when membership is proven;
+	 * otherwise the file waits for a login that proves it.
+	 */
+	public void cutForHop() {
+		if (!active) return;
+		Map<String, Object> summary = persistFinal("hop");
+		String id = sessionId;
+		reset();
+		if (membership.isMember()) {
+			sendStandalone(summary, id, currentPlayerName(), client.getAccountHash(), world, worldFlags);
 		}
 	}
 
-	// The only event built outside BaseNotifier — no live client exists at
-	// startup, so the envelope is reassembled from the persisted copy.
-	private void replayPersisted(PersistedSession persisted) {
-		Map<String, Object> payload = new HashMap<>();
-		payload.put("eventType", "SESSION_SUMMARY");
-		payload.put("eventTimestamp", System.currentTimeMillis());
-		payload.put("accountHash", persisted.accountHash);
-		payload.put("username", persisted.username);
-		// World flags drive the server's world gate (keeps leagues sessions out)
-		payload.put("world", persisted.world);
-		if (persisted.worldFlags != null) payload.put("worldFlags", persisted.worldFlags);
-		payload.put("sessionSummary", persisted.summary);
-
-		String recoveredSessionId = persisted.summary.has("sessionId")
-			? persisted.summary.get("sessionId").getAsString()
-			: null;
-
-		// Clear only on server confirm; otherwise retry next startup
-		webhookService.sendDataAsync(payload, response -> confirmDelivered(recoveredSessionId));
-		log.info("Recovered unfinished session, replayed as SESSION_SUMMARY");
+	/** In-memory only — a persisted session replays as 'recovered' later. */
+	public void reset() {
+		active = false;
+		resetState();
 	}
 
-	/** Throttled local persistence (client thread). */
+	// ------------------------------------------------------------------ ticking
+
+	/** Client thread, every tick while logged in — regardless of clan state. */
 	public void onGameTick() {
 		if (!active) return;
+
+		// Skills and varps can land a tick or two after LOGGED_IN — fill the blanks
+		if (snapshotEmpty(startSnapshot)) {
+			startSnapshot = buildSnapshot();
+			endSnapshot = startSnapshot;
+			if (!snapshotEmpty(startSnapshot)) dirty = true;
+		}
+		if (playtimeMinutes <= 0) readPlaytime();
+		readCounters();
+
 		// Pure skilling fires no accumulator event — treat XP movement as dirtiness
 		if (xpChangedSinceSnapshot()) {
 			touch();
 			dirty = true;
 		}
+
 		ticksSincePersist++;
 		if (dirty && ticksSincePersist >= PERSIST_INTERVAL_TICKS) {
 			ticksSincePersist = 0;
 			dirty = false;
 			try {
 				touch();
-				persist();
+				persist(buildSummary("recovered", lastUpdateMs));
 			} catch (Exception e) {
 				log.warn("Failed to persist session state: {}", e.getMessage());
 			}
 		}
+
+		if (!heartbeatRejected && ++ticksSinceHeartbeat >= HEARTBEAT_INTERVAL_TICKS) {
+			ticksSinceHeartbeat = 0;
+			if (membership.isMember()) sendHeartbeat();
+		}
 	}
 
-	public void reset() {
-		active = false;
-		resetState();
+	/** VarClientIntChanged for ACCOUNT_SUMMARY_PLAYTIME — the server re-sends it at login, hop and region load. */
+	public void onPlaytimeVarcChanged() {
+		int value = client.getVarcIntValue(VarClientID.ACCOUNT_SUMMARY_PLAYTIME);
+		if (value <= 0) return;
+		lastKnownPlaytimeMinutes = Math.max(lastKnownPlaytimeMinutes, value);
+		if (active && playtimeMinutes <= 0) {
+			playtimeMinutes = value;
+			dirty = true;
+		}
 	}
+
+	/** Latest Jagex "Time played" (minutes) seen this process, or 0 */
+	public int getLastKnownPlaytimeMinutes() {
+		return lastKnownPlaytimeMinutes;
+	}
+
+	// ------------------------------------------------------------------ accumulators
 
 	public void addKill(String npcName) {
 		if (!active || npcName == null || npcName.isEmpty()) return;
@@ -245,6 +247,109 @@ public class SessionTracker {
 		dirty = true;
 	}
 
+	// ------------------------------------------------------------------ delivery + recovery
+
+	/**
+	 * Server answered a summary. Drop the local copy only on a definitive
+	 * outcome; anything else (older backend, transient error) keeps it for the
+	 * next replay. The server dedupes, so keeping is always safe.
+	 */
+	public void confirmDelivered(String deliveredSessionId, JsonObject response) {
+		if (deliveredSessionId == null) return;
+		replaying.remove(deliveredSessionId);
+		String outcome = null;
+		try {
+			if (response != null && response.has("sessionStored") && !response.get("sessionStored").isJsonNull()) {
+				outcome = response.get("sessionStored").getAsString();
+			}
+		} catch (Exception ignored) {}
+		if ("stored".equals(outcome) || "duplicate".equals(outcome) || "rejected".equals(outcome)) {
+			store.delete(deliveredSessionId);
+			log.info("Session {} {} by server — local copy dropped", deliveredSessionId, outcome);
+		} else {
+			log.info("Session {} not acknowledged (sessionStored={}) — keeping local copy", deliveredSessionId, outcome);
+		}
+	}
+
+	/**
+	 * Replay every persisted session the server has not acknowledged.
+	 *
+	 * @param membershipProven true when called after this login proved clan
+	 *        membership — then files recorded before membership was known are
+	 *        sent too. At startup only files stamped as recorded by a member go.
+	 */
+	public void recoverPersistedSessions(boolean membershipProven) {
+		try {
+			for (PersistedSession persisted : store.readAll()) {
+				String id = persisted.sessionId();
+				if (id.equals(sessionId) || replaying.contains(id)) continue;
+				if (!persisted.member && !membershipProven) continue;
+				replaying.add(id);
+				replayPersisted(persisted);
+			}
+		} catch (Exception e) {
+			log.warn("Failed to recover persisted sessions: {}", e.getMessage());
+		}
+	}
+
+	// The envelope is reassembled from the persisted copy — no live client at startup.
+	private void replayPersisted(PersistedSession persisted) {
+		JsonObject summary = persisted.summary;
+		String reason = summary.has("endReason") ? summary.get("endReason").getAsString() : "recovered";
+		if (!"logout".equals(reason) && !"hop".equals(reason)) {
+			summary.addProperty("endReason", "recovered");
+		}
+		Map<String, Object> payload = envelope("SESSION_SUMMARY", persisted.username, persisted.accountHash, persisted.world, persisted.worldFlags);
+		payload.put("sessionSummary", summary);
+		String id = persisted.sessionId();
+		webhookService.sendDataAsync(payload, response -> confirmDelivered(id, response));
+		log.info("Replaying unacknowledged session {} ({})", id, reason);
+	}
+
+	private void sendStandalone(Map<String, Object> summary, String id, String name, long hash, int w, List<String> flags) {
+		Map<String, Object> payload = envelope("SESSION_SUMMARY", name, hash, w, flags);
+		payload.put("sessionSummary", summary);
+		replaying.add(id);
+		webhookService.sendDataAsync(payload, response -> confirmDelivered(id, response));
+	}
+
+	private void sendHeartbeat() {
+		touch();
+		log.info("Session {} heartbeat after {} min", sessionId, (lastUpdateMs - startedAtMs) / 60000);
+		Map<String, Object> payload = envelope("SESSION_HEARTBEAT", username, accountHash, world, worldFlags);
+		payload.put("sessionSummary", buildSummary("heartbeat", lastUpdateMs));
+		String id = sessionId;
+		webhookService.sendDataAsync(payload, response -> {
+			// A heartbeat never drops the local copy; 'rejected' (untracked world) just stops the beat
+			try {
+				if (response != null && response.has("sessionStored")
+					&& "rejected".equals(response.get("sessionStored").getAsString()) && id.equals(sessionId)) {
+					heartbeatRejected = true;
+				}
+			} catch (Exception ignored) {}
+		});
+	}
+
+	private Map<String, Object> envelope(String eventType, String name, long hash, int w, List<String> flags) {
+		Map<String, Object> payload = new HashMap<>();
+		payload.put("eventType", eventType);
+		payload.put("eventTimestamp", System.currentTimeMillis());
+		payload.put("accountHash", hash);
+		payload.put("username", name != null ? name : "Unknown");
+		payload.put("world", w);
+		if (flags != null) payload.put("worldFlags", flags);
+		return payload;
+	}
+
+	// ------------------------------------------------------------------ internals
+
+	private String currentPlayerName() {
+		if (client.getLocalPlayer() != null && client.getLocalPlayer().getName() != null) {
+			return client.getLocalPlayer().getName();
+		}
+		return membership.getPlayerName() != null ? membership.getPlayerName() : "Unknown";
+	}
+
 	private void resetState() {
 		sessionId = null;
 		startedAtMs = 0;
@@ -259,31 +364,68 @@ public class SessionTracker {
 		clues.clear();
 		totalLootValue = 0;
 		deaths.clear();
+		playtimeMinutes = 0;
+		countersStart = null;
+		countersEnd = null;
 		dirty = false;
 		ticksSincePersist = 0;
+		ticksSinceHeartbeat = 0;
+		heartbeatRejected = false;
 	}
 
 	/** Refresh the end snapshot and last-update time */
 	private void touch() {
-		refreshEndSnapshot();
+		if (client.getGameState() == GameState.LOGGED_IN) {
+			Map<String, Object> snapshot = buildSnapshot();
+			if (!snapshotEmpty(snapshot)) endSnapshot = snapshot;
+		}
 		lastUpdateMs = System.currentTimeMillis();
 	}
 
-	/** Rebuild the end snapshot if still logged in */
-	private void refreshEndSnapshot() {
-		if (client.getGameState() == GameState.LOGGED_IN) {
-			Map<String, Object> snapshot = buildSnapshot();
-			if (snapshot != null) {
-				endSnapshot = snapshot;
-			}
-		}
-	}
-
-	/** Has overall XP moved since the last end snapshot? */
 	private boolean xpChangedSinceSnapshot() {
 		if (client.getGameState() != GameState.LOGGED_IN || endSnapshot == null) return false;
 		Object totalXp = endSnapshot.get("totalXp");
 		return totalXp instanceof Number && ((Number) totalXp).longValue() != client.getOverallExperience();
+	}
+
+	private void readPlaytime() {
+		try {
+			int value = client.getVarcIntValue(VarClientID.ACCOUNT_SUMMARY_PLAYTIME);
+			if (value > 0) {
+				playtimeMinutes = value;
+				lastKnownPlaytimeMinutes = Math.max(lastKnownPlaytimeMinutes, value);
+			}
+		} catch (Exception ignored) {}
+	}
+
+	/**
+	 * The summary-tab varps arrive as a burst of zeros followed by the real
+	 * values in the same tick after login/hop, so an all-zero read is ignored:
+	 * the first non-zero read fixes the start, every later one moves the end.
+	 */
+	private void readCounters() {
+		Map<String, Integer> current = new LinkedHashMap<>();
+		boolean anyNonZero = false;
+		for (Map.Entry<String, Integer> e : COUNTER_VARPS.entrySet()) {
+			int v = client.getVarpValue(e.getValue());
+			if (v != 0) anyNonZero = true;
+			current.put(e.getKey(), v);
+		}
+		if (!anyNonZero) return;
+		if (countersStart == null) {
+			countersStart = current;
+			dirty = true;
+		}
+		if (countersEnd == null || !countersEnd.equals(current)) {
+			countersEnd = current;
+			dirty = true;
+		}
+	}
+
+	private static boolean snapshotEmpty(Map<String, Object> snapshot) {
+		if (snapshot == null) return true;
+		Object totalXp = snapshot.get("totalXp");
+		return !(totalXp instanceof Number) || ((Number) totalXp).longValue() <= 0;
 	}
 
 	/**
@@ -325,12 +467,21 @@ public class SessionTracker {
 		summary.put("clues", new HashMap<>(clues));
 		summary.put("totalLootValue", totalLootValue);
 		summary.put("deaths", new ArrayList<>(deaths));
+		if (worldFlags != null) summary.put("worldFlags", worldFlags);
+		if (playtimeMinutes > 0) summary.put("playtimeMinutes", playtimeMinutes);
+		if (countersStart != null) summary.put("countersStart", countersStart);
+		if (countersEnd != null) summary.put("countersEnd", countersEnd);
 		return summary;
 	}
 
-	private void persist() {
-		// Persisted summaries replay as "recovered"; endedAt = last local update we saw
-		persist(buildSummary("recovered", lastUpdateMs));
+	/** Final summary: refreshed, persisted (kept until acked), returned for the payload. */
+	private Map<String, Object> persistFinal(String endReason) {
+		touch();
+		Map<String, Object> summary = buildSummary(endReason, lastUpdateMs);
+		persist(summary);
+		log.info("Session {} ended ({}) after {} min, member={}", sessionId, endReason,
+			(lastUpdateMs - startedAtMs) / 60000, membership.isMember());
+		return summary;
 	}
 
 	private void persist(Map<String, Object> summary) {
@@ -339,7 +490,8 @@ public class SessionTracker {
 		persisted.username = username;
 		persisted.world = world;
 		persisted.worldFlags = worldFlags;
+		persisted.member = membership.isMember();
 		persisted.summary = gson.toJsonTree(summary).getAsJsonObject();
-		configManager.setConfiguration(CONFIG_GROUP, CONFIG_KEY_PREFIX + sessionId, gson.toJson(persisted));
+		store.write(persisted);
 	}
 }
