@@ -34,7 +34,6 @@ import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.events.GameStateChanged;
-import net.runelite.api.events.ClanChannelChanged;
 import net.runelite.api.events.VarClientIntChanged;
 import net.runelite.api.gameval.VarClientID;
 import net.runelite.api.events.GameTick;
@@ -155,15 +154,6 @@ public class RevalClanPlugin extends Plugin {
 	private boolean wasLoggedIn = false;
 	private boolean pendingLoginNotification = false;
 
-	/**
-	 * Cached clan answer for this login (see ClanMembership). Proven once from
-	 * the clan settings, sticky until a source says otherwise — never cleared
-	 * by a hop's channel drop or a left clan channel. Event subscribers gate on
-	 * it; the session accumulator does NOT (it records regardless, only sending
-	 * is gated).
-	 */
-	private volatile boolean inRequiredClan = false;
-
 	/** Refetch event filters every ~10 minutes so activated events propagate without a relog */
 	private static final int FILTER_REFETCH_INTERVAL_TICKS = 1000;
 	private int filterRefetchTicks = 0;
@@ -176,7 +166,6 @@ public class RevalClanPlugin extends Plugin {
 		log.info("Reval Clan plugin started!");
 		wasLoggedIn = false;
 		pendingLoginNotification = false;
-		inRequiredClan = false;
 		clanMembership.reset();
 
 		clientThread.invoke(() -> {
@@ -190,6 +179,7 @@ public class RevalClanPlugin extends Plugin {
 			// and LOGIN goes out once membership is proven (used to wait for a relog)
 			if (client.getGameState() == GameState.LOGGED_IN) {
 				onLoggedIn();
+				sessionTracker.startSession();
 			}
 
 			return true;
@@ -199,7 +189,7 @@ public class RevalClanPlugin extends Plugin {
 		overlayManager.add(syncGuideOverlay);
 
 		// Replay sessions the server never acknowledged (crash / X-out / lost response)
-		sessionTracker.recoverPersistedSessions(false);
+		sessionTracker.recoverPersistedSessions(0);
 
 		eventBus.register(lootNotifier);
 		eventBus.register(clogPersonalBestCapture);
@@ -245,7 +235,6 @@ public class RevalClanPlugin extends Plugin {
 	@Override
 	protected void shutDown() throws Exception {
 		log.info("Reval Clan plugin stopped!");
-		inRequiredClan = false;
 		clanMembership.reset();
 		wasLoggedIn = false;
 
@@ -289,29 +278,23 @@ public class RevalClanPlugin extends Plugin {
 
 		switch (gameStateChanged.getGameState()) {
 			case LOGGED_IN:
-				// Only a real login starts a session; a hop's LOGGED_IN starts the next segment
-				if (!wasLoggedIn) {
-					onLoggedIn();
-				} else if (pendingHopSegment) {
-					pendingHopSegment = false;
-					sessionTracker.startSession();
-				}
+				// LOGGED_IN also follows every region load and reconnect: only a fresh
+				// login runs the login hooks, and startSession is a no-op while a
+				// session is active — so this opens exactly the post-login and
+				// post-hop segments.
+				if (!wasLoggedIn) onLoggedIn();
+				sessionTracker.startSession();
 				break;
 
 			case HOPPING:
-				// Each session is one world: close this segment now, open the next on LOGGED_IN
-				if (wasLoggedIn) {
-					sessionTracker.cutForHop();
-					pendingHopSegment = true;
-				}
+				// Each session is one world: close this segment now, the next LOGGED_IN opens the next
+				if (wasLoggedIn) sessionTracker.cutForHop();
 				break;
 
 			case LOGIN_SCREEN: {
-				boolean wasInClan = inRequiredClan;
-				inRequiredClan = false;
+				boolean wasInClan = clanMembership.isMember();
 				clanMembership.reset();
 				pendingLoginNotification = false;
-				pendingHopSegment = false;
 				announcementService.reset();
 				leaguesNotifier.reset();
 				leaguesSyncNotifier.reset();
@@ -322,7 +305,7 @@ public class RevalClanPlugin extends Plugin {
 					if (wasInClan) {
 						logoutNotifier.onLogout(sessionTracker.finalizeSession());
 					} else {
-						// Not (yet) proven a member this login: keep the file, a later login that proves it replays it
+						// Not proven a member this login: the file waits for a login on this account that proves it
 						sessionTracker.finalizeSession();
 					}
 					wasLoggedIn = false;
@@ -339,24 +322,11 @@ public class RevalClanPlugin extends Plugin {
 		}
 	}
 
-	/** A world hop closed the session; the next LOGGED_IN opens a new segment */
-	private boolean pendingHopSegment = false;
-
-	/** Fresh login (or plugin enabled while logged in): start recording immediately, prove membership on ticks. */
+	/** Fresh login (or plugin enabled while logged in): LOGIN goes out once membership is proven on a tick. */
 	private void onLoggedIn() {
 		wasLoggedIn = true;
 		collectionLogManager.clearObtainedItems();
 		pendingLoginNotification = true;
-		sessionTracker.startSession();
-	}
-
-	@Subscribe
-	public void onClanChannelChanged(ClanChannelChanged event) {
-		// The channel arriving is the fastest proof at login; refresh right away
-		if (clanMembership.refresh()) {
-			inRequiredClan = true;
-			onClanValidated();
-		}
 	}
 
 	@Subscribe
@@ -366,6 +336,7 @@ public class RevalClanPlugin extends Plugin {
 		}
 	}
 
+	/** Runs once per login, the tick membership is proven. */
 	private void onClanValidated() {
 		eventFilterManager.setOnFiltersApplied(varbitNotifier::syncBaselines);
 		eventFilterManager.fetchFiltersAsync();
@@ -381,9 +352,8 @@ public class RevalClanPlugin extends Plugin {
 			loginNotifier.onLogin();
 		}
 
-		// Membership is proven: anything recorded before we knew (this login or an
-		// earlier one on this machine) can go out now
-		sessionTracker.recoverPersistedSessions(true);
+		// This account is a member: its sessions recorded before we knew can go out now
+		sessionTracker.recoverPersistedSessions(client.getAccountHash());
 
 		if (revalPanel != null) {
 			revalPanel.onLoggedIn();
@@ -392,23 +362,18 @@ public class RevalClanPlugin extends Plugin {
 
 	@Subscribe
 	public void onGameTick(GameTick gameTick) {
-		// The session records regardless of clan state — only sending is gated
+		// The session and its kill attribution record regardless of clan state — only sending is gated
 		sessionTracker.onGameTick();
+		killTracker.onGameTick(gameTick);
 
-		// Cheap re-read of the clan sources every tick; flips to member exactly once per login
-		if (clanMembership.refresh()) {
-			inRequiredClan = true;
-			onClanValidated();
-		} else if (inRequiredClan && !clanMembership.isMember()) {
-			inRequiredClan = false;
-		}
+		// Re-read the clan sources; flips to member exactly once per login
+		if (clanMembership.refresh()) onClanValidated();
 
-		if (!inRequiredClan) return;
+		if (!clanMembership.isMember()) return;
 
 		announcementService.onGameTick();
 		lootNotifier.onGameTick();
 		varbitNotifier.onGameTick();
-		killTracker.onGameTick(gameTick);
 		killCountNotifier.onTick();
 		diaryNotifier.onGameTick();
 		petNotifier.onGameTick();
@@ -436,7 +401,7 @@ public class RevalClanPlugin extends Plugin {
 	 */
 	@Subscribe
 	public void onScriptPreFired(ScriptPreFired preFired) {
-		if (!inRequiredClan) return;
+		if (!clanMembership.isMember()) return;
 
 		if (preFired.getScriptId() == 4100) {
 			try {
@@ -455,7 +420,7 @@ public class RevalClanPlugin extends Plugin {
 
 	@Subscribe
 	public void onChatMessage(ChatMessage event) {
-		if (!inRequiredClan) return;
+		if (!clanMembership.isMember()) return;
 
 		String message = event.getMessage();
 		String cleanMessage = COL_CLOSE.matcher(COL_OPEN.matcher(message).replaceAll("")).replaceAll("");
@@ -483,13 +448,13 @@ public class RevalClanPlugin extends Plugin {
 
 	@Subscribe
 	public void onStatChanged(StatChanged event) {
-		if (!inRequiredClan) return;
+		if (!clanMembership.isMember()) return;
 		levelNotifier.onStatChanged(event);
 	}
 
 	@Subscribe
 	public void onWidgetLoaded(WidgetLoaded event) {
-		if (!inRequiredClan) return;
+		if (!clanMembership.isMember()) return;
 		questNotifier.onWidgetLoaded(event);
 		clueNotifier.onWidgetLoaded(event);
 		leaguesSyncNotifier.onWidgetLoaded(event);
@@ -501,7 +466,7 @@ public class RevalClanPlugin extends Plugin {
 		// Kills feed the session accumulator regardless of clan state
 		KillTracker.KillData kill = killTracker.onActorDeath(event);
 		if (kill != null) sessionTracker.addKill(kill.npcName);
-		if (!inRequiredClan) return;
+		if (!clanMembership.isMember()) return;
 		deathNotifier.onActorDeath(event);
 		if (kill != null) detailedKillNotifier.onKill(kill);
 	}
@@ -513,27 +478,27 @@ public class RevalClanPlugin extends Plugin {
 
 	@Subscribe
 	public void onNpcDespawned(NpcDespawned event) {
-		// Not gated on inRequiredClan: must always evict the accumulator entry
+		// Not gated on membership: must always evict the accumulator entry
 		// so damaged-but-never-died NPCs don't pin memory
 		killTracker.onNpcDespawned(event);
 	}
 
 	@Subscribe
 	public void onMenuOptionClicked(MenuOptionClicked event) {
-		if (!inRequiredClan) return;
+		if (!clanMembership.isMember()) return;
 		emoteNotifier.onMenuOptionClicked(event);
 		musicNotifier.onMenuOptionClicked(event);
 	}
 
 	@Subscribe
 	public void onInteractingChanged(InteractingChanged event) {
-		if (!inRequiredClan) return;
+		if (!clanMembership.isMember()) return;
 		deathNotifier.onInteractingChanged(event);
 	}
 
 	@Subscribe
 	public void onVarbitChanged(VarbitChanged event) {
-		if (!inRequiredClan) return;
+		if (!clanMembership.isMember()) return;
 		diaryNotifier.onVarbitChanged(event);
 		varbitNotifier.onVarbitChanged(event);
 	}

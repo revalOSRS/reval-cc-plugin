@@ -4,7 +4,6 @@ import javax.inject.Singleton;
 
 import com.google.inject.Inject;
 import com.revalclan.PlayerDataCollector;
-import com.revalclan.session.SessionTracker;
 import com.revalclan.util.SyncStateManager;
 
 import java.util.Map;
@@ -19,9 +18,6 @@ public class LoginNotifier extends BaseNotifier {
 
 	@Inject
 	private SyncStateManager syncStateManager;
-
-	@Inject
-	private SessionTracker sessionTracker;
 
 	@Override
 	public boolean isEnabled() {
@@ -38,9 +34,6 @@ public class LoginNotifier extends BaseNotifier {
 	 */
 	public void onLogin() {
 		Map<String, Object> data = dataCollector.collectBoundaryData();
-		// Jagex's own "Time played" (minutes), sent to the client at login — server-side calibration
-		int playtime = sessionTracker.getLastKnownPlaytimeMinutes();
-		if (playtime > 0) data.put("playtimeMinutes", playtime);
 		sendNotification(data, syncStateManager.ackHandler(client.getAccountHash()));
 	}
 }

@@ -45,8 +45,6 @@ public class LogoutNotifier extends BaseNotifier {
 		if (sessionSummary != null) {
 			data.put("sessionSummary", sessionSummary);
 		}
-		int playtime = sessionTracker.getLastKnownPlaytimeMinutes();
-		if (playtime > 0) data.put("playtimeMinutes", playtime);
 		String sessionId = sessionSummary != null ? (String) sessionSummary.get("sessionId") : null;
 		sendNotification(data, syncStateManager.ackHandler(client.getAccountHash())
 			.andThen(response -> sessionTracker.confirmDelivered(sessionId, response)));

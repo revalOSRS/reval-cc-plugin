@@ -7,7 +7,6 @@ package com.revalclan.collectionlog;
 
 import com.revalclan.notifiers.SyncNotifier;
 import com.revalclan.util.ClanMembership;
-import com.revalclan.util.ClanValidator;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
@@ -96,8 +95,8 @@ public class CollectionLogSyncButton {
 		}
 		lastAttemptedSync = client.getTickCount();
 
-		// Validate clan membership (cached answer, live probe as fallback)
-		if (!clanMembership.isMember() && !ClanValidator.validateClan(client)) {
+		// Validate clan membership
+		if (!clanMembership.isMember()) {
 			client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "Reval: You must be in the Reval clan to sync.", "");
 			return;
 		}

@@ -8,8 +8,8 @@ import net.runelite.api.clan.ClanRank;
 import net.runelite.api.clan.ClanSettings;
 
 /**
- * Stateless clan-membership probes. {@link ClanMembership} owns the cached
- * answer; these only read what the client currently knows.
+ * Constants and stateless clan-membership probes. {@link ClanMembership}
+ * owns the cached answer; these only read what the client currently knows.
  *
  * Two sources, verified in-client (2026-09-10):
  * <ul>
@@ -62,16 +62,5 @@ public final class ClanValidator {
 
 	private static boolean rankOk(ClanRank rank) {
 		return MINIMUM_CLAN_RANK == null || rank == null || rank.getRank() >= MINIMUM_CLAN_RANK.getRank();
-	}
-
-	/**
-	 * Live, uncached check — kept for callers that need an instant answer
-	 * (the sync button). Prefer {@link ClanMembership#isMember()} everywhere else.
-	 */
-	public static boolean validateClan(Client client) {
-		String name = client.getLocalPlayer() != null ? client.getLocalPlayer().getName() : null;
-		Probe settings = probeSettings(client, name);
-		if (settings != Probe.UNKNOWN) return settings == Probe.MEMBER;
-		return probeChannel(client, name) == Probe.MEMBER;
 	}
 }
