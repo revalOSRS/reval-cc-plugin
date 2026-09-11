@@ -2,7 +2,7 @@ package com.revalclan.notifiers;
 
 import com.google.gson.JsonObject;
 import com.revalclan.RevalClanConfig;
-import com.revalclan.util.ClanValidator;
+import com.revalclan.util.ClanMembership;
 import com.revalclan.util.EventFilterManager;
 import com.revalclan.util.ScreenshotService;
 import com.revalclan.util.WebhookService;
@@ -34,6 +34,8 @@ public abstract class BaseNotifier {
 	@Inject protected RevalClanConfig config;
 
 	@Inject protected EventFilterManager filterManager;
+
+	@Inject protected ClanMembership clanMembership;
 	
 	@Inject protected ItemManager itemManager;
 
@@ -52,12 +54,13 @@ public abstract class BaseNotifier {
 	protected abstract String getEventType();
 
 	/**
-	 * Live clan-membership gate applied before every send. Notifiers whose
-	 * event fires after the clan channel is torn down (LOGOUT) override this;
-	 * their callers must have validated membership beforehand.
+	 * Clan-membership gate applied before every send — the cached per-login
+	 * answer, so a hop's channel drop or a closed clan channel never swallows
+	 * an event. Notifiers whose event fires after the login screen resets the
+	 * cache (LOGOUT) override this; their callers gate on the previous answer.
 	 */
 	protected boolean passesClanCheck() {
-		return ClanValidator.validateClan(client);
+		return clanMembership.isMember();
 	}
 
 	protected void sendNotification(Map<String, Object> data) {

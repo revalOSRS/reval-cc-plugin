@@ -33,7 +33,7 @@ public class LogoutNotifier extends BaseNotifier {
 		return "LOGOUT";
 	}
 
-	/** The clan channel is already torn down when LOGOUT fires; RevalClanPlugin gates on wasInClan. */
+	/** The membership cache is reset on the login screen where LOGOUT fires; RevalClanPlugin gates on the previous answer. */
 	@Override
 	protected boolean passesClanCheck() {
 		return true;
@@ -47,6 +47,6 @@ public class LogoutNotifier extends BaseNotifier {
 		}
 		String sessionId = sessionSummary != null ? (String) sessionSummary.get("sessionId") : null;
 		sendNotification(data, syncStateManager.ackHandler(client.getAccountHash())
-			.andThen(response -> sessionTracker.confirmDelivered(sessionId)));
+			.andThen(response -> sessionTracker.confirmDelivered(sessionId, response)));
 	}
 }
