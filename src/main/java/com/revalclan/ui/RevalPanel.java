@@ -56,6 +56,7 @@ public class RevalPanel extends PluginPanel {
 	private IndicatorTabButton competitionsTab;
 	private JButton diaryTab;
 	private String selectedTab = "PROFILE";
+	private final LazyPanelLoads panelLoads = new LazyPanelLoads();
 
 	// Admin
 	private AdminManager adminManager;
@@ -268,6 +269,19 @@ public class RevalPanel extends PluginPanel {
 		selectedTab = tabName;
 		updateNavStyles();
 		cardLayout.show(contentPanel, tabName);
+		loadSelectedTab();
+	}
+
+	private void loadSelectedTab() {
+		if (apiService == null) return;
+		switch (selectedTab) {
+			case "ACHIEVEMENTS": panelLoads.open(selectedTab, true, achievementsPanel::onLoggedIn); break;
+			case "COMPETITIONS": panelLoads.open(selectedTab, true, competitionsPanel::refresh); break;
+			case "EVENTS": panelLoads.open(selectedTab, true, eventsPanel::onLoggedIn); break;
+			case "DIARY": panelLoads.open(selectedTab, true, diaryPanel::onLoggedIn); break;
+			case "LEADERBOARD": panelLoads.open(selectedTab, false, leaderboardPanel::refresh); break;
+			case "RANKING": panelLoads.open(selectedTab, false, rankingPanel::loadOnOpen); break;
+		}
 	}
 
 	private void updateNavStyles() {
@@ -452,14 +466,14 @@ public class RevalPanel extends PluginPanel {
 	// ==================== Lifecycle ====================
 
 	public void onLoggedIn() {
+		panelLoads.onLogin();
 		profilePanel.refresh();
-		achievementsPanel.onLoggedIn();
-		competitionsPanel.refresh();
-		eventsPanel.onLoggedIn();
-		diaryPanel.onLoggedIn();
+		loadSelectedTab();
 	}
 
 	public void onLoggedOut() {
+		panelLoads.onLogout();
+		competitionsPanel.onLoggedOut();
 		profilePanel.onLoggedOut();
 		achievementsPanel.onLoggedOut();
 		eventsPanel.onLoggedOut();
@@ -467,6 +481,7 @@ public class RevalPanel extends PluginPanel {
 		if (adminButton != null) adminButton.setAdmin(false);
 
 		setEventsIndicator(false);
+		setCompetitionsIndicator(false);
 	}
 
 	// ==================== Tab Indicators ====================

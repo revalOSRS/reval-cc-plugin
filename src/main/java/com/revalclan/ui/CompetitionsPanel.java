@@ -92,6 +92,14 @@ public class CompetitionsPanel extends JPanel {
 		this.onIndicatorUpdate = callback;
 	}
 
+	public void onLoggedOut() {
+		myVotes.clear();
+		activeVotes = new ArrayList<>();
+		activeCompetitions = new ArrayList<>();
+		scheduledCompetitions = new ArrayList<>();
+		buildContent();
+	}
+
 	public void refresh() {
 		loadData(false);
 	}
