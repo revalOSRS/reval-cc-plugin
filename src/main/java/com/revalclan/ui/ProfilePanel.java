@@ -791,11 +791,15 @@ public class ProfilePanel extends JPanel {
 			list.add(empty);
 		} else {
 			int itemCount = 0;
+			int previousPoints = 0;
 			for (PointsResponse.PointSource tier : tiers) {
 				boolean completed = tier.getThreshold() != null && progress >= tier.getThreshold();
+				// Tier points are running totals; reaching a tier only adds the gap to the tier below
+				int addedPoints = Math.max(0, tier.getPointsValue() - previousPoints);
+				previousPoints = Math.max(previousPoints, tier.getPointsValue());
 				if (hideCompleted && completed) continue;
 				String desc = tier.getDescription() != null ? tier.getDescription() : tier.getName();
-				list.add(new ChecklistItem(desc, completed, tier.getPointsValue(), assetLoader));
+				list.add(new ChecklistItem(desc, completed, addedPoints, assetLoader));
 				list.add(Box.createRigidArea(new Dimension(0, 4)));
 				itemCount++;
 			}
