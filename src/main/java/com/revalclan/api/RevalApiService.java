@@ -62,7 +62,7 @@ public class RevalApiService {
     private AccountResponse cachedAccount;
     private String cachedAccountIdentifier;
     private long lastAccountFetch = 0;
-    private EventsResponse cachedEvents;
+    private volatile EventsResponse cachedEvents;
     private long lastEventsFetch = 0;
     private ActiveTeamsResponse cachedActiveTeams;
     private long lastActiveTeamsFetch = 0;
@@ -129,6 +129,11 @@ public class RevalApiService {
     }
 
     // ==================== EVENTS API ====================
+
+    /** Snapshot only: never fetches, even when the normal cache TTL has expired. */
+    public EventsResponse getLastFetchedEvents() {
+        return cachedEvents;
+    }
 
     public void fetchEvents(Consumer<EventsResponse> onSuccess, Consumer<Exception> onError) {
         if (cachedEvents != null && System.currentTimeMillis() - lastEventsFetch < EVENTS_CACHE_DURATION_MS) {
@@ -215,21 +220,6 @@ public class RevalApiService {
                                         Consumer<RegistrationStatusResponse> onSuccess, Consumer<Exception> onError) {
         get(ApiEndpoints.eventRegistrationStatus(eventId) + "?accountHash=" + accountHash,
             RegistrationStatusResponse.class, onSuccess, onError);
-    }
-
-    public void checkActiveEvents(Consumer<Boolean> onResult) {
-        fetchEvents(
-            response -> {
-                if (response.getData() != null && response.getData().getEvents() != null) {
-                    boolean hasActive = response.getData().getEvents().stream()
-                        .anyMatch(e -> e.isCurrentlyActive() || e.isUpcoming());
-                    onResult.accept(hasActive);
-                } else {
-                    onResult.accept(false);
-                }
-            },
-            error -> onResult.accept(false)
-        );
     }
 
     // ==================== ACHIEVEMENTS API ====================

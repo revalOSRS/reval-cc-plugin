@@ -269,7 +269,11 @@ public class RevalPanel extends PluginPanel {
 		selectedTab = tabName;
 		updateNavStyles();
 		cardLayout.show(contentPanel, tabName);
-		loadSelectedTab();
+		if ("EVENTS".equals(tabName)) {
+			panelLoads.openEveryTime(true, eventsPanel::onLoggedIn);
+		} else {
+			loadSelectedTab();
+		}
 	}
 
 	private void loadSelectedTab() {
@@ -277,7 +281,6 @@ public class RevalPanel extends PluginPanel {
 		switch (selectedTab) {
 			case "ACHIEVEMENTS": panelLoads.open(selectedTab, true, achievementsPanel::onLoggedIn); break;
 			case "COMPETITIONS": panelLoads.open(selectedTab, true, competitionsPanel::refresh); break;
-			case "EVENTS": panelLoads.open(selectedTab, true, eventsPanel::onLoggedIn); break;
 			case "DIARY": panelLoads.open(selectedTab, true, diaryPanel::onLoggedIn); break;
 			case "LEADERBOARD": panelLoads.open(selectedTab, false, leaderboardPanel::refresh); break;
 			case "RANKING": panelLoads.open(selectedTab, false, rankingPanel::loadOnOpen); break;

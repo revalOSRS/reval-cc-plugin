@@ -37,4 +37,16 @@ public class LazyPanelLoadsTest {
         loads.open("RANKING", false, requests::incrementAndGet);
         assertEquals(1, requests.get());
     }
+    @org.junit.Test
+    public void explicitOpenReloadsEveryTimeButNeverWhileLoggedOut() {
+        LazyPanelLoads loads = new LazyPanelLoads();
+        java.util.concurrent.atomic.AtomicInteger calls = new java.util.concurrent.atomic.AtomicInteger();
+        loads.openEveryTime(true, calls::incrementAndGet);
+        org.junit.Assert.assertEquals(0, calls.get());
+        loads.onLogin();
+        org.junit.Assert.assertEquals(0, calls.get());
+        loads.openEveryTime(true, calls::incrementAndGet);
+        loads.openEveryTime(true, calls::incrementAndGet);
+        org.junit.Assert.assertEquals(2, calls.get());
+    }
 }

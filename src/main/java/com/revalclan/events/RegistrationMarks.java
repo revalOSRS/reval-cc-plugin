@@ -20,8 +20,8 @@ import java.util.Map;
 /**
  * Admin-only: tracks which clan members have registered for an upcoming
  * event. {@link RegistrationMarksOverlay} draws a checkmark after their name
- * in the clan sidepanel and shows the event(s) on hover. Fetches go through
- * the service's events cache; this class only derives the lookup map.
+ * in the clan sidepanel and shows the event(s) on hover. Uses only the last
+ * explicitly fetched event list; startup/login/redraw never request it.
  */
 @Slf4j
 @Singleton
@@ -66,26 +66,17 @@ public class RegistrationMarks {
 	}
 
 	private void refresh() {
-		apiService.fetchEvents(
-			response -> {
-				Map<String, String> map = new HashMap<>();
-				if (response.getData() != null && response.getData().getEvents() != null) {
-					for (EventsResponse.EventSummary event : response.getData().getEvents()) {
-						if (!event.isUpcoming() || event.getRegistrations() == null) {
-							continue;
-						}
-						for (EventsResponse.EventRegistration reg : event.getRegistrations()) {
-							if (!reg.isRegistered() || reg.getOsrsNickname() == null) {
-								continue;
-							}
-							map.merge(Text.standardize(reg.getOsrsNickname()), event.getName(),
-								(a, b) -> a + ", " + b);
-						}
-					}
-				}
-				registrations = map;
-			},
-			error -> log.debug("Failed to fetch event registrations", error)
-		);
+        EventsResponse response = apiService.getLastFetchedEvents();
+        Map<String, String> map = new HashMap<>();
+        if (response != null && response.getData() != null && response.getData().getEvents() != null) {
+            for (EventsResponse.EventSummary event : response.getData().getEvents()) {
+                if (!event.isUpcoming() || event.getRegistrations() == null) continue;
+                for (EventsResponse.EventRegistration reg : event.getRegistrations()) {
+                    if (!reg.isRegistered() || reg.getOsrsNickname() == null) continue;
+                    map.merge(Text.standardize(reg.getOsrsNickname()), event.getName(), (a, b) -> a + ", " + b);
+                }
+            }
+        }
+        registrations = map;
 	}
 }

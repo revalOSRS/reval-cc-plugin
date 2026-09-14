@@ -229,7 +229,7 @@ public class EventsPanel extends JPanel {
 			return;
 		}
 		showLoading();
-		apiService.fetchEvents(this::onEventsLoaded, this::onError);
+		apiService.refreshEvents(this::onEventsLoaded, this::onError);
 	}
 
 	private void onEventsLoaded(EventsResponse response) {

@@ -18,6 +18,10 @@ final class LazyPanelLoads {
         loggedIn = false;
     }
 
+    void openEveryTime(boolean requiresLogin, Runnable load) {
+        if (!requiresLogin || loggedIn) load.run();
+    }
+
     void open(String panel, boolean requiresLogin, Runnable load) {
         if ((requiresLogin && !loggedIn) || !loaded.add(panel)) return;
         try {
