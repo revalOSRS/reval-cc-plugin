@@ -15,7 +15,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 @Singleton
 public class AnnouncementService {
-	private static final int POLL_INTERVAL_TICKS = 500;  // ~5 minutes
+	private final NotificationPollBackoff notificationPoll = new NotificationPollBackoff();
 	private static final int INITIAL_DELAY_TICKS = 5;
 
 	@Inject private ChatMessageManager chatMessageManager;
@@ -50,7 +50,7 @@ public class AnnouncementService {
 			return;
 		}
 
-		if (tickCounter % POLL_INTERVAL_TICKS == 0) {
+		if (!notificationFetchInProgress && notificationPoll.tick()) {
 			fetchNotifications();
 		}
 
@@ -90,12 +90,17 @@ public class AnnouncementService {
 		revalApiService.fetchNotifications(accountHash,
 			response -> {
 				notificationFetchInProgress = false;
+                notificationPoll.completed(response.getData() != null && response.getData().getNotifications() != null
+                    && response.getData().getNotifications().isEmpty());
 				if (response.getData() != null && response.getData().getNotifications() != null
 					&& !response.getData().getNotifications().isEmpty()) {
 					displayAndAcknowledgeNotifications(response.getData().getNotifications());
 				}
 			},
-			error -> notificationFetchInProgress = false
+			error -> {
+                notificationFetchInProgress = false;
+                notificationPoll.completed(false);
+            }
 		);
 	}
 
@@ -171,6 +176,7 @@ public class AnnouncementService {
 	}
 
 	public void reset() {
+		notificationPoll.reset();
 		tickCounter = 0;
 		initialFetchDone = false;
 		announcementFetchInProgress = false;
