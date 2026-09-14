@@ -15,6 +15,7 @@ public class AccountResponse extends ApiResponse {
 
     @Data
     public static class AccountData {
+        private com.revalclan.api.points.PointsResponse.PointsData pointsConfig;
         private OsrsAccount osrsAccount;
         private PointsBreakdown pointsBreakdown;
         private Integer questPoints;

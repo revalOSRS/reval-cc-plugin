@@ -105,7 +105,7 @@ public class RevalApiService {
             onSuccess.accept(cachedAccount);
             return;
         }
-        get(ApiEndpoints.ACCOUNT + "?accountHash=" + accountHash, AccountResponse.class, response -> {
+        get(ApiEndpoints.ACCOUNT + "?accountHash=" + accountHash + "&includePoints=true", AccountResponse.class, response -> {
             cachedAccount = response;
             cachedAccountIdentifier = identifier;
             lastAccountFetch = System.currentTimeMillis();

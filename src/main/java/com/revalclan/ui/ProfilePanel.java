@@ -103,7 +103,6 @@ public class ProfilePanel extends JPanel {
 		this.config = config;
 		this.itemManager = itemManager;
 		this.rankIconResolver = rankIconResolver;
-		fetchRanks();
 	}
 
 	/** Where the rank-up bar navigates (the Ranking side-panel view) */
@@ -177,6 +176,10 @@ public class ProfilePanel extends JPanel {
 				isLoading = false;
 				SwingUtilities.invokeLater(() -> {
 					currentAccount = response.getData();
+                    if (currentAccount != null && currentAccount.getPointsConfig() != null) {
+                        pointsData = currentAccount.getPointsConfig();
+                        ranks = pointsData.getRanks();
+                    }
 					if (currentAccount != null) {
 						pointsLog = currentAccount.getPointsLog();
 						if (onAccountLoaded != null) onAccountLoaded.accept(currentAccount);
