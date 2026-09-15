@@ -17,7 +17,6 @@ import javax.inject.Singleton;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
-import java.util.Base64;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledExecutorService;
 
@@ -32,8 +31,9 @@ public class ScreenshotService {
 	@Inject private ClientThread clientThread;
 	@Inject private ScheduledExecutorService executor;
 
-	public CompletableFuture<String> captureScreenshot() {
-		CompletableFuture<String> result = new CompletableFuture<>();
+	/** JPEG bytes of the next frame, or null when the capture failed. */
+	public CompletableFuture<byte[]> captureScreenshot() {
+		CompletableFuture<byte[]> result = new CompletableFuture<>();
 
 		clientThread.invoke(() -> {
 			Widget chat = client.getWidget(InterfaceID.Chatbox.CHATAREA);
@@ -62,7 +62,7 @@ public class ScreenshotService {
 					try {
 						BufferedImage screenshot = toBufferedImage(image);
 						screenshot = resizeIfNeeded(screenshot);
-						result.complete(compressAndEncode(screenshot));
+						result.complete(compress(screenshot));
 					} catch (Exception e) {
 						log.error("Error processing screenshot", e);
 						result.complete(null);
@@ -112,9 +112,9 @@ public class ScreenshotService {
 	}
 
 	/**
-	 * Compresses the image as JPEG and returns a base64-encoded string.
+	 * Compresses the image as JPEG.
 	 */
-	private String compressAndEncode(BufferedImage image) throws Exception {
+	private byte[] compress(BufferedImage image) throws Exception {
 		ByteArrayOutputStream baos = new ByteArrayOutputStream(65536);
 
 		ImageWriter writer = ImageIO.getImageWritersByFormatName("jpeg").next();
@@ -132,6 +132,6 @@ public class ScreenshotService {
 		byte[] bytes = baos.toByteArray();
 		log.debug("Screenshot captured: {}x{}, {} KB", image.getWidth(), image.getHeight(), bytes.length / 1024);
 
-		return Base64.getEncoder().encodeToString(bytes);
+		return bytes;
 	}
 }

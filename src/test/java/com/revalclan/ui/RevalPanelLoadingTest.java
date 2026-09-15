@@ -42,7 +42,8 @@ public class RevalPanelLoadingTest {
 		for (String tab : new String[]{"DIARY", "ACHIEVEMENTS", "EVENTS", "COMPETITIONS"}) {
 			SwingUtilities.invokeAndWait(() -> { panel.showTab(tab); panel.showTab(tab); });
 		}
-		for (String name : new String[]{"diary", "achievements", "events", "votes", "active", "scheduled"}) assertEquals(name, 1, api.count(name));
+		assertEquals(2, api.count("events"));
+		for (String name : new String[]{"diary", "achievements", "votes", "active", "scheduled"}) assertEquals(name, 1, api.count(name));
 	}
 	@Test public void publicPanelsSurviveLoginAndLogout() throws Exception {
 		SwingUtilities.invokeAndWait(() -> { panel.showTab("LEADERBOARD"); panel.showTab("RANKING"); });
@@ -65,6 +66,24 @@ public class RevalPanelLoadingTest {
 		flush();
 		SwingUtilities.invokeAndWait(() -> assertTrue(containsPrompt(panel.getCompetitionsPanel())));
 	}
+	@Test public void eventsRequireExplicitActionsAndRelogShowsReadyPrompt() throws Exception {
+		SwingUtilities.invokeAndWait(() -> panel.showTab("EVENTS"));
+		panel.onLoggedIn(); flush();
+		assertEquals(0, api.count("events"));
+		SwingUtilities.invokeAndWait(() -> assertFalse(containsPrompt(panel.getEventsPanel())));
+		SwingUtilities.invokeAndWait(() -> panel.showTab("EVENTS"));
+		api.events.accept(new Gson().fromJson("{\"status\":\"success\",\"data\":{\"events\":[{\"name\":\"Past\",\"status\":\"completed\"}]}}", EventsResponse.class));
+		flush();
+		SwingUtilities.invokeAndWait(() -> panel.showTab("EVENTS"));
+		assertEquals(2, api.count("events"));
+		panel.onLoggedOut(); panel.onLoggedIn(); flush();
+		assertEquals(2, api.count("events"));
+		SwingUtilities.invokeAndWait(() -> {
+			assertFalse(containsPrompt(panel.getEventsPanel()));
+			panel.getEventsPanel().refresh();
+		});
+		assertEquals(3, api.count("events"));
+	}
 	private static void flush() throws Exception { SwingUtilities.invokeAndWait(() -> {}); }
 	private static boolean containsPrompt(Component c) {
 		if (c instanceof LoginPrompt) return true;
@@ -74,6 +93,7 @@ public class RevalPanelLoadingTest {
 	private static class FakeApi extends RevalApiService {
 		final Map<String, Integer> calls = new HashMap<>();
 		Consumer<VotesResponse> votes;
+		Consumer<EventsResponse> events;
 		Consumer<CompetitionsResponse> active, scheduled;
 		FakeApi() { super(null, new Gson()); }
 		void called(String name) { assertTrue("Load must run on EDT", SwingUtilities.isEventDispatchThread()); calls.merge(name, 1, Integer::sum); }
@@ -84,8 +104,7 @@ public class RevalPanelLoadingTest {
 		@Override public void fetchLeaderboard(Consumer<LeaderboardResponse> ok, Consumer<Exception> err) { called("leaderboard"); }
 		@Override public void fetchDiaries(Long hash, Consumer<DiariesResponse> ok, Consumer<Exception> err) { called("diary"); }
 		@Override public void fetchAchievementDefinitions(Long hash, Consumer<AchievementsResponse> ok, Consumer<Exception> err) { called("achievements"); }
-		@Override public void fetchEvents(Consumer<EventsResponse> ok, Consumer<Exception> err) { called("events"); }
-		@Override public void refreshEvents(Consumer<EventsResponse> ok, Consumer<Exception> err) { called("events"); }
+		@Override public void fetchEvents(Consumer<EventsResponse> ok, Consumer<Exception> err) { called("events"); events = ok; }
 		@Override public void fetchVotes(Consumer<VotesResponse> ok, Consumer<Exception> err) { called("votes"); votes = ok; }
 		@Override public void fetchActiveCompetitions(Consumer<CompetitionsResponse> ok, Consumer<Exception> err) { called("active"); active = ok; }
 		@Override public void fetchScheduledCompetitions(Consumer<CompetitionsResponse> ok, Consumer<Exception> err) { called("scheduled"); scheduled = ok; }

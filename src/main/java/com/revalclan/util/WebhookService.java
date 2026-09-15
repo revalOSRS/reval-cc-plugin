@@ -9,6 +9,7 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.function.Consumer;
 import java.util.zip.GZIPOutputStream;
@@ -17,6 +18,8 @@ import java.util.zip.GZIPOutputStream;
 @Singleton
 public class WebhookService {
 	private static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
+	private static final MediaType GZIP = MediaType.parse("application/gzip");
+	private static final MediaType JPEG = MediaType.parse("image/jpeg");
 	private static final String WEBHOOK_URL = "https://api.revalosrs.ee/reval-webhook";
 
 	@Inject
@@ -31,42 +34,40 @@ public class WebhookService {
 	 * Consumer runs on the HTTP thread — do not touch the client from it.
 	 */
 	public void sendDataAsync(Map<String, Object> data, Consumer<JsonObject> onResponse) {
-		sendDataAsync(WEBHOOK_URL, data, onResponse);
+		sendDataAsync(data, null, onResponse);
 	}
 
 	/**
-	 * Sends player data to a specific webhook URL asynchronously
+	 * Async send with an optional JPEG screenshot. Without one the body is the
+	 * gzipped JSON. With one the request is multipart: the gzipped JSON in a
+	 * {@code payload} part and the image as raw bytes in a {@code screenshot}
+	 * part, which saves the third that base64 inside the JSON would add.
 	 *
-	 * @param webhookUrl The webhook endpoint URL
-	 * @param data The player data to send
+	 * @param data The event data
+	 * @param screenshotJpeg JPEG bytes, or null
 	 * @param onResponse Optional consumer for the parsed JSON response body
 	 */
-	private void sendDataAsync(String webhookUrl, Map<String, Object> data, Consumer<JsonObject> onResponse) {
-		if (webhookUrl == null || webhookUrl.trim().isEmpty()) {
-			return;
-		}
-
+	public void sendDataAsync(Map<String, Object> data, byte[] screenshotJpeg, Consumer<JsonObject> onResponse) {
 		try {
-			String json = gson.toJson(data);
-			byte[] jsonBytes = json.getBytes("UTF-8");
-			
-			ByteArrayOutputStream byteStream = new ByteArrayOutputStream();
-			try (GZIPOutputStream gzipStream = new GZIPOutputStream(byteStream)) {
-				gzipStream.write(jsonBytes);
-			}
-			byte[] compressedData = byteStream.toByteArray();
-			
-			RequestBody body = RequestBody.create(JSON, compressedData);
-			
-			Request request = new Request.Builder()
-				.url(webhookUrl)
-				.post(body)
-				.addHeader("Content-Type", "application/json")
-				.addHeader("Content-Encoding", "gzip")
-				.addHeader("User-Agent", PluginVersion.userAgent())
-				.build();
+			byte[] payload = gzip(gson.toJson(data).getBytes(StandardCharsets.UTF_8));
 
-			httpClient.newCall(request).enqueue(new Callback() {
+			Request.Builder request = new Request.Builder()
+				.url(WEBHOOK_URL)
+				.addHeader("User-Agent", PluginVersion.userAgent());
+
+			if (screenshotJpeg == null) {
+				request.post(RequestBody.create(JSON, payload))
+					.addHeader("Content-Type", "application/json")
+					.addHeader("Content-Encoding", "gzip");
+			} else {
+				request.post(new MultipartBody.Builder()
+					.setType(MultipartBody.FORM)
+					.addFormDataPart("payload", "payload.json.gz", RequestBody.create(GZIP, payload))
+					.addFormDataPart("screenshot", "screenshot.jpg", RequestBody.create(JPEG, screenshotJpeg))
+					.build());
+			}
+
+			httpClient.newCall(request.build()).enqueue(new Callback() {
 				@Override
 				public void onFailure(Call call, IOException e) {
 					log.error("Failed to send data to webhook: {}", e.getMessage());
@@ -99,6 +100,14 @@ public class WebhookService {
 		}
 	}
 
+	private static byte[] gzip(byte[] bytes) throws IOException {
+		ByteArrayOutputStream byteStream = new ByteArrayOutputStream();
+		try (GZIPOutputStream gzipStream = new GZIPOutputStream(byteStream)) {
+			gzipStream.write(bytes);
+		}
+		return byteStream.toByteArray();
+	}
+
 	private JsonObject parseJsonOrNull(Response response) {
 		try {
 			return gson.fromJson(response.body().string(), JsonObject.class);
@@ -108,4 +117,3 @@ public class WebhookService {
 		}
 	}
 }
-

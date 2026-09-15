@@ -83,25 +83,40 @@ public class EventsPanel extends JPanel {
 		cardLayout.show(cardContainer, "LEAGUES_BINGO");
 	}
 
+	private boolean memberSession;
+	private int loadGeneration;
+
+	/** Validation updates the prompt but never requests the event list. */
+	public void onLoginReady() {
+		memberSession = true;
+		loadGeneration++;
+		allEvents = new ArrayList<>();
+		buildFullUI();
+		eventsListPanel.removeAll();
+		eventsListPanel.add(new JLabel("Click Events or Refresh to load events."));
+		eventsListPanel.revalidate();
+		eventsListPanel.repaint();
+	}
+
 	public void load() {
 		loadAuthorized();
 	}
 
 	public void onLoggedOut() {
+		memberSession = false;
+		loadGeneration++;
+		allEvents = new ArrayList<>();
 		if (leaguesBingoPanel != null) leaguesBingoPanel.reset();
 		showList();
 		showNotLoggedIn();
 	}
 
 	public void refresh() {
-		if (apiService != null) {
-			refreshButton.setLoading(true);
-			apiService.refreshEvents(this::onEventsLoaded, this::onError);
-		}
+		loadAuthorized();
 	}
 
 	private void loadAuthorized() {
-		if (client == null || client.getAccountHash() == -1) {
+		if (!memberSession || client == null || client.getAccountHash() == -1) {
 			showNotLoggedIn();
 			return;
 		}
@@ -213,11 +228,13 @@ public class EventsPanel extends JPanel {
 			return;
 		}
 		showLoading();
-		apiService.fetchEvents(this::onEventsLoaded, this::onError);
+		final int generation = ++loadGeneration;
+		apiService.fetchEvents(response -> onEventsLoaded(response, generation), error -> onError(error, generation));
 	}
 
-	private void onEventsLoaded(EventsResponse response) {
+	private void onEventsLoaded(EventsResponse response, int generation) {
 		SwingUtilities.invokeLater(() -> {
+			if (generation != loadGeneration || !memberSession) return;
 			if (refreshButton != null) refreshButton.setLoading(false);
 			allEvents = response != null && response.getData() != null && response.getData().getEvents() != null
 				? response.getData().getEvents() : new ArrayList<>();
@@ -236,8 +253,9 @@ public class EventsPanel extends JPanel {
 		});
 	}
 
-	private void onError(Exception e) {
+	private void onError(Exception e, int generation) {
 		SwingUtilities.invokeLater(() -> {
+			if (generation != loadGeneration || !memberSession) return;
 			if (refreshButton != null) refreshButton.setLoading(false);
 			showError("Failed to load events: " + e.getMessage());
 		});

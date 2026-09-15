@@ -62,6 +62,7 @@ public class RevalPanel extends PluginPanel {
 	// Accessed only on the EDT. Public data survives validated login changes.
 	private final Map<String, Runnable> publicLoads = new HashMap<>();
 	private final Map<String, Runnable> memberLoads = new HashMap<>();
+	private final Map<String, Runnable> memberClickLoads = new HashMap<>();
 	private final Set<String> memberTabsLoaded = new HashSet<>();
 	private boolean clanValidated;
 
@@ -267,14 +268,16 @@ public class RevalPanel extends PluginPanel {
 		selectedTab = tabName;
 		updateNavStyles();
 		cardLayout.show(contentPanel, tabName);
-		loadSelectedTab();
+		loadSelectedTab(true);
 	}
 
-	private void loadSelectedTab() {
+	private void loadSelectedTab(boolean explicitClick) {
 		Runnable publicLoad = publicLoads.remove(selectedTab);
 		if (publicLoad != null) publicLoad.run();
 		Runnable memberLoad = memberLoads.get(selectedTab);
 		if (memberLoad != null && clanValidated && memberTabsLoaded.add(selectedTab)) memberLoad.run();
+		Runnable clickLoad = memberClickLoads.get(selectedTab);
+		if (explicitClick && clanValidated && clickLoad != null) clickLoad.run();
 	}
 
 	private void updateNavStyles() {
@@ -409,7 +412,7 @@ public class RevalPanel extends PluginPanel {
 		publicLoads.put("LEADERBOARD", leaderboardPanel::refresh);
 		memberLoads.put("ACHIEVEMENTS", achievementsPanel::refresh);
 		memberLoads.put("COMPETITIONS", competitionsPanel::refresh);
-		memberLoads.put("EVENTS", eventsPanel::load);
+		memberClickLoads.put("EVENTS", eventsPanel::load);
 		memberLoads.put("DIARY", diaryPanel::refresh);
 
 		adminManager = new AdminManager();
@@ -466,7 +469,8 @@ public class RevalPanel extends PluginPanel {
 			clanValidated = true;
 			memberTabsLoaded.clear();
 			profilePanel.refresh();
-			loadSelectedTab();
+			eventsPanel.onLoginReady();
+			loadSelectedTab(false);
 		});
 	}
 

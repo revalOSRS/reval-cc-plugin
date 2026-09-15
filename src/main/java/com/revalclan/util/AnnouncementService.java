@@ -15,7 +15,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 @Singleton
 public class AnnouncementService {
-	private static final int POLL_INTERVAL_TICKS = 500;  // ~5 minutes
+	private static final int NOTIFICATION_INTERVAL_TICKS = 1500; // ~15 minutes
+	private int notificationTicksRemaining = NOTIFICATION_INTERVAL_TICKS;
 	private static final int INITIAL_DELAY_TICKS = 5;
 
 	@Inject private ChatMessageManager chatMessageManager;
@@ -23,16 +24,17 @@ public class AnnouncementService {
 	@Inject private Client client;
 	@Inject private com.revalclan.RevalClanConfig config;
 
+	private int sessionGeneration;
 	private int tickCounter = 0;
 	private boolean initialFetchDone = false;
-	private volatile boolean announcementFetchInProgress = false;
-	private volatile boolean notificationFetchInProgress = false;
+	private boolean announcementFetchInProgress = false;
+	private boolean notificationFetchInProgress = false;
 
 	private final Set<Integer> shownBroadcastIds = new HashSet<>();
 	private final Map<Integer, Long> lastChatShownTime = new HashMap<>();
 	private final List<Announcement> cachedAnnouncements = new CopyOnWriteArrayList<>();
 
-	public void onGameTick() {
+	public synchronized void onGameTick() {
 		if (!config.showAnnouncements()) {
 			return;
 		}
@@ -50,7 +52,7 @@ public class AnnouncementService {
 			return;
 		}
 
-		if (tickCounter % POLL_INTERVAL_TICKS == 0) {
+		if (!notificationFetchInProgress && --notificationTicksRemaining <= 0) {
 			fetchNotifications();
 		}
 
@@ -62,17 +64,26 @@ public class AnnouncementService {
 			return;
 		}
 		announcementFetchInProgress = true;
+		final int generation = sessionGeneration;
 
 		revalApiService.fetchAnnouncements(
 			response -> {
-				announcementFetchInProgress = false;
-				if (response.getData() != null && response.getData().getAnnouncements() != null) {
-					cachedAnnouncements.clear();
-					cachedAnnouncements.addAll(response.getData().getAnnouncements());
-					processBroadcasts();
+				synchronized (AnnouncementService.this) {
+					if (generation != sessionGeneration) return;
+					announcementFetchInProgress = false;
+					if (response.getData() != null && response.getData().getAnnouncements() != null) {
+						cachedAnnouncements.clear();
+						cachedAnnouncements.addAll(response.getData().getAnnouncements());
+						processBroadcasts();
+					}
 				}
 			},
-			error -> announcementFetchInProgress = false
+			error -> {
+				synchronized (AnnouncementService.this) {
+					if (generation != sessionGeneration) return;
+					announcementFetchInProgress = false;
+				}
+			}
 		);
 	}
 
@@ -87,15 +98,25 @@ public class AnnouncementService {
 		}
 
 		notificationFetchInProgress = true;
+		notificationTicksRemaining = NOTIFICATION_INTERVAL_TICKS;
+		final int generation = sessionGeneration;
 		revalApiService.fetchNotifications(accountHash,
 			response -> {
-				notificationFetchInProgress = false;
-				if (response.getData() != null && response.getData().getNotifications() != null
-					&& !response.getData().getNotifications().isEmpty()) {
-					displayAndAcknowledgeNotifications(response.getData().getNotifications());
+				synchronized (AnnouncementService.this) {
+					if (generation != sessionGeneration) return;
+					notificationFetchInProgress = false;
+					if (response.getData() != null && response.getData().getNotifications() != null
+						&& !response.getData().getNotifications().isEmpty()) {
+						displayAndAcknowledgeNotifications(accountHash, response.getData().getNotifications());
+					}
 				}
 			},
-			error -> notificationFetchInProgress = false
+			error -> {
+				synchronized (AnnouncementService.this) {
+					if (generation != sessionGeneration) return;
+					notificationFetchInProgress = false;
+				}
+			}
 		);
 	}
 
@@ -137,7 +158,7 @@ public class AnnouncementService {
 		}
 	}
 
-	private void displayAndAcknowledgeNotifications(List<Notification> notifications) {
+	private void displayAndAcknowledgeNotifications(long accountHash, List<Notification> notifications) {
 		List<Integer> idsToAck = new ArrayList<>();
 
 		for (Notification notification : notifications) {
@@ -149,7 +170,7 @@ public class AnnouncementService {
 		}
 
 		if (!idsToAck.isEmpty()) {
-			revalApiService.acknowledgeNotifications(client.getAccountHash(), idsToAck,
+			revalApiService.acknowledgeNotifications(accountHash, idsToAck,
 				ackResponse -> {},
 				error -> {}
 			);
@@ -170,7 +191,9 @@ public class AnnouncementService {
 		return "<col=FFD700>[Reval]</col> " + notification.getMessage();
 	}
 
-	public void reset() {
+	public synchronized void reset() {
+		sessionGeneration++;
+		notificationTicksRemaining = NOTIFICATION_INTERVAL_TICKS;
 		tickCounter = 0;
 		initialFetchDone = false;
 		announcementFetchInProgress = false;
