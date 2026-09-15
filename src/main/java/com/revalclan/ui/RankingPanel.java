@@ -87,7 +87,9 @@ public class RankingPanel extends JPanel {
 		this.rankIconResolver = rankIconResolver;
 	}
 
-	public void loadOnOpen() { loadData(); }
+	public void load() {
+		loadData();
+	}
 
 	public void refresh() {
 		if (apiService != null) {

@@ -64,8 +64,7 @@ public class DiaryPanel extends JPanel {
 		showNotLoggedIn();
 	}
 
-	public void onLoggedIn() { loadData(); }
-	public void onLoggedOut() { SwingUtilities.invokeLater(this::showNotLoggedIn); }
+	public void onLoggedOut() { showNotLoggedIn(); }
 	public void refresh() { loadData(); }
 
 	private void loadData() {
