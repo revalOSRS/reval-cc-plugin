@@ -1,7 +1,7 @@
 package com.revalclan.notifiers;
 
 import com.revalclan.session.SessionTracker;
-import com.revalclan.util.RaidParty;
+import com.revalclan.util.RaidPartyTracker;
 import net.runelite.api.Item;
 import net.runelite.api.ItemComposition;
 import net.runelite.api.ItemContainer;
@@ -31,6 +31,9 @@ import java.util.regex.Pattern;
 public class LootNotifier extends BaseNotifier {
 	@Inject
 	private SessionTracker sessionTracker;
+
+	@Inject
+	private RaidPartyTracker raidPartyTracker;
 
 	private static final Pattern COLLECTION_LOG_PATTERN = Pattern.compile(
 		"New item added to your collection log: (?<item>.+)",
@@ -329,8 +332,9 @@ public class LootNotifier extends BaseNotifier {
 		// moons (Moons of Peril), barrows chests, gauntlet chests, and other special content
 		if (event.getType() == LootRecordType.EVENT || event.getType() == LootRecordType.PICKPOCKET) {
 			String source = event.getName();
-			// For raid chests (CoX / ToB / ToA) attach the party members present
-			handleLootDrop(event.getItems(), source, "EVENT", null, RaidParty.getMembers(client, source));
+			// For raid chests (CoX / ToB / ToA) attach the party: read live inside the raid,
+			// or as saved at the final boss when the reward is claimed from the outside chest
+			handleLootDrop(event.getItems(), source, "EVENT", null, raidPartyTracker.partyFor(source));
 		}
 		// Handle special NPCs that fire LootReceived instead of NpcLootReceived
 		else if (event.getType() == LootRecordType.NPC && SPECIAL_LOOT_NPC_NAMES.contains(event.getName())) {
@@ -674,15 +678,16 @@ public class LootNotifier extends BaseNotifier {
 		handleLootDrop(items, source, sourceType, sourceId, null, false);
 	}
 
-	private void handleLootDrop(Collection<ItemStack> items, String source, String sourceType, Integer sourceId, List<String> partyMembers) {
-		handleLootDrop(items, source, sourceType, sourceId, partyMembers, false);
+	private void handleLootDrop(Collection<ItemStack> items, String source, String sourceType, Integer sourceId, RaidPartyTracker.Party party) {
+		handleLootDrop(items, source, sourceType, sourceId, party, false);
 	}
 
 	/**
+	 * @param party   the raid party behind a raid chest, or null
 	 * @param keepAll send every item regardless of value: the backend asked to watch
 	 *                the container this came out of, so it wants the whole yield.
 	 */
-	private void handleLootDrop(Collection<ItemStack> items, String source, String sourceType, Integer sourceId, List<String> partyMembers, boolean keepAll) {
+	private void handleLootDrop(Collection<ItemStack> items, String source, String sourceType, Integer sourceId, RaidPartyTracker.Party party, boolean keepAll) {
 		// Get dynamic filters
 		long minLootValue = filterManager.getFilters().getLootMinValue();
 		Set<Integer> whitelistItemIds = filterManager.getFilters().getLootWhitelist();
@@ -741,8 +746,8 @@ public class LootNotifier extends BaseNotifier {
 		if (sourceId != null) {
 			lootData.put("sourceId", sourceId);
 		}
-		if (partyMembers != null) {
-			lootData.put("partyMembers", partyMembers);
+		if (party != null) {
+			party.addTo(lootData);
 		}
 		lootData.put("totalGEValue", totalGEValue);
 		lootData.put("totalHAValue", totalHAValue);
