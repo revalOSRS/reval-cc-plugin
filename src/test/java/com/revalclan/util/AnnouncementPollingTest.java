@@ -15,7 +15,7 @@ import java.util.function.Consumer;
 import static org.junit.Assert.*;
 
 public class AnnouncementPollingTest {
-	@Test public void backsOffAndIgnoresPreviousLoginResponses() throws Exception {
+	@Test public void pollsEveryFifteenMinutesAndIgnoresPreviousLoginResponses() throws Exception {
 		AnnouncementService service = new AnnouncementService();
 		FakeApi api = new FakeApi();
 		inject(service, "revalApiService", api);
@@ -27,14 +27,14 @@ public class AnnouncementPollingTest {
 		ticks(service, 1); assertEquals(1, api.responses.size());
 		NotificationsResponse empty = new Gson().fromJson("{\"status\":\"success\",\"data\":{\"notifications\":[]}}", NotificationsResponse.class);
 		api.responses.get(0).accept(empty);
-		ticks(service, 999); assertEquals(1, api.responses.size());
+		ticks(service, 1499); assertEquals(1, api.responses.size());
 		ticks(service, 1); assertEquals(2, api.responses.size());
 		ticks(service, 2000); assertEquals(2, api.responses.size()); // No overlapping request.
 		service.reset(); ticks(service, 5); assertEquals(3, api.responses.size());
 		api.responses.get(1).accept(empty); // Old callback must not complete the new request.
 		ticks(service, 2000); assertEquals(3, api.responses.size());
 		api.errors.get(2).accept(new Exception("Unavailable"));
-		ticks(service, 499); assertEquals(3, api.responses.size());
+		ticks(service, 1499); assertEquals(3, api.responses.size());
 		ticks(service, 1); assertEquals(4, api.responses.size());
 	}
 	private static void ticks(AnnouncementService service, int count) { for (int i = 0; i < count; i++) service.onGameTick(); }

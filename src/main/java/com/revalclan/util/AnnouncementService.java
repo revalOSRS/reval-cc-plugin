@@ -15,7 +15,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 @Singleton
 public class AnnouncementService {
-	private final NotificationPollBackoff notificationPoll = new NotificationPollBackoff();
+	private static final int NOTIFICATION_INTERVAL_TICKS = 1500; // ~15 minutes
+	private int notificationTicksRemaining = NOTIFICATION_INTERVAL_TICKS;
 	private static final int INITIAL_DELAY_TICKS = 5;
 
 	@Inject private ChatMessageManager chatMessageManager;
@@ -51,7 +52,7 @@ public class AnnouncementService {
 			return;
 		}
 
-		if (!notificationFetchInProgress && notificationPoll.tick()) {
+		if (!notificationFetchInProgress && --notificationTicksRemaining <= 0) {
 			fetchNotifications();
 		}
 
@@ -97,14 +98,13 @@ public class AnnouncementService {
 		}
 
 		notificationFetchInProgress = true;
+		notificationTicksRemaining = NOTIFICATION_INTERVAL_TICKS;
 		final int generation = sessionGeneration;
 		revalApiService.fetchNotifications(accountHash,
 			response -> {
 				synchronized (AnnouncementService.this) {
 					if (generation != sessionGeneration) return;
 					notificationFetchInProgress = false;
-					notificationPoll.completed(response.getData() != null && response.getData().getNotifications() != null
-						&& response.getData().getNotifications().isEmpty());
 					if (response.getData() != null && response.getData().getNotifications() != null
 						&& !response.getData().getNotifications().isEmpty()) {
 						displayAndAcknowledgeNotifications(accountHash, response.getData().getNotifications());
@@ -114,7 +114,6 @@ public class AnnouncementService {
 			error -> {
 				synchronized (AnnouncementService.this) {
 					if (generation != sessionGeneration) return;
-					notificationPoll.completed(false);
 					notificationFetchInProgress = false;
 				}
 			}
@@ -194,7 +193,7 @@ public class AnnouncementService {
 
 	public synchronized void reset() {
 		sessionGeneration++;
-		notificationPoll.reset();
+		notificationTicksRemaining = NOTIFICATION_INTERVAL_TICKS;
 		tickCounter = 0;
 		initialFetchDone = false;
 		announcementFetchInProgress = false;
