@@ -7,6 +7,7 @@ import com.revalclan.util.ClanMembership;
 import com.revalclan.util.WebhookService;
 import com.revalclan.util.Worlds;
 import lombok.extern.slf4j.Slf4j;
+import lombok.Setter;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.Skill;
@@ -16,6 +17,7 @@ import net.runelite.client.callback.ClientThread;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import java.util.function.Consumer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -73,11 +75,11 @@ public class SessionTracker {
 	@Inject private SessionStore store;
 	@Inject private ClanMembership membership;
 
+	@Setter private Consumer<JsonObject> onHeartbeatResponse;
 	private boolean active = false;
 	private boolean dirty = false;
 	private int ticksSincePersist = 0;
 	private int ticksSinceHeartbeat = 0;
-	private boolean heartbeatRejected = false;
 
 	private String sessionId;
 	private long startedAtMs;
@@ -146,12 +148,15 @@ public class SessionTracker {
 	public void cutForHop() {
 		if (!active) return;
 		PersistedSession persisted = persist(buildSummary("hop", touch()));
-		reset();
+		// Frequent world hops must not postpone configuration checks indefinitely.
+		active = false;
+		resetState();
 		if (persisted.member) send(persisted);
 	}
 
 	/** In-memory only — a persisted session replays as 'recovered' later. */
 	public void reset() {
+		ticksSinceHeartbeat = 0;
 		active = false;
 		resetState();
 	}
@@ -184,7 +189,8 @@ public class SessionTracker {
 			persist(buildSummary("recovered", touch()));
 		}
 
-		if (!heartbeatRejected && ++ticksSinceHeartbeat >= HEARTBEAT_INTERVAL_TICKS) {
+		// Keep checking changes even when this world is ineligible for session storage.
+		if (++ticksSinceHeartbeat >= HEARTBEAT_INTERVAL_TICKS) {
 			ticksSinceHeartbeat = 0;
 			if (membership.isMember()) sendHeartbeat();
 		}
@@ -283,12 +289,12 @@ public class SessionTracker {
 		Map<String, Object> payload = envelope("SESSION_HEARTBEAT", username, accountHash, world, worldFlags);
 		payload.put("sessionSummary", buildSummary(null, touch()));
 		String id = sessionId;
+		Consumer<JsonObject> changeHandler = onHeartbeatResponse;
 		log.info("Session {} heartbeat after {} min", id, (lastUpdateMs - startedAtMs) / 60000);
 		webhookService.sendDataAsync(payload, response -> {
-			// A heartbeat never drops the local copy; 'rejected' (untracked world) just stops the beat
-			if (!"rejected".equals(storedOutcome(response))) return;
 			clientThread.invokeLater(() -> {
-				if (id.equals(sessionId)) heartbeatRejected = true;
+				if (!active || !id.equals(sessionId)) return;
+				if (changeHandler != null) changeHandler.accept(response);
 			});
 		});
 	}
@@ -338,8 +344,6 @@ public class SessionTracker {
 		countersEnd = null;
 		dirty = false;
 		ticksSincePersist = 0;
-		ticksSinceHeartbeat = 0;
-		heartbeatRejected = false;
 	}
 
 	/** Refresh the end snapshot and the last-update time; returns the latter. */

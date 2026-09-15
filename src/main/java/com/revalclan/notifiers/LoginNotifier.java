@@ -7,6 +7,8 @@ import com.revalclan.PlayerDataCollector;
 import com.revalclan.util.SyncStateManager;
 
 import java.util.Map;
+import java.util.function.Consumer;
+import com.google.gson.JsonObject;
 
 /**
  * Sends the LOGIN boundary payload (full or slim depending on the fingerprint).
@@ -32,8 +34,12 @@ public class LoginNotifier extends BaseNotifier {
 	/**
 	 * Called when the player logs in.
 	 */
-	public void onLogin() {
+	public void onLogin(Consumer<JsonObject> onChanges) {
 		Map<String, Object> data = dataCollector.collectBoundaryData();
-		sendNotification(data, syncStateManager.ackHandler(client.getAccountHash()));
+		Consumer<JsonObject> ack = syncStateManager.ackHandler(client.getAccountHash());
+		sendNotification(data, response -> {
+			ack.accept(response);
+			onChanges.accept(response);
+		});
 	}
 }

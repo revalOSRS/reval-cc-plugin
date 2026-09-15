@@ -24,8 +24,10 @@ import com.revalclan.util.SyncStateManager;
 import com.revalclan.util.UIAssetLoader;
 import com.revalclan.util.Worlds;
 import com.google.inject.Provides;
+import com.google.gson.JsonObject;
 
 import java.awt.image.BufferedImage;
+import java.util.function.Consumer;
 import java.util.regex.Pattern;
 
 import javax.inject.Inject;
@@ -154,9 +156,7 @@ public class RevalClanPlugin extends Plugin {
 	private boolean wasLoggedIn = false;
 	private boolean pendingLoginNotification = false;
 
-	/** Refetch event filters every ~10 minutes so activated events propagate without a relog */
-	private static final int FILTER_REFETCH_INTERVAL_TICKS = 1000;
-	private int filterRefetchTicks = 0;
+	private int loginGeneration;
 
 	private static final Pattern COL_OPEN = Pattern.compile("<col=[0-9a-fA-F]+>");
 	private static final Pattern COL_CLOSE = Pattern.compile("</col>");
@@ -232,6 +232,8 @@ public class RevalClanPlugin extends Plugin {
 
 	@Override
 	protected void shutDown() throws Exception {
+		loginGeneration++;
+		eventFilterManager.resetSession();
 		log.info("Reval Clan plugin stopped!");
 		clanMembership.reset();
 		wasLoggedIn = false;
@@ -291,6 +293,8 @@ public class RevalClanPlugin extends Plugin {
 				break;
 
 			case LOGIN_SCREEN: {
+				loginGeneration++;
+				eventFilterManager.resetSession();
 				revalApiService.resetEventsSession();
 				boolean wasInClan = clanMembership.isMember();
 				clanMembership.reset();
@@ -325,6 +329,8 @@ public class RevalClanPlugin extends Plugin {
 
 	/** Fresh login (or plugin enabled while logged in): LOGIN goes out once membership is proven on a tick. */
 	private void onLoggedIn() {
+		loginGeneration++;
+		eventFilterManager.resetSession();
 		wasLoggedIn = true;
 		collectionLogManager.clearObtainedItems();
 		pendingLoginNotification = true;
@@ -341,6 +347,7 @@ public class RevalClanPlugin extends Plugin {
 	private void onClanValidated() {
 		eventFilterManager.setOnFiltersApplied(varbitNotifier::syncBaselines);
 		eventFilterManager.fetchFiltersAsync();
+		sessionTracker.setOnHeartbeatResponse(changeHandler());
 
 		// Fetch leagues config if on a seasonal world
 		if (Worlds.isSeasonal(client)) {
@@ -350,7 +357,7 @@ public class RevalClanPlugin extends Plugin {
 
 		if (pendingLoginNotification) {
 			pendingLoginNotification = false;
-			loginNotifier.onLogin();
+			loginNotifier.onLogin(changeHandler());
 		}
 
 		// This account is a member: its sessions recorded before we knew can go out now
@@ -359,6 +366,24 @@ public class RevalClanPlugin extends Plugin {
 		if (revalPanel != null) {
 			revalPanel.onLoggedIn();
 		}
+	}
+
+	private Consumer<JsonObject> changeHandler() {
+		final int generation = loginGeneration;
+		return response -> clientThread.invokeLater(() -> {
+			if (generation != loginGeneration || !wasLoggedIn || !clanMembership.isMember()) return;
+			JsonObject changes = response != null && response.has("changes") && response.get("changes").isJsonObject()
+				? response.getAsJsonObject("changes") : null;
+			eventFilterManager.onServerVersion(changeVersion(changes, "filters"));
+			announcementService.onServerVersion(changeVersion(changes, "notifications"));
+		});
+	}
+
+	private static String changeVersion(JsonObject changes, String key) {
+		if (changes == null || !changes.has(key) || !changes.get(key).isJsonPrimitive()
+			|| !changes.get(key).getAsJsonPrimitive().isString()) return null;
+		String value = changes.get(key).getAsString();
+		return value.isEmpty() ? null : value;
 	}
 
 	@Subscribe
@@ -381,11 +406,7 @@ public class RevalClanPlugin extends Plugin {
 		leaguesNotifier.onGameTick();
 		leaguesSyncNotifier.onGameTick();
 
-		// Activated events change the server-derived whitelists; refetch so a relog isn't needed
-		if (++filterRefetchTicks >= FILTER_REFETCH_INTERVAL_TICKS) {
-			filterRefetchTicks = 0;
-			eventFilterManager.fetchFiltersAsync();
-		}
+		eventFilterManager.onGameTick();
 
 		// Server flagged our fingerprint stale — repair with a full sync. Polled
 		// here (not invokeLater from the ack) because a stale ack can arrive on a

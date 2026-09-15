@@ -15,7 +15,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 @Singleton
 public class AnnouncementService {
-	private static final int NOTIFICATION_INTERVAL_TICKS = 1500; // ~15 minutes
+	private static final int NOTIFICATION_INTERVAL_TICKS = 6000; // ~60 minutes; login and heartbeat hints fetch sooner.
 	private int notificationTicksRemaining = NOTIFICATION_INTERVAL_TICKS;
 	private static final int INITIAL_DELAY_TICKS = 5;
 
@@ -25,6 +25,7 @@ public class AnnouncementService {
 	@Inject private com.revalclan.RevalClanConfig config;
 
 	private int sessionGeneration;
+	private String appliedNotificationVersion;
 	private int tickCounter = 0;
 	private boolean initialFetchDone = false;
 	private boolean announcementFetchInProgress = false;
@@ -57,6 +58,12 @@ public class AnnouncementService {
 		}
 
 		processChatAnnouncements();
+	}
+
+	/** Called on the client thread after a current login/heartbeat response. */
+	public synchronized void onServerVersion(String version) {
+		if (config.showAnnouncements() && initialFetchDone
+			&& (version == null || !version.equals(appliedNotificationVersion))) fetchNotifications();
 	}
 
 	private void fetchAnnouncements() {
@@ -105,6 +112,11 @@ public class AnnouncementService {
 				synchronized (AnnouncementService.this) {
 					if (generation != sessionGeneration) return;
 					notificationFetchInProgress = false;
+					if (response.getData() != null && response.getData().getNotifications() != null) {
+						appliedNotificationVersion = response.getData().getVersion();
+					} else {
+						notificationTicksRemaining = 100;
+					}
 					if (response.getData() != null && response.getData().getNotifications() != null
 						&& !response.getData().getNotifications().isEmpty()) {
 						displayAndAcknowledgeNotifications(accountHash, response.getData().getNotifications());
@@ -115,6 +127,7 @@ public class AnnouncementService {
 				synchronized (AnnouncementService.this) {
 					if (generation != sessionGeneration) return;
 					notificationFetchInProgress = false;
+					notificationTicksRemaining = 100;
 				}
 			}
 		);
@@ -193,6 +206,7 @@ public class AnnouncementService {
 
 	public synchronized void reset() {
 		sessionGeneration++;
+		appliedNotificationVersion = null;
 		notificationTicksRemaining = NOTIFICATION_INTERVAL_TICKS;
 		tickCounter = 0;
 		initialFetchDone = false;

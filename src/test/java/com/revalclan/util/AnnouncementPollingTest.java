@@ -15,7 +15,7 @@ import java.util.function.Consumer;
 import static org.junit.Assert.*;
 
 public class AnnouncementPollingTest {
-	@Test public void pollsEveryFifteenMinutesAndIgnoresPreviousLoginResponses() throws Exception {
+	@Test public void pollsHourlyAndIgnoresPreviousLoginResponses() throws Exception {
 		AnnouncementService service = new AnnouncementService();
 		FakeApi api = new FakeApi();
 		inject(service, "revalApiService", api);
@@ -27,15 +27,27 @@ public class AnnouncementPollingTest {
 		ticks(service, 1); assertEquals(1, api.responses.size());
 		NotificationsResponse empty = new Gson().fromJson("{\"status\":\"success\",\"data\":{\"notifications\":[]}}", NotificationsResponse.class);
 		api.responses.get(0).accept(empty);
-		ticks(service, 1499); assertEquals(1, api.responses.size());
-		ticks(service, 1); assertEquals(2, api.responses.size());
-		ticks(service, 2000); assertEquals(2, api.responses.size()); // No overlapping request.
-		service.reset(); ticks(service, 5); assertEquals(3, api.responses.size());
-		api.responses.get(1).accept(empty); // Old callback must not complete the new request.
-		ticks(service, 2000); assertEquals(3, api.responses.size());
-		api.errors.get(2).accept(new Exception("Unavailable"));
-		ticks(service, 1499); assertEquals(3, api.responses.size());
-		ticks(service, 1); assertEquals(4, api.responses.size());
+		// No marker was acknowledged, so a heartbeat retries; matching successful versions do not.
+		service.onServerVersion("v1"); assertEquals(2, api.responses.size());
+		NotificationsResponse versioned = new Gson().fromJson("{\"status\":\"success\",\"data\":{\"version\":\"v1\",\"notifications\":[]}}", NotificationsResponse.class);
+		api.responses.get(1).accept(versioned);
+		service.onServerVersion("v1"); assertEquals(2, api.responses.size());
+		service.onServerVersion("v2"); assertEquals(3, api.responses.size());
+		api.errors.get(2).accept(new Exception("retry"));
+		service.onServerVersion("v2"); assertEquals(4, api.responses.size());
+		api.responses.get(3).accept(versioned);
+		api.responses.clear(); api.errors.clear();
+		// Reset counts only; the service still has a successful fetch and a full hourly timeout.
+
+		ticks(service, 5999); assertEquals(0, api.responses.size());
+		ticks(service, 1); assertEquals(1, api.responses.size());
+		ticks(service, 7000); assertEquals(1, api.responses.size()); // No overlapping request.
+		service.reset(); ticks(service, 5); assertEquals(2, api.responses.size());
+		api.responses.get(0).accept(empty); // Old callback must not complete the new request.
+		ticks(service, 7000); assertEquals(2, api.responses.size());
+		api.errors.get(1).accept(new Exception("Unavailable"));
+		ticks(service, 99); assertEquals(2, api.responses.size());
+		ticks(service, 1); assertEquals(3, api.responses.size());
 	}
 	private static void ticks(AnnouncementService service, int count) { for (int i = 0; i < count; i++) service.onGameTick(); }
 	private static void inject(Object target, String name, Object value) throws Exception {
