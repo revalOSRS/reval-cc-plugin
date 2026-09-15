@@ -6,7 +6,6 @@ import com.revalclan.collectionlog.CollectionLogManager;
 import com.revalclan.collectionlog.CollectionLogSyncButton;
 import com.revalclan.collectionlog.SyncGuide;
 import com.revalclan.collectionlog.SyncGuideOverlay;
-import com.revalclan.events.RegistrationMarks;
 import com.revalclan.events.RegistrationMarksOverlay;
 import com.revalclan.playercards.PlayerCardManager;
 import com.revalclan.playercards.PlayerCardOverlay;
@@ -74,7 +73,6 @@ public class RevalClanPlugin extends Plugin {
 	@Inject	private SyncGuide syncGuide;
 	@Inject	private SyncGuideOverlay syncGuideOverlay;
 	@Inject	private ClanTeamColors clanTeamColors;
-	@Inject	private RegistrationMarks registrationMarks;
 	@Inject	private RegistrationMarksOverlay registrationMarksOverlay;
 	@Inject	private PlayerCardManager playerCardManager;
 	@Inject	private PlayerCardOverlay playerCardOverlay;
@@ -197,8 +195,6 @@ public class RevalClanPlugin extends Plugin {
 		eventBus.register(clogPersonalBestCapture);
 		eventBus.register(clanTeamColors);
 		clanTeamColors.startUp();
-		eventBus.register(registrationMarks);
-		registrationMarks.startUp();
 		overlayManager.add(registrationMarksOverlay);
 		eventBus.register(playerCardManager);
 		overlayManager.add(playerCardOverlay);
@@ -251,7 +247,7 @@ public class RevalClanPlugin extends Plugin {
 		eventBus.unregister(clogPersonalBestCapture);
 		eventBus.unregister(clanTeamColors);
 		clanTeamColors.shutDown();
-		eventBus.unregister(registrationMarks);
+		revalApiService.resetEventsSession();
 		overlayManager.remove(registrationMarksOverlay);
 		eventBus.unregister(playerCardManager);
 		playerCardManager.shutDown();
@@ -295,6 +291,7 @@ public class RevalClanPlugin extends Plugin {
 				break;
 
 			case LOGIN_SCREEN: {
+				revalApiService.resetEventsSession();
 				boolean wasInClan = clanMembership.isMember();
 				clanMembership.reset();
 				pendingLoginNotification = false;
