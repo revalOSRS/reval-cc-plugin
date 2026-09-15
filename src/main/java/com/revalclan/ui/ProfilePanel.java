@@ -170,22 +170,18 @@ public class ProfilePanel extends JPanel {
 		if (isLoading) return;
 		isLoading = true;
 		showLoading();
+		if (pointsData == null) fetchRanks();
 
 		apiService.fetchAccount(accountHash,
 			response -> {
 				isLoading = false;
 				SwingUtilities.invokeLater(() -> {
 					currentAccount = response.getData();
-					if (currentAccount != null && currentAccount.getPointsConfig() != null) {
-						pointsData = currentAccount.getPointsConfig();
-						ranks = pointsData.getRanks();
-					}
 					if (currentAccount != null) {
 						pointsLog = currentAccount.getPointsLog();
 						if (onAccountLoaded != null) onAccountLoaded.accept(currentAccount);
 					}
 					if (pointsData != null) buildProfile();
-					if (ranks == null || ranks.isEmpty() || pointsData == null) fetchRanks();
 				});
 			},
 			error -> {
@@ -199,6 +195,7 @@ public class ProfilePanel extends JPanel {
 		if (isLoading) return;
 		isLoading = true;
 		showLoading();
+		if (pointsData == null) fetchRanks();
 
 		apiService.fetchAccountById(osrsAccountId,
 			response -> {
@@ -207,7 +204,6 @@ public class ProfilePanel extends JPanel {
 					currentAccount = response.getData();
 					if (currentAccount != null) pointsLog = currentAccount.getPointsLog();
 					if (pointsData != null) buildProfile();
-					if (ranks == null || ranks.isEmpty() || pointsData == null) fetchRanks();
 				});
 			},
 			error -> {
