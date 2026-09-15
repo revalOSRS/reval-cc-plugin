@@ -9,7 +9,6 @@ import com.revalclan.ui.admin.PendingRankupsPanel;
 import com.revalclan.ui.components.AdminButton;
 import com.revalclan.ui.components.Clickable;
 import com.revalclan.ui.components.GradientSeparator;
-import com.revalclan.ui.components.IndicatorTabButton;
 import com.revalclan.ui.components.PanelTitle;
 import com.revalclan.ui.constants.UIConstants;
 import com.revalclan.util.ClanRankIconResolver;
@@ -28,6 +27,10 @@ import net.runelite.client.util.LinkBrowser;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 
 public class RevalPanel extends PluginPanel {
 	private static final String DISCORD_URL = "https://discord.gg/reval";
@@ -50,12 +53,17 @@ public class RevalPanel extends PluginPanel {
 	@Getter private AdminButton adminButton;
 
 	private JButton profileTab;
-	private IndicatorTabButton eventsTab;
+	private JButton eventsTab;
 	private JButton leaderboardTab;
 	private JButton achievementsTab;
-	private IndicatorTabButton competitionsTab;
+	private JButton competitionsTab;
 	private JButton diaryTab;
 	private String selectedTab = "PROFILE";
+	// Accessed only on the EDT. Public data survives validated login changes.
+	private final Map<String, Runnable> publicLoads = new HashMap<>();
+	private final Map<String, Runnable> memberLoads = new HashMap<>();
+	private final Set<String> memberTabsLoaded = new HashSet<>();
+	private boolean clanValidated;
 
 	// Admin
 	private AdminManager adminManager;
@@ -136,7 +144,7 @@ public class RevalPanel extends PluginPanel {
 		row2.setOpaque(false);
 		row2.setMaximumSize(new Dimension(Integer.MAX_VALUE, 28));
 
-		eventsTab = createIndicatorTabButton("Events");
+		eventsTab = createTabButton("Events");
 		eventsTab.setMaximumSize(new Dimension(Integer.MAX_VALUE, 28));
 		eventsTab.addActionListener(e -> selectTab("EVENTS"));
 
@@ -149,7 +157,7 @@ public class RevalPanel extends PluginPanel {
 		leaderboardTab.setToolTipText("Leaderboard");
 		leaderboardTab.addActionListener(e -> selectTab("LEADERBOARD"));
 
-		competitionsTab = createIndicatorTabButton("Competitions");
+		competitionsTab = createTabButton("Competitions");
 		competitionsTab.setMaximumSize(new Dimension(Integer.MAX_VALUE, 28));
 		competitionsTab.addActionListener(e -> selectTab("COMPETITIONS"));
 
@@ -188,15 +196,6 @@ public class RevalPanel extends PluginPanel {
 		return btn;
 	}
 
-	private IndicatorTabButton createIndicatorTabButton(String text) {
-		IndicatorTabButton btn = new IndicatorTabButton(text);
-		btn.setFont(FontManager.getRunescapeSmallFont());
-		btn.setFocusPainted(false);
-		btn.setBorderPainted(false);
-		btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-		btn.setPreferredSize(new Dimension(0, 28));
-		return btn;
-	}
 
 	private JPanel createHeader() {
 		JPanel header = new JPanel(new BorderLayout());
@@ -268,6 +267,14 @@ public class RevalPanel extends PluginPanel {
 		selectedTab = tabName;
 		updateNavStyles();
 		cardLayout.show(contentPanel, tabName);
+		loadSelectedTab();
+	}
+
+	private void loadSelectedTab() {
+		Runnable publicLoad = publicLoads.remove(selectedTab);
+		if (publicLoad != null) publicLoad.run();
+		Runnable memberLoad = memberLoads.get(selectedTab);
+		if (memberLoad != null && clanValidated && memberTabsLoaded.add(selectedTab)) memberLoad.run();
 	}
 
 	private void updateNavStyles() {
@@ -398,9 +405,12 @@ public class RevalPanel extends PluginPanel {
 		competitionsPanel.init(apiService, client);
 		eventsPanel.init(apiService, client);
 		diaryPanel.init(apiService, client, assetLoader);
-		// Wire up tab indicator callbacks
-		eventsPanel.setOnIndicatorUpdate(this::setEventsIndicator);
-		competitionsPanel.setOnIndicatorUpdate(this::setCompetitionsIndicator);
+		publicLoads.put("RANKING", rankingPanel::load);
+		publicLoads.put("LEADERBOARD", leaderboardPanel::refresh);
+		memberLoads.put("ACHIEVEMENTS", achievementsPanel::refresh);
+		memberLoads.put("COMPETITIONS", competitionsPanel::refresh);
+		memberLoads.put("EVENTS", eventsPanel::load);
+		memberLoads.put("DIARY", diaryPanel::refresh);
 
 		adminManager = new AdminManager();
 
@@ -452,35 +462,24 @@ public class RevalPanel extends PluginPanel {
 	// ==================== Lifecycle ====================
 
 	public void onLoggedIn() {
-		profilePanel.refresh();
-		achievementsPanel.onLoggedIn();
-		competitionsPanel.refresh();
-		eventsPanel.onLoggedIn();
-		diaryPanel.onLoggedIn();
+		SwingUtilities.invokeLater(() -> {
+			clanValidated = true;
+			memberTabsLoaded.clear();
+			profilePanel.refresh();
+			loadSelectedTab();
+		});
 	}
 
 	public void onLoggedOut() {
-		profilePanel.onLoggedOut();
-		achievementsPanel.onLoggedOut();
-		eventsPanel.onLoggedOut();
-		diaryPanel.onLoggedOut();
-		if (adminButton != null) adminButton.setAdmin(false);
-
-		setEventsIndicator(false);
+		SwingUtilities.invokeLater(() -> {
+			clanValidated = false;
+			memberTabsLoaded.clear();
+			competitionsPanel.onLoggedOut();
+			profilePanel.onLoggedOut();
+			achievementsPanel.onLoggedOut();
+			eventsPanel.onLoggedOut();
+			diaryPanel.onLoggedOut();
+			if (adminButton != null) adminButton.setAdmin(false);
+		});
 	}
-
-	// ==================== Tab Indicators ====================
-
-	public void setEventsIndicator(boolean active) {
-		if (eventsTab != null) {
-			eventsTab.setIndicator(active, UIConstants.ACCENT_GREEN);
-		}
-	}
-
-	public void setCompetitionsIndicator(boolean active) {
-		if (competitionsTab != null) {
-			competitionsTab.setIndicator(active, UIConstants.ACCENT_GOLD);
-		}
-	}
-
 }

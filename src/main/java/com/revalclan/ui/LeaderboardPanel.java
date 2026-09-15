@@ -129,7 +129,6 @@ public class LeaderboardPanel extends JPanel {
 		this.apiService = apiService;
 		this.assetLoader = assetLoader;
 		this.itemManager = itemManager;
-		loadLeaderboard();
 	}
 
 	public void refresh() {
