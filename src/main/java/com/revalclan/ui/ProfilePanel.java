@@ -176,10 +176,10 @@ public class ProfilePanel extends JPanel {
 				isLoading = false;
 				SwingUtilities.invokeLater(() -> {
 					currentAccount = response.getData();
-                    if (currentAccount != null && currentAccount.getPointsConfig() != null) {
-                        pointsData = currentAccount.getPointsConfig();
-                        ranks = pointsData.getRanks();
-                    }
+					if (currentAccount != null && currentAccount.getPointsConfig() != null) {
+						pointsData = currentAccount.getPointsConfig();
+						ranks = pointsData.getRanks();
+					}
 					if (currentAccount != null) {
 						pointsLog = currentAccount.getPointsLog();
 						if (onAccountLoaded != null) onAccountLoaded.accept(currentAccount);
