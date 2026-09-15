@@ -85,6 +85,9 @@ public class RankingPanel extends JPanel {
 		this.itemManager = itemManager;
 		this.spriteManager = spriteManager;
 		this.rankIconResolver = rankIconResolver;
+	}
+
+	public void load() {
 		loadData();
 	}
 

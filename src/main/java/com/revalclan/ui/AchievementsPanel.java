@@ -59,12 +59,8 @@ public class AchievementsPanel extends JPanel {
 		this.client = client;
 	}
 
-	public void onLoggedIn() {
-		loadData();
-	}
-
 	public void onLoggedOut() {
-		SwingUtilities.invokeLater(this::showNotLoggedIn);
+		showNotLoggedIn();
 	}
 
 	public void refresh() {
