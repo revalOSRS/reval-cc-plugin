@@ -1,12 +1,12 @@
 package com.revalclan.notifiers;
 
-import com.revalclan.util.RaidParty;
+import com.revalclan.util.RaidPartyTracker;
 import lombok.extern.slf4j.Slf4j;
 
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.time.Duration;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -36,11 +36,14 @@ public class KillCountNotifier extends BaseNotifier {
 		Pattern.CASE_INSENSITIVE
 	);
 
+	@Inject
+	private RaidPartyTracker raidPartyTracker;
+
 	private String pendingBoss = null;
 	private Integer pendingCount = null;
 	private Duration pendingTime = null;
 	private boolean pendingIsPb = false;
-	private List<String> pendingParty = null;
+	private RaidPartyTracker.Party pendingParty = null;
 	private int badTicks = 0;
 	private static final int MAX_BAD_TICKS = 10;
 
@@ -119,9 +122,9 @@ public class KillCountNotifier extends BaseNotifier {
 					int count = Integer.parseInt(countStr);
 					pendingBoss = boss;
 					pendingCount = count;
-					// Capture the raid party (CoX widget, ToB/ToA varcs) while it is
+					// Capture the raid party (CoX side panel, ToB/ToA varcs) while it is
 					// still populated; includes the local player
-					pendingParty = RaidParty.getMembers(client, boss);
+					pendingParty = raidPartyTracker.partyFor(boss);
 					badTicks = 0;
 				} catch (NumberFormatException e) {
 					log.debug("Failed to parse kill count: {}", countStr);
@@ -256,7 +259,7 @@ public class KillCountNotifier extends BaseNotifier {
 		}
 
 		if (pendingParty != null) {
-			kcData.put("partyMembers", pendingParty);
+			pendingParty.addTo(kcData);
 		}
 
 		sendNotification(kcData);
