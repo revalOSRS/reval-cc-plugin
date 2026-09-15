@@ -19,6 +19,7 @@ import com.revalclan.ui.RevalPanel;
 import com.revalclan.util.AnnouncementService;
 import com.revalclan.util.ClanRankIconResolver;
 import com.revalclan.util.EventFilterManager;
+import com.revalclan.util.RaidPartyTracker;
 import com.revalclan.util.SyncStateManager;
 import com.revalclan.util.UIAssetLoader;
 import com.revalclan.util.Worlds;
@@ -103,6 +104,7 @@ public class RevalClanPlugin extends Plugin {
 
 	@Inject	private DetailedKillNotifier detailedKillNotifier;
 	@Inject	private KillTracker killTracker;
+	@Inject	private RaidPartyTracker raidPartyTracker;
 
 	@Inject	private EmoteNotifier emoteNotifier;
 
@@ -259,6 +261,7 @@ public class RevalClanPlugin extends Plugin {
 		clueNotifier.reset();
 		killCountNotifier.reset();
 		killTracker.reset();
+		raidPartyTracker.reset();
 		leaguesNotifier.reset();
 		leaguesSyncNotifier.reset();
 
@@ -297,6 +300,7 @@ public class RevalClanPlugin extends Plugin {
 				leaguesSyncNotifier.reset();
 				lootNotifier.reset();
 				varbitNotifier.reset();
+				raidPartyTracker.reset();
 
 				if (wasLoggedIn) {
 					if (wasInClan) {
@@ -460,6 +464,8 @@ public class RevalClanPlugin extends Plugin {
 	@Subscribe
 	public void onActorDeath(ActorDeath event) {
 		lootNotifier.onActorDeath(event);
+		// A raid's final boss saves the party for an outside-chest claim
+		raidPartyTracker.onActorDeath(event);
 		// Kills feed the session accumulator regardless of clan state
 		KillTracker.KillData kill = killTracker.onActorDeath(event);
 		if (kill != null) sessionTracker.addKill(kill.npcName);
