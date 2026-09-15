@@ -95,8 +95,9 @@ public abstract class BaseNotifier {
 	}
 
 	/**
-	 * Captures a screenshot of the current game frame, attaches it to the data,
-	 * then sends the notification asynchronously.
+	 * Captures a screenshot of the current game frame, then sends the
+	 * notification with the image as its own request part (plain JSON when the
+	 * capture failed).
 	 * @param data The notification data
 	 */
 	protected void sendNotificationWithScreenshot(Map<String, Object> data) {
@@ -104,12 +105,7 @@ public abstract class BaseNotifier {
 		addEventMetadata(getEventType(), data, true);
 
 		screenshotService.captureScreenshot()
-			.thenAccept(base64Screenshot -> {
-				if (base64Screenshot != null) {
-					data.put("screenshot", base64Screenshot);
-				}
-				webhookService.sendDataAsync(data, null);
-			});
+			.thenAccept(screenshot -> webhookService.sendDataAsync(data, screenshot, null));
 	}
 
 	/**
