@@ -19,7 +19,6 @@ import java.awt.geom.RoundRectangle2D;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 public class EventsPanel extends JPanel {
@@ -41,8 +40,6 @@ public class EventsPanel extends JPanel {
 
 	private JButton upcomingTab;
 	private JButton activeTab;
-
-	private Consumer<Boolean> onIndicatorUpdate;
 
 	public EventsPanel() {
 		setLayout(new BorderLayout());
@@ -86,22 +83,14 @@ public class EventsPanel extends JPanel {
 		cardLayout.show(cardContainer, "LEAGUES_BINGO");
 	}
 
-	public void setOnIndicatorUpdate(Consumer<Boolean> callback) {
-		this.onIndicatorUpdate = callback;
-	}
-
-	public void onLoggedIn() {
-		if (allEvents.isEmpty() || isShowingLoginPrompt()) {
-			loadAuthorized();
-		}
+	public void load() {
+		loadAuthorized();
 	}
 
 	public void onLoggedOut() {
-		SwingUtilities.invokeLater(() -> {
-			if (leaguesBingoPanel != null) leaguesBingoPanel.reset();
-			showList();
-			showNotLoggedIn();
-		});
+		if (leaguesBingoPanel != null) leaguesBingoPanel.reset();
+		showList();
+		showNotLoggedIn();
 	}
 
 	public void refresh() {
@@ -109,11 +98,6 @@ public class EventsPanel extends JPanel {
 			refreshButton.setLoading(true);
 			apiService.refreshEvents(this::onEventsLoaded, this::onError);
 		}
-	}
-
-	private boolean isShowingLoginPrompt() {
-		return contentPanel.getComponentCount() == 0 ||
-			contentPanel.getComponent(0) instanceof LoginPrompt;
 	}
 
 	private void loadAuthorized() {
@@ -249,11 +233,6 @@ public class EventsPanel extends JPanel {
 
 			displayEvents();
 
-			if (onIndicatorUpdate != null) {
-				boolean hasActiveOrUpcoming = allEvents.stream()
-					.anyMatch(e -> e.isCurrentlyActive() || e.isUpcoming());
-				onIndicatorUpdate.accept(hasActiveOrUpcoming);
-			}
 		});
 	}
 
