@@ -25,7 +25,13 @@ public class EventFilterManager{
 	
 	@Inject private Gson gson;
 	
-	@Getter private EventFilters filters;
+	@Getter private volatile EventFilters filters;
+	private String appliedVersion;
+	private boolean fetchInProgress;
+	private int generation;
+	private int ticksRemaining;
+	private static final int DAILY_TICKS = 144_000;
+	private static final int RETRY_TICKS = 100; // One minute after a failed fetch.
 
 	/** Runs after every successful fetch, once the new filters are in place. */
 	@Setter private Runnable onFiltersApplied;
@@ -84,86 +90,62 @@ public class EventFilterManager{
 		filters = new EventFilters();
 	}
 	
-	/**
-	 * Fetch filters from the API
-	 * @return true if successful, false otherwise
-	 */
-	public boolean fetchFilters() {
-		try {
-			Request request = new Request.Builder()
-				.url(FILTERS_URL)
-				.get()
-				.addHeader("User-Agent", PluginVersion.userAgent())
-				.build();
-			
-			try (Response response = httpClient.newCall(request).execute()) {
-				if (!response.isSuccessful()) {
-					log.warn("Failed to fetch event filters: HTTP {}", response.code());
-					return false;
-				}
-				
-				String responseBody = response.body().string();
-				JsonObject json = gson.fromJson(responseBody, JsonObject.class);
-				
-				parseFilters(json);
-				
-				log.info("✓ Successfully fetched event filters from API");
-				return true;
-			}
-		} catch (IOException e) {
-			log.error("Failed to fetch event filters: {}", e.getMessage());
-			return false;
-		} catch (Exception e) {
-			log.error("Unexpected error fetching event filters", e);
-			return false;
-		}
+	public synchronized void resetSession() {
+		generation++;
+		fetchInProgress = false;
+		appliedVersion = null;
+		ticksRemaining = 0;
 	}
-	
-	/**
-	 * Fetch filters asynchronously
-	 */
-	public void fetchFiltersAsync() {
-		Request request = new Request.Builder()
-			.url(FILTERS_URL)
-			.get()
-			.addHeader("User-Agent", PluginVersion.userAgent())
-			.build();
-		
+
+	public synchronized void onGameTick() {
+		if (!fetchInProgress && --ticksRemaining <= 0) fetchFiltersAsync();
+	}
+
+	/** A missing hint falls back to heartbeat-paced fetching during rollout/outages. */
+	public synchronized void onServerVersion(String version) {
+		if (version == null || !version.equals(appliedVersion)) fetchFiltersAsync();
+	}
+
+	public synchronized void fetchFiltersAsync() {
+		if (fetchInProgress) return;
+		fetchInProgress = true;
+		final int requestGeneration = generation;
+		Request request = new Request.Builder().url(FILTERS_URL).get()
+			.addHeader("User-Agent", PluginVersion.userAgent()).build();
 		httpClient.newCall(request).enqueue(new Callback() {
-			@Override
-			public void onFailure(Call call, IOException e) {
-				log.error("Failed to fetch event filters: {}", e.getMessage());
+			@Override public void onFailure(Call call, IOException error) {
+				synchronized (EventFilterManager.this) {
+					if (requestGeneration != generation) return;
+					fetchInProgress = false;
+					ticksRemaining = RETRY_TICKS;
+				}
+				log.warn("Failed to fetch filters", error);
 			}
 
-			@Override
-			public void onResponse(Call call, Response response) {
-				try {
-					if (!response.isSuccessful()) {
-						log.warn("Failed to fetch event filters: HTTP {}", response.code());
-						return;
+			@Override public void onResponse(Call call, Response response) {
+				try (Response closeable = response) {
+					JsonObject json = response.isSuccessful() && response.body() != null
+						? gson.fromJson(response.body().string(), JsonObject.class) : null;
+					synchronized (EventFilterManager.this) {
+						if (requestGeneration != generation) return;
+						fetchInProgress = false;
+						ticksRemaining = RETRY_TICKS;
+						if (json != null && parseFilters(json)) {
+							appliedVersion = response.header("X-Reval-Filters-Version");
+							ticksRemaining = appliedVersion != null ? DAILY_TICKS : 1000;
+						}
 					}
-					
-					String responseBody = response.body().string();
-					JsonObject json = gson.fromJson(responseBody, JsonObject.class);
-					
-					parseFilters(json);
-					
-					log.info("✓ Successfully fetched event filters from API");
-				} catch (IOException e) {
-					log.error("Failed to parse event filters response: {}", e.getMessage());
-				} catch (Exception e) {
-					log.error("Unexpected error parsing event filters", e);
-				} finally {
-					response.close();
+				} catch (Exception error) {
+					onFailure(call, new IOException("Invalid filter response", error));
 				}
 			}
 		});
 	}
-	
+
 	/**
 	 * Parse the filters JSON response
 	 */
-	private void parseFilters(JsonObject json) {
+	private boolean parseFilters(JsonObject json) {
 		EventFilters newFilters = new EventFilters();
 		
 		try {
@@ -285,8 +267,10 @@ public class EventFilterManager{
 			// Atomically replace filters
 			this.filters = newFilters;
 			if (onFiltersApplied != null) onFiltersApplied.run();
+			return true;
 		} catch (Exception e) {
 			log.error("Error parsing filters JSON", e);
+			return false;
 		}
 	}
 }
