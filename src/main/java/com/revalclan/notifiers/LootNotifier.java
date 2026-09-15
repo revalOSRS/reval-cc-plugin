@@ -2,6 +2,7 @@ package com.revalclan.notifiers;
 
 import com.revalclan.session.SessionTracker;
 import com.revalclan.util.RaidPartyTracker;
+import com.revalclan.util.RaidRewardLedger;
 import net.runelite.api.Item;
 import net.runelite.api.ItemComposition;
 import net.runelite.api.ItemContainer;
@@ -34,6 +35,9 @@ public class LootNotifier extends BaseNotifier {
 
 	@Inject
 	private RaidPartyTracker raidPartyTracker;
+
+	@Inject
+	private RaidRewardLedger raidRewardLedger;
 
 	private static final Pattern COLLECTION_LOG_PATTERN = Pattern.compile(
 		"New item added to your collection log: (?<item>.+)",
@@ -332,6 +336,8 @@ public class LootNotifier extends BaseNotifier {
 		// moons (Moons of Peril), barrows chests, gauntlet chests, and other special content
 		if (event.getType() == LootRecordType.EVENT || event.getType() == LootRecordType.PICKPOCKET) {
 			String source = event.getName();
+			// A ToB / ToA chest reopened after an instance change holds a reward already reported
+			if (!raidRewardLedger.record(source, event.getItems())) return;
 			// For raid chests (CoX / ToB / ToA) attach the party: read live inside the raid,
 			// or as saved at the final boss when the reward is claimed from the outside chest
 			handleLootDrop(event.getItems(), source, "EVENT", null, raidPartyTracker.partyFor(source));
@@ -559,6 +565,9 @@ public class LootNotifier extends BaseNotifier {
 	 */
 	public void onGameMessage(String message) {
 		if (!isEnabled()) return;
+
+		// A completed ToB / ToA leaves a new reward in its chest
+		raidRewardLedger.onGameMessage(message);
 
 		// Track "New item added to your collection log: X" for the buffered loot flag
 		Matcher clogMatcher = COLLECTION_LOG_PATTERN.matcher(message);
