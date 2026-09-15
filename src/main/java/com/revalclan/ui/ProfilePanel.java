@@ -139,7 +139,7 @@ public class ProfilePanel extends JPanel {
 	}
 
 	public void onLoggedOut() {
-		SwingUtilities.invokeLater(this::showNotLoggedIn);
+		showNotLoggedIn();
 	}
 
 	public void loadCurrentAccount() {

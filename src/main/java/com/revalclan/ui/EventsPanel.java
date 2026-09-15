@@ -19,7 +19,6 @@ import java.awt.geom.RoundRectangle2D;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 public class EventsPanel extends JPanel {
@@ -41,8 +40,6 @@ public class EventsPanel extends JPanel {
 
 	private JButton upcomingTab;
 	private JButton activeTab;
-
-	private Consumer<Boolean> onIndicatorUpdate;
 
 	public EventsPanel() {
 		setLayout(new BorderLayout());
@@ -86,38 +83,40 @@ public class EventsPanel extends JPanel {
 		cardLayout.show(cardContainer, "LEAGUES_BINGO");
 	}
 
-	public void setOnIndicatorUpdate(Consumer<Boolean> callback) {
-		this.onIndicatorUpdate = callback;
+	private boolean memberSession;
+	private int loadGeneration;
+
+	/** Validation updates the prompt but never requests the event list. */
+	public void onLoginReady() {
+		memberSession = true;
+		loadGeneration++;
+		allEvents = new ArrayList<>();
+		buildFullUI();
+		eventsListPanel.removeAll();
+		eventsListPanel.add(new JLabel("Click Events or Refresh to load events."));
+		eventsListPanel.revalidate();
+		eventsListPanel.repaint();
 	}
 
-	public void onLoggedIn() {
-		if (allEvents.isEmpty() || isShowingLoginPrompt()) {
-			loadAuthorized();
-		}
+	public void load() {
+		loadAuthorized();
 	}
 
 	public void onLoggedOut() {
-		SwingUtilities.invokeLater(() -> {
-			if (leaguesBingoPanel != null) leaguesBingoPanel.reset();
-			showList();
-			showNotLoggedIn();
-		});
+		memberSession = false;
+		loadGeneration++;
+		allEvents = new ArrayList<>();
+		if (leaguesBingoPanel != null) leaguesBingoPanel.reset();
+		showList();
+		showNotLoggedIn();
 	}
 
 	public void refresh() {
-		if (apiService != null) {
-			refreshButton.setLoading(true);
-			apiService.refreshEvents(this::onEventsLoaded, this::onError);
-		}
-	}
-
-	private boolean isShowingLoginPrompt() {
-		return contentPanel.getComponentCount() == 0 ||
-			contentPanel.getComponent(0) instanceof LoginPrompt;
+		loadAuthorized();
 	}
 
 	private void loadAuthorized() {
-		if (client == null || client.getAccountHash() == -1) {
+		if (!memberSession || client == null || client.getAccountHash() == -1) {
 			showNotLoggedIn();
 			return;
 		}
@@ -229,11 +228,13 @@ public class EventsPanel extends JPanel {
 			return;
 		}
 		showLoading();
-		apiService.refreshEvents(this::onEventsLoaded, this::onError);
+		final int generation = ++loadGeneration;
+		apiService.fetchEvents(response -> onEventsLoaded(response, generation), error -> onError(error, generation));
 	}
 
-	private void onEventsLoaded(EventsResponse response) {
+	private void onEventsLoaded(EventsResponse response, int generation) {
 		SwingUtilities.invokeLater(() -> {
+			if (generation != loadGeneration || !memberSession) return;
 			if (refreshButton != null) refreshButton.setLoading(false);
 			allEvents = response != null && response.getData() != null && response.getData().getEvents() != null
 				? response.getData().getEvents() : new ArrayList<>();
@@ -249,16 +250,12 @@ public class EventsPanel extends JPanel {
 
 			displayEvents();
 
-			if (onIndicatorUpdate != null) {
-				boolean hasActiveOrUpcoming = allEvents.stream()
-					.anyMatch(e -> e.isCurrentlyActive() || e.isUpcoming());
-				onIndicatorUpdate.accept(hasActiveOrUpcoming);
-			}
 		});
 	}
 
-	private void onError(Exception e) {
+	private void onError(Exception e, int generation) {
 		SwingUtilities.invokeLater(() -> {
+			if (generation != loadGeneration || !memberSession) return;
 			if (refreshButton != null) refreshButton.setLoading(false);
 			showError("Failed to load events: " + e.getMessage());
 		});

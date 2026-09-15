@@ -40,6 +40,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * Service for fetching data from the Reval Plugin API.
@@ -54,7 +55,6 @@ public class RevalApiService {
     // Cache durations
     private static final long CACHE_DURATION_MS = 5 * 60 * 1000;
     private static final long ACCOUNT_CACHE_DURATION_MS = 2 * 60 * 1000;
-    private static final long EVENTS_CACHE_DURATION_MS = 60 * 1000;
 
     // Cached responses
     private PointsResponse cachedPoints;
@@ -62,8 +62,6 @@ public class RevalApiService {
     private AccountResponse cachedAccount;
     private String cachedAccountIdentifier;
     private long lastAccountFetch = 0;
-    private volatile EventsResponse cachedEvents;
-    private long lastEventsFetch = 0;
     private ActiveTeamsResponse cachedActiveTeams;
     private long lastActiveTeamsFetch = 0;
     private AchievementsResponse cachedAchievements;
@@ -130,27 +128,34 @@ public class RevalApiService {
 
     // ==================== EVENTS API ====================
 
-    /** Snapshot only: never fetches, even when the normal cache TTL has expired. */
-    public EventsResponse getLastFetchedEvents() {
-        return cachedEvents;
+    private final CopyOnWriteArrayList<Consumer<EventsResponse>> eventsListeners = new CopyOnWriteArrayList<>();
+    private long eventsGeneration;
+
+    /** Successful event responses, or an empty response on session reset. Never mutate Swing directly here. */
+    public void addEventsListener(Consumer<EventsResponse> listener) {
+        eventsListeners.add(listener);
+    }
+
+    /** End the session without allowing an old in-flight response to restore its marks. */
+    public synchronized void resetEventsSession() {
+        eventsGeneration++;
+        eventsListeners.forEach(listener -> listener.accept(new EventsResponse()));
     }
 
     public void fetchEvents(Consumer<EventsResponse> onSuccess, Consumer<Exception> onError) {
-        if (cachedEvents != null && System.currentTimeMillis() - lastEventsFetch < EVENTS_CACHE_DURATION_MS) {
-            onSuccess.accept(cachedEvents);
-            return;
-        }
+        final long generation;
+        synchronized (this) { generation = ++eventsGeneration; }
         get(ApiEndpoints.EVENTS, EventsResponse.class, response -> {
-            cachedEvents = response;
-            lastEventsFetch = System.currentTimeMillis();
-            onSuccess.accept(response);
-        }, onError);
-    }
-
-    public void refreshEvents(Consumer<EventsResponse> onSuccess, Consumer<Exception> onError) {
-        cachedEvents = null;
-        lastEventsFetch = 0;
-        fetchEvents(onSuccess, onError);
+            synchronized (this) {
+                if (generation != eventsGeneration) return;
+                eventsListeners.forEach(listener -> listener.accept(response));
+                onSuccess.accept(response);
+            }
+        }, error -> {
+            synchronized (this) {
+                if (generation == eventsGeneration) onError.accept(error);
+            }
+        });
     }
 
     public void fetchActiveTeams(Consumer<ActiveTeamsResponse> onSuccess, Consumer<Exception> onError) {
@@ -201,19 +206,13 @@ public class RevalApiService {
     public void registerForEvent(String eventId, long accountHash,
                                  Consumer<RegistrationResponse> onSuccess, Consumer<Exception> onError) {
         post(ApiEndpoints.eventRegister(eventId), "{\"accountHash\":\"" + accountHash + "\"}", 
-            RegistrationResponse.class, response -> {
-                cachedEvents = null;
-                onSuccess.accept(response);
-            }, onError);
+            RegistrationResponse.class, onSuccess, onError);
     }
 
     public void cancelEventRegistration(String eventId, long accountHash,
                                         Consumer<RegistrationResponse> onSuccess, Consumer<Exception> onError) {
         delete(ApiEndpoints.eventRegister(eventId), "{\"accountHash\":\"" + accountHash + "\"}",
-            RegistrationResponse.class, response -> {
-                cachedEvents = null;
-                onSuccess.accept(response);
-            }, onError);
+            RegistrationResponse.class, onSuccess, onError);
     }
 
     public void checkRegistrationStatus(String eventId, long accountHash,
@@ -446,8 +445,6 @@ public class RevalApiService {
         cachedAccount = null;
         cachedAccountIdentifier = null;
         lastAccountFetch = 0;
-        cachedEvents = null;
-        lastEventsFetch = 0;
         cachedActiveTeams = null;
         lastActiveTeamsFetch = 0;
         cachedAchievements = null;

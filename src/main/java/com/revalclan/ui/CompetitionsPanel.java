@@ -12,6 +12,7 @@ import com.revalclan.util.DateTimeUtil;
 import net.runelite.api.Client;
 import net.runelite.client.ui.FontManager;
 
+import com.revalclan.ui.components.LoginPrompt;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
@@ -21,7 +22,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Consumer;
 
 public class CompetitionsPanel extends JPanel {
 	private static final Color MEDAL_GOLD = new Color(255, 215, 0);
@@ -42,7 +42,7 @@ public class CompetitionsPanel extends JPanel {
 	private List<CompetitionsResponse.Competition> scheduledCompetitions = new ArrayList<>();
 	private Map<String, String> myVotes = new HashMap<>();
 
-	private Consumer<Boolean> onIndicatorUpdate;
+	private int loadGeneration;
 
 	public CompetitionsPanel() {
 		setLayout(new BorderLayout());
@@ -88,16 +88,18 @@ public class CompetitionsPanel extends JPanel {
 		this.client = client;
 	}
 
-	public void setOnIndicatorUpdate(Consumer<Boolean> callback) {
-		this.onIndicatorUpdate = callback;
-	}
-
 	public void onLoggedOut() {
+		loadGeneration++;
 		myVotes.clear();
 		activeVotes = new ArrayList<>();
 		activeCompetitions = new ArrayList<>();
 		scheduledCompetitions = new ArrayList<>();
-		buildContent();
+		refreshButton.setLoading(false);
+		cardLayout.show(cardContainer, "LIST");
+		contentPanel.removeAll();
+		contentPanel.add(new LoginPrompt("Competitions"));
+		contentPanel.revalidate();
+		contentPanel.repaint();
 	}
 
 	public void refresh() {
@@ -106,59 +108,84 @@ public class CompetitionsPanel extends JPanel {
 
 	private void loadData(boolean showLoadingState) {
 		if (apiService == null) return;
+		if (client == null || client.getAccountHash() == -1) {
+			onLoggedOut();
+			return;
+		}
+		final int generation = ++loadGeneration;
 		if (showLoadingState) showLoading();
 		refreshButton.setLoading(true);
 
 		final boolean[] loaded = {false, false, false};
 		Runnable checkComplete = () -> {
 			if (loaded[0] && loaded[1] && loaded[2]) {
-				SwingUtilities.invokeLater(() -> { refreshButton.setLoading(false); buildContent(); });
+				refreshButton.setLoading(false);
+				buildContent();
 			}
 		};
 
 		apiService.fetchVotes(
-			response -> {
+			response -> SwingUtilities.invokeLater(() -> {
+				if (generation != loadGeneration) return;
 				activeVotes = response.getData() != null && response.getData().getVotes() != null
 					? response.getData().getVotes() : new ArrayList<>();
-				fetchMyVotes(activeVotes);
+				fetchMyVotes(activeVotes, generation);
 				loaded[0] = true;
 				checkComplete.run();
-			},
-			error -> { activeVotes = new ArrayList<>(); loaded[0] = true; checkComplete.run(); }
+			}),
+			error -> SwingUtilities.invokeLater(() -> {
+				if (generation != loadGeneration) return;
+				activeVotes = new ArrayList<>();
+				loaded[0] = true;
+				checkComplete.run();
+			})
 		);
 
 		apiService.fetchActiveCompetitions(
-			response -> {
+			response -> SwingUtilities.invokeLater(() -> {
+				if (generation != loadGeneration) return;
 				activeCompetitions = response.getData() != null && response.getData().getCompetitions() != null
 					? response.getData().getCompetitions() : new ArrayList<>();
 				loaded[1] = true;
 				checkComplete.run();
-			},
-			error -> { activeCompetitions = new ArrayList<>(); loaded[1] = true; checkComplete.run(); }
+			}),
+			error -> SwingUtilities.invokeLater(() -> {
+				if (generation != loadGeneration) return;
+				activeCompetitions = new ArrayList<>();
+				loaded[1] = true;
+				checkComplete.run();
+			})
 		);
 
 		apiService.fetchScheduledCompetitions(
-			response -> {
+			response -> SwingUtilities.invokeLater(() -> {
+				if (generation != loadGeneration) return;
 				scheduledCompetitions = response.getData() != null && response.getData().getCompetitions() != null
 					? response.getData().getCompetitions() : new ArrayList<>();
 				loaded[2] = true;
 				checkComplete.run();
-			},
-			error -> { scheduledCompetitions = new ArrayList<>(); loaded[2] = true; checkComplete.run(); }
+			}),
+			error -> SwingUtilities.invokeLater(() -> {
+				if (generation != loadGeneration) return;
+				scheduledCompetitions = new ArrayList<>();
+				loaded[2] = true;
+				checkComplete.run();
+			})
 		);
 	}
 
-	private void fetchMyVotes(List<VotesResponse.Vote> votes) {
+	private void fetchMyVotes(List<VotesResponse.Vote> votes, int generation) {
 		if (client == null || client.getAccountHash() == -1) return;
 		myVotes.clear();
 		for (VotesResponse.Vote vote : votes) {
 			apiService.fetchMyVote(vote.getId(), client.getAccountHash(),
-				response -> {
+				response -> SwingUtilities.invokeLater(() -> {
+					if (generation != loadGeneration) return;
 					if (response.getData() != null && response.getData().getHasVoted() && response.getData().getOptionId() != null) {
 						myVotes.put(vote.getId(), response.getData().getOptionId());
-						SwingUtilities.invokeLater(this::buildContent);
+						buildContent();
 					}
-				},
+				}),
 				error -> {}
 			);
 		}
@@ -213,10 +240,7 @@ public class CompetitionsPanel extends JPanel {
 		contentPanel.revalidate();
 		contentPanel.repaint();
 
-		if (onIndicatorUpdate != null) {
-			boolean hasActiveOrScheduled = !activeCompetitions.isEmpty() || !scheduledCompetitions.isEmpty();
-			onIndicatorUpdate.accept(hasActiveOrScheduled);
-		}
+
 	}
 
 	private void addSection(String text) {
