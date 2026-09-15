@@ -32,7 +32,7 @@ public class RevalPanelLoadingTest {
 				(proxy, method, args) -> method.getName().equals("getAccountHash") ? 42L : null);
 			panel = new RevalPanel();
 			panel.init(api, client, null, null, null, null, null);
-			api.calls.clear(); // Profile rank metadata is intentionally eager.
+			assertEquals(0, api.count("ranking"));
 		});
 	}
 	@Test public void loginLoadsOnlySelectedMemberTabsOnEdt() throws Exception {
@@ -49,7 +49,7 @@ public class RevalPanelLoadingTest {
 		SwingUtilities.invokeAndWait(() -> { panel.showTab("LEADERBOARD"); panel.showTab("RANKING"); });
 		panel.onLoggedIn(); panel.onLoggedOut(); flush();
 		SwingUtilities.invokeAndWait(() -> { panel.showTab("LEADERBOARD"); panel.showTab("RANKING"); });
-		assertEquals(1, api.count("leaderboard")); assertEquals(1, api.count("ranking"));
+		assertEquals(1, api.count("leaderboard")); assertEquals(2, api.count("ranking"));
 	}
 	@Test public void selectionBeforeValidationAndQuickRelogLoadSelectedMemberTab() throws Exception {
 		SwingUtilities.invokeAndWait(() -> panel.showTab("DIARY"));

@@ -103,7 +103,6 @@ public class ProfilePanel extends JPanel {
 		this.config = config;
 		this.itemManager = itemManager;
 		this.rankIconResolver = rankIconResolver;
-		fetchRanks();
 	}
 
 	/** Where the rank-up bar navigates (the Ranking side-panel view) */
@@ -171,6 +170,7 @@ public class ProfilePanel extends JPanel {
 		if (isLoading) return;
 		isLoading = true;
 		showLoading();
+		if (pointsData == null) fetchRanks();
 
 		apiService.fetchAccount(accountHash,
 			response -> {
@@ -182,7 +182,6 @@ public class ProfilePanel extends JPanel {
 						if (onAccountLoaded != null) onAccountLoaded.accept(currentAccount);
 					}
 					if (pointsData != null) buildProfile();
-					if (ranks == null || ranks.isEmpty() || pointsData == null) fetchRanks();
 				});
 			},
 			error -> {
@@ -196,6 +195,7 @@ public class ProfilePanel extends JPanel {
 		if (isLoading) return;
 		isLoading = true;
 		showLoading();
+		if (pointsData == null) fetchRanks();
 
 		apiService.fetchAccountById(osrsAccountId,
 			response -> {
@@ -204,7 +204,6 @@ public class ProfilePanel extends JPanel {
 					currentAccount = response.getData();
 					if (currentAccount != null) pointsLog = currentAccount.getPointsLog();
 					if (pointsData != null) buildProfile();
-					if (ranks == null || ranks.isEmpty() || pointsData == null) fetchRanks();
 				});
 			},
 			error -> {
