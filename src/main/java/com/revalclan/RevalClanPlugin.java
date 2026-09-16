@@ -27,7 +27,6 @@ import com.google.inject.Provides;
 import com.google.gson.JsonObject;
 
 import java.awt.image.BufferedImage;
-import java.util.function.Consumer;
 import java.util.regex.Pattern;
 
 import javax.inject.Inject;
@@ -156,8 +155,6 @@ public class RevalClanPlugin extends Plugin {
 	private boolean wasLoggedIn = false;
 	private boolean pendingLoginNotification = false;
 
-	private int loginGeneration;
-
 	private static final Pattern COL_OPEN = Pattern.compile("<col=[0-9a-fA-F]+>");
 	private static final Pattern COL_CLOSE = Pattern.compile("</col>");
 
@@ -167,6 +164,7 @@ public class RevalClanPlugin extends Plugin {
 		wasLoggedIn = false;
 		pendingLoginNotification = false;
 		clanMembership.reset();
+		sessionTracker.setOnHeartbeatResponse(this::onChanges);
 
 		clientThread.invoke(() -> {
 			if (client.getIndexConfig() == null || client.getGameState().ordinal() < GameState.LOGIN_SCREEN.ordinal()) {
@@ -232,7 +230,6 @@ public class RevalClanPlugin extends Plugin {
 
 	@Override
 	protected void shutDown() throws Exception {
-		loginGeneration++;
 		eventFilterManager.resetSession();
 		log.info("Reval Clan plugin stopped!");
 		clanMembership.reset();
@@ -293,7 +290,6 @@ public class RevalClanPlugin extends Plugin {
 				break;
 
 			case LOGIN_SCREEN: {
-				loginGeneration++;
 				eventFilterManager.resetSession();
 				revalApiService.resetEventsSession();
 				boolean wasInClan = clanMembership.isMember();
@@ -329,7 +325,6 @@ public class RevalClanPlugin extends Plugin {
 
 	/** Fresh login (or plugin enabled while logged in): LOGIN goes out once membership is proven on a tick. */
 	private void onLoggedIn() {
-		loginGeneration++;
 		eventFilterManager.resetSession();
 		wasLoggedIn = true;
 		collectionLogManager.clearObtainedItems();
@@ -346,8 +341,6 @@ public class RevalClanPlugin extends Plugin {
 	/** Runs once per login, the tick membership is proven. */
 	private void onClanValidated() {
 		eventFilterManager.setOnFiltersApplied(varbitNotifier::syncBaselines);
-		eventFilterManager.fetchFiltersAsync();
-		sessionTracker.setOnHeartbeatResponse(changeHandler());
 
 		// Fetch leagues config if on a seasonal world
 		if (Worlds.isSeasonal(client)) {
@@ -357,7 +350,7 @@ public class RevalClanPlugin extends Plugin {
 
 		if (pendingLoginNotification) {
 			pendingLoginNotification = false;
-			loginNotifier.onLogin(changeHandler());
+			loginNotifier.onLogin(this::onChanges);
 		}
 
 		// This account is a member: its sessions recorded before we knew can go out now
@@ -368,10 +361,9 @@ public class RevalClanPlugin extends Plugin {
 		}
 	}
 
-	private Consumer<JsonObject> changeHandler() {
-		final int generation = loginGeneration;
-		return response -> clientThread.invokeLater(() -> {
-			if (generation != loginGeneration || !wasLoggedIn || !clanMembership.isMember()) return;
+	private void onChanges(JsonObject response) {
+		clientThread.invokeLater(() -> {
+			if (!wasLoggedIn || !clanMembership.isMember()) return;
 			JsonObject changes = response != null && response.has("changes") && response.get("changes").isJsonObject()
 				? response.getAsJsonObject("changes") : null;
 			eventFilterManager.onServerVersion(changeVersion(changes, "filters"));

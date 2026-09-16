@@ -14,17 +14,23 @@ public class EventFilterRefreshTest {
 		OkHttpClient http = new OkHttpClient() {
 			@Override public Call newCall(Request request) {
 				Pending pending = new Pending(request);
-				return (Call) java.lang.reflect.Proxy.newProxyInstance(Call.class.getClassLoader(), new Class<?>[]{Call.class},
-					(proxy, method, args) -> {
-						if (method.getName().equals("enqueue")) { pending.callback = (Callback) args[0]; requests.add(pending); }
-						return null;
-					});
+				return new Call() {
+					public Request request() { return request; }
+					public Response execute() { throw new UnsupportedOperationException(); }
+					public void enqueue(Callback callback) { pending.callback = callback; requests.add(pending); }
+					public void cancel() {}
+					public boolean isExecuted() { return pending.callback != null; }
+					public boolean isCanceled() { return false; }
+					public okio.Timeout timeout() { return okio.Timeout.NONE; }
+					public Call clone() { return newCall(request); }
+				};
 			}
 		};
 		try {
 			EventFilterManager filters = new EventFilterManager();
 			inject(filters, "httpClient", http); inject(filters, "gson", new Gson());
-			filters.resetSession(); filters.fetchFiltersAsync();
+			filters.setOnFiltersApplied(() -> assertFalse("Listener must run outside the manager lock", Thread.holdsLock(filters)));
+			filters.resetSession(); filters.onGameTick();
 			Pending first = take(requests);
 			filters.onServerVersion("v1"); assertTrue(requests.isEmpty());
 			first.complete(200, "v1", 111);
@@ -38,7 +44,7 @@ public class EventFilterRefreshTest {
 			assertTrue(requests.isEmpty());
 			filters.onGameTick();
 			Pending old = take(requests);
-			filters.resetSession(); filters.fetchFiltersAsync();
+			filters.resetSession(); filters.onGameTick();
 			Pending current = take(requests);
 			old.complete(200, "stale", 999);
 			assertFalse(filters.getFilters().getLootWhitelist().contains(999));
@@ -47,6 +53,10 @@ public class EventFilterRefreshTest {
 			filters.onServerVersion("v3");
 			take(requests).complete(200, "v3", 333);
 			assertTrue(filters.getFilters().getLootWhitelist().contains(333));
+			filters.onServerVersion(null);
+			take(requests).complete(200, null, 444);
+			for (int i = 0; i < 1000; i++) filters.onGameTick();
+			assertTrue("No separate legacy timer", requests.isEmpty());
 		} finally {
 			http.dispatcher().executorService().shutdownNow();
 			http.connectionPool().evictAll();

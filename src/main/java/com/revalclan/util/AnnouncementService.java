@@ -18,6 +18,7 @@ public class AnnouncementService {
 	private static final int NOTIFICATION_INTERVAL_TICKS = 6000; // ~60 minutes; login and heartbeat hints fetch sooner.
 	private int notificationTicksRemaining = NOTIFICATION_INTERVAL_TICKS;
 	private static final int INITIAL_DELAY_TICKS = 5;
+	private static final int RETRY_TICKS = 100; // ~1 minute.
 
 	@Inject private ChatMessageManager chatMessageManager;
 	@Inject private RevalApiService revalApiService;
@@ -115,7 +116,7 @@ public class AnnouncementService {
 					if (response.getData() != null && response.getData().getNotifications() != null) {
 						appliedNotificationVersion = response.getData().getVersion();
 					} else {
-						notificationTicksRemaining = 100;
+						notificationTicksRemaining = RETRY_TICKS;
 					}
 					if (response.getData() != null && response.getData().getNotifications() != null
 						&& !response.getData().getNotifications().isEmpty()) {
@@ -127,7 +128,7 @@ public class AnnouncementService {
 				synchronized (AnnouncementService.this) {
 					if (generation != sessionGeneration) return;
 					notificationFetchInProgress = false;
-					notificationTicksRemaining = 100;
+					notificationTicksRemaining = RETRY_TICKS;
 				}
 			}
 		);

@@ -126,15 +126,19 @@ public class EventFilterManager{
 				try (Response closeable = response) {
 					JsonObject json = response.isSuccessful() && response.body() != null
 						? gson.fromJson(response.body().string(), JsonObject.class) : null;
+					EventFilters parsed = json == null ? null : parseFilters(json);
+					Runnable listener;
 					synchronized (EventFilterManager.this) {
 						if (requestGeneration != generation) return;
 						fetchInProgress = false;
 						ticksRemaining = RETRY_TICKS;
-						if (json != null && parseFilters(json)) {
-							appliedVersion = response.header("X-Reval-Filters-Version");
-							ticksRemaining = appliedVersion != null ? DAILY_TICKS : 1000;
-						}
+						if (parsed == null) return;
+						filters = parsed;
+						appliedVersion = response.header("X-Reval-Filters-Version");
+						ticksRemaining = DAILY_TICKS;
+						listener = onFiltersApplied;
 					}
+					if (listener != null) listener.run();
 				} catch (Exception error) {
 					onFailure(call, new IOException("Invalid filter response", error));
 				}
@@ -145,7 +149,7 @@ public class EventFilterManager{
 	/**
 	 * Parse the filters JSON response
 	 */
-	private boolean parseFilters(JsonObject json) {
+	private EventFilters parseFilters(JsonObject json) {
 		EventFilters newFilters = new EventFilters();
 		
 		try {
@@ -264,13 +268,10 @@ public class EventFilterManager{
 				if (enabled.has("leagues")) newFilters.leaguesEnabled = enabled.get("leagues").getAsBoolean();
 			}
 			
-			// Atomically replace filters
-			this.filters = newFilters;
-			if (onFiltersApplied != null) onFiltersApplied.run();
-			return true;
+			return newFilters;
 		} catch (Exception e) {
 			log.error("Error parsing filters JSON", e);
-			return false;
+			return null;
 		}
 	}
 }

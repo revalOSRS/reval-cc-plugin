@@ -148,15 +148,12 @@ public class SessionTracker {
 	public void cutForHop() {
 		if (!active) return;
 		PersistedSession persisted = persist(buildSummary("hop", touch()));
-		// Frequent world hops must not postpone configuration checks indefinitely.
-		active = false;
-		resetState();
+		reset();
 		if (persisted.member) send(persisted);
 	}
 
 	/** In-memory only — a persisted session replays as 'recovered' later. */
 	public void reset() {
-		ticksSinceHeartbeat = 0;
 		active = false;
 		resetState();
 	}
