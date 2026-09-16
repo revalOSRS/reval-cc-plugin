@@ -19,6 +19,7 @@ public class NotificationsResponse extends ApiResponse {
 
 	@Data
 	public static class NotificationsData {
+		private String version;
 		private int count;
 		private List<Notification> notifications;
 	}
