@@ -135,9 +135,9 @@ public class DeathNotifier extends BaseNotifier {
 				keptItems.add(item);
 			} else {
 				lostItems.add(item);
-				int gePrice = (int) item.get("gePrice");
+				long gePrice = ((Number) item.get("gePrice")).longValue();
 				int quantity = (int) item.get("quantity");
-				totalLostValue += (long) gePrice * quantity;
+				totalLostValue += gePrice * quantity;
 			}
 		}
 
@@ -181,7 +181,7 @@ public class DeathNotifier extends BaseNotifier {
 		collectItemsFromContainer(94, items);
 
 		// Sort by GE price descending (most valuable kept first)
-		items.sort(Comparator.<Map<String, Object>>comparingInt(m -> (int) m.get("gePrice")).reversed());
+		items.sort(Comparator.<Map<String, Object>>comparingLong(m -> ((Number) m.get("gePrice")).longValue()).reversed());
 
 		return items;
 	}
@@ -199,7 +199,7 @@ public class DeathNotifier extends BaseNotifier {
 		for (Item item : containerItems) {
 			if (item.getId() <= 0 || item.getQuantity() <= 0) continue;
 
-			int gePrice = itemManager.getItemPrice(item.getId());
+			long gePrice = itemManager.getItemPrice(item.getId());
 			String name;
 			try {
 				ItemComposition comp = itemManager.getItemComposition(item.getId());

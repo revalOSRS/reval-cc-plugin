@@ -712,11 +712,11 @@ public class LootNotifier extends BaseNotifier {
 			// Skip blacklisted items
 			if (blacklistItemIds.contains(itemId)) continue;
 
-			int gePrice = itemManager.getItemPrice(itemId);
+			long gePrice = itemManager.getItemPrice(itemId);
 			int haValue = itemManager.getItemComposition(itemId).getPrice();
 			boolean isTradeable = itemManager.getItemComposition(itemId).isTradeable();
 			String itemName = itemManager.getItemComposition(itemId).getName();
-			long stackValue = (long) gePrice * item.getQuantity();
+			long stackValue = gePrice * item.getQuantity();
 
 			String suspectReason = suspectReason(itemId, item.getQuantity(), tickCounter);
 
