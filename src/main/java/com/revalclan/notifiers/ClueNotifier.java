@@ -73,7 +73,7 @@ public class ClueNotifier extends BaseNotifier {
 					int quantity = child.getItemQuantity();
 					int itemId = child.getItemId();
 					if (itemId > -1 && quantity > 0) {
-						int price = itemManager.getItemPrice(itemId);
+						long price = itemManager.getItemPrice(itemId);
 						String name = itemManager.getItemComposition(itemId).getName();
 
 						Map<String, Object> item = new HashMap<>();
@@ -83,7 +83,7 @@ public class ClueNotifier extends BaseNotifier {
 						item.put("price", price);
 						items.add(item);
 
-						totalValue += (long) price * quantity;
+						totalValue += price * quantity;
 					}
 				}
 
