@@ -82,6 +82,21 @@ public class CombatAchievementPersonalBestCaptureTest {
 		verify(client, never()).getWidget(anyInt());
 	}
 
+	@Test public void acceptsTheLiveBossInterfaceOnloadEvent() {
+		ScriptPreFired event = init();
+		Widget universe = mock(Widget.class);
+		when(universe.getId()).thenReturn(46727169);
+		when(event.getScriptEvent().getSource()).thenReturn(universe);
+		when(event.getScriptEvent().getArguments()).thenReturn(new Object[] {
+			4835, 46727170, 46727171, 46727173, 46727174, 46727177, 46727178,
+			46727181, 46727182, 46727189, 46727190, 46727191, 46727193, 46727195, 46727194
+		});
+		events.post(event);
+		assertTrue("The live CA onload must populate the upload cache", sync().containsKey("tztok-jad"));
+		assertEquals("The CA onload source is legitimate, unlike collection-log resize listeners",
+			2973.0, (Double) sync().get("tztok-jad"), .00001);
+	}
+
 	@Test public void toaNormalAndExpertRemainSeparateWithoutInventingTeamSize() {
 		select(58, "Tombs of Amascut", VarPlayerID.TOTAL_COMPLETED_TOMBSOFAMASCUT, 13, 1390);
 		events.post(init());
@@ -152,7 +167,9 @@ public class CombatAchievementPersonalBestCaptureTest {
 	@Test public void otherInterfacesAndNestedOrWidgetScriptsCannotReadIf1() {
 		events.post(new ScriptPreFired(4843));
 		ScriptPreFired event = init();
-		when(event.getScriptEvent().getSource()).thenReturn(mock(Widget.class));
+		Widget listener = mock(Widget.class);
+		when(listener.getId()).thenReturn(InterfaceID.CaBoss.CA_BOSS_STATS);
+		when(event.getScriptEvent().getSource()).thenReturn(listener);
 		events.post(event);
 		event = init();
 		event.getScriptEvent().getArguments()[10] = 621 << 16;
