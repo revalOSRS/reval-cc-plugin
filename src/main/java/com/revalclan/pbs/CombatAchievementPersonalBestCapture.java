@@ -108,10 +108,13 @@ public class CombatAchievementPersonalBestCapture {
 	public void onScriptPreFired(ScriptPreFired event) {
 		if (event.getScriptId() != BOSS_INIT) return;
 		ScriptEvent input = event.getScriptEvent();
-		if (input == null || input.getSource() != null
+		if (input == null
 			|| client.getGameState() != GameState.LOGGED_IN
 			|| configManager.getRSProfileKey() == null
 			|| client.getVarbitValue(VarbitID.COLLECTION_POH_HOST_BOOK_OPEN) != 0) return;
+		// Unlike Collection Log's server draw, CA opens through an onload event
+		// sourced from its universe widget. Other widget listeners are not page loads.
+		if (input.getSource() != null && input.getSource().getId() != InterfaceID.CaBoss.UNIVERSE) return;
 
 		// ca_boss_init has fourteen component arguments. Accept only the real
 		// boss interface's root initialization, never local/nested redraws.
