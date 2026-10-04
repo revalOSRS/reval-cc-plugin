@@ -96,6 +96,7 @@ public class PlayerDataCollector {
 		data.put("achievementDiaries", achievementDiaryManager.sync());
 		data.put("combatAchievements", combatAchievementManager.sync());
 		data.put("personalBests", personalBestManager.sync());
+		// Historical wire name: shared verified PBs from Collection Log and CA.
 		data.put("clogPersonalBests", clogPersonalBestCapture.sync());
 		return data;
 	}
