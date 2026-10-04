@@ -19,6 +19,7 @@ A dedicated panel for Reval clan members with:
 - **Combat Achievements**: Full tracking of all 625 tasks with completion status, points, and tier progress
 - **Collection Log**: Complete item tracking with obtained items, kill counts, and category organization
 - **Personal Bests**: Capture game-recorded times from visited Collection Log and Combat Achievements boss pages, including separate raid modes
+- **Rank-up announcements**: Show in-game Reval promotions in clan chat with the new rank's title and icon
 - **Achievement Diaries**: Progress tracking for all regions and difficulty tiers
 - **Quest Completion**: Full quest state tracking with completion counts
 - **Player Metadata**: Account type, combat level, total level, and experience tracking
@@ -63,9 +64,18 @@ Configure the plugin in the RuneLite settings panel:
 
 ### Notifications
 Which game events are tracked is decided by the Reval backend, not per player, so the plugin stays in sync with what the clan systems expect. The per-player switches are:
-- **Show clan notifications**: Reval announcements and notifications in chat
+- **Show clan notifications**: Reval announcements, notifications, and in-game rank promotions in chat
 - **Send player deaths to Discord**: post your deaths (and who killed you) to the clan Discord
 - **Leagues Events**: Leagues task, relic, area and combat mastery tracking
+
+Rank-up announcements use the same setting and appear as clan-system messages, for example
+`[Reval] Shafli has been promoted to [rank icon] Sapphire.` They announce actual in-game
+rank increases observed while connected to Reval clan chat, including changes to offline
+members in the clan roster. Every plugin client displays its own local announcement;
+the plugin does not send player chat or require a backend broadcast. Logging in, hopping,
+rejoining chat, and enabling the plugin establish a baseline without replaying old rank
+changes. New members, demotions, and point-earned ranks awaiting staff application are
+not announced. If an icon is unavailable, the rank title still appears.
 
 ### Leagues Bingo boards
 Active Leagues Bingo events on the Events tab open in the side panel: pick a team from the standings, pick one of its region boards (completion, points and x2 status per board), then browse the tile grid. Clicking a tile shows the task, its requirements, progress and who contributed.
