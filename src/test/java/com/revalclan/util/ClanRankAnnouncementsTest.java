@@ -3,6 +3,8 @@ package com.revalclan.util;
 import com.revalclan.RevalClanConfig;
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
+import net.runelite.api.EnumComposition;
+import net.runelite.api.EnumID;
 import net.runelite.api.GameState;
 import net.runelite.api.clan.ClanChannel;
 import net.runelite.api.clan.ClanMember;
@@ -59,7 +61,7 @@ public class ClanRankAnnouncementsTest {
 		verify(chat).queue(message.capture());
 		assertEquals(ChatMessageType.CLAN_MESSAGE, message.getValue().getType());
 		assertEquals("Reval", message.getValue().getSender());
-		assertEquals("Shafli has been promoted to <img=512> Sapphire.", message.getValue().getRuneLiteFormattedMessage());
+		assertEquals("Shafli's clan rank is now <img=512> Sapphire.", message.getValue().getRuneLiteFormattedMessage());
 	}
 
 	@Test
@@ -150,7 +152,7 @@ public class ClanRankAnnouncementsTest {
 		tick(); rank(20); tick();
 		ArgumentCaptor<QueuedMessage> message = ArgumentCaptor.forClass(QueuedMessage.class);
 		verify(chat).queue(message.capture());
-		assertEquals("Shafli has been promoted to Sapphire.", message.getValue().getRuneLiteFormattedMessage());
+		assertEquals("Shafli's clan rank is now Sapphire.", message.getValue().getRuneLiteFormattedMessage());
 	}
 
 	@Test
@@ -161,13 +163,34 @@ public class ClanRankAnnouncementsTest {
 		tick(); rank(20); tick();
 		ArgumentCaptor<QueuedMessage> message = ArgumentCaptor.forClass(QueuedMessage.class);
 		verify(chat).queue(message.capture());
-		assertEquals("Shafli has been promoted to <img=600> Custom <lt>img=1<gt>.", message.getValue().getRuneLiteFormattedMessage());
+		assertEquals("Shafli's clan rank is now <img=600> Custom <lt>img=1<gt>.", message.getValue().getRuneLiteFormattedMessage());
 	}
 
 	@Test
 	public void resetForPluginRestartDoesNotReplayChanges() {
 		tick(); announcements.reset(); rank(20); tick();
 		verifyNoInteractions(chat);
+	}
+
+	@Test
+	public void earnedRankUsesItsOwnIconBeforeTheClanRosterIsUpdated() {
+		EnumComposition names = mock(EnumComposition.class);
+		when(client.getEnum(EnumID.CLAN_RANK_NAME)).thenReturn(names);
+		when(names.getKeys()).thenReturn(new int[]{200});
+		when(names.getStringValue(200)).thenReturn("Sapphire");
+		announcements.announceEarned("Shafli", "sapphire");
+		ArgumentCaptor<QueuedMessage> message = ArgumentCaptor.forClass(QueuedMessage.class);
+		verify(chat).queue(message.capture());
+		assertEquals(ChatMessageType.CLAN_MESSAGE, message.getValue().getType());
+		assertEquals("Shafli has earned <img=512> Sapphire.", message.getValue().getRuneLiteFormattedMessage());
+	}
+
+	@Test
+	public void earnedRankWithoutAnIconStillShowsItsTitle() {
+		announcements.announceEarned("Shafli", "red_topaz");
+		ArgumentCaptor<QueuedMessage> message = ArgumentCaptor.forClass(QueuedMessage.class);
+		verify(chat).queue(message.capture());
+		assertEquals("Shafli has earned Red Topaz.", message.getValue().getRuneLiteFormattedMessage());
 	}
 
 	private void rank(int rank) { when(member.getRank()).thenReturn(new ClanRank(rank)); }

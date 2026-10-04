@@ -19,7 +19,7 @@ A dedicated panel for Reval clan members with:
 - **Combat Achievements**: Full tracking of all 625 tasks with completion status, points, and tier progress
 - **Collection Log**: Complete item tracking with obtained items, kill counts, and category organization
 - **Personal Bests**: Capture game-recorded times from visited Collection Log and Combat Achievements boss pages, including separate raid modes
-- **Rank-up announcements**: Show in-game Reval promotions in clan chat with the new rank's title and icon
+- **Rank-up announcements**: Announce earned Reval ranks and their in-game application in clan chat with the new rank's title and icon
 - **Achievement Diaries**: Progress tracking for all regions and difficulty tiers
 - **Quest Completion**: Full quest state tracking with completion counts
 - **Player Metadata**: Account type, combat level, total level, and experience tracking
@@ -69,13 +69,16 @@ Which game events are tracked is decided by the Reval backend, not per player, s
 - **Leagues Events**: Leagues task, relic, area and combat mastery tracking
 
 Rank-up announcements use the same setting and appear as clan-system messages, for example
-`[Reval] Shafli has been promoted to [rank icon] Sapphire.` They announce actual in-game
+`[Reval] Shafli's clan rank is now [rank icon] Sapphire.` They announce actual in-game
 rank increases observed while connected to Reval clan chat, including changes to offline
 members in the clan roster. Every plugin client displays its own local announcement;
 the plugin does not send player chat or require a backend broadcast. Logging in, hopping,
 rejoining chat, and enabling the plugin establish a baseline without replaying old rank
-changes. New members, demotions, and point-earned ranks awaiting staff application are
-not announced. If an icon is unavailable, the rank title still appears.
+changes. New members and demotions are not announced. The backend also delivers new point-earned
+ranks as `[Reval] Shafli has earned [rank icon] Sapphire.`, before staff applies the rank.
+These earned-rank notifications expire after 15 minutes and use the existing notification
+fetch/acknowledgement path. The earned trigger requires the companion backend change;
+old clients display its plain-text broadcast. If an icon is unavailable, the title still appears.
 
 ### Leagues Bingo boards
 Active Leagues Bingo events on the Events tab open in the side panel: pick a team from the standings, pick one of its region boards (completion, points and x2 status per board), then browse the tile grid. Clicking a tile shows the task, its requirements, progress and who contributed.

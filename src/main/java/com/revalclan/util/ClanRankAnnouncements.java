@@ -3,6 +3,8 @@ package com.revalclan.util;
 import com.revalclan.RevalClanConfig;
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
+import net.runelite.api.EnumComposition;
+import net.runelite.api.EnumID;
 import net.runelite.api.GameState;
 import net.runelite.api.clan.ClanChannel;
 import net.runelite.api.clan.ClanMember;
@@ -70,12 +72,32 @@ public class ClanRankAnnouncements {
 	private void announce(ClanMember member, ClanTitle title) {
 		String rankName = title == null || title.getName() == null || title.getName().isEmpty()
 			? "rank " + member.getRank().getRank() : title.getName();
+		queue(member.getName(), "'s clan rank is now ", rankName, title);
+	}
+
+	/** Called on the client thread for a server-delivered, point-earned promotion. */
+	public void announceEarned(String playerName, String newRank) {
+		String rankName = RankNames.display(newRank);
+		ClanTitle title = null;
+		EnumComposition names = client.getEnum(EnumID.CLAN_RANK_NAME);
+		if (names != null) {
+			for (int id : names.getKeys()) {
+				if (rankName.equalsIgnoreCase(names.getStringValue(id))) {
+					title = new ClanTitle(id, rankName);
+					break;
+				}
+			}
+		}
+		queue(playerName, " has earned ", rankName, title);
+	}
+
+	private void queue(String playerName, String action, String rankName, ClanTitle title) {
 		int icon = title == null ? -1 : chatIconManager.getIconNumber(title);
 		String iconTag = icon >= 0 ? "<img=" + icon + "> " : "";
 		chatMessageManager.queue(QueuedMessage.builder()
 			.type(ChatMessageType.CLAN_MESSAGE)
 			.sender("Reval")
-			.runeLiteFormattedMessage(Text.escapeJagex(member.getName()) + " has been promoted to "
+			.runeLiteFormattedMessage(Text.escapeJagex(playerName) + action
 				+ iconTag + Text.escapeJagex(rankName) + ".")
 			.build());
 	}

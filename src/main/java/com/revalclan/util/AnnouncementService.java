@@ -7,6 +7,7 @@ import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
 import net.runelite.client.chat.ChatMessageManager;
 import net.runelite.client.chat.QueuedMessage;
+import net.runelite.client.callback.ClientThread;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -23,6 +24,8 @@ public class AnnouncementService {
 	@Inject private ChatMessageManager chatMessageManager;
 	@Inject private RevalApiService revalApiService;
 	@Inject private Client client;
+	@Inject private ClientThread clientThread;
+	@Inject private ClanRankAnnouncements clanRankAnnouncements;
 	@Inject private com.revalclan.RevalClanConfig config;
 
 	private int sessionGeneration;
@@ -33,6 +36,7 @@ public class AnnouncementService {
 	private boolean notificationFetchInProgress = false;
 
 	private final Set<Integer> shownBroadcastIds = new HashSet<>();
+	private final Set<Integer> shownNotificationIds = new HashSet<>();
 	private final Map<Integer, Long> lastChatShownTime = new HashMap<>();
 	private final List<Announcement> cachedAnnouncements = new CopyOnWriteArrayList<>();
 
@@ -120,7 +124,13 @@ public class AnnouncementService {
 					}
 					if (response.getData() != null && response.getData().getNotifications() != null
 						&& !response.getData().getNotifications().isEmpty()) {
-						displayAndAcknowledgeNotifications(accountHash, response.getData().getNotifications());
+						clientThread.invoke(() -> {
+							synchronized (AnnouncementService.this) {
+								if (generation == sessionGeneration && config.showAnnouncements()) {
+									displayAndAcknowledgeNotifications(accountHash, response.getData().getNotifications());
+								}
+							}
+						});
 					}
 				}
 			},
@@ -176,11 +186,21 @@ public class AnnouncementService {
 		List<Integer> idsToAck = new ArrayList<>();
 
 		for (Notification notification : notifications) {
+			idsToAck.add(notification.getId());
+			if (!shownNotificationIds.add(notification.getId())) continue;
+			Map<String, Object> metadata = notification.getMetadata();
+			if (metadata != null && "rank_earned".equals(metadata.get("type"))
+				&& metadata.get("playerName") instanceof String
+				&& metadata.get("newRank") instanceof String
+				&& !((String) metadata.get("playerName")).trim().isEmpty()
+				&& !((String) metadata.get("newRank")).trim().isEmpty()) {
+				clanRankAnnouncements.announceEarned((String) metadata.get("playerName"), (String) metadata.get("newRank"));
+				continue;
+			}
 			chatMessageManager.queue(QueuedMessage.builder()
 				.type(ChatMessageType.BROADCAST)
 				.runeLiteFormattedMessage(formatNotificationMessage(notification))
 				.build());
-			idsToAck.add(notification.getId());
 		}
 
 		if (!idsToAck.isEmpty()) {
@@ -214,6 +234,7 @@ public class AnnouncementService {
 		announcementFetchInProgress = false;
 		notificationFetchInProgress = false;
 		shownBroadcastIds.clear();
+		shownNotificationIds.clear();
 		lastChatShownTime.clear();
 		cachedAnnouncements.clear();
 	}
