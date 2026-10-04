@@ -25,7 +25,6 @@ import java.util.Set;
 @Singleton
 public class ClogPersonalBestCapture {
 	// The old header-scraping cache is untrusted. Do not copy or upload it.
-	private static final String CONFIG_GROUP = "revalclanclogpbv2";
 	private static final int DRAW_LIST = 2730;
 	private static final int DRAW = 7797;
 	private static final int TAB_LINK = 4900;
@@ -47,7 +46,7 @@ public class ClogPersonalBestCapture {
 	@Inject private ConfigManager configManager;
 
 	public Map<String, Object> sync() {
-		return PbStore.read(configManager, CONFIG_GROUP);
+		return PbStore.read(configManager, PbStore.VERIFIED_GROUP);
 	}
 
 	@Subscribe
@@ -116,13 +115,8 @@ public class ClogPersonalBestCapture {
 	private void store(String key, int pbVarp, int kcVarp) {
 		int ticks = client.getVarpValue(pbVarp);
 		int completions = client.getVarpValue(kcVarp);
-		if (ticks <= 0 || completions <= 0) {
-			// An authoritative no-PB/no-completion response invalidates our copy.
-			configManager.unsetRSProfileConfiguration(CONFIG_GROUP, key);
-			return;
-		}
 		// The game's time_convert[_ms] scripts use 0.6 seconds per tick.
 		// Read raw ticks so the player's precise-timing setting cannot round PBs.
-		configManager.setRSProfileConfiguration(CONFIG_GROUP, key, ticks * 0.6);
+		PbStore.recordVerified(configManager, key, ticks, completions);
 	}
 }

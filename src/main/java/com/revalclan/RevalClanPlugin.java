@@ -13,6 +13,7 @@ import com.revalclan.teams.ClanTeamColors;
 import com.revalclan.ui.leaguesbingo.LeaguesBingoPanel;
 import com.revalclan.notifiers.*;
 import com.revalclan.pbs.ClogPersonalBestCapture;
+import com.revalclan.pbs.CombatAchievementPersonalBestCapture;
 import com.revalclan.session.SessionTracker;
 import com.revalclan.util.ClanMembership;
 import com.revalclan.ui.RevalPanel;
@@ -84,6 +85,7 @@ public class RevalClanPlugin extends Plugin {
 	@Inject	private VarbitNotifier varbitNotifier;
 
 	@Inject	private ClogPersonalBestCapture clogPersonalBestCapture;
+	@Inject	private CombatAchievementPersonalBestCapture combatAchievementPersonalBestCapture;
 
 	@Inject	private PetNotifier petNotifier;
 
@@ -191,6 +193,7 @@ public class RevalClanPlugin extends Plugin {
 
 		eventBus.register(lootNotifier);
 		eventBus.register(clogPersonalBestCapture);
+		eventBus.register(combatAchievementPersonalBestCapture);
 		eventBus.register(clanTeamColors);
 		clanTeamColors.startUp();
 		overlayManager.add(registrationMarksOverlay);
@@ -244,6 +247,7 @@ public class RevalClanPlugin extends Plugin {
 
 		eventBus.unregister(lootNotifier);
 		eventBus.unregister(clogPersonalBestCapture);
+		eventBus.unregister(combatAchievementPersonalBestCapture);
 		eventBus.unregister(clanTeamColors);
 		clanTeamColors.shutDown();
 		revalApiService.resetEventsSession();
@@ -533,5 +537,4 @@ public class RevalClanPlugin extends Plugin {
 		return configManager.getConfig(RevalClanConfig.class);
 	}
 }
-
 
