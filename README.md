@@ -18,6 +18,7 @@ A dedicated panel for Reval clan members with:
 ### 📊 Player Data Sync
 - **Combat Achievements**: Full tracking of all 625 tasks with completion status, points, and tier progress
 - **Collection Log**: Complete item tracking with obtained items, kill counts, and category organization
+- **Personal Bests**: Capture game-recorded times from visited Collection Log and Combat Achievements boss pages, including separate raid modes
 - **Achievement Diaries**: Progress tracking for all regions and difficulty tiers
 - **Quest Completion**: Full quest state tracking with completion counts
 - **Player Metadata**: Account type, combat level, total level, and experience tracking
@@ -81,6 +82,11 @@ Choose where the "View Reval Profile" right-click option appears: on players in 
 
 ### Automatic Sync on Logout
 When you log out, the plugin automatically collects and sends all player data to your configured webhook endpoint.
+
+### Personal Best Times
+Visit boss pages in Collection Log or **Combat Achievements → Bosses** to capture their current personal bests. Combat Achievements includes times such as Jad, Zuk, and raid modes that Collection Log does not display. These pages provide overall times for each mode; team-size variants are captured only when a source identifies the team size.
+
+Captured times are included in the next player-data sync or logout. Bosses with no recorded time or no completions are skipped, and unvisited pages are not scanned automatically.
 
 ## Support
 
