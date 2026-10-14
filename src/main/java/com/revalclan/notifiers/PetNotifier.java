@@ -52,6 +52,15 @@ public class PetNotifier extends BaseNotifier {
 	);
 
 	/**
+	 * Pattern matching a source suffix appended to pet names in clan broadcasts
+	 * at shared-loot bosses (e.g., "Nexling from Nex")
+	 */
+	private static final Pattern PET_SOURCE_SUFFIX = Pattern.compile(
+		"^(?<pet>.+?)\\s+from\\s+.+$",
+		Pattern.CASE_INSENSITIVE
+	);
+
+	/**
 	 * Maximum number of ticks to wait for pet name before sending notification without it
 	 */
 	private static final int MAX_TICKS_WAIT = 10;
@@ -155,7 +164,10 @@ public class PetNotifier extends BaseNotifier {
 				}
 
 				if (pet != null && !pet.trim().isEmpty()) {
-					this.petName = pet.trim();
+					String resolved = resolvePetName(pet.trim());
+					if (resolved != null) {
+						this.petName = resolved;
+					}
 				}
 				if (milestone != null && !milestone.trim().isEmpty()) {
 					this.killCount = milestone.trim();
@@ -320,6 +332,30 @@ public class PetNotifier extends BaseNotifier {
 		PET_NAMES.add("lil' creator");
 		PET_NAMES.add("pet penance queen");
 		PET_NAMES.add("quetzin");
+	}
+
+	/**
+	 * Resolve a pet name captured from a clan broadcast to a known pet name.
+	 * Shared-loot bosses broadcast the pet with its source appended
+	 * (e.g., "Nexling from Nex"); the suffix is stripped so the same pet is
+	 * never recorded under two different names. Returns null when the name
+	 * (with or without a source suffix) is not a known pet, so tracking falls
+	 * back to the collection log sync instead of storing an unverified name.
+	 */
+	private String resolvePetName(String rawName) {
+		if (isPetItem(rawName)) {
+			return rawName;
+		}
+
+		Matcher sourceMatcher = PET_SOURCE_SUFFIX.matcher(rawName);
+		if (sourceMatcher.matches()) {
+			String stripped = sourceMatcher.group("pet").trim();
+			if (isPetItem(stripped)) {
+				return stripped;
+			}
+		}
+
+		return null;
 	}
 
 	/**
