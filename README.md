@@ -52,7 +52,7 @@ Completed collection categories have green text, borders, and backgrounds in the
 pages not yet opened. The selected greenlog has a brighter highlight. Completion status is scoped
 to the selected account and uses the same cached log response without extra database reads.
 
-Share a board through normal clan chat with `!reval luck araxxor`, `!reval leaderboard clues hard`,
+Share a board through regular public chat or clan chat with `!reval luck araxxor`, `!reval leaderboard clues hard`,
 or `!reval clog forestry`. Updated Reval clients underline the message and offer **Open Reval
 board** on left-click or in its right-click menu. A clog without an explicit player opens the
 sender's account; add a player name to share another account. Sharing selects the same page and

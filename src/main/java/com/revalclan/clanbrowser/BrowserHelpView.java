@@ -44,8 +44,8 @@ final class BrowserHelpView extends JPanel implements Scrollable {
         boards.add(text("Leave the clue tier or boss out for the combined view.\nChoose statistics with the buttons below member search.",18,BrowserTheme.TEXT,2)); gap(boards,6);
         boards.add(text("Statistics: clog, pets, points, greenlogs, xp,\nmonthly-clog, monthly-points, clues, combat, bosses.\nClue tiers: beginner, easy, medium, hard, elite, master.",17,BrowserTheme.MUTED,3));
 
-        JPanel sharing=card("Share a board in clan chat",BrowserTheme.GREEN);
-        sharing.add(text("Use ! instead of :: to send a shareable message.",18,BrowserTheme.TEXT,1)); gap(sharing,8);
+        JPanel sharing=card("Share a board in chat",BrowserTheme.GREEN);
+        sharing.add(text("Send with ! in public or clan chat.",18,BrowserTheme.TEXT,1)); gap(sharing,8);
         sharing.add(code("!reval luck araxxor\n!reval clog forestry\n!reval leaderboard clues hard",3));
         sharing.add(text("Other updated Reval clients can click the message\nto open the same board. A shared clog uses your account\nunless you add a different player's name.",18,BrowserTheme.TEXT,3)); gap(sharing,6);
         sharing.add(text(":: opens privately     ! shares through normal chat\nPlayers need the updated Reval plugin to open shares.",17,BrowserTheme.MUTED,2));

@@ -17,6 +17,41 @@ import static org.mockito.Mockito.*;
 import static org.mockito.ArgumentMatchers.*;
 
 public class BoardChatLinksTest {
+    @Test public void publicChatLinksAreClickableWithoutAReportMenuIncludingYourOwnMessages() {
+        for (String name : Arrays.asList("Valgusruum", "Alice Smith")) {
+            for (String[] command : new String[][]{{"clog forestry","clog","forestry"},{"luck araxxor","luck","araxxor"},
+                  {"deserved vorkath","deserved","vorkath"},{"dryboard vorkath","dryboard","vorkath"},{"leaderboard clues hard","leaderboard","clues"}}) {
+                Fixture f = new Fixture(); PublicMenu menu = new PublicMenu(f);
+                when(f.sender.getText()).thenReturn(name + ":"); f.text.set("!reval " + command[0]);
+                f.links.startUp(); f.links.prioritize(); f.links.prioritize();
+                verify(menu.menu,times(1)).createMenuEntry(-1);
+                verify(menu.link).setOption("Open Reval board"); verify(menu.link).setForceLeftClick(true);
+                assertEquals("Hovering a public share must not open or fetch a board",0,f.opened.get());
+                f.text.set("Another message after scrolling"); when(f.sender.getText()).thenReturn("RecycledName:");
+                menu.click.get().accept(menu.link);
+                assertEquals(1,f.opened.get()); assertEquals(name,f.author.get());
+                assertEquals(command[1],f.command.get().kind);
+                assertEquals(command[2],f.command.get().kind.equals("leaderboard") ? f.command.get().metric : f.command.get().category);
+                if (f.command.get().kind.equals("leaderboard")) assertEquals("hard",f.command.get().tier);
+                f.links.clear(); menu.click.get().accept(menu.link); assertEquals(1,f.opened.get());
+            }
+        }
+    }
+
+    @Test public void publicChatFallbackIgnoresHiddenClippedAndRecycledMessages() {
+        Fixture f = new Fixture(); PublicMenu menu = new PublicMenu(f); f.links.startUp();
+        when(f.area.isHidden()).thenReturn(true); f.links.prioritize(); when(f.area.isHidden()).thenReturn(false);
+        when(f.message.isHidden()).thenReturn(true); f.links.prioritize(); when(f.message.isHidden()).thenReturn(false);
+        when(f.message.getBounds()).thenReturn(new java.awt.Rectangle(100,150,300,120));
+        when(f.client.getMouseCanvasPosition()).thenReturn(new net.runelite.api.Point(140,170)); f.links.prioritize();
+        when(f.message.getBounds()).thenReturn(new java.awt.Rectangle(100,200,300,20));
+        when(f.client.getMouseCanvasPosition()).thenReturn(new net.runelite.api.Point(450,210)); f.links.prioritize();
+        when(f.client.getMouseCanvasPosition()).thenReturn(new net.runelite.api.Point(140,210));
+        f.text.set("An ordinary message"); f.links.prioritize();
+        f.text.set("!reval luck araxxor"); when(f.sender.getText()).thenReturn(""); f.links.prioritize();
+        verify(menu.menu,never()).createMenuEntry(anyInt()); assertEquals(0,f.opened.get());
+    }
+
     @Test public void sharedCommandsKeepThePageAndUseTheSenderOnlyWhenNoAccountWasSpecified() {
         BrowserModels.Page forestry = new BrowserModels.Page(); forestry.value="forestry"; forestry.label="Forestry";
         BrowserCommand self = BoardChatLinks.parse("<col=ff00ff>!reval clog forestry</col>").resolveShared(Arrays.asList(forestry),"Alice Smith");
@@ -68,6 +103,22 @@ public class BoardChatLinksTest {
     }
 
     private static int count(String text,String value) { return (text.length()-text.replace(value,"").length())/value.length(); }
+    private static class PublicMenu {
+        final Menu menu=mock(Menu.class);
+        final MenuEntry cancel=mock(MenuEntry.class),link=mock(MenuEntry.class,RETURNS_SELF);
+        final AtomicReference<MenuEntry[]> entries=new AtomicReference<>(new MenuEntry[]{cancel});
+        final AtomicReference<Consumer<MenuEntry>> click=new AtomicReference<>();
+        PublicMenu(Fixture f) {
+            when(f.area.getBounds()).thenReturn(new java.awt.Rectangle(0,180,500,180));
+            when(f.message.getBounds()).thenReturn(new java.awt.Rectangle(100,200,300,20));
+            when(f.client.getMouseCanvasPosition()).thenReturn(new net.runelite.api.Point(140,210));
+            when(f.client.getMenu()).thenReturn(menu); when(cancel.getType()).thenReturn(MenuAction.CANCEL);
+            when(menu.getMenuEntries()).thenAnswer(i->entries.get());
+            when(menu.createMenuEntry(-1)).thenAnswer(i->{entries.set(new MenuEntry[]{cancel,link});return link;});
+            doAnswer(i->{click.set(i.getArgument(0));return link;}).when(link).onClick(any());
+            when(link.onClick()).thenAnswer(i->click.get());
+        }
+    }
     private static class Fixture {
         final Client client=mock(Client.class);
         final Widget area=mock(Widget.class),sender=mock(Widget.class),message=mock(Widget.class),row=mock(Widget.class);

@@ -49,7 +49,7 @@ final class BoardChatLinks {
             Widget message = children[i], sender = children[i - 1];
             if (message == null || message.isHidden() || !BrowserCommand.validPlayer(author(sender))) continue;
             if (parse(message.getText()) == null) continue;
-            Link link = new Link(message);
+            Link link = new Link(message, sender);
             message.setText(link.decorated);
             links.add(link);
         }
@@ -73,6 +73,10 @@ final class BoardChatLinks {
         if (command == null || !BrowserCommand.validPlayer(sender)) return;
         Menu menu = client.getMenu();
         for (MenuEntry entry : menu.getMenuEntries()) if (isOurEntry(entry)) return;
+        addEntry(menu, command, sender, message);
+    }
+
+    private void addEntry(Menu menu, BrowserCommand command, String sender, Widget message) {
         int version = generation;
         // Capture the command and sender now: chat widgets may be recycled while the menu is open.
         boardClick = entry -> { if (enabled && version == generation) open.accept(command, sender); };
@@ -82,14 +86,30 @@ final class BoardChatLinks {
     }
 
     void prioritize() {
-        if (!enabled || boardEntry == null) return;
+        if (!enabled || (links.isEmpty() && boardEntry == null)) return;
         Menu menu = client.getMenu();
+        if (menu == null) return;
         MenuEntry[] entries = menu.getMenuEntries();
-        for (int i = 0; i < entries.length - 1; i++) {
+        for (int i = 0; i < entries.length; i++) {
             if (!isOurEntry(entries[i])) continue;
-            System.arraycopy(entries, i + 1, entries, i, entries.length - i - 1);
-            entries[entries.length - 1] = boardEntry;
-            menu.setMenuEntries(entries);
+            if (i < entries.length - 1) {
+                System.arraycopy(entries, i + 1, entries, i, entries.length - i - 1);
+                entries[entries.length - 1] = boardEntry;
+                menu.setMenuEntries(entries);
+            }
+            return;
+        }
+        // Public/self chat rows need not expose Report. Hit-test the rendered message
+        // instead of relying on an unrelated menu option to make the share clickable.
+        net.runelite.api.Point mouse = client.getMouseCanvasPosition();
+        Widget area = client.getWidget(InterfaceID.Chatbox.SCROLLAREA);
+        if (mouse == null || area == null || area.isHidden() || !area.getBounds().contains(mouse.getX(), mouse.getY())) return;
+        for (Link link : links) {
+            Widget message = link.widget;
+            if (message.isHidden() || !message.getBounds().contains(mouse.getX(), mouse.getY())) continue;
+            BrowserCommand command = parse(message.getText());
+            String sender = author(link.sender);
+            if (command != null && BrowserCommand.validPlayer(sender)) addEntry(menu, command, sender, message);
             return;
         }
     }
@@ -106,10 +126,10 @@ final class BoardChatLinks {
     private static String author(Widget sender) { return clean(sender == null ? null : sender.getText()).replaceFirst(":\\s*$", "").trim(); }
     private static String clean(String value) { return value == null ? "" : Text.removeTags(value).replace('\u00a0', ' ').trim(); }
     private static final class Link {
-        final Widget widget;
+        final Widget widget, sender;
         final String text, decorated;
-        Link(Widget widget) {
-            this.widget = widget; text = widget.getText();
+        Link(Widget widget, Widget sender) {
+            this.widget = widget; this.sender = sender; text = widget.getText();
             decorated = "<col=ffcf63><u>" + clean(text) + "</u></col>";
         }
     }
