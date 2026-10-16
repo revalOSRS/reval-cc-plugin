@@ -34,6 +34,7 @@ public class BrowserNavigationTest {
     private HttpServer server;
     private OkHttpClient http;
     private ClanBrowserWindow window;
+    private JFrame gameWindow;
     private String previous;
     private final CountDownLatch releaseBoss = new CountDownLatch(1);
     private final BlockingQueue<BrowserModels.View> loaded = new LinkedBlockingQueue<>();
@@ -75,7 +76,8 @@ public class BrowserNavigationTest {
             }
         };
         SwingUtilities.invokeAndWait(() -> {
-            window = new ClanBrowserWindow(null,api,id -> null);
+            gameWindow = new JFrame("Game window");
+            window = new ClanBrowserWindow(gameWindow,api,id -> null);
             window.open(BrowserCommand.parse("reval clog forestry Valgusruum")); window.setVisible(false);
         });
         assertNotNull("Initial collection log did not load",loaded.poll(5,TimeUnit.SECONDS));
@@ -85,6 +87,7 @@ public class BrowserNavigationTest {
     @After public void stop() throws Exception {
         releaseBoss.countDown();
         if (window != null) SwingUtilities.invokeAndWait(window::dispose);
+        if (gameWindow != null) SwingUtilities.invokeAndWait(gameWindow::dispose);
         if (server != null) server.stop(0);
         if (http != null) { http.dispatcher().executorService().shutdownNow(); http.connectionPool().evictAll(); }
         if (previous == null) System.clearProperty("reval.browserApi"); else System.setProperty("reval.browserApi",previous);
@@ -196,7 +199,7 @@ public class BrowserNavigationTest {
 
     @Test public void browserIsAnIndependentWindowThatCannotHoldTheGameBehindAnOwnedDialog() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
-            assertTrue("The browser must be a separate frame",JFrame.class.isInstance(window));
+            assertTrue("The browser must be an independent frame",JFrame.class.isInstance(window));
             assertNull("The game must not own a dialog that stays above it",window.getOwner());
             assertFalse(window.isAlwaysOnTop());
         });

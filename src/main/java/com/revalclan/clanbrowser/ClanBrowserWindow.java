@@ -76,12 +76,14 @@ public final class ClanBrowserWindow extends JFrame {
     private boolean adjusting, closed;
     private int generation;
 
-    public ClanBrowserWindow(Window owner, BrowserApi api, IntFunction<BufferedImage> icons) {
+    public ClanBrowserWindow(Window anchor, BrowserApi api, IntFunction<BufferedImage> icons) {
         super("Reval · Clan browser");
+        // Retain component buffering without the separate native window's stale swap buffer.
+        getRootPane().setDoubleBuffered(false);
         this.api = api; this.icons = icons;
         setDefaultCloseOperation(DISPOSE_ON_CLOSE); setMinimumSize(new Dimension(960, 620)); setSize(1180, 820);
-        setLocationRelativeTo(owner);
-        java.awt.GraphicsConfiguration screen = owner != null ? owner.getGraphicsConfiguration() : java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDefaultConfiguration();
+        setLocationRelativeTo(anchor);
+        java.awt.GraphicsConfiguration screen = anchor != null ? anchor.getGraphicsConfiguration() : java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDefaultConfiguration();
         java.awt.Rectangle available = new java.awt.Rectangle(screen.getBounds());
         Insets screenInsets = java.awt.Toolkit.getDefaultToolkit().getScreenInsets(screen);
         available.x += screenInsets.left; available.y += screenInsets.top; available.width -= screenInsets.left + screenInsets.right; available.height -= screenInsets.top + screenInsets.bottom;
