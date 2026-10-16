@@ -33,12 +33,21 @@ public interface RevalClanConfig extends Config {
 		return false;
 	}
 
+	// ── Themes ─────────────────────────────────────────────────────────
+	@ConfigSection(
+		name = "Themes",
+		description = "Seasonal themes for the Reval side panel",
+		position = 1,
+		closedByDefault = true
+	)
+	String themesSection = "themesSection";
+
 	@ConfigItem(
 		keyName = "halloweenTheme",
 		name = "Halloween theme",
 		description = "Pumpkin-orange tabs, candlelit cards and cobwebs. Automatic enables it in October; Off restores the normal theme. Changes reload the side panel.",
-		section = panelSection,
-		position = 1
+		section = themesSection,
+		position = 0
 	)
 	default HalloweenAppearance halloweenTheme() {
 		return HalloweenAppearance.AUTOMATIC;
@@ -48,7 +57,7 @@ public interface RevalClanConfig extends Config {
 	@ConfigSection(
 		name = "Profile cards",
 		description = "Where the 'View Reval Profile' right-click option appears",
-		position = 1
+		position = 2
 	)
 	String profileCardsSection = "profileCardsSection";
 
@@ -89,7 +98,7 @@ public interface RevalClanConfig extends Config {
 	@ConfigSection(
 		name = "Events",
 		description = "Clan event features",
-		position = 2
+		position = 3
 	)
 	String clanEventsSection = "clanEventsSection";
 
@@ -124,7 +133,7 @@ public interface RevalClanConfig extends Config {
 	@ConfigSection(
 		name = "Notifications",
 		description = "What the plugin shows you and what it shares with the clan",
-		position = 3
+		position = 4
 	)
 	String eventsSection = "eventsSection";
 
@@ -164,7 +173,7 @@ public interface RevalClanConfig extends Config {
 	@ConfigSection(
 		name = "Clan browser",
 		description = "Collection logs and shared clan leaderboards",
-		position = 4
+		position = 5
 	)
 	String clanBrowserSection = "clanBrowserSection";
 
