@@ -18,6 +18,8 @@ import com.revalclan.pbs.CombatAchievementPersonalBestCapture;
 import com.revalclan.session.SessionTracker;
 import com.revalclan.util.ClanMembership;
 import com.revalclan.ui.RevalPanel;
+import com.revalclan.ui.components.HalloweenDecoration;
+import com.revalclan.ui.constants.UIConstants;
 import com.revalclan.util.AnnouncementService;
 import com.revalclan.util.ClanRankIconResolver;
 import com.revalclan.util.EventFilterManager;
@@ -29,9 +31,11 @@ import com.google.inject.Provides;
 import com.google.gson.JsonObject;
 
 import java.awt.image.BufferedImage;
+import java.time.LocalDate;
 import java.util.regex.Pattern;
 
 import javax.inject.Inject;
+import javax.swing.SwingUtilities;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
@@ -206,33 +210,52 @@ public class RevalClanPlugin extends Plugin {
 
 		// Initialize and add the side panel
 		try {
-			revalPanel = new RevalPanel();
-			revalPanel.init(revalApiService, client, uiAssetLoader, itemManager, spriteManager, config,
-				rankIconResolver);
-			revalPanel.getLeaderboardPanel().setOnOpenBrowser(clanBrowserManager::openPointsLeaderboard);
-			revalPanel.getEventsPanel().setLeaguesBingoPanel(injector.getInstance(LeaguesBingoPanel.class));
-			revalPanel.setOnSyncGuide(() -> {
-				syncGuide.arm();
-				clientThread.invoke(() -> {
-					if (client.getGameState() == GameState.LOGGED_IN) {
-						client.addChatMessage(ChatMessageType.GAMEMESSAGE, "",
-							"Reval: Open your Collection Log - the sync button will be highlighted.", "");
-					}
-				});
-			});
-			
-			BufferedImage icon = uiAssetLoader.getImage("reval.png");
-			
-			navButton = NavigationButton.builder()
-				.tooltip("Reval Clan")
-				.icon(icon)
-				.priority(1)
-				.panel(revalPanel)
-				.build();
-			
-			clientToolbar.addNavigation(navButton);
+			if (SwingUtilities.isEventDispatchThread()) {
+				rebuildSidepanel();
+			} else {
+				SwingUtilities.invokeAndWait(this::rebuildSidepanel);
+			}
 		} catch (Exception e) {
 			log.error("Failed to initialize Reval Clan panel", e);
+		}
+	}
+
+	/** Rebuild the themed Swing tree without restarting game tracking or the plugin. */
+	private void rebuildSidepanel() {
+		boolean replacing = revalPanel != null;
+		String activeTab = replacing ? revalPanel.getActiveTab() : "PROFILE";
+		if (replacing) revalPanel.shutDown();
+		if (navButton != null) clientToolbar.removeNavigation(navButton);
+
+		UIConstants.setHalloweenTheme(config.halloweenTheme().isActive(LocalDate.now()));
+		revalPanel = new RevalPanel();
+		revalPanel.init(revalApiService, client, uiAssetLoader, itemManager, spriteManager, config,
+			rankIconResolver);
+		revalPanel.getLeaderboardPanel().setOnOpenBrowser(clanBrowserManager::openPointsLeaderboard);
+		revalPanel.getEventsPanel().setLeaguesBingoPanel(injector.getInstance(LeaguesBingoPanel.class));
+		revalPanel.setOnSyncGuide(() -> {
+			syncGuide.arm();
+			clientThread.invoke(() -> {
+				if (client.getGameState() == GameState.LOGGED_IN) {
+					client.addChatMessage(ChatMessageType.GAMEMESSAGE, "",
+						"Reval: Open your Collection Log - the sync button will be highlighted.", "");
+				}
+			});
+		});
+		revalPanel.showTab(activeTab);
+
+		BufferedImage icon = UIConstants.isHalloweenTheme()
+			? HalloweenDecoration.pumpkinImage(30) : uiAssetLoader.getImage("reval.png");
+		navButton = NavigationButton.builder()
+			.tooltip(UIConstants.isHalloweenTheme() ? "Reval Clan - Halloween" : "Reval Clan")
+			.icon(icon)
+			.priority(1)
+			.panel(revalPanel)
+			.build();
+		clientToolbar.addNavigation(navButton);
+		if (replacing) clientToolbar.openPanel(navButton);
+		if (client.getGameState() == GameState.LOGGED_IN && clanMembership.isMember()) {
+			revalPanel.onLoggedIn();
 		}
 	}
 
@@ -248,6 +271,7 @@ public class RevalClanPlugin extends Plugin {
 		overlayManager.remove(syncGuideOverlay);
 		if (revalPanel != null) {
 			revalPanel.shutDown();
+			revalPanel = null;
 		}
 
 		eventBus.unregister(lootNotifier);
@@ -278,6 +302,7 @@ public class RevalClanPlugin extends Plugin {
 		// Remove the side panel
 		if (navButton != null) {
 			clientToolbar.removeNavigation(navButton);
+			navButton = null;
 		}
 	}
 
@@ -536,6 +561,11 @@ public class RevalClanPlugin extends Plugin {
 
 		if ("hideCompletedItems".equals(event.getKey()) && revalPanel != null) {
 			revalPanel.getProfilePanel().rebuild();
+		}
+		if ("halloweenTheme".equals(event.getKey()) && revalPanel != null) {
+			SwingUtilities.invokeLater(() -> {
+				if (revalPanel != null) rebuildSidepanel();
+			});
 		}
 	}
 
