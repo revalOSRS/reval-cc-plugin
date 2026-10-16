@@ -63,6 +63,7 @@ public final class ClanBrowserWindow extends JFrame {
     private String logCategory, logAccount, logMenuMode;
     private BrowserModels.Catalogue catalogue;
     private BrowserCommand request;
+    private ViewRequest activeRead;
     private BrowserModels.View data;
     private CollectionGrid grid;
     private LeaderboardView standings;
@@ -72,6 +73,14 @@ public final class ClanBrowserWindow extends JFrame {
     private String kind = "clog", lastCategory = "vorkath", lastMetric = "clog";
     private boolean adjusting, closed;
     private int generation;
+
+    private static final class ViewRequest {
+        final BrowserCommand command;
+        final long accountHash;
+        ViewRequest(BrowserCommand command, long accountHash) { this.command = command; this.accountHash = accountHash; }
+        boolean usesViewer() { return command.kind.equals("clog") && command.player == null; }
+        String accountKey() { return command.player == null ? "account:" + accountHash : "player:" + command.player.toLowerCase(Locale.ROOT); }
+    }
 
     public ClanBrowserWindow(Window anchor, BrowserApi api, IntFunction<BufferedImage> icons) {
         super("Reval · Clan browser");
@@ -145,24 +154,34 @@ public final class ClanBrowserWindow extends JFrame {
         addWindowListener(new WindowAdapter() { @Override public void windowClosed(WindowEvent event) { closed = true; generation++; cancel(); } });
     }
 
-    public void identity(long accountHash, String viewer) { this.accountHash = accountHash; this.viewer = viewer; findMe.setEnabled(viewer != null); if (standings != null) standings.viewer(viewer); }
+    public void identity(long accountHash, String viewer) {
+        boolean changed = this.accountHash != accountHash;
+        this.accountHash = accountHash; this.viewer = viewer;
+        findMe.setEnabled(viewer != null); if (standings != null) standings.viewer(viewer);
+        if (changed && activeRead != null && activeRead.usesViewer()) {
+            generation++; cancel(); activeRead = null; data = null; grid = null; standings = null;
+            if (!closed) perform();
+        }
+    }
     public void open(BrowserCommand command) { open(command, null); }
     public void open(BrowserCommand command, String sharedBy) {
         if (!SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Browser window must open on the EDT");
         closed = false; search.setText("");
         setExtendedState(getExtendedState() & ~ICONIFIED); setVisible(true); toFront();
+        if (command.kind.equals("help")) { showHelp(); return; }
+        cancel();
         if (catalogue != null) { configure(command.resolveShared(catalogue.pages, sharedBy)); perform(); return; }
-        request = command; busy(true); message("Loading clan categories…", null);
+        request = command; activeRead = null; data = null; busy(true); message("Loading clan categories…", null);
         final int ticket = ++generation;
         catalogueCall = api.catalogue(result -> {
-            if (closed) return;
+            if (closed || ticket != generation) return;
             catalogue = result;
-            if (ticket != generation) return;
             configure(command.resolveShared(catalogue.pages, sharedBy)); perform();
         }, error -> { if (!closed && ticket == generation) { busy(false); message(error, () -> open(command, sharedBy)); } });
     }
 
     private void configure(BrowserCommand command) {
+        command = command.resolve(catalogue);
         adjusting = true; request = command; kind = command.kind; tools.setVisible(!kind.equals("help"));
         if (command.category != null) lastCategory = command.category;
         if (command.metric != null) lastMetric = command.metric;
@@ -205,10 +224,10 @@ public final class ClanBrowserWindow extends JFrame {
         configure(new BrowserCommand("leaderboard", null, metric, null, null, null)); perform();
     }
     private void chooseMode(String mode) {
-        if (catalogue == null) return;
         // An explicit Collection log tab click always returns to the logged-in account.
         // Category buttons and commands still preserve a deliberately selected clan member.
-        configure(new BrowserCommand(mode, categoryForMode(mode, lastCategory, catalogue.pages), lastMetric, null, null, null)); search.setText(""); perform();
+        String category = catalogue == null ? lastCategory : categoryForMode(mode, lastCategory, catalogue.pages);
+        open(new BrowserCommand(mode, category, lastMetric, null, null, null));
     }
     static String categoryForMode(String mode, String category, List<BrowserModels.Page> pages) {
         if (mode.equals("leaderboard") || mode.equals("clog")) return category;
@@ -236,13 +255,16 @@ public final class ClanBrowserWindow extends JFrame {
     private void perform(boolean refresh) {
         if (request == null) return;
         if (request.kind.equals("help")) { showHelp(); return; }
+        request = request.resolve(catalogue);
         if (dataCall != null) dataCall.cancel();
+        final ViewRequest read = new ViewRequest(request, accountHash);
+        activeRead = read;
         final int ticket = ++generation;
-        dataCall = api.view(request, accountHash, refresh, result -> {
-            if (closed || ticket != generation) return;
+        dataCall = api.view(read.command, read.accountHash, refresh, result -> {
+            if (!accepts(read, ticket)) return;
             data = result; busy(false); render();
         }, error -> {
-            if (closed || ticket != generation) return;
+            if (!accepts(read, ticket)) return;
             busy(false);
             if (categoryBrowser()) collectionMessage(error, () -> submitSelection(refresh));
             else message(error, () -> submitSelection(refresh));
@@ -256,6 +278,10 @@ public final class ClanBrowserWindow extends JFrame {
                 message("Loading clan standings…", null);
             }
         }
+    }
+
+    private boolean accepts(ViewRequest read, int ticket) {
+        return !closed && ticket == generation && activeRead == read && (!read.usesViewer() || read.accountHash == accountHash);
     }
 
     private void render() {
@@ -367,7 +393,7 @@ public final class ClanBrowserWindow extends JFrame {
         return null;
     }
 
-    private String logAccountKey() { return request.player == null ? "account:" + accountHash : "player:" + request.player.toLowerCase(Locale.ROOT); }
+    private String logAccountKey() { return (activeRead != null ? activeRead : new ViewRequest(request, accountHash)).accountKey(); }
 
     private boolean categoryBrowser() { return kind.equals("clog") || kind.equals("luck") || kind.equals("deserved"); }
 
@@ -450,7 +476,8 @@ public final class ClanBrowserWindow extends JFrame {
         JPanel content = panel(new BorderLayout()); content.add(box, BorderLayout.CENTER); return content;
     }
     private void showHelp() {
-        if (dataCall != null) dataCall.cancel(); generation++; data = null; busy(false); grid = null; standings = null;
+        cancel(); generation++; activeRead = null; request = BrowserCommand.parse("reval help"); kind = "help";
+        data = null; busy(false); grid = null; standings = null;
         title.text = "Reval · Command guide"; title.repaint(); setTitle("Reval · Command guide"); body.removeAll();
         tools.setVisible(false); choices.setVisible(false); statistics.setVisible(false);
         modeButtons.values().forEach(button -> highlight(button, false));
@@ -461,7 +488,10 @@ public final class ClanBrowserWindow extends JFrame {
             guide.requestFocusInWindow(); guide.getViewport().setViewPosition(new java.awt.Point(0, 0));
         });
     }
-    private void cancel() { if (dataCall != null) dataCall.cancel(); if (catalogueCall != null) catalogueCall.cancel(); }
+    private void cancel() {
+        if (dataCall != null) { dataCall.cancel(); dataCall = null; }
+        if (catalogueCall != null) { catalogueCall.cancel(); catalogueCall = null; }
+    }
     BrowserModels.View currentView() { return loading.isVisible() ? null : data; }
     private static String titleFor(BrowserCommand command) { return command.kind.equals("clog") ? "Collection Log" : command.kind.equals("deserved") ? "Deserved Greenlogs" : command.kind.equals("dryboard") ? "Dryboard" : command.kind.equals("luck") ? "Greenlog Luck" : "Clan Leaderboards"; }
     private static String capitalize(String value) { return value.substring(0, 1).toUpperCase(Locale.ROOT) + value.substring(1); }

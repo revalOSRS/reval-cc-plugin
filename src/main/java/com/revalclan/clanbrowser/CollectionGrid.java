@@ -1,7 +1,6 @@
 package com.revalclan.clanbrowser;
 
 import java.awt.AlphaComposite;
-import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
@@ -13,7 +12,6 @@ import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.function.IntFunction;
 import javax.swing.JComponent;
@@ -28,8 +26,6 @@ final class CollectionGrid extends JComponent implements Scrollable, javax.acces
     private final Map<Integer, Rectangle> iconBounds = new HashMap<>();
     private final List<Cell> cells = new ArrayList<>();
     private final List<Heading> headings = new ArrayList<>();
-    private String search = "";
-    private String filter = "All items";
     private int lastWidth = -1, lastViewportHeight = -1, layoutHeight;
     private static final class Cell { BrowserModels.Item item; int x, y, size; boolean complete; }
     private static final class Heading { String text, counter, rank; int y; boolean complete; }
@@ -46,15 +42,6 @@ final class CollectionGrid extends JComponent implements Scrollable, javax.acces
         return accessibleContext;
     }
 
-    void filter(String query, String selection) {
-        search = query == null ? "" : query.toLowerCase(Locale.ROOT).trim(); filter = selection;
-        lastWidth = -1; revalidate(); repaint();
-    }
-    private boolean matches(BrowserModels.Item item) {
-        boolean received = item.quantity != null && item.quantity > 0;
-        return (search.isEmpty() || item.name != null && item.name.toLowerCase(Locale.ROOT).contains(search))
-            && (!"Obtained".equals(filter) || received) && (!"Missing".equals(filter) || !received);
-    }
     private void layoutCells() {
         int width = Math.max(200, getWidth() > 0 ? getWidth() : 900);
         int viewportHeight = getParent() instanceof javax.swing.JViewport ? getParent().getHeight() : -1;
@@ -85,9 +72,7 @@ final class CollectionGrid extends JComponent implements Scrollable, javax.acces
         boolean fillWidth = columns > 1 && spare < columns;
         int top = padding;
         for (BrowserModels.Group group : groups) {
-            List<BrowserModels.Item> visible = new ArrayList<>();
-            for (BrowserModels.Item item : group.items) if (matches(item)) visible.add(item);
-            if (visible.isEmpty()) continue;
+            if (group.items.isEmpty()) continue;
             if (groups.size() > 1) {
                 Heading heading = new Heading(); heading.text = group.subcategory + "  (" + group.items.stream().filter(item -> item.quantity != null && item.quantity > 0).count() + " / " + group.items.size() + ")";
                 heading.y = top; heading.complete = group.complete;
@@ -96,14 +81,14 @@ final class CollectionGrid extends JComponent implements Scrollable, javax.acces
                 heading.rank = group.rank == null ? null : "Clan luck: #" + group.rank.rank + " / " + group.rank.total + (group.rank.estimated ? " (est.)" : "");
                 headings.add(heading); top += heading.rank == null ? 42 : 66;
             }
-            for (int i = 0; i < visible.size(); i++) {
+            for (int i = 0; i < group.items.size(); i++) {
                 int column = i % columns;
-                Cell cell = new Cell(); cell.item = visible.get(i);
+                Cell cell = new Cell(); cell.item = group.items.get(i);
                 cell.x = padding + column * (size + gap) + (fillWidth ? column * spare / (columns - 1) : 0);
                 cell.y = top + i / columns * (size + gap);
                 cell.size = size; cell.complete = group.complete; cells.add(cell);
             }
-            int rows = (visible.size() + columns - 1) / columns;
+            int rows = (group.items.size() + columns - 1) / columns;
             top += rows * size + Math.max(0, rows - 1) * gap + 12;
         }
         layoutHeight = Math.max(180, top);
@@ -140,7 +125,7 @@ final class CollectionGrid extends JComponent implements Scrollable, javax.acces
             BrowserTheme.text(g, cell.item.quantity == null ? "?" : BrowserTheme.number(cell.item.quantity), cell.x + cell.size - 5, cell.y + 1, 26, cell.size - 8,
                 cell.size >= 100 ? 28 : 23, received ? BrowserTheme.YELLOW : BrowserTheme.MUTED, true, true);
         }
-        if (cells.isEmpty()) BrowserTheme.text(g, "No items match your filter", 24, 30, 45, getWidth() - 48, 26, BrowserTheme.MUTED, false, false);
+        if (cells.isEmpty()) BrowserTheme.text(g, "No items in this collection log", 24, 30, 45, getWidth() - 48, 26, BrowserTheme.MUTED, false, false);
         g.dispose();
     }
     private BufferedImage icon(Integer id) {

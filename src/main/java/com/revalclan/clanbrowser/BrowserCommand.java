@@ -67,21 +67,45 @@ public final class BrowserCommand {
         return new BrowserCommand(kind, words.isEmpty() ? "vorkath" : String.join(" ", words), null, null, null, player);
     }
 
+    /** Resolve request/cache identities independently of how a command spelled its category. */
+    public BrowserCommand resolve(BrowserModels.Catalogue catalogue) {
+        if (catalogue == null) return this;
+        BrowserCommand resolved = resolvePlayerSuffix(catalogue.pages);
+        BrowserModels.Choice matched = "bosses".equals(metric) ? match(boss, catalogue.bosses) : null;
+        return matched == null ? resolved : new BrowserCommand(kind, resolved.category, metric, matched.value, tier, resolved.player);
+    }
+
+    private static BrowserModels.Choice match(String value, List<? extends BrowserModels.Choice> choices) {
+        if (value == null) return null;
+        String needle = normalize(value);
+        for (BrowserModels.Choice choice : choices) {
+            if (normalize(choice.value).equals(needle) || normalize(choice.label).equals(needle)
+                || choice.aliases.stream().anyMatch(alias -> normalize(alias).equals(needle))) return choice;
+        }
+        return null;
+    }
+
     /** Also accept ::reval clog forestry Valgusruum, resolving the longest known page first. */
     public BrowserCommand resolvePlayerSuffix(List<BrowserModels.Page> pages) {
+        List<BrowserModels.Page> candidates = new ArrayList<>(pages);
+        if (kind.equals("clog")) {
+            BrowserModels.Page allClues = new BrowserModels.Page(); allClues.value = "clues"; allClues.label = "All clue tiers";
+            allClues.aliases.addAll(Arrays.asList("clues", "all clues", "all clue tiers")); candidates.add(allClues);
+        }
+        BrowserModels.Choice exact = match(category, candidates);
+        if (exact != null) return withCategory(exact.value);
         if (!kind.equals("clog") || player != null || category == null) return this;
         String needle = normalize(category), best = null;
-        List<BrowserModels.Page> candidates = new ArrayList<>(pages);
-        BrowserModels.Page allClues = new BrowserModels.Page(); allClues.value = "clues"; allClues.label = "All clue tiers";
-        allClues.aliases.addAll(Arrays.asList("clues", "all clues", "all clue tiers")); candidates.add(allClues);
+        BrowserModels.Page bestPage = null;
         for (BrowserModels.Page page : candidates) {
             List<String> names = new ArrayList<>(page.aliases);
             names.add(page.value);
             names.add(page.label);
             for (String raw : names) {
                 String name = normalize(raw);
-                if (needle.equals(name)) return withCategory(page.value);
-                if (!name.isEmpty() && needle.startsWith(name + " ") && (best == null || name.length() > best.length())) best = name;
+                if (!name.isEmpty() && needle.startsWith(name + " ") && (best == null || name.length() > best.length())) {
+                    best = name; bestPage = page;
+                }
             }
         }
         if (best == null) return this;
@@ -91,7 +115,7 @@ public final class BrowserCommand {
         for (int i = 0; i < best.split(" ").length && original.find(); i++) end = original.end();
         String tail = category.substring(end).trim();
         if (!validPlayer(tail)) return this;
-        return new BrowserCommand(kind, best, metric, boss, tier, tail);
+        return new BrowserCommand(kind, bestPage.value, metric, boss, tier, tail);
     }
 
     public BrowserCommand withCategory(String value) { return new BrowserCommand(kind, value, metric, boss, tier, player); }

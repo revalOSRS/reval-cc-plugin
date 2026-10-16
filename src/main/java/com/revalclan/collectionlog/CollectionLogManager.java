@@ -459,30 +459,12 @@ public class CollectionLogManager {
 
 		subcategoryData.put("items", itemsList);
 
-		// Add primary KC
-		addPrimaryKC(subcategorySlug, subcategoryData);
-		
-		// Add additional KCs (including derived and summed)
-		addAdditionalKCs(subcategorySlug, subcategoryData);
+		Map<String, Integer> counters = readPageCounters(subcategorySlug);
+		// The legacy sync shape always includes a primary KC, even for pages without one.
+		subcategoryData.put("kc", counters.getOrDefault("kc", 0));
+		subcategoryData.putAll(counters);
 
 		return subcategoryData;
-	}
-
-	/**
-	 * Add primary KC to subcategory data
-	 */
-	private void addPrimaryKC(String subcategorySlug, Map<String, Object> subcategoryData) {
-		KCSource kcSource = categoryKCMap.get(subcategorySlug);
-		if (kcSource != null) {
-			try {
-				int kc = kcSource.isVarbit ? client.getVarbitValue(kcSource.id) : client.getVarpValue(kcSource.id);
-				subcategoryData.put("kc", kc);
-			} catch (Exception e) {
-				subcategoryData.put("kc", 0);
-			}
-		} else {
-			subcategoryData.put("kc", 0);
-		}
 	}
 
 	/** Counter-only payload for pages touched by these items; null means all pages. */
@@ -506,27 +488,33 @@ public class CollectionLogManager {
 		if (pages.contains("the_nightmare")) pages.add("phosanis_nightmare");
 		Map<String, Map<String, Integer>> result = new HashMap<>();
 		for (String page : pages) {
-			Map<String, Integer> values = new HashMap<>();
-			readCounter(values, "kc", categoryKCMap.get(page));
-			for (Map.Entry<String, KCSource> entry : additionalKCMap.getOrDefault(page, Collections.emptyMap()).entrySet()) {
-				readCounter(values, entry.getKey(), entry.getValue());
-			}
-			for (Map.Entry<String, String[]> entry : derivedKCMap.getOrDefault(page, Collections.emptyMap()).entrySet()) {
-				String[] sources = entry.getValue();
-				if (values.containsKey(sources[0]) && values.containsKey(sources[1])) {
-					int value = values.get(sources[0]) - values.get(sources[1]);
-					if (value >= 0) values.put(entry.getKey(), value);
-				}
-			}
-			for (Map.Entry<String, String[]> entry : summedKCMap.getOrDefault(page, Collections.emptyMap()).entrySet()) {
-				if (Arrays.stream(entry.getValue()).allMatch(values::containsKey)) {
-					values.put(entry.getKey(), Arrays.stream(entry.getValue()).mapToInt(values::get).sum());
-				}
-			}
-			values.keySet().removeIf(key -> key.endsWith("_combined_kc"));
+			Map<String, Integer> values = readPageCounters(page);
 			if (!values.isEmpty()) result.put(page, values);
 		}
 		return result;
+	}
+
+	/** Shared validated inputs and calculations for both sync and event snapshots. */
+	private Map<String, Integer> readPageCounters(String page) {
+		Map<String, Integer> values = new HashMap<>();
+		readCounter(values, "kc", categoryKCMap.get(page));
+		for (Map.Entry<String, KCSource> entry : additionalKCMap.getOrDefault(page, Collections.emptyMap()).entrySet()) {
+			readCounter(values, entry.getKey(), entry.getValue());
+		}
+		for (Map.Entry<String, String[]> entry : derivedKCMap.getOrDefault(page, Collections.emptyMap()).entrySet()) {
+			String[] sources = entry.getValue();
+			if (values.containsKey(sources[0]) && values.containsKey(sources[1])) {
+				int value = values.get(sources[0]) - values.get(sources[1]);
+				if (value >= 0) values.put(entry.getKey(), value);
+			}
+		}
+		for (Map.Entry<String, String[]> entry : summedKCMap.getOrDefault(page, Collections.emptyMap()).entrySet()) {
+			if (Arrays.stream(entry.getValue()).allMatch(values::containsKey)) {
+				values.put(entry.getKey(), Arrays.stream(entry.getValue()).mapToInt(values::get).sum());
+			}
+		}
+		values.keySet().removeIf(key -> key.endsWith("_combined_kc"));
+		return values;
 	}
 
 	private void readCounter(Map<String, Integer> values, String key, KCSource source) {
@@ -536,56 +524,6 @@ public class CollectionLogManager {
 			if (value >= 0) values.put(key, value);
 		} catch (RuntimeException ignored) {
 			// Unavailable is not a zero-count completion.
-		}
-	}
-
-	/**
-	 * Add additional KCs including derived and summed calculations
-	 */
-	private void addAdditionalKCs(String subcategorySlug, Map<String, Object> subcategoryData) {
-		Map<String, KCSource> additionalKCs = additionalKCMap.get(subcategorySlug);
-		if (additionalKCs == null || additionalKCs.isEmpty()) return;
-
-		Map<String, Integer> kcValues = new HashMap<>();
-		
-		// Fetch all KC values
-		for (Map.Entry<String, KCSource> entry : additionalKCs.entrySet()) {
-			try {
-				KCSource source = entry.getValue();
-				int value = source.isVarbit ? client.getVarbitValue(source.id) : client.getVarpValue(source.id);
-				kcValues.put(entry.getKey(), value);
-			} catch (Exception e) {
-				kcValues.put(entry.getKey(), 0);
-			}
-		}
-		
-		// Process derived KCs (subtraction: original = combined - awakened)
-		Map<String, String[]> derivedKCs = derivedKCMap.get(subcategorySlug);
-		if (derivedKCs != null) {
-			for (Map.Entry<String, String[]> entry : derivedKCs.entrySet()) {
-				String[] calc = entry.getValue();
-				int result = kcValues.getOrDefault(calc[0], 0) - kcValues.getOrDefault(calc[1], 0);
-				kcValues.put(entry.getKey(), result);
-			}
-		}
-		
-		// Process summed KCs (addition: total = sum of all sources)
-		Map<String, String[]> summedKCs = summedKCMap.get(subcategorySlug);
-		if (summedKCs != null) {
-			for (Map.Entry<String, String[]> entry : summedKCs.entrySet()) {
-				int sum = 0;
-				for (String sourceKCName : entry.getValue()) {
-					sum += kcValues.getOrDefault(sourceKCName, 0);
-				}
-				kcValues.put(entry.getKey(), sum);
-			}
-		}
-		
-		// Add all KC values to subcategory data (exclude intermediate _combined_kc values)
-		for (Map.Entry<String, Integer> entry : kcValues.entrySet()) {
-			if (!entry.getKey().endsWith("_combined_kc")) {
-				subcategoryData.put(entry.getKey(), entry.getValue());
-			}
 		}
 	}
 

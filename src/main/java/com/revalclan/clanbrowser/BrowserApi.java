@@ -45,6 +45,7 @@ public class BrowserApi {
     }
 
     public Call view(BrowserCommand command, long accountHash, boolean refresh, Consumer<BrowserModels.View> success, Consumer<String> failure) {
+        command = command.resolve(cached);
         Map<String, String> parameters = command.parameters(accountHash);
         Map<String, String> identity = new LinkedHashMap<>(parameters);
         identity.replaceAll((name, value) -> name.equals("accountHash") ? value :
