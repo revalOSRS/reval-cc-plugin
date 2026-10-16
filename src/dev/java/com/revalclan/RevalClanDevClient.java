@@ -3,7 +3,7 @@ package com.revalclan;
 import net.runelite.client.RuneLite;
 import net.runelite.client.externalplugins.ExternalPluginManager;
 
-public class RevalClanPluginTest
+public class RevalClanDevClient
 {
 	public static void main(String[] args) throws Exception
 	{

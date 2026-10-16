@@ -82,6 +82,11 @@ its optional `revalBrowserAtlas` points to a local sprite atlas for visual QA. W
 override, the plugin uses the normal Reval backend. The backend clan-browser endpoints must be
 deployed before an owner-managed plugin release.
 
+Local launchers and their logging config live in `src/dev`. `./gradlew build` creates the plugin
+jar from `src/main`; `./gradlew shadowJar` creates the standalone development client with its
+RuneLite runtime. Use `./gradlew runClient` to launch the client normally. Neither jar includes
+automated test classes or test-framework dependencies.
+
 ### 🖥️ Sidepanel UI (Planned)
 A dedicated panel for Reval clan members with:
 - **Profile**: View your clan rank, points progress, milestones, and achievements
