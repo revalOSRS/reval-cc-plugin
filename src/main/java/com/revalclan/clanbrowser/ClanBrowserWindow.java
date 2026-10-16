@@ -2,7 +2,6 @@ package com.revalclan.clanbrowser;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
-import java.awt.Dialog;
 import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
@@ -24,7 +23,7 @@ import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JComponent;
-import javax.swing.JDialog;
+import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JProgressBar;
@@ -36,8 +35,8 @@ import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import okhttp3.Call;
 
-/** One owned, modeless window. Game ticks/network work never run on the Swing event thread. */
-public final class ClanBrowserWindow extends JDialog {
+/** Independent window: the game can regain focus and stack above it while it stays open. */
+public final class ClanBrowserWindow extends JFrame {
     private final BrowserApi api;
     private final IntFunction<BufferedImage> icons;
     private final JPanel body = panel(new BorderLayout());
@@ -78,7 +77,7 @@ public final class ClanBrowserWindow extends JDialog {
     private int generation;
 
     public ClanBrowserWindow(Window owner, BrowserApi api, IntFunction<BufferedImage> icons) {
-        super(owner, "Reval · Clan browser", Dialog.ModalityType.MODELESS);
+        super("Reval · Clan browser");
         this.api = api; this.icons = icons;
         setDefaultCloseOperation(DISPOSE_ON_CLOSE); setMinimumSize(new Dimension(960, 620)); setSize(1180, 820);
         setLocationRelativeTo(owner);
@@ -206,7 +205,9 @@ public final class ClanBrowserWindow extends JDialog {
     }
     private void chooseMode(String mode) {
         if (catalogue == null) return;
-        configure(new BrowserCommand(mode, categoryForMode(mode, lastCategory, catalogue.pages), lastMetric, null, null, player.getText())); search.setText(""); perform();
+        // An explicit Collection log tab click always returns to the logged-in account.
+        // Category buttons and commands still preserve a deliberately selected clan member.
+        configure(new BrowserCommand(mode, categoryForMode(mode, lastCategory, catalogue.pages), lastMetric, null, null, mode.equals("clog") ? null : player.getText())); search.setText(""); perform();
     }
     static String categoryForMode(String mode, String category, List<BrowserModels.Page> pages) {
         if (mode.equals("leaderboard") || mode.equals("clog")) return category;
@@ -442,7 +443,7 @@ public final class ClanBrowserWindow extends JDialog {
     }
     private JPanel messagePanel(String text, Runnable retry) {
         JPanel box = panel(new GridBagLayout()); JPanel inner = panel(new BorderLayout(0, 16));
-        JLabel label = label(text, 23, BrowserTheme.TEXT); label.setHorizontalAlignment(SwingConstants.CENTER); inner.add(label, BorderLayout.CENTER);
+        JLabel label = label(BrowserTheme.plainText(text), 23, BrowserTheme.TEXT); label.setHorizontalAlignment(SwingConstants.CENTER); inner.add(label, BorderLayout.CENTER);
         if (retry != null) { JButton button = BrowserTheme.button("Try again"); button.addActionListener(event -> retry.run()); inner.add(button, BorderLayout.SOUTH); }
         box.add(inner);
         JPanel content = panel(new BorderLayout()); content.add(box, BorderLayout.CENTER); return content;

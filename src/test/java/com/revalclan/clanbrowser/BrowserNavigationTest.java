@@ -19,6 +19,8 @@ import javax.swing.JProgressBar;
 import javax.swing.SwingUtilities;
 import javax.swing.JTextField;
 import javax.swing.JTable;
+import javax.swing.JLabel;
+import javax.swing.JFrame;
 import okhttp3.Call;
 import okhttp3.OkHttpClient;
 import org.junit.After;
@@ -38,6 +40,7 @@ public class BrowserNavigationTest {
     private final BlockingQueue<String> errors = new LinkedBlockingQueue<>();
     private final AtomicInteger reads = new AtomicInteger();
     private final AtomicBoolean failBoss = new AtomicBoolean();
+    private final BlockingQueue<okhttp3.HttpUrl> queries = new LinkedBlockingQueue<>();
 
     @Before public void start() throws Exception {
         assumeFalse("Native window checks need a desktop", GraphicsEnvironment.isHeadless());
@@ -50,15 +53,18 @@ public class BrowserNavigationTest {
         });
         server.createContext("/plugin/clan-browser/view", exchange -> {
             reads.incrementAndGet();
+            okhttp3.HttpUrl url = okhttp3.HttpUrl.parse("http://localhost" + exchange.getRequestURI()); queries.offer(url);
             boolean boss = exchange.getRequestURI().getQuery().contains("category=vorkath");
             if (boss) try { releaseBoss.await(5,TimeUnit.SECONDS); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
             String query=exchange.getRequestURI().getQuery();
             String selected = boss ? page("vorkath","Vorkath","Bosses") : query.contains("category=zulrah") ? page("zulrah","Zulrah","Bosses") : page("forestry","Forestry","Other");
             String kind=query.contains("command=deserved") ? "deserved" : query.contains("command=luck") ? "luck" : "clog";
             boolean failure = boss && failBoss.get();
-            byte[] body = (failure ? "{\"status\":\"error\",\"message\":\"Temporarily unavailable\"}" :
-                "{\"status\":\"success\",\"data\":{\"kind\":\""+kind+"\",\"completedPages\":[{\"category\":\"Other\",\"subcategory\":\"Forestry\"},{\"category\":\"Bosses\",\"subcategory\":\"Zulrah\"}],\"page\":"+selected+",\"account\":{\"osrs_nickname\":\"Valgusruum\",\"obtained\":141,\"total\":1717},\"groups\":[],\"rows\":[{\"player\":\"Clan Member\",\"rank\":1,\"value\":812,\"status\":\"complete\"}]}}").getBytes(StandardCharsets.UTF_8);
-            exchange.sendResponseHeaders(failure ? 500 : 200,body.length); exchange.getResponseBody().write(body); exchange.close();
+            boolean loggedOut = kind.equals("clog") && url.queryParameter("player") == null && url.queryParameter("accountHash") == null;
+            String account = "otherguy".equalsIgnoreCase(url.queryParameter("player")) ? "OtherGuy" : url.queryParameter("player") == null ? "My Account" : "Valgusruum";
+            byte[] body = (loggedOut ? "{\"status\":\"error\",\"message\":\"Log in to view your log, or enter a clan member’s OSRS name.\"}" : failure ? "{\"status\":\"error\",\"message\":\"Temporarily unavailable\"}" :
+                "{\"status\":\"success\",\"data\":{\"kind\":\""+kind+"\",\"completedPages\":[{\"category\":\"Other\",\"subcategory\":\"Forestry\"},{\"category\":\"Bosses\",\"subcategory\":\"Zulrah\"}],\"page\":"+selected+",\"account\":{\"osrs_nickname\":\""+account+"\",\"obtained\":141,\"total\":1717},\"groups\":[],\"rows\":[{\"player\":\"Clan Member\",\"rank\":1,\"value\":812,\"status\":\"complete\"}]}}").getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(loggedOut ? 400 : failure ? 500 : 200,body.length); exchange.getResponseBody().write(body); exchange.close();
         });
         server.start();
         System.setProperty("reval.browserApi","http://127.0.0.1:"+server.getAddress().getPort()+"/plugin");
@@ -73,6 +79,7 @@ public class BrowserNavigationTest {
             window.open(BrowserCommand.parse("reval clog forestry Valgusruum")); window.setVisible(false);
         });
         assertNotNull("Initial collection log did not load",loaded.poll(5,TimeUnit.SECONDS));
+        queries.clear();
     }
 
     @After public void stop() throws Exception {
@@ -156,6 +163,51 @@ public class BrowserNavigationTest {
             assertEquals("luck",window.currentView().kind); assertFalse(loading(window));
         });
         assertEquals("Returning to Luck must reuse its cached standings",4,reads.get());
+    }
+
+    @Test public void collectionLogTabDefaultsToOwnAccountButExplicitPlayerNavigationStaysSelected() throws Exception {
+        releaseBoss.countDown();
+        SwingUtilities.invokeAndWait(() -> { window.identity(42L,"My Account"); button(window,"Collection log").doClick(0); });
+        assertNotNull(loaded.poll(5,TimeUnit.SECONDS));
+        okhttp3.HttpUrl own = queries.poll(5,TimeUnit.SECONDS);
+        assertNotNull("Switching to your account must issue its own request",own);
+        assertEquals("42",own.queryParameter("accountHash"));
+        assertNull("The Collection log tab must discard the previously viewed account",own.queryParameter("player"));
+        SwingUtilities.invokeAndWait(() -> assertEquals("My Account",window.currentView().account.name));
+        SwingUtilities.invokeAndWait(() -> button(window,"Bosses").doClick(0));
+        assertNotNull(loaded.poll(5,TimeUnit.SECONDS));
+        assertNull("Category navigation must keep using the viewer's account",queries.poll(5,TimeUnit.SECONDS).queryParameter("player"));
+        SwingUtilities.invokeAndWait(() -> { window.open(BrowserCommand.parse("reval clog forestry OtherGuy")); window.setVisible(false); });
+        assertNotNull(loaded.poll(5,TimeUnit.SECONDS)); assertEquals("otherguy",queries.poll(5,TimeUnit.SECONDS).queryParameter("player"));
+        SwingUtilities.invokeAndWait(() -> button(window,"Bosses").doClick(0));
+        assertNotNull(loaded.poll(5,TimeUnit.SECONDS));
+        assertEquals("OtherGuy",queries.poll(5,TimeUnit.SECONDS).queryParameter("player"));
+    }
+
+    @Test public void serverErrorTypographyIsReadableInTheRunescapeFont() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { window.open(BrowserCommand.parse("reval clog forestry")); window.setVisible(false); });
+        assertNotNull("Expected the logged-out error",errors.poll(5,TimeUnit.SECONDS));
+        SwingUtilities.invokeAndWait(() -> {
+            JLabel message = messageLabel(window,"Log in to view your log"); assertNotNull(message);
+            assertEquals("Log in to view your log, or enter a clan member's OSRS name.",message.getText());
+            assertEquals("Every character in the displayed error must have a glyph",-1,message.getFont().canDisplayUpTo(message.getText()));
+        });
+    }
+
+    @Test public void browserIsAnIndependentWindowThatCannotHoldTheGameBehindAnOwnedDialog() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            assertTrue("The browser must be a separate frame",JFrame.class.isInstance(window));
+            assertNull("The game must not own a dialog that stays above it",window.getOwner());
+            assertFalse(window.isAlwaysOnTop());
+        });
+    }
+
+    private static JLabel messageLabel(Container root,String prefix) {
+        for (Component child : root.getComponents()) {
+            if (child instanceof JLabel && ((JLabel)child).getText() != null && ((JLabel)child).getText().startsWith(prefix)) return (JLabel)child;
+            if (child instanceof Container) { JLabel found=messageLabel((Container)child,prefix); if (found != null) return found; }
+        }
+        return null;
     }
     private static boolean categoryDropdownVisible(Container root) {
         for (Component child : root.getComponents()) {

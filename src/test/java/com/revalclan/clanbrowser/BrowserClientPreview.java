@@ -7,7 +7,6 @@ import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.externalplugins.ExternalPluginManager;
 import net.runelite.client.plugins.PluginManager;
 import javax.swing.Timer;
-import javax.swing.JDialog;
 import java.awt.Window;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
@@ -38,9 +37,8 @@ public class BrowserClientPreview {
                 ClanBrowserWindow window = (ClanBrowserWindow) candidate;
                 if (window.currentView() == null) return;
                 try {
-                    JDialog dialog = window;
-                    BufferedImage image = new BufferedImage(dialog.getContentPane().getWidth(), dialog.getContentPane().getHeight(), BufferedImage.TYPE_INT_ARGB);
-                    Graphics2D g = image.createGraphics(); dialog.getContentPane().printAll(g); g.dispose();
+                    BufferedImage image = new BufferedImage(window.getContentPane().getWidth(), window.getContentPane().getHeight(), BufferedImage.TYPE_INT_ARGB);
+                    Graphics2D g = image.createGraphics(); window.getContentPane().printAll(g); g.dispose();
                     ImageIO.write(image, "png", Path.of(path).toFile());
                     System.out.println("RuneLite browser render saved: " + path); capture.stop();
                 } catch (Exception error) { error.printStackTrace(); capture.stop(); }

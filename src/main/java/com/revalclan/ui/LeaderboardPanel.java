@@ -34,6 +34,7 @@ public class LeaderboardPanel extends JPanel {
 	private final JPanel profileViewPanel;
 	private JTextField searchField;
 	private RefreshButton refreshButton;
+	private final JButton openBrowserButton = new JButton("Open full leaderboard");
 
 	private List<LeaderboardResponse.LeaderboardEntry> allEntries = new ArrayList<>();
 	private List<LeaderboardResponse.LeaderboardEntry> filteredEntries = new ArrayList<>();
@@ -81,7 +82,7 @@ public class LeaderboardPanel extends JPanel {
 	}
 
 	private JPanel createSearchPanel() {
-		JPanel panel = new JPanel(new BorderLayout());
+		JPanel panel = new JPanel(new BorderLayout(0, 8));
 		panel.setBackground(UIConstants.CARD_BG);
 		panel.setBorder(new EmptyBorder(8, 10, 8, 10));
 
@@ -103,7 +104,23 @@ public class LeaderboardPanel extends JPanel {
 		});
 
 		panel.add(searchField, BorderLayout.CENTER);
+		openBrowserButton.setFont(FontManager.getRunescapeSmallFont());
+		openBrowserButton.setForeground(UIConstants.ACCENT_GOLD);
+		openBrowserButton.setBackground(UIConstants.BACKGROUND);
+		openBrowserButton.setBorder(BorderFactory.createCompoundBorder(
+			BorderFactory.createLineBorder(UIConstants.BORDER_COLOR), new EmptyBorder(7, 6, 7, 6)));
+		openBrowserButton.setFocusPainted(false);
+		openBrowserButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+		openBrowserButton.setToolTipText("Open the clan browser at Total Points");
+		openBrowserButton.setEnabled(false);
+		panel.add(openBrowserButton, BorderLayout.SOUTH);
 		return panel;
+	}
+
+	public void setOnOpenBrowser(Runnable openBrowser) {
+		for (java.awt.event.ActionListener listener : openBrowserButton.getActionListeners()) openBrowserButton.removeActionListener(listener);
+		openBrowserButton.setEnabled(openBrowser != null);
+		if (openBrowser != null) openBrowserButton.addActionListener(event -> openBrowser.run());
 	}
 
 	private JPanel createBackHeader(String playerName) {

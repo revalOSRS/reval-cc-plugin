@@ -27,6 +27,12 @@ final class BrowserTheme {
     static final NumberFormat NUMBERS = NumberFormat.getIntegerInstance(Locale.US);
     private static final DateTimeFormatter STAMP = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm 'UTC'").withZone(ZoneOffset.UTC);
     private BrowserTheme() {}
+    /** API prose can contain typography absent from the RuneScape pixel font. */
+    static String plainText(String text) {
+        return text == null ? null : text.replace('\u2018', '\'').replace('\u2019', '\'')
+            .replace('\u201c', '"').replace('\u201d', '"').replace('\u2013', '-').replace('\u2014', '-')
+            .replace("\u2026", "...").replace('\u00a0', ' ');
+    }
     static String number(Number value) { return value == null ? "?" : NUMBERS.format(value); }
     static Font font(float size, boolean bold) { return (bold ? FontManager.getRunescapeBoldFont() : FontManager.getRunescapeFont()).deriveFont(size); }
     static String timestamp(String value) {
