@@ -49,6 +49,7 @@ public final class ClanBrowserWindow extends JDialog {
     private final JPanel choices = panel(new BorderLayout(8, 0));
     private final JPanel statistics = panel(new BorderLayout(0, 8));
     private final JPanel extra = panel(new BorderLayout());
+    private final JPanel tools = panel(new BorderLayout(8, 0));
     private final JComboBox<String> tiers = new JComboBox<>(new String[]{"All tiers", "Beginner", "Easy", "Medium", "Hard", "Elite", "Master"});
     private final JTextField search = new JTextField();
     private final JComboBox<String> itemFilter = new JComboBox<>(new String[]{"All items", "Obtained", "Missing"});
@@ -59,9 +60,11 @@ public final class ClanBrowserWindow extends JDialog {
     private final Map<String, String> lastLogPages = new LinkedHashMap<>();
     private final Map<String, JButton> logTabs = new LinkedHashMap<>();
     private final Map<String, JButton> logPages = new LinkedHashMap<>();
+    private final java.util.Set<String> completedLogPages = new java.util.HashSet<>();
+    private String completionAccount, completionGeneratedAt;
     private JPanel logContent, logSidebar, logDetail;
     private Strip logStrip;
-    private String logCategory, logAccount;
+    private String logCategory, logAccount, logMenuMode;
     private BrowserModels.Catalogue catalogue;
     private BrowserCommand request;
     private BrowserModels.View data;
@@ -112,7 +115,7 @@ public final class ClanBrowserWindow extends JDialog {
         tiers.addActionListener(event -> { if (!adjusting) submitSelection(); });
         styleCombo(tiers); styleCombo(itemFilter);
         controls.add(choices);
-        JPanel tools = panel(new BorderLayout(8, 0)); BrowserTheme.field(search); search.getAccessibleContext().setAccessibleName("Search displayed items or clan members");
+        BrowserTheme.field(search); search.getAccessibleContext().setAccessibleName("Search displayed items or clan members");
         tools.add(search, BorderLayout.CENTER);
         JPanel toolsRight = panel(new java.awt.FlowLayout(java.awt.FlowLayout.RIGHT, 6, 0));
         toolsRight.add(playerBox); toolsRight.add(itemFilter); toolsRight.add(findMe);
@@ -161,7 +164,7 @@ public final class ClanBrowserWindow extends JDialog {
     }
 
     private void configure(BrowserCommand command) {
-        adjusting = true; request = command; kind = command.kind;
+        adjusting = true; request = command; kind = command.kind; tools.setVisible(!kind.equals("help"));
         if (command.category != null) lastCategory = command.category;
         if (command.metric != null) lastMetric = command.metric;
         for (Map.Entry<String, JButton> entry : modeButtons.entrySet()) {
@@ -170,7 +173,7 @@ public final class ClanBrowserWindow extends JDialog {
         }
         List<BrowserModels.Page> pages = new ArrayList<>();
         if (catalogue != null) for (BrowserModels.Page page : catalogue.pages) if (!kind.equals("dryboard") || page.category.equals("Bosses") || page.category.equals("Raids")) pages.add(page);
-        boolean board = kind.equals("leaderboard"); choices.setVisible(!board && !kind.equals("clog")); statistics.setVisible(board);
+        boolean board = kind.equals("leaderboard"); choices.setVisible(kind.equals("dryboard")); statistics.setVisible(board);
         selection.choices(pages);
         selection.placeholder("Search a category, or type cox / tob / toa…");
         selection.value(lastCategory);
@@ -219,7 +222,7 @@ public final class ClanBrowserWindow extends JDialog {
     private void submitSelection(boolean refresh) {
         if (catalogue == null || adjusting) return;
         String metric = kind.equals("leaderboard") ? lastMetric : null;
-        request = new BrowserCommand(kind, kind.equals("leaderboard") ? null : kind.equals("clog") ? lastCategory : selection.value(), metric,
+        request = new BrowserCommand(kind, kind.equals("leaderboard") ? null : categoryBrowser() ? lastCategory : selection.value(), metric,
             "bosses".equals(metric) ? boss.value() : null,
             "clues".equals(metric) ? "All tiers".equals(tiers.getSelectedItem()) ? "all" : tiers.getSelectedItem().toString().toLowerCase(Locale.ROOT) : null,
             kind.equals("clog") ? player.getText() : null);
@@ -239,13 +242,13 @@ public final class ClanBrowserWindow extends JDialog {
         }, error -> {
             if (closed || ticket != generation) return;
             busy(false);
-            if (request.kind.equals("clog")) collectionMessage(error, () -> submitSelection(refresh));
+            if (categoryBrowser()) collectionMessage(error, () -> submitSelection(refresh));
             else message(error, () -> submitSelection(refresh));
         });
         // Cache hits have already rendered in this EDT event. Never clear them for a loading frame.
         if (dataCall != null) {
             data = null; grid = null; standings = null;
-            if (request.kind.equals("clog")) { busy(false); loadingItems(); }
+            if (categoryBrowser()) { busy(false); loadingDetails(); }
             else {
                 busy(true); title.text = titleFor(request); title.repaint();
                 message("Loading clan standings…", null);
@@ -260,14 +263,16 @@ public final class ClanBrowserWindow extends JDialog {
             title.text = "Collection Log  (" + BrowserTheme.number(data.account.obtained) + " / " + BrowserTheme.number(data.account.total) + ")";
             if (data.page.value != null) { lastCategory = data.page.value; lastLogPages.put(data.page.category, data.page.value); }
             if (request.player != null) player.setText(data.account.name);
-            collectionLayout(); collectionNavigation(data.page);
+            collectionLayout(); rememberCompletions(); collectionNavigation(data.page);
             logAccount = logAccountKey();
             logStrip.update(data.account.name, "Last synced: " + BrowserTheme.timestamp(data.account.lastSyncedAt));
             logDetail.removeAll(); logDetail.add(new LogSummary(data), BorderLayout.NORTH);
             grid = new CollectionGrid(data.groups, icons); logDetail.add(BrowserTheme.scroll(grid), BorderLayout.CENTER);
             setTitle("Reval · " + data.account.name + " · " + data.page.label);
         } else {
-            body.removeAll();
+            JPanel destination = body;
+            if (categoryBrowser()) { collectionLayout(); collectionNavigation(data.page); logDetail.removeAll(); destination = logDetail; }
+            else body.removeAll();
             String page = data.page != null ? data.page.label : null;
             title.text = "dryboard".equals(data.kind) ? "Dryboard · " + page : "deserved".equals(data.kind) ? "Deserved Greenlogs · " + page : "luck".equals(data.kind) ? "Greenlog Luck · " + page : data.title;
             String left = "dryboard".equals(data.kind) ? "Kills since last recorded unique" : page != null ? page : "Full clan standings";
@@ -277,11 +282,11 @@ public final class ClanBrowserWindow extends JDialog {
                     ? ("deserved".equals(data.kind) ? "Highest" : "Lowest") + " completion " + LeaderboardView.metricLabel(data) + " first" : "Completed logs first";
             }
             String right = data.completedTotal != null ? BrowserTheme.number(data.completedTotal) + " greenlogged" : data.subtitle != null ? data.subtitle : "Updated: " + BrowserTheme.timestamp(data.generatedAt);
-            body.add(new Strip(left, right), BorderLayout.NORTH);
+            destination.add(new Strip(left, right), BorderLayout.NORTH);
             standings = new LeaderboardView(data, viewer, data.page == null ? null : name -> {
                 configure(new BrowserCommand("clog", data.page.value != null ? data.page.value : data.page.subcategory, null, null, null, name)); perform();
             });
-            body.add(standings, BorderLayout.CENTER);
+            destination.add(standings, BorderLayout.CENTER);
             setTitle("Reval · " + title.text);
         }
         title.repaint(); filter(); body.revalidate(); body.repaint();
@@ -303,23 +308,54 @@ public final class ClanBrowserWindow extends JDialog {
             pages.add(logSidebar, BorderLayout.WEST); pages.add(logDetail, BorderLayout.CENTER);
             logContent.add(pages, BorderLayout.CENTER);
         }
+        logStrip.setVisible(kind.equals("clog"));
         if (logContent.getParent() != body) { body.removeAll(); body.add(logContent, BorderLayout.CENTER); }
     }
 
     private void collectionNavigation(BrowserModels.Page page) {
         if (page == null) return;
-        if (!page.category.equals(logCategory)) {
-            logCategory = page.category; logPages.clear(); logSidebar.removeAll();
+        String menuMode = kind.equals("clog") ? "clog" : "board";
+        if (!page.category.equals(logCategory) || !menuMode.equals(logMenuMode)) {
+            logCategory = page.category; logMenuMode = menuMode; logPages.clear(); logSidebar.removeAll();
             logSidebar.add(categoryList(page.category, page.value), BorderLayout.CENTER);
         }
         if (page.value != null) lastLogPages.put(page.category, page.value);
         logTabs.forEach((category, button) -> highlight(button, category.equals(page.category)));
-        logPages.forEach((value, button) -> highlight(button, value.equals(page.value)));
+        logPages.forEach((value, button) -> {
+            BrowserModels.Page entry = value.equals("clues") ? null : catalogue.pages.stream().filter(item -> value.equals(item.value)).findFirst().orElse(null);
+            boolean complete = kind.equals("clog") && (entry == null ? value.equals("clues") && allCluesComplete() : completedLogPages.contains(completionKey(entry.category, entry.subcategory)));
+            BrowserTheme.collectionCategory(button, value.equals(page.value), complete);
+        });
+    }
+
+    private static String completionKey(String category, String subcategory) { return category + "\0" + subcategory; }
+    private void useCompletionAccount() {
+        String key = logAccountKey();
+        if (!key.equals(completionAccount)) { completedLogPages.clear(); completionGeneratedAt = null; completionAccount = key; }
+    }
+    private void rememberCompletions() {
+        useCompletionAccount();
+        if (completionGeneratedAt != null && data.generatedAt != null && data.generatedAt.compareTo(completionGeneratedAt) < 0) return;
+        if (data.completedPages != null) {
+            completedLogPages.clear();
+            for (BrowserModels.Page page : data.completedPages) completedLogPages.add(completionKey(page.category, page.subcategory));
+        } else {
+            for (BrowserModels.Group group : data.groups) {
+                String key = completionKey(group.category, group.subcategory);
+                if (group.complete) completedLogPages.add(key); else completedLogPages.remove(key);
+            }
+        }
+        completionGeneratedAt = data.generatedAt;
+    }
+    private boolean allCluesComplete() {
+        List<BrowserModels.Page> clues = new ArrayList<>();
+        for (BrowserModels.Page page : catalogue.pages) if ("Clues".equals(page.category)) clues.add(page);
+        return !clues.isEmpty() && clues.stream().allMatch(page -> completedLogPages.contains(completionKey(page.category, page.subcategory)));
     }
 
     private BrowserModels.Page selectedLogPage() {
         String needle = BrowserCommand.normalize(request.category);
-        if (java.util.Arrays.asList("clues", "all clues", "all clue tiers").contains(needle)) {
+        if (kind.equals("clog") && java.util.Arrays.asList("clues", "all clues", "all clue tiers").contains(needle)) {
             BrowserModels.Page page = new BrowserModels.Page(); page.value = "clues"; page.label = "All clue tiers"; page.category = "Clues"; return page;
         }
         for (BrowserModels.Page page : catalogue.pages) {
@@ -331,9 +367,12 @@ public final class ClanBrowserWindow extends JDialog {
 
     private String logAccountKey() { return request.player == null ? "account:" + accountHash : "player:" + request.player.toLowerCase(Locale.ROOT); }
 
-    private void loadingItems() {
-        collectionLayout(); BrowserModels.Page page = selectedLogPage(); collectionNavigation(page);
-        if (!logAccountKey().equals(logAccount)) {
+    private boolean categoryBrowser() { return kind.equals("clog") || kind.equals("luck") || kind.equals("deserved"); }
+
+    private void loadingDetails() {
+        collectionLayout(); if (kind.equals("clog")) useCompletionAccount();
+        BrowserModels.Page page = selectedLogPage(); collectionNavigation(page);
+        if (kind.equals("clog") && !logAccountKey().equals(logAccount)) {
             logStrip.update(request.player != null ? request.player : viewer != null ? viewer : "Your account", "");
             title.text = "Collection Log";
         }
@@ -342,11 +381,12 @@ public final class ClanBrowserWindow extends JDialog {
         JLabel category = label(name, 29, BrowserTheme.ORANGE); category.setHorizontalAlignment(SwingConstants.CENTER);
         category.setPreferredSize(new Dimension(100, 38)); summary.add(category, BorderLayout.NORTH);
         logDetail.removeAll(); logDetail.add(summary, BorderLayout.NORTH);
-        JPanel pending = messagePanel("Loading items…", null);
+        JPanel pending = messagePanel(kind.equals("clog") ? "Loading items…" : "Loading standings…", null);
         JProgressBar progress = new JProgressBar(); progress.setIndeterminate(true); progress.setPreferredSize(new Dimension(100, 3));
         progress.setForeground(BrowserTheme.GOLD); progress.setBackground(BrowserTheme.PANEL); pending.add(progress, BorderLayout.SOUTH);
         logDetail.add(pending, BorderLayout.CENTER);
-        setTitle("Reval · " + (request.player != null ? request.player : viewer != null ? viewer : "Your account") + " · " + name);
+        if (!kind.equals("clog")) title.text = titleFor(request) + " · " + name;
+        setTitle("Reval · " + (kind.equals("clog") ? request.player != null ? request.player : viewer != null ? viewer : "Your account" : titleFor(request)) + " · " + name);
         title.repaint(); body.revalidate(); body.repaint();
     }
 
@@ -366,7 +406,7 @@ public final class ClanBrowserWindow extends JDialog {
         JPanel list = panel(null); list.setLayout(new javax.swing.BoxLayout(list, javax.swing.BoxLayout.Y_AXIS));
         list.setBorder(BorderFactory.createEmptyBorder(6, 6, 6, 6));
         List<BrowserModels.Page> pages = new ArrayList<>();
-        if (category.equals("Clues")) { BrowserModels.Page all = new BrowserModels.Page(); all.value = "clues"; all.label = "All clue tiers"; pages.add(all); }
+        if (kind.equals("clog") && category.equals("Clues")) { BrowserModels.Page all = new BrowserModels.Page(); all.value = "clues"; all.label = "All clue tiers"; pages.add(all); }
         for (BrowserModels.Page page : catalogue.pages) if (category.equals(page.category)) pages.add(page);
         JButton active = null;
         for (BrowserModels.Page page : pages) {
@@ -386,12 +426,12 @@ public final class ClanBrowserWindow extends JDialog {
         return scroll;
     }
     private void selectPage(String value) {
-        configure(new BrowserCommand("clog", value, null, null, null, player.getText())); perform();
+        configure(new BrowserCommand(categoryBrowser() ? kind : "clog", value, null, null, null, player.getText())); perform();
     }
     private void selectTab(String category) {
         String remembered = lastLogPages.get(category);
-        if (remembered != null) { selectPage(remembered); return; }
-        if (category.equals("Clues")) { selectPage("clues"); return; }
+        if (remembered != null && (kind.equals("clog") || !remembered.equals("clues"))) { selectPage(remembered); return; }
+        if (kind.equals("clog") && category.equals("Clues")) { selectPage("clues"); return; }
         for (BrowserModels.Page page : catalogue.pages) if (category.equals(page.category)) { selectPage(page.value); return; }
     }
     private void filter() { if (grid != null) grid.filter(search.getText(), itemFilter.getSelectedItem().toString()); if (standings != null) standings.filter(search.getText()); }
@@ -409,25 +449,10 @@ public final class ClanBrowserWindow extends JDialog {
     }
     private void showHelp() {
         if (dataCall != null) dataCall.cancel(); generation++; data = null; busy(false); grid = null; standings = null;
-        title.text = "Reval · Command guide"; title.repaint(); body.removeAll();
-        JPanel help = panel(new java.awt.GridLayout(0, 1, 0, 12));
-        String[][] examples = {{"::reval clog forestry", "Your collection log; hover an item for its name."},
-            {"::reval clog forestry Valgusruum", "View another clan account. Player names with spaces can be quoted."},
-            {"::reval luck vorkath", "Lowest greenlog completion counters first."},
-            {"::reval deserved vorkath", "Highest greenlog completion counters first."},
-            {"::reval dryboard vorkath", "Kills since the last recorded unique, including duplicate drops."},
-            {"::reval leaderboard clues hard", "Full clue-tier standings, split into account types."},
-            {"::reval leaderboard bosses vorkath", "A specific boss, or leave its name out for all bosses."},
-            {"::reval leaderboard clog | pets | points | greenlogs | xp", "All-time standings. Use the statistic buttons below the member search to switch."},
-            {"::reval leaderboard monthly-clog | monthly-points | clues | combat | bosses", "Monthly standings use the clan's Tallinn calendar month."},
-            {"!reval luck araxxor", "Share through clan chat. Updated Reval clients can click the message to open the board."},
-            {"!reval clog forestry", "Share your log, or add a player name to share another account's log."},
-            {"Refresh", "Revisits use your session cache. Refresh reloads this view from clan data."}};
-        for (String[] example : examples) {
-            JPanel row = panel(new BorderLayout(0, 3)); row.setBorder(BorderFactory.createEmptyBorder(5, 14, 5, 14));
-            row.add(label(example[0], 22, BrowserTheme.GOLD), BorderLayout.NORTH); row.add(label(example[1], 18, BrowserTheme.MUTED), BorderLayout.SOUTH); help.add(row);
-        }
-        body.add(BrowserTheme.scroll(help), BorderLayout.CENTER); body.revalidate(); body.repaint();
+        title.text = "Reval · Command guide"; title.repaint(); setTitle("Reval · Command guide"); body.removeAll();
+        tools.setVisible(false); choices.setVisible(false); statistics.setVisible(false);
+        modeButtons.values().forEach(button -> highlight(button, false));
+        body.add(BrowserTheme.scroll(new BrowserHelpView()), BorderLayout.CENTER); body.revalidate(); body.repaint();
     }
     private void cancel() { if (dataCall != null) dataCall.cancel(); if (catalogueCall != null) catalogueCall.cancel(); }
     BrowserModels.View currentView() { return loading.isVisible() ? null : data; }

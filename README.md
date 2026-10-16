@@ -8,8 +8,9 @@ A comprehensive RuneLite plugin for the Reval clan in Old School RuneScape. Feat
 
 Type `::reval` or `::reval help` to open the command guide. Commands open a resizable native window;
 the game remains usable while it is open. Collection Log uses boxed subcategories under the main
-category tabs. Luck, Deserved, and Dryboard have category autocomplete; leaderboard statistics
-are selected with buttons below the member search. The `?` button opens the command guide.
+category tabs. Luck and Deserved use the same tabs and sidebar with standings in the content area;
+Dryboard has category autocomplete. Leaderboard statistics are selected with buttons below member
+search. The `?` button opens a guide with syntax, examples, and private/chat-sharing instructions.
 
 | Command | View |
 | --- | --- |
@@ -47,6 +48,9 @@ the game account. The category catalogue and RuneLite item sprites are also cach
 Cached pages switch immediately without a loading frame. While a new collection page loads,
 the account header, main tabs, and category buttons stay visible; only its item area shows loading
 or a retryable error.
+Completed collection categories have green text, borders, and backgrounds in the sidebar, including
+pages not yet opened. The selected greenlog has a brighter highlight. Completion status is scoped
+to the selected account and uses the same cached log response without extra database reads.
 
 Share a board through normal clan chat with `!reval luck araxxor`, `!reval leaderboard clues hard`,
 or `!reval clog forestry`. Updated Reval clients underline the message and offer **Open Reval

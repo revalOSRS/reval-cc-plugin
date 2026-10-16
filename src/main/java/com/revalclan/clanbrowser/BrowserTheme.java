@@ -64,6 +64,12 @@ final class BrowserTheme {
         button.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(BORDER), BorderFactory.createEmptyBorder(5, 12, 5, 12)));
         button.setFocusPainted(false); return button;
     }
+    static void collectionCategory(JButton button, boolean selected, boolean complete) {
+        button.setForeground(complete ? GREEN : selected ? GOLD : TEXT);
+        button.setBackground(complete ? selected ? new Color(0x4e6039) : RECEIVED : selected ? new Color(0x6b5a3d) : HEADER);
+        Color border = complete ? selected ? GREEN : GREEN_BORDER : BORDER;
+        button.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(border), BorderFactory.createEmptyBorder(5, 12, 5, 12)));
+    }
     static void field(JTextField field) {
         field.setBackground(HEADER); field.setForeground(TEXT); field.setCaretColor(GOLD); field.setFont(font(20, false));
         field.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(BORDER), BorderFactory.createEmptyBorder(5, 8, 5, 8)));

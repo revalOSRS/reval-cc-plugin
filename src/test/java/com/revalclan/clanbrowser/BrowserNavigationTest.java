@@ -17,6 +17,8 @@ import java.util.function.Consumer;
 import javax.swing.JButton;
 import javax.swing.JProgressBar;
 import javax.swing.SwingUtilities;
+import javax.swing.JTextField;
+import javax.swing.JTable;
 import okhttp3.Call;
 import okhttp3.OkHttpClient;
 import org.junit.After;
@@ -50,10 +52,12 @@ public class BrowserNavigationTest {
             reads.incrementAndGet();
             boolean boss = exchange.getRequestURI().getQuery().contains("category=vorkath");
             if (boss) try { releaseBoss.await(5,TimeUnit.SECONDS); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
-            String selected = boss ? page("vorkath","Vorkath","Bosses") : page("forestry","Forestry","Other");
+            String query=exchange.getRequestURI().getQuery();
+            String selected = boss ? page("vorkath","Vorkath","Bosses") : query.contains("category=zulrah") ? page("zulrah","Zulrah","Bosses") : page("forestry","Forestry","Other");
+            String kind=query.contains("command=deserved") ? "deserved" : query.contains("command=luck") ? "luck" : "clog";
             boolean failure = boss && failBoss.get();
             byte[] body = (failure ? "{\"status\":\"error\",\"message\":\"Temporarily unavailable\"}" :
-                "{\"status\":\"success\",\"data\":{\"kind\":\"clog\",\"page\":"+selected+",\"account\":{\"osrs_nickname\":\"Valgusruum\",\"obtained\":141,\"total\":1717},\"groups\":[]}}").getBytes(StandardCharsets.UTF_8);
+                "{\"status\":\"success\",\"data\":{\"kind\":\""+kind+"\",\"completedPages\":[{\"category\":\"Other\",\"subcategory\":\"Forestry\"},{\"category\":\"Bosses\",\"subcategory\":\"Zulrah\"}],\"page\":"+selected+",\"account\":{\"osrs_nickname\":\"Valgusruum\",\"obtained\":141,\"total\":1717},\"groups\":[],\"rows\":[{\"player\":\"Clan Member\",\"rank\":1,\"value\":812,\"status\":\"complete\"}]}}").getBytes(StandardCharsets.UTF_8);
             exchange.sendResponseHeaders(failure ? 500 : 200,body.length); exchange.getResponseBody().write(body); exchange.close();
         });
         server.start();
@@ -119,8 +123,58 @@ public class BrowserNavigationTest {
         assertEquals(2,reads.get());
     }
 
+    @Test public void greenlogsIncludeUnvisitedCategoriesAndNeverLeakToAnotherAccount() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            assertEquals(BrowserTheme.GREEN,button(window,"Forestry").getForeground());
+            button(window,"Bosses").doClick(0);
+            assertEquals("An unopened completed page must already be green",BrowserTheme.GREEN,button(window,"Zulrah").getForeground());
+            assertNotEquals("The unfinished page must keep its ordinary selected style",BrowserTheme.GREEN,button(window,"Vorkath").getForeground());
+            window.open(BrowserCommand.parse("reval clog forestry OtherGuy")); window.setVisible(false);
+            assertNotEquals("Another account must not inherit the previous account's greenlogs",BrowserTheme.GREEN,button(window,"Forestry").getForeground());
+        });
+    }
+
+    @Test public void luckAndDeservedUseCategoryButtonsAndCacheTheirStandings() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            button(window,"Luck").doClick(0);
+            assertNotNull(button(window,"Other")); assertNotNull(button(window,"Forestry"));
+            assertFalse("Luck must not show a category dropdown",categoryDropdownVisible(window));
+        });
+        assertEquals("luck",loaded.poll(5,TimeUnit.SECONDS).kind);
+        SwingUtilities.invokeAndWait(() -> {
+            assertTrue("Luck must show a leaderboard",containsTable(window));
+            button(window,"Bosses").doClick(0);
+            assertNotNull(button(window,"Zulrah"));
+        });
+        releaseBoss.countDown(); assertEquals("luck",loaded.poll(5,TimeUnit.SECONDS).kind);
+        SwingUtilities.invokeAndWait(() -> button(window,"Deserved").doClick(0));
+        assertEquals("deserved",loaded.poll(5,TimeUnit.SECONDS).kind);
+        SwingUtilities.invokeAndWait(() -> {
+            assertTrue(containsTable(window)); assertNotNull(button(window,"Vorkath"));
+            assertFalse(categoryDropdownVisible(window));
+            button(window,"Luck").doClick(0);
+            assertEquals("luck",window.currentView().kind); assertFalse(loading(window));
+        });
+        assertEquals("Returning to Luck must reuse its cached standings",4,reads.get());
+    }
+    private static boolean categoryDropdownVisible(Container root) {
+        for (Component child : root.getComponents()) {
+            if (!child.isVisible()) continue;
+            if (child instanceof JTextField && "Category".equals(((JTextField)child).getAccessibleContext().getAccessibleName())) return true;
+            if (child instanceof Container && categoryDropdownVisible((Container)child)) return true;
+        }
+        return false;
+    }
+    private static boolean containsTable(Container root) {
+        for (Component child : root.getComponents()) {
+            if (child instanceof JTable) return true;
+            if (child instanceof Container && containsTable((Container)child)) return true;
+        }
+        return false;
+    }
+
     private static String page(String value,String label,String category) {
-        return "{\"value\":\""+value+"\",\"label\":\""+label+"\",\"category\":\""+category+"\"}";
+        return "{\"value\":\""+value+"\",\"label\":\""+label+"\",\"category\":\""+category+"\",\"subcategory\":\""+label+"\"}";
     }
     private static JButton button(Container root,String label) {
         for (Component child : root.getComponents()) {

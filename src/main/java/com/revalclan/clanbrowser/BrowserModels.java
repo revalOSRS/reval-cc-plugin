@@ -42,6 +42,7 @@ public final class BrowserModels {
         public JsonElement metric;
         public Metric overviewMetric;
         public List<Group> groups = new ArrayList<>();
+        public List<Page> completedPages;
         public List<Panel> panels = new ArrayList<>();
         public List<Section> sections = new ArrayList<>();
         public List<Row> rows = new ArrayList<>();
