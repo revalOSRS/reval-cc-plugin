@@ -6,6 +6,10 @@ import java.util.Locale;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import net.runelite.api.Client;
+import net.runelite.api.ChatMessageType;
+import net.runelite.api.MessageNode;
+import net.runelite.api.events.ScriptCallbackEvent;
+import net.runelite.api.gameval.VarbitID;
 import net.runelite.api.Menu;
 import net.runelite.api.MenuAction;
 import net.runelite.api.MenuEntry;
@@ -20,6 +24,7 @@ final class BoardChatLinks {
     private final Client client;
     private final BiConsumer<BrowserCommand, String> open;
     private final List<Link> links = new ArrayList<>();
+    private final List<Shared> building = new ArrayList<>();
     private MenuEntry boardEntry;
     private Consumer<MenuEntry> boardClick;
     private boolean enabled;
@@ -36,26 +41,68 @@ final class BoardChatLinks {
         } catch (IllegalArgumentException ignored) { return null; }
     }
 
-    void startUp() { enabled = true; rebuild(); }
+    // RuneLite's per-message callback belongs to ChatBuilder (84), which also runs
+    // for new messages/notifications without the BUILD_CHATBOX wrapper (216).
+    static final int CHAT_BUILDER = 84;
 
-    void rebuild() {
-        restoreText();
+    void startUp() { enabled = true; rebuild(); }
+    void rebuild() { client.refreshChat(); }
+    void beginBuild() { building.clear(); }
+
+    void format(ScriptCallbackEvent event) {
+        if (!enabled || !"chatMessageBuilding".equals(event.getEventName())) return;
+        int ints = client.getIntStackSize(), objects = client.getObjectStackSize();
+        if (ints < 2 || objects < 4 || client.getIntStack()[ints - 2] != 0) return;
+        MessageNode node = client.getMessages().get(client.getIntStack()[ints - 1]);
+        Shared shared = null;
+        if (node != null && playerChat(node.getType()) && BrowserCommand.validPlayer(clean(node.getName()))) {
+            String source = node.getValue();
+            boolean group = node.getType() == ChatMessageType.CLAN_GIM_CHAT;
+            if (group && source != null && source.startsWith("|")) source = source.substring(1);
+            BrowserCommand command = parse(source);
+            if (command != null) {
+                shared = new Shared(command, clean(node.getName()), color() + "Click to view " + label(command) + "</col>");
+                // Format before the game measures/wraps the row. The source node stays
+                // unchanged, so every redraw starts from the same original command.
+                client.getObjectStack()[objects - 2] = (group && node.getValue().startsWith("|") ? "|" : "") + shared.decorated;
+            }
+        }
+        // Every built message occupies one row, including ordinary notifications.
+        // Keeping those empty positions prevents a notice moving another link's target.
+        building.add(shared);
+    }
+
+    void finishBuild() {
         if (!enabled) return;
         Widget area = client.getWidget(InterfaceID.Chatbox.SCROLLAREA);
-        if (area == null || area.isHidden()) return;
+        if (area == null || area.isHidden()) { links.clear(); return; }
         Widget[] children = area.getDynamicChildren();
-        if (children == null) return;
-        // Each visible chat line has sender, message, clan name and rank icon.
-        for (int i = 1; i < children.length; i += 4) {
-            Widget message = children[i];
-            if (message == null || message.isHidden()) continue;
-            if (parse(message.getText()) == null) continue;
-            Widget sender = client.getWidget(InterfaceID.Chatbox.LINE0 + (i - 1) / 4);
-            if (!BrowserCommand.validPlayer(author(sender))) continue;
-            Link link = new Link(message, sender);
-            message.setText(link.decorated);
-            links.add(link);
+        if (children == null) { links.clear(); return; }
+        // ChatBuilder can return early without rebuilding anything this cycle.
+        if (building.isEmpty()) return;
+        links.clear();
+        int offset = children.length > 1 && children[1] != null && clean(children[1].getText()).startsWith("Public chat filtering:") ? 1 : 0;
+        for (int i = 0; i < building.size(); i++) {
+            Shared shared = building.get(i);
+            int rowIndex = i + offset, messageIndex = rowIndex * 4 + 1;
+            if (shared == null || messageIndex >= children.length) continue;
+            Widget message = children[messageIndex];
+            Widget sender = client.getWidget(InterfaceID.Chatbox.LINE0 + rowIndex);
+            if (message == null || message.isHidden() || sender == null) continue;
+            Link link = new Link(message, sender, shared);
+            if (link.command() != null) links.add(link);
         }
+        building.clear();
+    }
+
+    private static boolean playerChat(ChatMessageType type) {
+        return type == ChatMessageType.PUBLICCHAT || type == ChatMessageType.MODCHAT || type == ChatMessageType.FRIENDSCHAT ||
+            type == ChatMessageType.CLAN_CHAT || type == ChatMessageType.CLAN_GUEST_CHAT || type == ChatMessageType.CLAN_GIM_CHAT;
+    }
+
+    private String color() {
+        boolean transparent = client.isResized() && client.getVarbitValue(VarbitID.CHATBOX_TRANSPARENCY) == 1;
+        return transparent ? "<col=63c5b5>" : "<col=2b7d77>";
     }
 
     void menuEntryAdded(MenuEntryAdded event) {
@@ -83,7 +130,7 @@ final class BoardChatLinks {
         int version = generation;
         // Capture the command and sender now: chat widgets may be recycled while the menu is open.
         boardClick = entry -> { if (enabled && version == generation) open.accept(command, sender); };
-        boardEntry = menu.createMenuEntry(-1).setOption(OPEN).setTarget("<col=ffcf63>" + label(command) + "</col>")
+        boardEntry = menu.createMenuEntry(-1).setOption(OPEN).setTarget(color() + label(command) + "</col>")
             .setType(MenuAction.RUNELITE).setForceLeftClick(true)
             .onClick(boardClick);
     }
@@ -117,7 +164,7 @@ final class BoardChatLinks {
         }
     }
 
-    void clear() { enabled = false; generation++; boardEntry = null; boardClick = null; restoreText(); }
+    void clear() { enabled = false; generation++; boardEntry = null; boardClick = null; links.clear(); building.clear(); client.refreshChat(); }
 
     private boolean isOurEntry(MenuEntry entry) { return entry == boardEntry && boardClick != null && entry.onClick() == boardClick; }
 
@@ -163,29 +210,28 @@ final class BoardChatLinks {
         return result.toString();
     }
 
-    private void restoreText() {
-        for (Link link : links) if (link.decorated.equals(link.widget.getText())) link.widget.setText(link.text);
-        links.clear();
-    }
-
     // The static row's operation target is the actual account name. The dynamic
     // sender text is presentation and can include timestamps or other decorations.
     private static String author(Widget sender) { return clean(sender == null ? null : sender.getName()); }
     private static String clean(String value) { return value == null ? "" : Text.removeTags(value).replace('\u00a0', ' ').trim(); }
+    private static final class Shared {
+        final BrowserCommand command;
+        final String account, decorated;
+        Shared(BrowserCommand command, String account, String decorated) {
+            this.command = command; this.account = account; this.decorated = decorated;
+        }
+    }
     private static final class Link {
         final Widget widget, sender;
-        final String text, decorated, account;
-        Link(Widget widget, Widget sender) {
-            this.widget = widget; this.sender = sender; text = widget.getText();
-            account = author(sender);
-            decorated = "<col=ffcf63><u>Click to view " + label(parse(text)) + "</u></col>";
+        final Shared shared;
+        Link(Widget widget, Widget sender, Shared shared) {
+            this.widget = widget; this.sender = sender; this.shared = shared;
         }
         BrowserCommand command() {
             String current = widget.getText();
-            // A readable label carries the original command only while it still
-            // belongs to this exact row/account. Ordinary recycled text stays ordinary.
-            if (decorated.equals(current)) return account.equals(author(sender)) ? parse(text) : null;
-            return parse(current);
+            // Game chat colors wrap the callback's formatted text. This exact row
+            // must still contain our label and belong to the original sender.
+            return current != null && current.contains(shared.decorated) && shared.account.equals(author(sender)) ? shared.command : null;
         }
     }
 }

@@ -5,10 +5,11 @@ import javax.inject.Singleton;
 import javax.swing.SwingUtilities;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
-import net.runelite.api.ScriptID;
 import net.runelite.api.events.CommandExecuted;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.ScriptPostFired;
+import net.runelite.api.events.ScriptPreFired;
+import net.runelite.api.events.ScriptCallbackEvent;
 import net.runelite.api.events.MenuEntryAdded;
 import net.runelite.api.events.PostMenuSort;
 import net.runelite.client.callback.ClientThread;
@@ -42,8 +43,14 @@ public class ClanBrowserManager {
         try { open(BrowserCommand.parse(command)); }
         catch (IllegalArgumentException error) { open(BrowserCommand.parse("reval help")); }
     }
+    @Subscribe public void onScriptPreFired(ScriptPreFired event) {
+        if (running && event.getScriptId() == BoardChatLinks.CHAT_BUILDER) chatLinks.beginBuild();
+    }
+    @Subscribe(priority = -100) public void onScriptCallbackEvent(ScriptCallbackEvent event) {
+        if (running) chatLinks.format(event);
+    }
     @Subscribe public void onScriptPostFired(ScriptPostFired event) {
-        if (running && event.getScriptId() == ScriptID.BUILD_CHATBOX) chatLinks.rebuild();
+        if (running && event.getScriptId() == BoardChatLinks.CHAT_BUILDER) chatLinks.finishBuild();
     }
     @Subscribe public void onMenuEntryAdded(MenuEntryAdded event) { if (running) chatLinks.menuEntryAdded(event); }
     @Subscribe public void onPostMenuSort(PostMenuSort event) { if (running) chatLinks.prioritize(); }
