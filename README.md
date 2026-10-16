@@ -7,7 +7,9 @@ A comprehensive RuneLite plugin for the Reval clan in Old School RuneScape. Feat
 ### In-game clan browser
 
 Type `::reval` or `::reval help` to open the command guide. Commands open a resizable native window;
-the game remains usable while it is open. Categories and statistics have searchable autocomplete.
+the game remains usable while it is open. Collection Log uses boxed subcategories under the main
+category tabs. Luck, Deserved, and Dryboard have category autocomplete; leaderboard statistics
+are selected with buttons below the member search. The `?` button opens the command guide.
 
 | Command | View |
 | --- | --- |

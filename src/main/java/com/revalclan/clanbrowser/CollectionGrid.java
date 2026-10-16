@@ -64,14 +64,26 @@ final class CollectionGrid extends JComponent implements Scrollable, javax.acces
         int target = count <= 6 ? 144 : count <= 30 ? 112 : count <= 80 ? 88 : 64;
         int gap = count > 80 ? 7 : 10, padding = 12;
         int columns = Math.max(1, Math.min(Math.max(1, count), (width - padding * 2 + gap) / (target + gap)));
-        int size = Math.min(target, (width - padding * 2 - (columns - 1) * gap) / columns);
+        if (count > 0 && count <= 6 && (width - padding * 2 - (count - 1) * gap) / count >= 96) columns = count;
+        int size = Math.min(200, (width - padding * 2 - (columns - 1) * gap) / columns);
         if (groups.size() == 1 && count <= 30 && count > 0 && viewportHeight > 0) {
+            // Reflow into more columns before shrinking cells; this avoids the
+            // wide side gutters left by centering a height-limited fixed grid.
+            while (columns < count) {
+                int rows = (count + columns - 1) / columns;
+                if (rows * size + (rows - 1) * gap + padding * 2 <= viewportHeight) break;
+                int next = (width - padding * 2 - columns * gap) / (columns + 1);
+                if (next < 72) break;
+                columns++; size = Math.min(200, next);
+            }
             int rows = (count + columns - 1) / columns;
             int fitting = (viewportHeight - padding * 2 - (rows - 1) * gap) / rows;
             if (fitting >= 72) size = Math.min(size, fitting);
         }
         int gridWidth = columns * size + (columns - 1) * gap;
-        int left = (width - gridWidth) / 2, top = 12;
+        int spare = width - padding * 2 - gridWidth;
+        boolean fillWidth = columns > 1 && spare < columns;
+        int top = padding;
         for (BrowserModels.Group group : groups) {
             List<BrowserModels.Item> visible = new ArrayList<>();
             for (BrowserModels.Item item : group.items) if (matches(item)) visible.add(item);
@@ -85,7 +97,10 @@ final class CollectionGrid extends JComponent implements Scrollable, javax.acces
                 headings.add(heading); top += heading.rank == null ? 42 : 66;
             }
             for (int i = 0; i < visible.size(); i++) {
-                Cell cell = new Cell(); cell.item = visible.get(i); cell.x = left + i % columns * (size + gap); cell.y = top + i / columns * (size + gap);
+                int column = i % columns;
+                Cell cell = new Cell(); cell.item = visible.get(i);
+                cell.x = padding + column * (size + gap) + (fillWidth ? column * spare / (columns - 1) : 0);
+                cell.y = top + i / columns * (size + gap);
                 cell.size = size; cell.complete = group.complete; cells.add(cell);
             }
             int rows = (visible.size() + columns - 1) / columns;

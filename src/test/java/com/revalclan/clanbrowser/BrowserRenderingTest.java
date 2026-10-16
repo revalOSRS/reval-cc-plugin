@@ -19,11 +19,16 @@ public class BrowserRenderingTest {
             CollectionGrid grid = new CollectionGrid(Arrays.asList(group), id -> icon);
             javax.swing.JViewport viewport = new javax.swing.JViewport(); viewport.setSize(1100, 330); viewport.setView(grid); grid.setSize(1100, 330);
             assertTrue("All 23 items should fit without clipping the last row", grid.getPreferredSize().height <= 330);
-            group.items.subList(1, group.items.size()).clear(); grid.filter("", "All items"); grid.setSize(200, 160);
-            BufferedImage painted = new BufferedImage(200, 160, BufferedImage.TYPE_INT_ARGB); Graphics2D g = painted.createGraphics(); grid.paint(g); g.dispose();
-            int left = 200, right = -1, top = 160, bottom = -1;
-            for (int y = 0; y < 160; y++) for (int x = 0; x < 200; x++) if (painted.getRGB(x, y) == java.awt.Color.MAGENTA.getRGB()) { left = Math.min(left,x); right = Math.max(right,x); top = Math.min(top,y); bottom = Math.max(bottom,y); }
-            assertEquals(199, left + right); assertEquals(167, top + bottom);
+            BufferedImage full = new BufferedImage(1100, 330, BufferedImage.TYPE_INT_ARGB); Graphics2D fullGraphics = full.createGraphics(); grid.paint(fullGraphics); fullGraphics.dispose();
+            int first = 1100, last = -1;
+            for (int x = 0; x < 1100; x++) if (full.getRGB(x, 14) == BrowserTheme.RECEIVED.getRGB()) { first = Math.min(first, x); last = x; }
+            assertEquals("Only the shared 12-pixel inset and cell border should remain", 13, first);
+            assertEquals("The first row should use the available width", 13, 1100 - last - 1);
+            group.items.subList(1, group.items.size()).clear(); viewport.setSize(200, 200); grid.filter("", "All items"); grid.setSize(200, 200);
+            BufferedImage painted = new BufferedImage(200, 200, BufferedImage.TYPE_INT_ARGB); Graphics2D g = painted.createGraphics(); grid.paint(g); g.dispose();
+            int left = 200, right = -1, top = 200, bottom = -1;
+            for (int y = 0; y < 200; y++) for (int x = 0; x < 200; x++) if (painted.getRGB(x, y) == java.awt.Color.MAGENTA.getRGB()) { left = Math.min(left,x); right = Math.max(right,x); top = Math.min(top,y); bottom = Math.max(bottom,y); }
+            assertEquals(199, left + right); assertEquals(199, top + bottom);
         });
     }
     @Test public void largeClueGridPaintsOnlyTheVisibleCellsAndKeepsAllItemsScrollable() throws Exception {

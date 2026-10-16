@@ -6,7 +6,6 @@ import java.awt.Dialog;
 import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
-import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.GridLayout;
 import java.awt.Insets;
@@ -43,10 +42,12 @@ public final class ClanBrowserWindow extends JDialog {
     private final IntFunction<BufferedImage> icons;
     private final JPanel body = panel(new BorderLayout());
     private final Title title = new Title();
-    private final SearchPicker selection = new SearchPicker("Category or statistic");
+    private final SearchPicker selection = new SearchPicker("Category");
     private final SearchPicker boss = new SearchPicker("Boss");
     private final JTextField player = new JTextField(12);
     private final JPanel playerBox = panel(new BorderLayout(6, 0));
+    private final JPanel choices = panel(new BorderLayout(8, 0));
+    private final JPanel statistics = panel(new BorderLayout(0, 8));
     private final JPanel extra = panel(new BorderLayout());
     private final JComboBox<String> tiers = new JComboBox<>(new String[]{"All tiers", "Beginner", "Easy", "Medium", "Hard", "Elite", "Master"});
     private final JTextField search = new JTextField();
@@ -54,6 +55,8 @@ public final class ClanBrowserWindow extends JDialog {
     private final JButton findMe = BrowserTheme.button("Find me");
     private final JProgressBar loading = new JProgressBar();
     private final Map<String, JButton> modeButtons = new LinkedHashMap<>();
+    private final Map<String, JButton> metricButtons = new LinkedHashMap<>();
+    private final Map<String, String> lastLogPages = new LinkedHashMap<>();
     private BrowserModels.Catalogue catalogue;
     private BrowserCommand request;
     private BrowserModels.View data;
@@ -92,28 +95,36 @@ public final class ClanBrowserWindow extends JDialog {
             modes.add(button); modeButtons.put(name[0], button);
         }
         controls.add(modes); controls.add(javax.swing.Box.createVerticalStrut(9));
-        JPanel choices = panel(new GridBagLayout());
-        GridBagConstraints c = new GridBagConstraints(); c.gridy = 0; c.fill = GridBagConstraints.HORIZONTAL; c.insets = new Insets(0, 0, 0, 8);
-        c.gridx = 0; c.weightx = 1; choices.add(selection, c);
-        c.gridx++; c.weightx = 0; extra.setPreferredSize(new Dimension(220, 36)); choices.add(extra, c);
+        choices.setBorder(BorderFactory.createEmptyBorder(0, 0, 9, 0));
+        choices.add(selection, BorderLayout.CENTER);
         BrowserTheme.field(player); player.putClientProperty("JTextField.placeholderText", "Your account");
+        player.setToolTipText("Press Enter to load this account's collection log");
         player.getAccessibleContext().setAccessibleName("OSRS player name");
         JLabel playerLabel = label("Player", 20, BrowserTheme.MUTED); playerBox.add(playerLabel, BorderLayout.WEST); playerBox.add(player, BorderLayout.CENTER);
-        c.gridx++; choices.add(playerBox, c);
-        JButton view = BrowserTheme.button("View"); c.gridx++; c.insets = new Insets(0, 0, 0, 0); choices.add(view, c);
-        view.addActionListener(event -> submitSelection()); player.addActionListener(event -> submitSelection());
+        player.addActionListener(event -> submitSelection());
         selection.onSubmit(value -> { if (!adjusting) { configureExtra(); submitSelection(); } });
         boss.onSubmit(value -> { if (!adjusting) submitSelection(); });
         tiers.addActionListener(event -> { if (!adjusting) submitSelection(); });
         styleCombo(tiers); styleCombo(itemFilter);
-        controls.add(choices); controls.add(javax.swing.Box.createVerticalStrut(9));
+        controls.add(choices);
         JPanel tools = panel(new BorderLayout(8, 0)); BrowserTheme.field(search); search.getAccessibleContext().setAccessibleName("Search displayed items or clan members");
         tools.add(search, BorderLayout.CENTER);
         JPanel toolsRight = panel(new java.awt.FlowLayout(java.awt.FlowLayout.RIGHT, 6, 0));
-        toolsRight.add(itemFilter); toolsRight.add(findMe);
+        toolsRight.add(playerBox); toolsRight.add(itemFilter); toolsRight.add(findMe);
         JButton refresh = BrowserTheme.button("Refresh"); refresh.addActionListener(event -> submitSelection()); toolsRight.add(refresh);
         JButton help = BrowserTheme.button("?"); help.setToolTipText("In-game command help"); help.addActionListener(event -> showHelp()); toolsRight.add(help);
         tools.add(toolsRight, BorderLayout.EAST); controls.add(tools);
+        JPanel metrics = panel(new GridLayout(0, 5, 7, 7));
+        metrics.getAccessibleContext().setAccessibleName("Leaderboard statistics");
+        String[][] stats = {{"clog", "Collection log"}, {"pets", "Pets"}, {"points", "Points"}, {"greenlogs", "Greenlogs"}, {"xp", "Total XP"},
+            {"monthly-clog", "Monthly clog"}, {"monthly-points", "Monthly points"}, {"clues", "Clues"}, {"combat", "Combat points"}, {"bosses", "Boss kills"}};
+        for (String[] stat : stats) {
+            JButton button = BrowserTheme.button(stat[1]); button.addActionListener(event -> chooseMetric(stat[0]));
+            metrics.add(button); metricButtons.put(stat[0], button);
+        }
+        statistics.setBorder(BorderFactory.createEmptyBorder(9, 0, 0, 0));
+        statistics.add(metrics, BorderLayout.NORTH); statistics.add(extra, BorderLayout.CENTER);
+        statistics.setVisible(false); controls.add(statistics);
         search.getDocument().addDocumentListener(new DocumentListener() {
             public void insertUpdate(DocumentEvent event) { filter(); }
             public void removeUpdate(DocumentEvent event) { filter(); }
@@ -153,10 +164,15 @@ public final class ClanBrowserWindow extends JDialog {
         }
         List<BrowserModels.Page> pages = new ArrayList<>();
         if (catalogue != null) for (BrowserModels.Page page : catalogue.pages) if (!kind.equals("dryboard") || page.category.equals("Bosses") || page.category.equals("Raids")) pages.add(page);
-        if (kind.equals("clog")) { BrowserModels.Page clues = new BrowserModels.Page(); clues.label = "All clue tiers"; clues.value = "clues"; clues.category = "Clues"; pages.add(0, clues); }
-        selection.choices(kind.equals("leaderboard") ? catalogue.metrics : pages);
-        selection.placeholder(kind.equals("leaderboard") ? "Search a statistic…" : "Search a category, or type cox / tob / toa…");
-        selection.value(kind.equals("leaderboard") ? lastMetric : lastCategory);
+        boolean board = kind.equals("leaderboard"); choices.setVisible(!board && !kind.equals("clog")); statistics.setVisible(board);
+        selection.choices(pages);
+        selection.placeholder("Search a category, or type cox / tob / toa…");
+        selection.value(lastCategory);
+        for (Map.Entry<String, JButton> entry : metricButtons.entrySet()) {
+            boolean active = entry.getKey().equals(lastMetric);
+            entry.getValue().setBackground(active ? new Color(0x6b5a3d) : BrowserTheme.HEADER);
+            entry.getValue().setForeground(active ? BrowserTheme.GOLD : BrowserTheme.TEXT);
+        }
         boss.choices(catalogue.bosses); boss.placeholder("All bosses, or search a boss…"); boss.value(command.boss == null ? "all" : command.boss);
         tiers.setSelectedItem(command.tier == null || command.tier.equals("all") ? "All tiers" : capitalize(command.tier));
         player.setText(command.player == null ? "" : command.player); playerBox.setVisible(kind.equals("clog"));
@@ -166,10 +182,18 @@ public final class ClanBrowserWindow extends JDialog {
     }
 
     private void configureExtra() {
-        extra.removeAll(); boolean board = kind.equals("leaderboard"); String metric = selection.value();
+        extra.removeAll(); boolean board = kind.equals("leaderboard"); String metric = lastMetric;
         boolean show = board && (metric.equals("bosses") || metric.equals("clues"));
-        if (show) extra.add(metric.equals("bosses") ? boss : tiers, BorderLayout.CENTER);
+        if (show) {
+            JPanel filter = panel(new BorderLayout(8, 0)); filter.setPreferredSize(new Dimension(420, 36));
+            filter.add(label(metric.equals("bosses") ? "Boss" : "Clue tier", 20, BrowserTheme.MUTED), BorderLayout.WEST);
+            filter.add(metric.equals("bosses") ? boss : tiers, BorderLayout.CENTER); extra.add(filter, BorderLayout.WEST);
+        }
         extra.setVisible(show); extra.revalidate();
+    }
+    private void chooseMetric(String metric) {
+        if (catalogue == null) return;
+        configure(new BrowserCommand("leaderboard", null, metric, null, null, player.getText())); perform();
     }
     private void chooseMode(String mode) {
         if (catalogue == null) return;
@@ -187,8 +211,8 @@ public final class ClanBrowserWindow extends JDialog {
     }
     private void submitSelection() {
         if (catalogue == null || adjusting) return;
-        String metric = kind.equals("leaderboard") ? selection.value() : null;
-        request = new BrowserCommand(kind, kind.equals("leaderboard") ? null : selection.value(), metric,
+        String metric = kind.equals("leaderboard") ? lastMetric : null;
+        request = new BrowserCommand(kind, kind.equals("leaderboard") ? null : kind.equals("clog") ? lastCategory : selection.value(), metric,
             "bosses".equals(metric) ? boss.value() : null,
             "clues".equals(metric) ? "All tiers".equals(tiers.getSelectedItem()) ? "all" : tiers.getSelectedItem().toString().toLowerCase(Locale.ROOT) : null,
             kind.equals("clog") ? player.getText() : null);
@@ -213,7 +237,7 @@ public final class ClanBrowserWindow extends JDialog {
         boolean clog = "clog".equals(data.kind);
         if (clog && data.account != null) {
             title.text = "Collection Log  (" + BrowserTheme.number(data.account.obtained) + " / " + BrowserTheme.number(data.account.total) + ")";
-            if (data.page.value != null) { selection.value(data.page.value); lastCategory = data.page.value; }
+            if (data.page.value != null) { lastCategory = data.page.value; lastLogPages.put(data.page.category, data.page.value); }
             if (request.player != null) player.setText(data.account.name);
             JPanel content = panel(new BorderLayout(0, 9));
             JPanel above = panel(new BorderLayout(0, 8));
@@ -224,9 +248,11 @@ public final class ClanBrowserWindow extends JDialog {
                 button.setForeground(selected ? BrowserTheme.GOLD : BrowserTheme.TEXT); button.setBackground(selected ? new Color(0x6b5a3d) : BrowserTheme.HEADER);
                 button.addActionListener(event -> selectTab(tab)); tabs.add(button);
             }
-            JPanel heading = panel(new BorderLayout(0, 6)); heading.add(tabs, BorderLayout.NORTH); heading.add(new LogSummary(data), BorderLayout.CENTER);
-            above.add(heading, BorderLayout.CENTER); content.add(above, BorderLayout.NORTH);
-            grid = new CollectionGrid(data.groups, icons); content.add(BrowserTheme.scroll(grid), BorderLayout.CENTER); body.add(content, BorderLayout.CENTER);
+            above.add(tabs, BorderLayout.CENTER); content.add(above, BorderLayout.NORTH);
+            JPanel pages = panel(new BorderLayout(9, 0)); pages.add(categoryList(data.page.category, data.page.value), BorderLayout.WEST);
+            JPanel detail = panel(new BorderLayout(0, 6)); detail.add(new LogSummary(data), BorderLayout.NORTH);
+            grid = new CollectionGrid(data.groups, icons); detail.add(BrowserTheme.scroll(grid), BorderLayout.CENTER);
+            pages.add(detail, BorderLayout.CENTER); content.add(pages, BorderLayout.CENTER); body.add(content, BorderLayout.CENTER);
             setTitle("Reval · " + data.account.name + " · " + data.page.label);
         } else {
             String page = data.page != null ? data.page.label : null;
@@ -248,10 +274,36 @@ public final class ClanBrowserWindow extends JDialog {
         title.repaint(); filter(); body.revalidate(); body.repaint();
     }
 
-    private void selectTab(String category) {
-        for (BrowserModels.Page page : catalogue.pages) if (category.equals(page.category)) {
-            configure(new BrowserCommand("clog", page.value, null, null, null, player.getText())); perform(); return;
+    private javax.swing.JScrollPane categoryList(String category, String selected) {
+        JPanel list = panel(null); list.setLayout(new javax.swing.BoxLayout(list, javax.swing.BoxLayout.Y_AXIS));
+        list.setBorder(BorderFactory.createEmptyBorder(6, 6, 6, 6));
+        List<BrowserModels.Page> pages = new ArrayList<>();
+        if (category.equals("Clues")) { BrowserModels.Page all = new BrowserModels.Page(); all.value = "clues"; all.label = "All clue tiers"; pages.add(all); }
+        for (BrowserModels.Page page : catalogue.pages) if (category.equals(page.category)) pages.add(page);
+        JButton active = null;
+        for (BrowserModels.Page page : pages) {
+            JButton button = BrowserTheme.button(page.label); button.setFont(BrowserTheme.font(18, true)); button.setToolTipText(page.label);
+            button.setAlignmentX(LEFT_ALIGNMENT); button.setMaximumSize(new Dimension(Integer.MAX_VALUE, 36));
+            button.setPreferredSize(new Dimension(206, 36));
+            boolean chosen = page.value.equals(selected);
+            button.setBackground(chosen ? new Color(0x6b5a3d) : BrowserTheme.HEADER); button.setForeground(chosen ? BrowserTheme.GOLD : BrowserTheme.TEXT);
+            button.addActionListener(event -> selectPage(page.value)); list.add(button); list.add(javax.swing.Box.createVerticalStrut(5));
+            if (chosen) active = button;
         }
+        javax.swing.JScrollPane scroll = BrowserTheme.scroll(list); scroll.setPreferredSize(new Dimension(230, 100));
+        scroll.getAccessibleContext().setAccessibleName(category + " collection categories");
+        JButton chosen = active;
+        if (chosen != null) SwingUtilities.invokeLater(() -> { if (chosen.isShowing()) list.scrollRectToVisible(chosen.getBounds()); });
+        return scroll;
+    }
+    private void selectPage(String value) {
+        configure(new BrowserCommand("clog", value, null, null, null, player.getText())); perform();
+    }
+    private void selectTab(String category) {
+        String remembered = lastLogPages.get(category);
+        if (remembered != null) { selectPage(remembered); return; }
+        if (category.equals("Clues")) { selectPage("clues"); return; }
+        for (BrowserModels.Page page : catalogue.pages) if (category.equals(page.category)) { selectPage(page.value); return; }
     }
     private void filter() { if (grid != null) grid.filter(search.getText(), itemFilter.getSelectedItem().toString()); if (standings != null) standings.filter(search.getText()); }
     private void busy(boolean value) { loading.setVisible(value); }
@@ -273,8 +325,8 @@ public final class ClanBrowserWindow extends JDialog {
             {"::reval dryboard vorkath", "Kills since the last recorded unique, including duplicate drops."},
             {"::reval leaderboard clues hard", "Full clue-tier standings, split into account types."},
             {"::reval leaderboard bosses vorkath", "A specific boss, or leave its name out for all bosses."},
-            {"::reval leaderboard clog | pets | points | greenlogs | xp", "All-time standings. Choose a statistic from the autocomplete to switch."},
-            {"::reval leaderboard monthly-clog | monthly-points | clues | combat | bosses", "Monthly standings use the clan’s Tallinn calendar month."}};
+            {"::reval leaderboard clog | pets | points | greenlogs | xp", "All-time standings. Use the statistic buttons below the member search to switch."},
+            {"::reval leaderboard monthly-clog | monthly-points | clues | combat | bosses", "Monthly standings use the clan's Tallinn calendar month."}};
         for (String[] example : examples) {
             JPanel row = panel(new BorderLayout(0, 3)); row.setBorder(BorderFactory.createEmptyBorder(5, 14, 5, 14));
             row.add(label(example[0], 22, BrowserTheme.GOLD), BorderLayout.NORTH); row.add(label(example[1], 18, BrowserTheme.MUTED), BorderLayout.SOUTH); help.add(row);
