@@ -35,10 +35,9 @@ final class BoardChatLinks {
 
     static BrowserCommand parse(String text) {
         String raw = clean(text);
-        if (raw.length() > 150 || !raw.matches("(?is)^!reval\\s+.+")) return null;
+        if (raw.length() > 150 || !raw.matches("(?is)^!reval(?:\\s+.*)?$")) return null;
         try {
-            BrowserCommand command = BrowserCommand.parse(raw.substring(1));
-            return "help".equals(command.kind) ? null : command;
+            return BrowserCommand.parse(raw.substring(1));
         } catch (IllegalArgumentException ignored) { return null; }
     }
 
@@ -182,6 +181,7 @@ final class BoardChatLinks {
     private String label(BrowserCommand command, String sender) {
         command = command.resolveShared(pages, sender);
         switch (command.kind) {
+            case "help": return "Reval command guide";
             case "clog": return command.player + "'s collection log: " + title(command.category);
             case "luck": return title(command.category) + " luck board";
             case "deserved": return title(command.category) + " deserved board";

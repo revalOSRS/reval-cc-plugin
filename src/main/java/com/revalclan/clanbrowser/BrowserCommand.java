@@ -34,17 +34,17 @@ public final class BrowserCommand {
         List<String> words = new ArrayList<>();
         Matcher matcher = TOKENS.matcher(text == null ? "" : text.trim());
         while (matcher.find()) words.add(matcher.group(1) != null ? matcher.group(1) : matcher.group(2) != null ? matcher.group(2) : matcher.group(3));
-        if (!words.isEmpty() && words.get(0).replaceFirst("^::", "").equalsIgnoreCase("reval")) words.remove(0);
+        if (!words.isEmpty() && words.get(0).equalsIgnoreCase("reval")) words.remove(0);
         if (words.isEmpty()) return new BrowserCommand("help", null, null, null, null, null);
         String kind = words.remove(0).toLowerCase(Locale.ROOT);
         if (kind.equals("help")) return new BrowserCommand("help", null, null, null, null, null);
         if (!Arrays.asList("clog", "luck", "deserved", "dryboard", "leaderboard").contains(kind)) {
-            throw new IllegalArgumentException("Use clog, luck, deserved, dryboard or leaderboard. Try ::reval help.");
+            throw new IllegalArgumentException("Use clog, luck, deserved, dryboard or leaderboard. Try !reval help.");
         }
         if (kind.equals("leaderboard")) {
             String metric = words.isEmpty() ? "clog" : words.remove(0).toLowerCase(Locale.ROOT);
             if (metric.equals("total-xp")) metric = "xp";
-            if (!METRICS.contains(metric)) throw new IllegalArgumentException("Unknown statistic. Try ::reval leaderboard clog or ::reval help.");
+            if (!METRICS.contains(metric)) throw new IllegalArgumentException("Unknown statistic. Try !reval leaderboard clog or !reval help.");
             String rest = String.join(" ", words);
             if (metric.equals("clues") && !rest.isEmpty() && !TIERS.contains(rest.toLowerCase(Locale.ROOT))) throw new IllegalArgumentException("Clue tiers: beginner, easy, medium, hard, elite, master or all.");
             if (!rest.isEmpty() && !metric.equals("clues") && !metric.equals("bosses")) throw new IllegalArgumentException("This statistic does not need a category.");
@@ -85,7 +85,7 @@ public final class BrowserCommand {
         return null;
     }
 
-    /** Also accept ::reval clog forestry Valgusruum, resolving the longest known page first. */
+    /** Also accept a player after the category, resolving the longest known page first. */
     public BrowserCommand resolvePlayerSuffix(List<BrowserModels.Page> pages) {
         List<BrowserModels.Page> candidates = new ArrayList<>(pages);
         if (kind.equals("clog")) {

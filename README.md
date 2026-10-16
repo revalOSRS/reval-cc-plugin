@@ -6,23 +6,24 @@ A comprehensive RuneLite plugin for the Reval clan in Old School RuneScape. Feat
 
 ### In-game clan browser
 
-Type `::reval` or `::reval help` to open the command guide. Commands open a resizable native window;
+Send `!reval` or `!reval help` in public or clan chat, then click its link to open the command guide.
+Commands open a resizable native window when clicked;
 the game remains usable while it is open. Collection Log uses boxed subcategories under the main
 category tabs. Luck and Deserved use the same tabs and sidebar with standings in the content area;
 Dryboard has category autocomplete. Leaderboard statistics are selected with buttons below member
-search. The `?` button opens a guide with syntax, examples, and private/chat-sharing instructions.
+search. The `?` button opens a guide with syntax, examples, and chat-sharing instructions.
 
 | Command | View |
 | --- | --- |
-| `::reval clog forestry` | Your synced collection log, using your logged-in account |
-| `::reval clog forestry Valgusruum` | Another clan account’s collection log |
-| `::reval clog clues Phosani55555` | All clue pages, including rare and shared rewards |
-| `::reval luck vorkath` | Lowest saved greenlog completion counters first |
-| `::reval deserved vorkath` | Highest saved greenlog completion counters first |
-| `::reval dryboard vorkath` | Kills since the last recorded unique, including duplicates |
-| `::reval leaderboard xp` | Full clan standings for a statistic |
-| `::reval leaderboard clues hard` | A specific clue tier; omit the tier for all seven tabs |
-| `::reval leaderboard bosses toa` | A specific boss or raid; omit the boss for all bosses |
+| `!reval clog forestry` | Your synced collection log, using your logged-in account |
+| `!reval clog forestry Valgusruum` | Another clan account’s collection log |
+| `!reval clog clues Phosani55555` | All clue pages, including rare and shared rewards |
+| `!reval luck vorkath` | Lowest saved greenlog completion counters first |
+| `!reval deserved vorkath` | Highest saved greenlog completion counters first |
+| `!reval dryboard vorkath` | Kills since the last recorded unique, including duplicates |
+| `!reval leaderboard xp` | Full clan standings for a statistic |
+| `!reval leaderboard clues hard` | A specific clue tier; omit the tier for all seven tabs |
+| `!reval leaderboard bosses toa` | A specific boss or raid; omit the boss for all bosses |
 
 Leaderboard statistics: `clog`, `pets`, `points`, `greenlogs`, `monthly-clog`, `monthly-points`,
 `clues`, `combat`, `bosses`, and `xp`. Boss aliases include `cox`, `tob`, `toa`, and `bandos`.
@@ -58,14 +59,16 @@ or `!reval clog forestry`. Updated Reval clients show a teal link such as
 right-click menu. The original command remains attached to the link. A clog without an explicit player opens the
 sender's account; add a player name to share another account. Sharing selects the same page and
 account, using the recipient's normal cache; it is not a frozen snapshot. Messages remain ordinary
-chat for players without the update. Receiving a share does not fetch data or open a window until
-clicked, and the plugin never sends a chat message automatically. Links are formatted before the
+chat for players without the update. Shares, including your own, do not fetch data or open a window until
+clicked. History redraws never open a window, and the plugin never sends an extra chat message
+automatically. Links are formatted before the
 game lays out each message, so they appear immediately and survive notifications, scrolling and
 chat-filter changes. Original history text stays unchanged.
 
 In **Reval Clan → Clan browser**, **Enable !reval chat commands** is on by default.
 Switch it off to leave shared commands as ordinary text without board-click actions.
-Changes apply immediately to existing chat history; private `::reval` commands remain available.
+Changes apply immediately to existing chat history. Sidebar browser access remains available
+when chat commands are disabled.
 
 For local development, start the backend’s read-only `scripts/dev-clan-browser.ts` server with a
 read-only database URL, then run:
@@ -76,8 +79,8 @@ JAVA_HOME=$(/usr/libexec/java_home -v 21) ./gradlew runBrowserClient \
   '-PrevalBrowserCommand=clog forestry Valgusruum'
 ```
 
-`runBrowserClient` starts the real RuneLite client with Reval loaded and invokes the same command
-event as in-game chat. `runBrowserPreview` opens just the native window without a game login;
+`runBrowserClient` starts the real RuneLite client with Reval loaded and opens the selected browser
+page directly without sending chat. `runBrowserPreview` opens just the native window without a game login;
 its optional `revalBrowserAtlas` points to a local sprite atlas for visual QA. Without an API
 override, the plugin uses the normal Reval backend. The backend clan-browser endpoints must be
 deployed before an owner-managed plugin release.

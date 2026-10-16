@@ -1,9 +1,7 @@
 package com.revalclan.clanbrowser;
 
 import com.revalclan.RevalClanPlugin;
-import net.runelite.api.events.CommandExecuted;
 import net.runelite.client.RuneLite;
-import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.externalplugins.ExternalPluginManager;
 import net.runelite.client.plugins.PluginManager;
 import javax.swing.Timer;
@@ -13,7 +11,7 @@ import java.awt.image.BufferedImage;
 import java.nio.file.Path;
 import javax.imageio.ImageIO;
 
-/** Starts the real local client, then exercises the same command event used by in-game ::reval. */
+/** Starts the real local client and opens the browser directly without sending chat. */
 public class BrowserClientPreview {
     public static void main(String[] args) throws Exception {
         ExternalPluginManager.loadBuiltin(RevalClanPlugin.class); RuneLite.main(args);
@@ -22,10 +20,11 @@ public class BrowserClientPreview {
         ready.addActionListener(event -> {
             if (RuneLite.getInjector() == null) return;
             PluginManager plugins = RuneLite.getInjector().getInstance(PluginManager.class);
-            boolean active = plugins.getPlugins().stream().anyMatch(plugin -> plugin instanceof RevalClanPlugin && plugins.isPluginActive(plugin));
-            if (!active) return;
-            RuneLite.getInjector().getInstance(EventBus.class).post(new CommandExecuted("reval", command.replaceFirst("^(::)?reval\\s+", "").split("\\s+")));
-            System.out.println("Opened local RuneLite clan browser: ::reval " + command); ready.stop();
+            RevalClanPlugin reval = (RevalClanPlugin) plugins.getPlugins().stream()
+                .filter(plugin -> plugin instanceof RevalClanPlugin && plugins.isPluginActive(plugin)).findFirst().orElse(null);
+            if (reval == null) return;
+            reval.getInjector().getInstance(ClanBrowserManager.class).open(BrowserCommand.parse(command));
+            System.out.println("Opened local RuneLite clan browser: " + command); ready.stop();
             String screenshot = System.getProperty("reval.browserScreenshot");
             if (screenshot != null) captureWhenReady(screenshot);
         }); ready.start();

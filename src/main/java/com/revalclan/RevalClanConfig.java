@@ -159,7 +159,7 @@ public interface RevalClanConfig extends Config {
 	@ConfigItem(
 		keyName = "enableChatCommands",
 		name = "Enable !reval chat commands",
-		description = "Show clickable !reval boards in public and clan chat. Turn off to leave messages as ordinary text. Private ::reval commands still work.",
+		description = "Show clickable !reval boards in public and clan chat. Turn off to leave messages as ordinary text.",
 		section = clanBrowserSection,
 		position = 0
 	)

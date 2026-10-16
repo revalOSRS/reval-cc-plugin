@@ -6,7 +6,6 @@ import javax.inject.Singleton;
 import javax.swing.SwingUtilities;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
-import net.runelite.api.events.CommandExecuted;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.ScriptPostFired;
 import net.runelite.api.events.ScriptPreFired;
@@ -60,12 +59,6 @@ public class ClanBrowserManager {
         if (running && "revalclan".equals(event.getGroup()) && "enableChatCommands".equals(event.getKey())) clientThread.invoke(this::applyChatSetting);
     }
     @Subscribe public void onProfileChanged(ProfileChanged event) { if (running) clientThread.invoke(this::applyChatSetting); }
-    @Subscribe public void onCommandExecuted(CommandExecuted event) {
-        if (!running || !"reval".equalsIgnoreCase(event.getCommand())) return;
-        String command = "reval " + String.join(" ", event.getArguments());
-        try { open(BrowserCommand.parse(command)); }
-        catch (IllegalArgumentException error) { open(BrowserCommand.parse("reval help")); }
-    }
     @Subscribe public void onScriptPreFired(ScriptPreFired event) {
         if (running && chatEnabled && event.getScriptId() == BoardChatLinks.CHAT_BUILDER) chatLinks.beginBuild();
     }
