@@ -17,17 +17,41 @@ import static org.mockito.Mockito.*;
 import static org.mockito.ArgumentMatchers.*;
 
 public class BoardChatLinksTest {
+    @Test public void timestampedPublicSharesRegisterLinksAndKeepTheActualSender() {
+        for (String name : Arrays.asList("Valgusruum", "Alice Smith")) {
+            for (String time : Arrays.asList("[16:14]", "[16:14:02]", "[4:14 PM]", "[4:14:02 PM]", "2026-10-16 16:14:02", "16:14")) {
+                for (String command : Arrays.asList("clog forestry", "luck araxxor", "deserved vorkath", "dryboard vorkath", "leaderboard clues hard")) {
+                    Fixture f = new Fixture(); PublicMenu menu = new PublicMenu(f);
+                    // Exact rendered shape from the live client, including Timestamp and rank icon.
+                    when(f.sender.getText()).thenReturn("<col=000000>" + time + "</col> <img=2>" + name + ":");
+                    when(f.row.getName()).thenReturn("<col=ffffff><img=2>" + name + "</col>");
+                    f.text.set("<col=0000ff>!Reval " + command + "</col>");
+                    f.links.startUp();
+                    assertTrue("Timestamped shares should be visibly linked", f.text.get().contains("<u>!Reval " + command + "</u>"));
+                    f.links.prioritize();
+                    verify(menu.menu).createMenuEntry(-1);
+                    menu.click.get().accept(menu.link);
+                    assertEquals(name, f.author.get());
+                    assertEquals(1, f.opened.get());
+                    assertEquals(command.split(" ")[0], f.command.get().kind);
+                }
+            }
+        }
+    }
+
     @Test public void publicChatLinksAreClickableWithoutAReportMenuIncludingYourOwnMessages() {
         for (String name : Arrays.asList("Valgusruum", "Alice Smith")) {
             for (String[] command : new String[][]{{"clog forestry","clog","forestry"},{"luck araxxor","luck","araxxor"},
                   {"deserved vorkath","deserved","vorkath"},{"dryboard vorkath","dryboard","vorkath"},{"leaderboard clues hard","leaderboard","clues"}}) {
                 Fixture f = new Fixture(); PublicMenu menu = new PublicMenu(f);
-                when(f.sender.getText()).thenReturn(name + ":"); f.text.set("!reval " + command[0]);
+                when(f.sender.getText()).thenReturn(name + ":"); when(f.row.getName()).thenReturn(name);
+                f.text.set("!reval " + command[0]);
                 f.links.startUp(); f.links.prioritize(); f.links.prioritize();
                 verify(menu.menu,times(1)).createMenuEntry(-1);
                 verify(menu.link).setOption("Open Reval board"); verify(menu.link).setForceLeftClick(true);
                 assertEquals("Hovering a public share must not open or fetch a board",0,f.opened.get());
                 f.text.set("Another message after scrolling"); when(f.sender.getText()).thenReturn("RecycledName:");
+                when(f.row.getName()).thenReturn("RecycledName");
                 menu.click.get().accept(menu.link);
                 assertEquals(1,f.opened.get()); assertEquals(name,f.author.get());
                 assertEquals(command[1],f.command.get().kind);
@@ -48,7 +72,7 @@ public class BoardChatLinksTest {
         when(f.client.getMouseCanvasPosition()).thenReturn(new net.runelite.api.Point(450,210)); f.links.prioritize();
         when(f.client.getMouseCanvasPosition()).thenReturn(new net.runelite.api.Point(140,210));
         f.text.set("An ordinary message"); f.links.prioritize();
-        f.text.set("!reval luck araxxor"); when(f.sender.getText()).thenReturn(""); f.links.prioritize();
+        f.text.set("!reval luck araxxor"); when(f.row.getName()).thenReturn(""); f.links.prioritize();
         verify(menu.menu,never()).createMenuEntry(anyInt()); assertEquals(0,f.opened.get());
     }
 
@@ -75,7 +99,9 @@ public class BoardChatLinksTest {
     }
 
     @Test public void nativeChatActionIsTheLeftClickAndCapturesTheSharedPageBeforeWidgetsChange() {
-        Fixture f = new Fixture(); f.links.startUp();
+        Fixture f = new Fixture();
+        when(f.sender.getText()).thenReturn("[16:14] <img=2>Alice\u00a0Smith: ");
+        f.links.startUp();
         Menu menu=mock(Menu.class); when(f.client.getMenu()).thenReturn(menu);
         MenuEntry report=mock(MenuEntry.class),copy=mock(MenuEntry.class),link=mock(MenuEntry.class,RETURNS_SELF);
         when(report.getOption()).thenReturn("Report"); when(report.getType()).thenReturn(MenuAction.CC_OP);
@@ -94,6 +120,7 @@ public class BoardChatLinksTest {
         verify(link).setForceLeftClick(true); verify(link).setOption("Open Reval board");
         entries.set(new MenuEntry[]{report,link,copy}); f.links.prioritize(); assertSame(link,entries.get()[2]);
         f.text.set("Different row after scroll"); when(f.sender.getText()).thenReturn("SomeoneElse:");
+        when(f.row.getName()).thenReturn("SomeoneElse");
         Consumer<MenuEntry> saved=click.get(); saved.accept(link);
         assertEquals(1,f.opened.get()); assertEquals("Alice Smith",f.author.get()); assertEquals("forestry",f.command.get().category);
         // Menu entries are reused every frame: never promote an entry whose callback has changed.
@@ -129,6 +156,7 @@ public class BoardChatLinksTest {
         Fixture() {
             when(client.getWidget(InterfaceID.Chatbox.SCROLLAREA)).thenReturn(area);
             when(client.getWidget(InterfaceID.Chatbox.LINE0)).thenReturn(row); when(row.getParent()).thenReturn(area);
+            when(row.getName()).thenReturn("<col=ffffff><img=2>Alice\u00a0Smith</col>");
             when(area.getId()).thenReturn(InterfaceID.Chatbox.SCROLLAREA);
             when(area.getDynamicChildren()).thenReturn(new Widget[]{sender,message,null,null});
             when(sender.getText()).thenReturn("<img=2>Alice\u00a0Smith: ");

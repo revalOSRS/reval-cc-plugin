@@ -46,9 +46,11 @@ final class BoardChatLinks {
         if (children == null) return;
         // Each visible chat line has sender, message, clan name and rank icon.
         for (int i = 1; i < children.length; i += 4) {
-            Widget message = children[i], sender = children[i - 1];
-            if (message == null || message.isHidden() || !BrowserCommand.validPlayer(author(sender))) continue;
+            Widget message = children[i];
+            if (message == null || message.isHidden()) continue;
             if (parse(message.getText()) == null) continue;
+            Widget sender = client.getWidget(InterfaceID.Chatbox.LINE0 + (i - 1) / 4);
+            if (!BrowserCommand.validPlayer(author(sender))) continue;
             Link link = new Link(message, sender);
             message.setText(link.decorated);
             links.add(link);
@@ -69,7 +71,7 @@ final class BoardChatLinks {
         Widget message = children[index + 1];
         if (message == null || message.isHidden()) return;
         BrowserCommand command = parse(message.getText());
-        String sender = author(children[index]);
+        String sender = author(row);
         if (command == null || !BrowserCommand.validPlayer(sender)) return;
         Menu menu = client.getMenu();
         for (MenuEntry entry : menu.getMenuEntries()) if (isOurEntry(entry)) return;
@@ -123,7 +125,9 @@ final class BoardChatLinks {
         links.clear();
     }
 
-    private static String author(Widget sender) { return clean(sender == null ? null : sender.getText()).replaceFirst(":\\s*$", "").trim(); }
+    // The static row's operation target is the actual account name. The dynamic
+    // sender text is presentation and can include timestamps or other decorations.
+    private static String author(Widget sender) { return clean(sender == null ? null : sender.getName()); }
     private static String clean(String value) { return value == null ? "" : Text.removeTags(value).replace('\u00a0', ' ').trim(); }
     private static final class Link {
         final Widget widget, sender;
