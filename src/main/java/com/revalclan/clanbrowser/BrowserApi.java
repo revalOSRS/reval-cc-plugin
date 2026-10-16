@@ -19,7 +19,7 @@ import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
 
-/** Cancellable, asynchronous reads. Every UI callback is delivered on the Swing EDT. */
+/** Cancellable reads. Callbacks run on the EDT; a cached view is applied inline when already on it. */
 @Singleton
 public class BrowserApi {
     private final OkHttpClient http;
@@ -54,7 +54,11 @@ public class BrowserApi {
         String key = endpoint("view", identity).toString();
         BrowserModels.View saved;
         synchronized (views) { if (refresh) views.remove(key); saved = views.get(key); }
-        if (saved != null) { SwingUtilities.invokeLater(() -> success.accept(saved)); return null; }
+        if (saved != null) {
+            if (SwingUtilities.isEventDispatchThread()) success.accept(saved);
+            else SwingUtilities.invokeLater(() -> success.accept(saved));
+            return null;
+        }
         if (refresh) parameters.put("refresh", "true");
         return get("view", parameters, BrowserModels.View.class, data -> {
             synchronized (views) {

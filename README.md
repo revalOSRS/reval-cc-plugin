@@ -44,6 +44,9 @@ cached view makes no HTTP or database request; search and item filters are local
 reloads the selected view from clan data, bypassing both the client and backend view caches.
 Restarting the client or evicting an older selection requires another read. Refresh does not sync
 the game account. The category catalogue and RuneLite item sprites are also cached.
+Cached pages switch immediately without a loading frame. While a new collection page loads,
+the account header, main tabs, and category buttons stay visible; only its item area shows loading
+or a retryable error.
 
 Share a board through normal clan chat with `!reval luck araxxor`, `!reval leaderboard clues hard`,
 or `!reval clog forestry`. Updated Reval clients underline the message and offer **Open Reval
