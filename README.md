@@ -35,13 +35,13 @@ at #1; otherwise completed logs without a comparable counter remain visible with
 When fewer than ten members have completed a category, the remaining places show the closest
 unfinished logs. Double-click a category-board row to open that account’s collection log.
 
-Collection logs use RuneLite’s cached item sprites, adaptive cell sizes, hover names, and obtained /
-missing filters. Completion counters remain frozen at their saved greenlog value; `~` marks an
+Collection logs use RuneLite’s cached item sprites, adaptive cell sizes, and hover names.
+Enter an account in **Find a clan member** and press Enter to load its log; **Find me** returns to your own. Completion counters remain frozen at their saved greenlog value; `~` marks an
 estimated value. Dryboard uses recorded drop history and omits accounts without comparable current
 and last-drop counters. These views read clan data and do not trigger a sync or modify points.
 
 The client keeps its 64 most recently viewed selections in memory for the session. Reopening a
-cached view makes no HTTP or database request; search and item filters are local too. Refresh
+cached view makes no HTTP or database request; leaderboard searches are local too. Refresh
 reloads the selected view from clan data, bypassing both the client and backend view caches.
 Restarting the client or evicting an older selection requires another read. Refresh does not sync
 the game account. The category catalogue and RuneLite item sprites are also cached.
@@ -53,13 +53,15 @@ pages not yet opened. The selected greenlog has a brighter highlight. Completion
 to the selected account and uses the same cached log response without extra database reads.
 
 Share a board through regular public chat or clan chat with `!reval luck araxxor`, `!reval leaderboard clues hard`,
-or `!reval clog forestry`. Updated Reval clients show an underlined link such as
+or `!reval clog forestry`. Updated Reval clients show a teal link such as
 **Click to view Araxxor luck board**, with **Open Reval board** on left-click or in its
 right-click menu. The original command remains attached to the link. A clog without an explicit player opens the
 sender's account; add a player name to share another account. Sharing selects the same page and
 account, using the recipient's normal cache; it is not a frozen snapshot. Messages remain ordinary
 chat for players without the update. Receiving a share does not fetch data or open a window until
-clicked, and the plugin never sends a chat message automatically.
+clicked, and the plugin never sends a chat message automatically. Links are formatted before the
+game lays out each message, so they appear immediately and survive notifications, scrolling and
+chat-filter changes. Original history text stays unchanged.
 
 For local development, start the backend’s read-only `scripts/dev-clan-browser.ts` server with a
 read-only database URL, then run:

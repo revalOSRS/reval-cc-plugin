@@ -200,6 +200,30 @@ public class BrowserNavigationTest {
         });
     }
 
+    @Test public void collectionMemberSearchLoadsOnEnterAndFindMeReturnsToOwnAccount() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            window.identity(42L,"My Account");
+            JTextField member=field(window,"Find a clan member");assertNotNull(member);
+            assertEquals("Valgusruum",member.getText());
+            member.setText("OtherGuy");
+            assertEquals("Typing a member must not fetch on every character",1,reads.get());
+            member.postActionEvent();
+        });
+        assertNotNull(loaded.poll(5,TimeUnit.SECONDS));
+        assertEquals("OtherGuy",queries.poll(5,TimeUnit.SECONDS).queryParameter("player"));
+        SwingUtilities.invokeAndWait(() -> {
+            assertEquals("OtherGuy",window.currentView().account.name);
+            button(window,"Find me").doClick(0);
+        });
+        assertNotNull(loaded.poll(5,TimeUnit.SECONDS));
+        okhttp3.HttpUrl own=queries.poll(5,TimeUnit.SECONDS);
+        assertEquals("42",own.queryParameter("accountHash"));assertNull(own.queryParameter("player"));
+        SwingUtilities.invokeAndWait(() -> {
+            assertEquals("My Account",window.currentView().account.name);
+            assertEquals("",field(window,"Find a clan member").getText());
+        });
+    }
+
     @Test public void browserIsAnIndependentWindowThatCannotHoldTheGameBehindAnOwnedDialog() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             assertTrue("The browser must be an independent frame",JFrame.class.isInstance(window));
@@ -272,6 +296,13 @@ public class BrowserNavigationTest {
         for (Component child : root.getComponents()) {
             if (child instanceof JButton && label.equals(((JButton)child).getText())) return (JButton)child;
             if (child instanceof Container) { JButton found=button((Container)child,label); if (found != null) return found; }
+        }
+        return null;
+    }
+    private static JTextField field(Container root,String name) {
+        for (Component child : root.getComponents()) {
+            if (child instanceof JTextField && name.equals(((JTextField)child).getAccessibleContext().getAccessibleName())) return (JTextField)child;
+            if (child instanceof Container) { JTextField found=field((Container)child,name); if(found!=null)return found; }
         }
         return null;
     }

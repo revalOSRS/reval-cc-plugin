@@ -43,15 +43,12 @@ public final class ClanBrowserWindow extends JFrame {
     private final Title title = new Title();
     private final SearchPicker selection = new SearchPicker("Category");
     private final SearchPicker boss = new SearchPicker("Boss");
-    private final JTextField player = new JTextField(12);
-    private final JPanel playerBox = panel(new BorderLayout(6, 0));
     private final JPanel choices = panel(new BorderLayout(8, 0));
     private final JPanel statistics = panel(new BorderLayout(0, 8));
     private final JPanel extra = panel(new BorderLayout());
     private final JPanel tools = panel(new BorderLayout(8, 0));
     private final JComboBox<String> tiers = new JComboBox<>(new String[]{"All tiers", "Beginner", "Easy", "Medium", "Hard", "Elite", "Master"});
     private final JTextField search = new JTextField();
-    private final JComboBox<String> itemFilter = new JComboBox<>(new String[]{"All items", "Obtained", "Missing"});
     private final JButton findMe = BrowserTheme.button("Find me");
     private final JProgressBar loading = new JProgressBar();
     private final Map<String, JButton> modeButtons = new LinkedHashMap<>();
@@ -106,20 +103,15 @@ public final class ClanBrowserWindow extends JFrame {
         controls.add(modes); controls.add(javax.swing.Box.createVerticalStrut(9));
         choices.setBorder(BorderFactory.createEmptyBorder(0, 0, 9, 0));
         choices.add(selection, BorderLayout.CENTER);
-        BrowserTheme.field(player); player.putClientProperty("JTextField.placeholderText", "Your account");
-        player.setToolTipText("Press Enter to load this account's collection log");
-        player.getAccessibleContext().setAccessibleName("OSRS player name");
-        JLabel playerLabel = label("Player", 20, BrowserTheme.MUTED); playerBox.add(playerLabel, BorderLayout.WEST); playerBox.add(player, BorderLayout.CENTER);
-        player.addActionListener(event -> submitSelection());
         selection.onSubmit(value -> { if (!adjusting) { configureExtra(); submitSelection(); } });
         boss.onSubmit(value -> { if (!adjusting) submitSelection(); });
         tiers.addActionListener(event -> { if (!adjusting) submitSelection(); });
-        styleCombo(tiers); styleCombo(itemFilter);
+        styleCombo(tiers);
         controls.add(choices);
-        BrowserTheme.field(search); search.getAccessibleContext().setAccessibleName("Search displayed items or clan members");
+        BrowserTheme.field(search); search.getAccessibleContext().setAccessibleName("Find a clan member");
         tools.add(search, BorderLayout.CENTER);
         JPanel toolsRight = panel(new java.awt.FlowLayout(java.awt.FlowLayout.RIGHT, 6, 0));
-        toolsRight.add(playerBox); toolsRight.add(itemFilter); toolsRight.add(findMe);
+        toolsRight.add(findMe);
         JButton refresh = BrowserTheme.button("Refresh"); refresh.setToolTipText("Reload this view from the server"); refresh.addActionListener(event -> submitSelection(true)); toolsRight.add(refresh);
         JButton help = BrowserTheme.button("?"); help.setToolTipText("In-game command help"); help.addActionListener(event -> showHelp()); toolsRight.add(help);
         tools.add(toolsRight, BorderLayout.EAST); controls.add(tools);
@@ -139,7 +131,12 @@ public final class ClanBrowserWindow extends JFrame {
             public void removeUpdate(DocumentEvent event) { filter(); }
             public void changedUpdate(DocumentEvent event) { filter(); }
         });
-        itemFilter.addActionListener(event -> filter()); findMe.addActionListener(event -> { search.setText(""); if (standings != null) standings.findViewer(); });
+        search.addActionListener(event -> { if (kind.equals("clog")) submitSelection(); });
+        findMe.addActionListener(event -> {
+            search.setText("");
+            if (kind.equals("clog")) { configure(request.withPlayer(null)); perform(); }
+            else if (standings != null) standings.findViewer();
+        });
         loading.setIndeterminate(true); loading.setForeground(BrowserTheme.GOLD); loading.setBackground(BrowserTheme.PANEL); loading.setPreferredSize(new Dimension(10, 3)); loading.setVisible(false);
         top.add(controls, BorderLayout.CENTER); top.add(loading, BorderLayout.SOUTH);
         frame.add(top, BorderLayout.NORTH); frame.add(body, BorderLayout.CENTER);
@@ -186,9 +183,10 @@ public final class ClanBrowserWindow extends JFrame {
         }
         boss.choices(catalogue.bosses); boss.placeholder("All bosses, or search a boss…"); boss.value(command.boss == null ? "all" : command.boss);
         tiers.setSelectedItem(command.tier == null || command.tier.equals("all") ? "All tiers" : capitalize(command.tier));
-        player.setText(command.player == null ? "" : command.player); playerBox.setVisible(kind.equals("clog"));
-        itemFilter.setVisible(kind.equals("clog")); findMe.setVisible(!kind.equals("clog"));
-        search.putClientProperty("JTextField.placeholderText", kind.equals("clog") ? "Find an item…" : "Find a clan member…");
+        if (kind.equals("clog")) search.setText(command.player == null ? "" : command.player);
+        findMe.setVisible(true);
+        search.putClientProperty("JTextField.placeholderText", "Find a clan member…");
+        search.setToolTipText(kind.equals("clog") ? "Enter an OSRS name and press Enter to view their collection log" : "Filter the displayed clan standings");
         configureExtra(); adjusting = false;
     }
 
@@ -204,13 +202,13 @@ public final class ClanBrowserWindow extends JFrame {
     }
     private void chooseMetric(String metric) {
         if (catalogue == null) return;
-        configure(new BrowserCommand("leaderboard", null, metric, null, null, player.getText())); perform();
+        configure(new BrowserCommand("leaderboard", null, metric, null, null, null)); perform();
     }
     private void chooseMode(String mode) {
         if (catalogue == null) return;
         // An explicit Collection log tab click always returns to the logged-in account.
         // Category buttons and commands still preserve a deliberately selected clan member.
-        configure(new BrowserCommand(mode, categoryForMode(mode, lastCategory, catalogue.pages), lastMetric, null, null, mode.equals("clog") ? null : player.getText())); search.setText(""); perform();
+        configure(new BrowserCommand(mode, categoryForMode(mode, lastCategory, catalogue.pages), lastMetric, null, null, null)); search.setText(""); perform();
     }
     static String categoryForMode(String mode, String category, List<BrowserModels.Page> pages) {
         if (mode.equals("leaderboard") || mode.equals("clog")) return category;
@@ -229,7 +227,7 @@ public final class ClanBrowserWindow extends JFrame {
         request = new BrowserCommand(kind, kind.equals("leaderboard") ? null : categoryBrowser() ? lastCategory : selection.value(), metric,
             "bosses".equals(metric) ? boss.value() : null,
             "clues".equals(metric) ? "All tiers".equals(tiers.getSelectedItem()) ? "all" : tiers.getSelectedItem().toString().toLowerCase(Locale.ROOT) : null,
-            kind.equals("clog") ? player.getText() : null);
+            kind.equals("clog") ? search.getText() : null);
         if (request.category != null) lastCategory = request.category;
         if (request.metric != null) lastMetric = request.metric;
         configureExtra(); perform(refresh);
@@ -266,7 +264,7 @@ public final class ClanBrowserWindow extends JFrame {
         if (clog && data.account != null) {
             title.text = "Collection Log  (" + BrowserTheme.number(data.account.obtained) + " / " + BrowserTheme.number(data.account.total) + ")";
             if (data.page.value != null) { lastCategory = data.page.value; lastLogPages.put(data.page.category, data.page.value); }
-            if (request.player != null) player.setText(data.account.name);
+            if (request.player != null) { search.setText(data.account.name); request = request.withPlayer(data.account.name); }
             collectionLayout(); rememberCompletions(); collectionNavigation(data.page);
             logAccount = logAccountKey();
             logStrip.update(data.account.name, "Last synced: " + BrowserTheme.timestamp(data.account.lastSyncedAt));
@@ -430,7 +428,7 @@ public final class ClanBrowserWindow extends JFrame {
         return scroll;
     }
     private void selectPage(String value) {
-        configure(new BrowserCommand(categoryBrowser() ? kind : "clog", value, null, null, null, player.getText())); perform();
+        configure(new BrowserCommand(categoryBrowser() ? kind : "clog", value, null, null, null, kind.equals("clog") ? request.player : null)); perform();
     }
     private void selectTab(String category) {
         String remembered = lastLogPages.get(category);
@@ -438,7 +436,7 @@ public final class ClanBrowserWindow extends JFrame {
         if (kind.equals("clog") && category.equals("Clues")) { selectPage("clues"); return; }
         for (BrowserModels.Page page : catalogue.pages) if (category.equals(page.category)) { selectPage(page.value); return; }
     }
-    private void filter() { if (grid != null) grid.filter(search.getText(), itemFilter.getSelectedItem().toString()); if (standings != null) standings.filter(search.getText()); }
+    private void filter() { if (!kind.equals("clog") && standings != null) standings.filter(search.getText()); }
     private void busy(boolean value) { loading.setVisible(value); }
     private void message(String text, Runnable retry) {
         grid = null; standings = null; body.removeAll();
