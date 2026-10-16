@@ -111,7 +111,7 @@ public final class ClanBrowserWindow extends JDialog {
         tools.add(search, BorderLayout.CENTER);
         JPanel toolsRight = panel(new java.awt.FlowLayout(java.awt.FlowLayout.RIGHT, 6, 0));
         toolsRight.add(playerBox); toolsRight.add(itemFilter); toolsRight.add(findMe);
-        JButton refresh = BrowserTheme.button("Refresh"); refresh.addActionListener(event -> submitSelection()); toolsRight.add(refresh);
+        JButton refresh = BrowserTheme.button("Refresh"); refresh.setToolTipText("Reload this view from the server"); refresh.addActionListener(event -> submitSelection(true)); toolsRight.add(refresh);
         JButton help = BrowserTheme.button("?"); help.setToolTipText("In-game command help"); help.addActionListener(event -> showHelp()); toolsRight.add(help);
         tools.add(toolsRight, BorderLayout.EAST); controls.add(tools);
         JPanel metrics = panel(new GridLayout(0, 5, 7, 7));
@@ -140,18 +140,19 @@ public final class ClanBrowserWindow extends JDialog {
     }
 
     public void identity(long accountHash, String viewer) { this.accountHash = accountHash; this.viewer = viewer; findMe.setEnabled(viewer != null); if (standings != null) standings.viewer(viewer); }
-    public void open(BrowserCommand command) {
+    public void open(BrowserCommand command) { open(command, null); }
+    public void open(BrowserCommand command, String sharedBy) {
         if (!SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Browser window must open on the EDT");
         closed = false; search.setText(""); setVisible(true); toFront();
-        if (catalogue != null) { configure(command.resolvePlayerSuffix(catalogue.pages)); perform(); return; }
+        if (catalogue != null) { configure(command.resolveShared(catalogue.pages, sharedBy)); perform(); return; }
         request = command; busy(true); message("Loading clan categories…", null);
         final int ticket = ++generation;
         catalogueCall = api.catalogue(result -> {
             if (closed) return;
             catalogue = result;
             if (ticket != generation) return;
-            configure(command.resolvePlayerSuffix(catalogue.pages)); perform();
-        }, error -> { if (!closed && ticket == generation) { busy(false); message(error, () -> open(command)); } });
+            configure(command.resolveShared(catalogue.pages, sharedBy)); perform();
+        }, error -> { if (!closed && ticket == generation) { busy(false); message(error, () -> open(command, sharedBy)); } });
     }
 
     private void configure(BrowserCommand command) {
@@ -209,7 +210,8 @@ public final class ClanBrowserWindow extends JDialog {
         }
         return needle.equals("clues") && !mode.equals("dryboard") ? "hard-clues" : "vorkath";
     }
-    private void submitSelection() {
+    private void submitSelection() { submitSelection(false); }
+    private void submitSelection(boolean refresh) {
         if (catalogue == null || adjusting) return;
         String metric = kind.equals("leaderboard") ? lastMetric : null;
         request = new BrowserCommand(kind, kind.equals("leaderboard") ? null : kind.equals("clog") ? lastCategory : selection.value(), metric,
@@ -218,18 +220,19 @@ public final class ClanBrowserWindow extends JDialog {
             kind.equals("clog") ? player.getText() : null);
         if (request.category != null) lastCategory = request.category;
         if (request.metric != null) lastMetric = request.metric;
-        configureExtra(); perform();
+        configureExtra(); perform(refresh);
     }
-    private void perform() {
+    private void perform() { perform(false); }
+    private void perform(boolean refresh) {
         if (request == null) return;
         if (request.kind.equals("help")) { showHelp(); return; }
         if (dataCall != null) dataCall.cancel();
         final int ticket = ++generation; data = null; busy(true); title.text = titleFor(request); title.repaint();
         message("Loading " + (kind.equals("clog") ? "collection log" : "clan standings") + "…", null);
-        dataCall = api.view(request, accountHash, result -> {
+        dataCall = api.view(request, accountHash, refresh, result -> {
             if (closed || ticket != generation) return;
             data = result; busy(false); render();
-        }, error -> { if (!closed && ticket == generation) { busy(false); message(error, this::submitSelection); } });
+        }, error -> { if (!closed && ticket == generation) { busy(false); message(error, () -> submitSelection(refresh)); } });
     }
 
     private void render() {
@@ -326,7 +329,10 @@ public final class ClanBrowserWindow extends JDialog {
             {"::reval leaderboard clues hard", "Full clue-tier standings, split into account types."},
             {"::reval leaderboard bosses vorkath", "A specific boss, or leave its name out for all bosses."},
             {"::reval leaderboard clog | pets | points | greenlogs | xp", "All-time standings. Use the statistic buttons below the member search to switch."},
-            {"::reval leaderboard monthly-clog | monthly-points | clues | combat | bosses", "Monthly standings use the clan's Tallinn calendar month."}};
+            {"::reval leaderboard monthly-clog | monthly-points | clues | combat | bosses", "Monthly standings use the clan's Tallinn calendar month."},
+            {"!reval luck araxxor", "Share through clan chat. Updated Reval clients can click the message to open the board."},
+            {"!reval clog forestry", "Share your log, or add a player name to share another account's log."},
+            {"Refresh", "Revisits use your session cache. Refresh reloads this view from clan data."}};
         for (String[] example : examples) {
             JPanel row = panel(new BorderLayout(0, 3)); row.setBorder(BorderFactory.createEmptyBorder(5, 14, 5, 14));
             row.add(label(example[0], 22, BrowserTheme.GOLD), BorderLayout.NORTH); row.add(label(example[1], 18, BrowserTheme.MUTED), BorderLayout.SOUTH); help.add(row);

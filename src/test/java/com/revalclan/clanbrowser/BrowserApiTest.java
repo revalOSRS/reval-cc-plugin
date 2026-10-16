@@ -16,6 +16,46 @@ import org.junit.Test;
 import static org.junit.Assert.*;
 
 public class BrowserApiTest {
+    @Test public void revisitsUseTheClientCacheAndRefreshExplicitlyBypassesTheServerCache() throws Exception {
+        java.util.concurrent.atomic.AtomicInteger calls = new java.util.concurrent.atomic.AtomicInteger();
+        AtomicBoolean forced = new AtomicBoolean();
+        server.createContext("/plugin/clan-browser/view", exchange -> {
+            int version = calls.incrementAndGet(); forced.set(String.valueOf(exchange.getRequestURI().getQuery()).contains("refresh=true"));
+            byte[] body = ("{\"status\":\"success\",\"data\":{\"kind\":\"clog\",\"title\":\"" + version + "\"}}").getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, body.length); exchange.getResponseBody().write(body); exchange.close();
+        });
+        BrowserApi api = new BrowserApi(http, new Gson()); BrowserCommand command = BrowserCommand.parse("reval clog vorkath");
+        assertEquals("1", read(api, command, -100, false).title);
+        assertEquals("1", read(api, command, -100, false).title); assertEquals(1, calls.get());
+        assertEquals("2", read(api, command, -100, true).title); assertTrue(forced.get());
+        assertEquals("2", read(api, command, -100, false).title); assertEquals(2, calls.get());
+        assertEquals("3", read(api, command, -200, false).title); assertFalse(forced.get());
+        assertEquals("2", read(api, command, -100, false).title); assertEquals(3, calls.get());
+    }
+    @Test public void capitalizationAndDefaultFiltersShareOneCacheEntry() throws Exception {
+        java.util.concurrent.atomic.AtomicInteger calls = new java.util.concurrent.atomic.AtomicInteger();
+        server.createContext("/plugin/clan-browser/view", exchange -> {
+            byte[] body = ("{\"status\":\"success\",\"data\":{\"title\":\"" + calls.incrementAndGet() + "\"}}").getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, body.length); exchange.getResponseBody().write(body); exchange.close();
+        });
+        BrowserApi api = new BrowserApi(http, new Gson());
+        BrowserCommand lower = BrowserCommand.parse("reval clog general-graardor --player valgusruum");
+        BrowserCommand display = BrowserCommand.parse("reval clog General Graardor --player Valgusruum");
+        assertEquals("1", read(api, lower, 0, false).title);
+        assertEquals("1", read(api, display, 0, false).title);
+        assertEquals("2", read(api, display, 0, true).title);
+        assertEquals("2", read(api, lower, 0, false).title);
+        assertEquals("3", read(api, BrowserCommand.parse("reval leaderboard clues"), 0, false).title);
+        assertEquals("3", read(api, BrowserCommand.parse("reval leaderboard clues all"), 0, false).title);
+        assertEquals("4", read(api, BrowserCommand.parse("reval leaderboard bosses"), 0, false).title);
+        assertEquals("4", read(api, BrowserCommand.parse("reval leaderboard bosses all"), 0, false).title);
+        assertEquals(4, calls.get());
+    }
+    private static BrowserModels.View read(BrowserApi api, BrowserCommand command, long account, boolean refresh) throws Exception {
+        CountDownLatch done = new CountDownLatch(1); java.util.concurrent.atomic.AtomicReference<BrowserModels.View> result = new java.util.concurrent.atomic.AtomicReference<>();
+        api.view(command, account, refresh, data -> { result.set(data); done.countDown(); }, error -> done.countDown());
+        assertTrue(done.await(5, TimeUnit.SECONDS)); assertNotNull(result.get()); return result.get();
+    }
     private HttpServer server;
     private OkHttpClient http;
     private String previous;

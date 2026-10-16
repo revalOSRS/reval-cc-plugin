@@ -91,6 +91,10 @@ public final class BrowserCommand {
     }
 
     public BrowserCommand withCategory(String value) { return new BrowserCommand(kind, value, metric, boss, tier, player); }
+    public BrowserCommand resolveShared(List<BrowserModels.Page> pages, String sender) {
+        BrowserCommand resolved = resolvePlayerSuffix(pages);
+        return resolved.kind.equals("clog") && resolved.player == null && validPlayer(sender) ? resolved.withPlayer(sender) : resolved;
+    }
     public BrowserCommand withPlayer(String value) { return new BrowserCommand(kind, category, metric, boss, tier, value); }
     public static String normalize(String value) { return value == null ? "" : value.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", " ").trim(); }
     public static boolean validPlayer(String value) { return value != null && value.matches("[a-zA-Z0-9 _-]{1,12}"); }

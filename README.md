@@ -39,6 +39,20 @@ missing filters. Completion counters remain frozen at their saved greenlog value
 estimated value. Dryboard uses recorded drop history and omits accounts without comparable current
 and last-drop counters. These views read clan data and do not trigger a sync or modify points.
 
+The client keeps its 64 most recently viewed selections in memory for the session. Reopening a
+cached view makes no HTTP or database request; search and item filters are local too. Refresh
+reloads the selected view from clan data, bypassing both the client and backend view caches.
+Restarting the client or evicting an older selection requires another read. Refresh does not sync
+the game account. The category catalogue and RuneLite item sprites are also cached.
+
+Share a board through normal clan chat with `!reval luck araxxor`, `!reval leaderboard clues hard`,
+or `!reval clog forestry`. Updated Reval clients underline the message and offer **Open Reval
+board** on left-click or in its right-click menu. A clog without an explicit player opens the
+sender's account; add a player name to share another account. Sharing selects the same page and
+account, using the recipient's normal cache; it is not a frozen snapshot. Messages remain ordinary
+chat for players without the update. Receiving a share does not fetch data or open a window until
+clicked, and the plugin never sends a chat message automatically.
+
 For local development, start the backend’s read-only `scripts/dev-clan-browser.ts` server with a
 read-only database URL, then run:
 

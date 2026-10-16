@@ -6,6 +6,8 @@ import com.revalclan.api.common.ApiEndpoints;
 import com.revalclan.util.PluginVersion;
 import java.io.IOException;
 import java.util.Map;
+import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.function.Consumer;
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -24,6 +26,7 @@ public class BrowserApi {
     private final Gson gson;
     private BrowserModels.Catalogue cached;
     private long cachedAt;
+    private final Map<String, BrowserModels.View> views = new LinkedHashMap<>(16, .75f, true);
 
     @Inject public BrowserApi(OkHttpClient http, Gson gson) { this.http = http; this.gson = gson; }
 
@@ -38,7 +41,28 @@ public class BrowserApi {
     }
 
     public Call view(BrowserCommand command, long accountHash, Consumer<BrowserModels.View> success, Consumer<String> failure) {
-        return get("view", command.parameters(accountHash), BrowserModels.View.class, success, failure);
+        return view(command, accountHash, false, success, failure);
+    }
+
+    public Call view(BrowserCommand command, long accountHash, boolean refresh, Consumer<BrowserModels.View> success, Consumer<String> failure) {
+        Map<String, String> parameters = command.parameters(accountHash);
+        Map<String, String> identity = new LinkedHashMap<>(parameters);
+        identity.replaceAll((name, value) -> name.equals("accountHash") ? value :
+            name.equals("category") || name.equals("boss") ? BrowserCommand.normalize(value) : value.toLowerCase(Locale.ROOT));
+        if ("all".equals(identity.get("tier"))) identity.remove("tier");
+        if (java.util.Arrays.asList("all", "overall", "all bosses").contains(identity.get("boss"))) identity.remove("boss");
+        String key = endpoint("view", identity).toString();
+        BrowserModels.View saved;
+        synchronized (views) { if (refresh) views.remove(key); saved = views.get(key); }
+        if (saved != null) { SwingUtilities.invokeLater(() -> success.accept(saved)); return null; }
+        if (refresh) parameters.put("refresh", "true");
+        return get("view", parameters, BrowserModels.View.class, data -> {
+            synchronized (views) {
+                views.put(key, data);
+                if (views.size() > 64) views.remove(views.keySet().iterator().next());
+            }
+            success.accept(data);
+        }, failure);
     }
 
     public static HttpUrl endpoint(String path, Map<String, String> parameters) {
