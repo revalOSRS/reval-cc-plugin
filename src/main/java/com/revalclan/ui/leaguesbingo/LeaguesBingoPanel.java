@@ -23,7 +23,6 @@ import net.runelite.client.game.SpriteManager;
 import net.runelite.client.ui.FontManager;
 
 import javax.inject.Inject;
-import javax.inject.Singleton;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
@@ -47,7 +46,6 @@ import java.util.List;
  * boards, then browse the tiles. Mirrors the homepage showcase, fed by the
  * same public payload, sized for the 225px RuneLite panel.
  */
-@Singleton
 public class LeaguesBingoPanel extends JPanel {
 	private enum View { TEAMS, BOARDS, BOARD }
 

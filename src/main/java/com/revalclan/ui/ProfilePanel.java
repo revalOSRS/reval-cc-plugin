@@ -429,7 +429,7 @@ public class ProfilePanel extends JPanel {
 
 	/** Full-width block button so the refresh action stands out */
 	private JButton buildRefreshProfileButton() {
-		JButton btn = new BlockButton("Refresh Profile", UIConstants.ACCENT_GOLD, 26);
+		JButton btn = new BlockButton("Refresh Profile", UIConstants.panelAccent(), 26);
 		btn.addActionListener(e -> {
 			btn.setText("Refreshing...");
 			btn.setEnabled(false);
@@ -547,7 +547,7 @@ public class ProfilePanel extends JPanel {
 		JProgressBar bar = new JProgressBar(0, 100);
 		bar.setValue((int) (progress * 100));
 		bar.setBackground(UIConstants.PROGRESS_BG);
-		bar.setForeground(UIConstants.ACCENT_GOLD);
+		bar.setForeground(UIConstants.panelAccent());
 		bar.setBorderPainted(false);
 		bar.setPreferredSize(new Dimension(100, 5));
 		bar.setMaximumSize(new Dimension(Integer.MAX_VALUE, 5));
@@ -817,6 +817,10 @@ public class ProfilePanel extends JPanel {
 	}
 
 	private JPanel createStatCard(String value, String label, Color accentColor, String sourceType) {
+		Color valueColor = accentColor != null ? accentColor : UIConstants.TEXT_PRIMARY;
+		if (UIConstants.isHalloweenTheme() && !UIConstants.TEXT_SECONDARY.equals(accentColor)) {
+			valueColor = sourceType != null ? UIConstants.HALLOWEEN_ACCENT : UIConstants.HALLOWEEN_STAT_GREEN;
+		}
 		JPanel card = new JPanel() {
 			private boolean hovered = false;
 			{
@@ -835,13 +839,17 @@ public class ProfilePanel extends JPanel {
 				Color bg = hovered ? UIConstants.CARD_BG.brighter() : UIConstants.CARD_BG;
 				g2d.setColor(bg);
 				g2d.fillRoundRect(0, 0, getWidth(), getHeight(), 6, 6);
+				if (UIConstants.isHalloweenTheme()) {
+					g2d.setColor(UIConstants.BORDER_COLOR);
+					g2d.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 6, 6);
+				}
 				g2d.dispose();
 			}
 		};
 
 		JLabel valueLabel = new JLabel(value);
 		valueLabel.setFont(FontManager.getRunescapeBoldFont());
-		valueLabel.setForeground(accentColor != null ? accentColor : UIConstants.TEXT_PRIMARY);
+		valueLabel.setForeground(valueColor);
 		valueLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
 
 		JLabel nameLabel = new JLabel(label);
@@ -862,6 +870,7 @@ public class ProfilePanel extends JPanel {
 	}
 
 	private JPanel wrapInRoundedPanel(JPanel content) {
+		if (UIConstants.isHalloweenTheme()) content.setOpaque(false);
 		JPanel wrapper = new JPanel(new BorderLayout()) {
 			@Override
 			protected void paintComponent(Graphics g) {
@@ -869,6 +878,10 @@ public class ProfilePanel extends JPanel {
 				g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 				g2d.setColor(UIConstants.CARD_BG);
 				g2d.fillRoundRect(0, 0, getWidth(), getHeight(), 8, 8);
+				if (UIConstants.isHalloweenTheme()) {
+					g2d.setColor(UIConstants.BORDER_COLOR);
+					g2d.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 8, 8);
+				}
 				g2d.dispose();
 			}
 		};

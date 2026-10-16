@@ -11,50 +11,50 @@ public class UIConstants {
     // ========== Background Colors ==========
     
     /** Main background color used for panels and containers */
-    public static final Color BACKGROUND = new Color(15, 17, 17);
+    public static Color BACKGROUND = new Color(15, 17, 17);
     
     /** Card background color for elevated content */
-    public static final Color CARD_BG = new Color(28, 31, 33);
+    public static Color CARD_BG = new Color(28, 31, 33);
     
     /** Card hover state background color */
-    public static final Color CARD_HOVER = new Color(35, 38, 42);
+    public static Color CARD_HOVER = new Color(35, 38, 42);
     
     /** Border color for cards and containers */
-    public static final Color BORDER_COLOR = new Color(50, 54, 58);
+    public static Color BORDER_COLOR = new Color(50, 54, 58);
     
     /** Progress bar background color */
-    public static final Color PROGRESS_BG = new Color(40, 43, 47);
+    public static Color PROGRESS_BG = new Color(40, 43, 47);
     
     /** Row/item background color (darker than card) */
-    public static final Color ROW_BG = new Color(22, 24, 26);
+    public static Color ROW_BG = new Color(22, 24, 26);
     
     /** Header background color (same as card) */
-    public static final Color HEADER_BG = CARD_BG;
+    public static Color HEADER_BG = CARD_BG;
     
     /** Header hover state background color (same as card hover) */
-    public static final Color HEADER_HOVER = CARD_HOVER;
+    public static Color HEADER_HOVER = CARD_HOVER;
     
     /** Tab active state background */
-    public static final Color TAB_ACTIVE = new Color(45, 48, 52);
+    public static Color TAB_ACTIVE = new Color(45, 48, 52);
     
     /** Tab hover state background */
-    public static final Color TAB_HOVER = new Color(38, 42, 46);
+    public static Color TAB_HOVER = new Color(38, 42, 46);
     
     // ========== Text Colors ==========
     
     /** Primary text color for main content */
-    public static final Color TEXT_PRIMARY = new Color(230, 230, 220);
+    public static Color TEXT_PRIMARY = new Color(230, 230, 220);
     
     /** Secondary text color for less important content */
-    public static final Color TEXT_SECONDARY = new Color(150, 150, 140);
+    public static Color TEXT_SECONDARY = new Color(150, 150, 140);
     
     /** Muted text color for disabled or very subtle content */
-    public static final Color TEXT_MUTED = new Color(100, 100, 95);
+    public static Color TEXT_MUTED = new Color(100, 100, 95);
     
     // ========== Accent Colors ==========
     
     /** Gold accent color - used for points, highlights, and important elements */
-    public static final Color ACCENT_GOLD = new Color(218, 165, 32);
+    public static Color ACCENT_GOLD = new Color(218, 165, 32);
     
     /** Green accent color - used for success states, positive values, and completion */
     public static final Color ACCENT_GREEN = new Color(139, 195, 74);
@@ -150,6 +150,50 @@ public class UIConstants {
     
     /** Mythic rarity color */
     public static final Color RARITY_MYTHIC = new Color(239, 83, 80);
+
+    // ========== Jack-o'-Lantern seasonal appearance ==========
+
+    public static final Color HALLOWEEN_ACCENT = new Color(245, 163, 75);
+    public static final Color HALLOWEEN_TAB = new Color(163, 87, 33);
+    public static final Color HALLOWEEN_TAB_BORDER = new Color(209, 138, 69);
+    public static final Color HALLOWEEN_TAB_TEXT = new Color(255, 241, 211);
+    public static final Color HALLOWEEN_STAT_GREEN = new Color(177, 201, 126);
+    public static final Color COBWEB = new Color(224, 203, 164, 50);
+    public static final Color PUMPKIN_BODY = new Color(217, 119, 41);
+    public static final Color PUMPKIN_LIGHT = new Color(255, 184, 88);
+    public static final Color PUMPKIN_OUTLINE = new Color(81, 42, 22);
+    public static final Color PUMPKIN_FACE = new Color(65, 36, 25);
+    public static final Color PUMPKIN_GLOW = new Color(255, 208, 114);
+    public static final Color PUMPKIN_STEM = new Color(126, 153, 97);
+
+    private static boolean halloweenTheme;
+
+    public static boolean isHalloweenTheme() {
+        return halloweenTheme;
+    }
+
+    /** Apply before constructing the panel tree. Theme changes rebuild that tree on the EDT. */
+    public static void setHalloweenTheme(boolean enabled) {
+        halloweenTheme = enabled;
+        BACKGROUND = enabled ? new Color(18, 18, 15) : new Color(15, 17, 17);
+        CARD_BG = enabled ? new Color(33, 27, 22) : new Color(28, 31, 33);
+        CARD_HOVER = enabled ? new Color(45, 35, 26) : new Color(35, 38, 42);
+        BORDER_COLOR = enabled ? new Color(71, 50, 34) : new Color(50, 54, 58);
+        PROGRESS_BG = enabled ? new Color(57, 42, 29) : new Color(40, 43, 47);
+        ROW_BG = enabled ? new Color(24, 22, 18) : new Color(22, 24, 26);
+        HEADER_BG = CARD_BG;
+        HEADER_HOVER = CARD_HOVER;
+        TAB_ACTIVE = enabled ? HALLOWEEN_TAB : new Color(45, 48, 52);
+        TAB_HOVER = enabled ? CARD_HOVER : new Color(38, 42, 46);
+        TEXT_PRIMARY = enabled ? new Color(231, 225, 210) : new Color(230, 230, 220);
+        TEXT_SECONDARY = enabled ? new Color(175, 162, 142) : new Color(150, 150, 140);
+        TEXT_MUTED = enabled ? new Color(119, 105, 87) : new Color(100, 100, 95);
+        ACCENT_GOLD = enabled ? new Color(227, 182, 104) : new Color(218, 165, 32);
+    }
+
+    public static Color panelAccent() {
+        return halloweenTheme ? HALLOWEEN_ACCENT : ACCENT_GOLD;
+    }
     
     // ========== Private Constructor ==========
     

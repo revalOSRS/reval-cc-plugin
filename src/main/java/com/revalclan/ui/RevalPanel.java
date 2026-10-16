@@ -9,6 +9,8 @@ import com.revalclan.ui.admin.PendingRankupsPanel;
 import com.revalclan.ui.components.AdminButton;
 import com.revalclan.ui.components.Clickable;
 import com.revalclan.ui.components.GradientSeparator;
+import com.revalclan.ui.components.HalloweenDecoration;
+import com.revalclan.ui.components.HalloweenTabButton;
 import com.revalclan.ui.components.PanelTitle;
 import com.revalclan.ui.constants.UIConstants;
 import com.revalclan.util.ClanRankIconResolver;
@@ -188,7 +190,7 @@ public class RevalPanel extends PluginPanel {
 	}
 
 	private JButton createTabButton(String text) {
-		JButton btn = new JButton(text);
+		JButton btn = new HalloweenTabButton(text);
 		btn.setFont(FontManager.getRunescapeSmallFont());
 		btn.setFocusPainted(false);
 		btn.setBorderPainted(false);
@@ -199,7 +201,15 @@ public class RevalPanel extends PluginPanel {
 
 
 	private JPanel createHeader() {
-		JPanel header = new JPanel(new BorderLayout());
+		JPanel header = new JPanel(new BorderLayout()) {
+			@Override
+			protected void paintComponent(Graphics g) {
+				super.paintComponent(g);
+				if (UIConstants.isHalloweenTheme()) {
+					HalloweenDecoration.paintHeader(g, getWidth(), getHeight());
+				}
+			}
+		};
 		header.setBackground(UIConstants.BACKGROUND);
 		header.setBorder(new EmptyBorder(6, 12, 8, 12));
 
@@ -251,10 +261,26 @@ public class RevalPanel extends PluginPanel {
 		topRow.add(rightPanel, BorderLayout.EAST);
 
 		PanelTitle titleLabel = new PanelTitle("REVAL CLAN", SwingConstants.CENTER);
+		titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+		if (UIConstants.isHalloweenTheme()) {
+			titleLabel.setForeground(UIConstants.HALLOWEEN_ACCENT);
+			titleLabel.setFont(FontManager.getRunescapeBoldFont().deriveFont(20f));
+			titleLabel.setIcon(HalloweenDecoration.pumpkinIcon(20));
+			titleLabel.setIconTextGap(5);
+		}
 
-		JPanel titlePanel = new JPanel(new BorderLayout());
-		titlePanel.setBackground(UIConstants.BACKGROUND);
-		titlePanel.add(titleLabel, BorderLayout.CENTER);
+		JPanel titlePanel = new JPanel();
+		titlePanel.setLayout(new BoxLayout(titlePanel, BoxLayout.Y_AXIS));
+		titlePanel.setOpaque(false);
+		titlePanel.add(titleLabel);
+		if (UIConstants.isHalloweenTheme()) {
+			JLabel seasonalLabel = new JLabel("HALLOWEEN AT REVAL");
+			seasonalLabel.setFont(FontManager.getRunescapeSmallFont());
+			seasonalLabel.setForeground(UIConstants.TEXT_SECONDARY);
+			seasonalLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+			titlePanel.add(Box.createVerticalStrut(4));
+			titlePanel.add(seasonalLabel);
+		}
 		titlePanel.setBorder(new EmptyBorder(4, 0, 6, 0));
 
 		header.add(topRow, BorderLayout.NORTH);
@@ -291,8 +317,13 @@ public class RevalPanel extends PluginPanel {
 
 	private void styleTab(JButton tab, boolean active) {
 		if (tab == null) return;
-		tab.setBackground(active ? UIConstants.ACCENT_BLUE : UIConstants.CARD_BG);
-		tab.setForeground(active ? Color.WHITE : UIConstants.TEXT_SECONDARY);
+		tab.setSelected(active);
+		tab.setBackground(active
+			? (UIConstants.isHalloweenTheme() ? UIConstants.HALLOWEEN_TAB : UIConstants.ACCENT_BLUE)
+			: UIConstants.CARD_BG);
+		tab.setForeground(active
+			? (UIConstants.isHalloweenTheme() ? UIConstants.HALLOWEEN_TAB_TEXT : Color.WHITE)
+			: UIConstants.TEXT_SECONDARY);
 	}
 
 	private JLabel createSocialIcon(String url, String tooltip) {

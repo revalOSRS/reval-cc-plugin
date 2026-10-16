@@ -1,5 +1,6 @@
 package com.revalclan;
 
+import com.revalclan.ui.HalloweenAppearance;
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
@@ -30,6 +31,17 @@ public interface RevalClanConfig extends Config {
 	)
 	default boolean hideCompletedItems() {
 		return false;
+	}
+
+	@ConfigItem(
+		keyName = "halloweenTheme",
+		name = "Halloween theme",
+		description = "Pumpkin-orange tabs, candlelit cards and cobwebs. Automatic enables it in October; Off restores the normal theme. Changes reload the side panel.",
+		section = panelSection,
+		position = 1
+	)
+	default HalloweenAppearance halloweenTheme() {
+		return HalloweenAppearance.AUTOMATIC;
 	}
 
 	// ── Profile cards ──────────────────────────────────────────────────
