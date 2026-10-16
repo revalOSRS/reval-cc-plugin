@@ -184,7 +184,7 @@ public class BrowserNavigationTest {
         assertNotNull(loaded.poll(5,TimeUnit.SECONDS));
         assertNull("Category navigation must keep using the viewer's account",queries.poll(5,TimeUnit.SECONDS).queryParameter("player"));
         SwingUtilities.invokeAndWait(() -> { window.open(BrowserCommand.parse("reval clog forestry OtherGuy")); window.setVisible(false); });
-        assertNotNull(loaded.poll(5,TimeUnit.SECONDS)); assertEquals("otherguy",queries.poll(5,TimeUnit.SECONDS).queryParameter("player"));
+        assertNotNull(loaded.poll(5,TimeUnit.SECONDS)); assertEquals("OtherGuy",queries.poll(5,TimeUnit.SECONDS).queryParameter("player"));
         SwingUtilities.invokeAndWait(() -> button(window,"Bosses").doClick(0));
         assertNotNull(loaded.poll(5,TimeUnit.SECONDS));
         assertEquals("OtherGuy",queries.poll(5,TimeUnit.SECONDS).queryParameter("player"));

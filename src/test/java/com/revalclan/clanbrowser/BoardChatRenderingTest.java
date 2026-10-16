@@ -3,6 +3,7 @@ package com.revalclan.clanbrowser;
 import java.lang.reflect.Constructor;
 import com.revalclan.RevalClanConfig;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import net.runelite.api.events.CommandExecuted;
 import net.runelite.api.events.PostMenuSort;
 import net.runelite.client.events.ConfigChanged;
@@ -28,6 +29,28 @@ import static org.mockito.ArgumentMatchers.*;
 
 /** Replays the actual per-message build callback, including RuneLite's core recoloring. */
 public class BoardChatRenderingTest {
+    @Test public void collectionSharesNameTheTargetPlayerWithoutFetchingOnReceiptOrRedraw() throws Exception {
+        Fixture f = new Fixture();
+        BrowserModels.Catalogue catalogue = new BrowserModels.Catalogue();
+        BrowserModels.Page forestry = new BrowserModels.Page(); forestry.value="forestry"; forestry.label="Forestry";
+        catalogue.pages.add(forestry);
+        f.catalogueSuccess.get().accept(catalogue);
+        f.add(1,ChatMessageType.PUBLICCHAT,"<img=2>Valgusruum","!reval clog forestry");
+        f.add(2,ChatMessageType.CLAN_CHAT,"SomeoneElse","!reval clog forestry Valgusruum");
+        f.add(3,ChatMessageType.CLAN_GIM_CHAT,"SomeoneElse","|!reval clog forestry --player \"Love Yourz\"");
+        for (int pass=0;pass<5;pass++) {
+            assertEquals("<col=2b7d77>Click to view Valgusruum's collection log: Forestry</col>",f.render(1));
+            assertEquals("<col=2b7d77>Click to view Valgusruum's collection log: Forestry</col>",f.render(2));
+            assertEquals("|<col=2b7d77>Click to view Love Yourz's collection log: Forestry</col>",f.render(3));
+        }
+        verify(f.api,times(1)).catalogue(any(),any());
+        verify(f.api,never()).view(any(),anyLong(),any(),any());
+        verify(f.nodes.get(2),never()).setValue(anyString());
+        when(f.config.enableChatCommands()).thenReturn(false);f.configChanged("revalclan","enableChatCommands");
+        f.catalogueSuccess.get().accept(catalogue);
+        assertEquals("A delayed catalogue must not re-enable sharing","!reval clog forestry Valgusruum",f.render(2));
+    }
+
     @Test public void sharesAreFormattedBeforeTheirFirstLayoutAndStayFormattedAfterNotifications() throws Exception {
         Fixture f = new Fixture();
         f.add(40, ChatMessageType.PUBLICCHAT, "<img=2>Valgusruum", "!Reval luck araxxor");
@@ -92,13 +115,15 @@ public class BoardChatRenderingTest {
         verify(f.client,never()).refreshChat();
         when(f.config.enableChatCommands()).thenReturn(true);
         f.events.post(new net.runelite.client.events.ProfileChanged());
-        assertTrue("Changing RuneLite profiles must use that profile's chat preference",f.render(1).contains("Click to view collection log"));
+        assertTrue("Changing RuneLite profiles must use that profile's chat preference",f.render(1).contains("Click to view Valgusruum's collection log"));
         verify(f.client).refreshChat();
     }
 
     private static class Fixture {
         final Client client=mock(Client.class);
         final RevalClanConfig config=mock(RevalClanConfig.class);
+        final BrowserApi api=mock(BrowserApi.class);
+        final AtomicReference<Consumer<BrowserModels.Catalogue>> catalogueSuccess=new AtomicReference<>();
         final AtomicReference<BrowserCommand> privateCommand=new AtomicReference<>();
         final ClientThread clientThread=mock(ClientThread.class);
         final EventBus events=new EventBus();
@@ -109,6 +134,7 @@ public class BoardChatRenderingTest {
         Fixture() throws Exception { this(true); }
         @SuppressWarnings("unchecked") Fixture(boolean enabled) throws Exception {
             when(config.enableChatCommands()).thenReturn(enabled);
+            doAnswer(i->{catalogueSuccess.set(i.getArgument(0));return null;}).when(api).catalogue(any(),any());
             IterableHashTable<MessageNode> messages=mock(IterableHashTable.class);
             when(client.getMessages()).thenReturn(messages);
             when(messages.get(anyLong())).thenAnswer(i->nodes.get(((Long)i.getArgument(0)).intValue()));
@@ -118,7 +144,7 @@ public class BoardChatRenderingTest {
             doAnswer(i->{((Runnable)i.getArgument(0)).run();return null;}).when(clientThread).invoke(any(Runnable.class));
             Constructor<ChatMessageManager> core=ChatMessageManager.class.getDeclaredConstructor(Client.class, ChatColorConfig.class, ClientThread.class, EventBus.class);
             core.setAccessible(true);core.newInstance(client,mock(ChatColorConfig.class),clientThread,events);
-            manager=new ClanBrowserManager(client,clientThread,mock(ItemManager.class),mock(BrowserApi.class),config) {
+            manager=new ClanBrowserManager(client,clientThread,mock(ItemManager.class),api,config) {
                 @Override public void open(BrowserCommand command) { privateCommand.set(command); }
             };
             events.register(manager);manager.startUp();

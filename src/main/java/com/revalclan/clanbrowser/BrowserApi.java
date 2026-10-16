@@ -24,8 +24,8 @@ import okhttp3.Response;
 public class BrowserApi {
     private final OkHttpClient http;
     private final Gson gson;
-    private BrowserModels.Catalogue cached;
-    private long cachedAt;
+    private volatile BrowserModels.Catalogue cached;
+    private volatile long cachedAt;
     private final Map<String, BrowserModels.View> views = new LinkedHashMap<>(16, .75f, true);
 
     @Inject public BrowserApi(OkHttpClient http, Gson gson) { this.http = http; this.gson = gson; }

@@ -32,12 +32,12 @@ public class BrowserCommandTest {
         BrowserModels.Page page = new BrowserModels.Page(); page.value = "general-graardor"; page.label = "General Graardor";
         page.aliases.addAll(Arrays.asList("General Graardor", "bandos"));
         BrowserCommand command = BrowserCommand.parse("::reval clog general graardor \"Love Yourz\"").resolvePlayerSuffix(Arrays.asList(page));
-        assertEquals("general graardor", command.category); assertEquals("love yourz", command.player);
+        assertEquals("general graardor", command.category); assertEquals("Love Yourz", command.player);
         assertNull(BrowserCommand.parse("::reval clog general graardor").resolvePlayerSuffix(Arrays.asList(page)).player);
         assertEquals("Valgusruum", BrowserCommand.parse("::reval clog forestry player:Valgusruum").player);
         assertEquals("Love Yourz", BrowserCommand.parse("::reval clog forestry --player \"Love Yourz\"").player);
         BrowserCommand clues = BrowserCommand.parse("::reval clog clues Phosani55555").resolvePlayerSuffix(Arrays.asList(page));
-        assertEquals("clues", clues.category); assertEquals("phosani55555", clues.player);
+        assertEquals("clues", clues.category); assertEquals("Phosani55555", clues.player);
     }
 
     @Test public void preservesSignedAccountHashesAndNeverSendsOneWhenAPlayerWasSelected() {

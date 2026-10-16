@@ -25,6 +25,7 @@ final class BoardChatLinks {
     private final BiConsumer<BrowserCommand, String> open;
     private final List<Link> links = new ArrayList<>();
     private final List<Shared> building = new ArrayList<>();
+    private List<BrowserModels.Page> pages = java.util.Collections.emptyList();
     private MenuEntry boardEntry;
     private Consumer<MenuEntry> boardClick;
     private boolean enabled;
@@ -46,6 +47,10 @@ final class BoardChatLinks {
     static final int CHAT_BUILDER = 84;
 
     void startUp() { enabled = true; rebuild(); }
+    void catalogue(List<BrowserModels.Page> pages) {
+        this.pages = new ArrayList<>(pages);
+        if (enabled) rebuild();
+    }
     void rebuild() { client.refreshChat(); }
     void beginBuild() { building.clear(); }
 
@@ -61,7 +66,8 @@ final class BoardChatLinks {
             if (group && source != null && source.startsWith("|")) source = source.substring(1);
             BrowserCommand command = parse(source);
             if (command != null) {
-                shared = new Shared(command, clean(node.getName()), color() + "Click to view " + label(command) + "</col>");
+                String sender = clean(node.getName());
+                shared = new Shared(command, sender, color() + "Click to view " + label(command, sender) + "</col>");
                 // Format before the game measures/wraps the row. The source node stays
                 // unchanged, so every redraw starts from the same original command.
                 client.getObjectStack()[objects - 2] = (group && node.getValue().startsWith("|") ? "|" : "") + shared.decorated;
@@ -130,7 +136,7 @@ final class BoardChatLinks {
         int version = generation;
         // Capture the command and sender now: chat widgets may be recycled while the menu is open.
         boardClick = entry -> { if (enabled && version == generation) open.accept(command, sender); };
-        boardEntry = menu.createMenuEntry(-1).setOption(OPEN).setTarget(color() + label(command) + "</col>")
+        boardEntry = menu.createMenuEntry(-1).setOption(OPEN).setTarget(color() + label(command, sender) + "</col>")
             .setType(MenuAction.RUNELITE).setForceLeftClick(true)
             .onClick(boardClick);
     }
@@ -173,9 +179,10 @@ final class BoardChatLinks {
         return parse(message.getText());
     }
 
-    private static String label(BrowserCommand command) {
+    private String label(BrowserCommand command, String sender) {
+        command = command.resolveShared(pages, sender);
         switch (command.kind) {
-            case "clog": return "collection log: " + title(command.category) + (command.player == null ? "" : " (" + command.player + ")");
+            case "clog": return command.player + "'s collection log: " + title(command.category);
             case "luck": return title(command.category) + " luck board";
             case "deserved": return title(command.category) + " deserved board";
             case "dryboard": return title(command.category) + " dryboard";

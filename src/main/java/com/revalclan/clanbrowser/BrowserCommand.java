@@ -85,7 +85,11 @@ public final class BrowserCommand {
             }
         }
         if (best == null) return this;
-        String tail = needle.substring(best.length()).trim();
+        // Match with normalized names, but retain the player's original spelling.
+        Matcher original = Pattern.compile("[a-z0-9]+", Pattern.CASE_INSENSITIVE).matcher(category);
+        int end = 0;
+        for (int i = 0; i < best.split(" ").length && original.find(); i++) end = original.end();
+        String tail = category.substring(end).trim();
         if (!validPlayer(tail)) return this;
         return new BrowserCommand(kind, best, metric, boss, tier, tail);
     }

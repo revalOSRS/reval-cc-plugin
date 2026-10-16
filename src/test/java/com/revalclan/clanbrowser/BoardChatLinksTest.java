@@ -26,9 +26,13 @@ public class BoardChatLinksTest {
             {"luck araxxor", "Araxxor luck board"},
             {"deserved general graardor", "General Graardor deserved board"},
             {"dryboard vorkath", "Vorkath dryboard"},
-            {"clog forestry", "collection log: Forestry"},
-            {"clog forestry player:Valgusruum", "collection log: Forestry (Valgusruum)"},
-            {"clog forestry Valgusruum", "collection log: Forestry Valgusruum"},
+            {"clog forestry", "Alice Smith's collection log: Forestry"},
+            {"clog forestry player:Valgusruum", "Valgusruum's collection log: Forestry"},
+            {"clog forestry Valgusruum", "Valgusruum's collection log: Forestry"},
+            {"clog forestry --player \"Love Yourz\"", "Love Yourz's collection log: Forestry"},
+            {"clog general graardor \"Love Yourz\"", "Love Yourz's collection log: General Graardor"},
+            {"clog bandos Valgusruum", "Valgusruum's collection log: Bandos"},
+            {"clog clues Valgusruum", "Valgusruum's collection log: Clues"},
             {"leaderboard points", "Total points leaderboard"},
             {"leaderboard xp", "Total XP leaderboard"},
             {"leaderboard clues hard", "Hard clues leaderboard"},
@@ -39,8 +43,10 @@ public class BoardChatLinksTest {
             f.receive(original); f.links.startUp();
             String expected = "<col=2b7d77>Click to view " + example[1] + "</col>";
             assertEquals(expected, f.text.get());
+            assertFalse(f.text.get().contains("<u>"));
             f.links.rebuild(); assertEquals(expected, f.text.get());
             f.links.prioritize(); menu.click.get().accept(menu.link);
+            verify(menu.link).setTarget("<col=2b7d77>" + example[1] + "</col>");
             assertEquals(BoardChatLinks.parse(original).parameters(0), f.command.get().parameters(0));
             assertEquals("Alice Smith", f.author.get());
             f.links.clear(); assertEquals(original, f.text.get());
@@ -136,7 +142,7 @@ public class BoardChatLinksTest {
             f.client.getIntStack()[1]=1;f.client.getObjectStack()[2]="!reval clog forestry";f.links.format(event);
             // The game's outer chat color wraps our label after the callback.
             f.text.set("<col=0000ff>"+f.client.getObjectStack()[2]+"</col>");f.links.finishBuild();
-            assertTrue(f.text.get().contains("Click to view collection log: Forestry"));
+            assertTrue(f.text.get().contains("Click to view Alice Smith's collection log: Forestry"));
         }
         f.links.prioritize();menu.click.get().accept(menu.link);
         assertEquals("Alice Smith",f.author.get());assertEquals("forestry",f.command.get().category);
@@ -159,7 +165,7 @@ public class BoardChatLinksTest {
         BrowserCommand self = BoardChatLinks.parse("<col=ff00ff>!reval clog forestry</col>").resolveShared(Arrays.asList(forestry),"Alice Smith");
         assertEquals("forestry",self.category); assertEquals("Alice Smith",self.player);
         BrowserCommand explicit = BoardChatLinks.parse("!reval clog forestry Valgusruum").resolveShared(Arrays.asList(forestry),"Alice Smith");
-        assertEquals("valgusruum",explicit.player);
+        assertEquals("Valgusruum",explicit.player);
         assertEquals("hard", BoardChatLinks.parse("!REVAL leaderboard clues hard").tier);
         assertEquals("araxxor", BoardChatLinks.parse("!reval luck araxxor").category);
         for (String invalid : Arrays.asList("hello !reval luck vorkath","!revaluation luck vorkath","!reval help","!reval delete","!reval leaderboard bank")) assertNull(invalid,BoardChatLinks.parse(invalid));
@@ -167,7 +173,7 @@ public class BoardChatLinksTest {
 
     @Test public void decoratingChatDoesNotOpenAnythingOrOverwriteRecycledMessages() {
         Fixture f = new Fixture(); f.links.startUp();
-        assertEquals(0,f.opened.get()); assertTrue(f.text.get().contains("<col=2b7d77>Click to view collection log: Forestry</col>"));
+        assertEquals(0,f.opened.get()); assertTrue(f.text.get().contains("<col=2b7d77>Click to view Alice Smith's collection log: Forestry</col>"));
         f.links.rebuild(); assertEquals(1,count(f.text.get(),"Click to view")); assertFalse(f.text.get().contains("<u>"));
         f.receive("An ordinary new message"); f.links.rebuild(); assertEquals("An ordinary new message",f.text.get());
         f.receive("!reval dryboard vorkath"); f.links.rebuild(); f.links.clear();
@@ -234,6 +240,10 @@ public class BoardChatLinksTest {
         final BoardChatLinks links=new BoardChatLinks(client,(value,name)->{opened.incrementAndGet();command.set(value);author.set(name);});
         void receive(String value) { source.set(value); text.set(value); }
         @SuppressWarnings("unchecked") Fixture() {
+            BrowserModels.Page forestry = new BrowserModels.Page(); forestry.value="forestry"; forestry.label="Forestry";
+            BrowserModels.Page graardor = new BrowserModels.Page(); graardor.value="general-graardor"; graardor.label="General Graardor";
+            graardor.aliases.add("bandos");
+            links.catalogue(Arrays.asList(forestry,graardor));
             IterableHashTable<MessageNode> messages=mock(IterableHashTable.class);
             MessageNode node=mock(MessageNode.class);
             when(client.getMessages()).thenReturn(messages); when(messages.get(1)).thenReturn(node);

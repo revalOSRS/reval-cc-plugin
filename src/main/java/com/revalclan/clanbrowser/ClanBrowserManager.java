@@ -31,6 +31,7 @@ public class ClanBrowserManager {
     private ClanBrowserWindow window;
     private volatile boolean running;
     private boolean chatEnabled;
+    private volatile okhttp3.Call chatCatalogueCall;
 
     @Inject public ClanBrowserManager(Client client, ClientThread clientThread, ItemManager items, BrowserApi api, RevalClanConfig config) {
         this.client = client; this.clientThread = clientThread; this.items = items; this.api = api; this.config = config;
@@ -39,6 +40,7 @@ public class ClanBrowserManager {
     public void startUp() { running = true; clientThread.invoke(this::applyChatSetting); }
     public void shutDown() {
         running = false;
+        if (chatCatalogueCall != null) chatCatalogueCall.cancel();
         clientThread.invoke(() -> { chatEnabled = false; chatLinks.clear(); });
         SwingUtilities.invokeLater(() -> { if (window != null) { window.dispose(); window = null; } });
     }
@@ -46,7 +48,13 @@ public class ClanBrowserManager {
         boolean enabled = running && config.enableChatCommands();
         if (enabled == chatEnabled) return;
         chatEnabled = enabled;
-        if (enabled) chatLinks.startUp(); else chatLinks.clear();
+        if (enabled) {
+            chatLinks.startUp();
+            // Share the browser's cached catalogue. Rendering/hovering never fetches.
+            chatCatalogueCall = api.catalogue(data -> clientThread.invoke(() -> {
+                if (running) chatLinks.catalogue(data.pages);
+            }), ignored -> {});
+        } else chatLinks.clear();
     }
     @Subscribe public void onConfigChanged(ConfigChanged event) {
         if (running && "revalclan".equals(event.getGroup()) && "enableChatCommands".equals(event.getKey())) clientThread.invoke(this::applyChatSetting);
