@@ -152,7 +152,8 @@ public final class ClanBrowserWindow extends JFrame {
     public void open(BrowserCommand command) { open(command, null); }
     public void open(BrowserCommand command, String sharedBy) {
         if (!SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Browser window must open on the EDT");
-        closed = false; search.setText(""); setVisible(true); toFront();
+        closed = false; search.setText("");
+        setExtendedState(getExtendedState() & ~ICONIFIED); setVisible(true); toFront();
         if (catalogue != null) { configure(command.resolveShared(catalogue.pages, sharedBy)); perform(); return; }
         request = command; busy(true); message("Loading clan categories…", null);
         final int ticket = ++generation;

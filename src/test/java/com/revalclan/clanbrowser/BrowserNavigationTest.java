@@ -228,10 +228,14 @@ public class BrowserNavigationTest {
                 for (java.awt.Window candidate : java.awt.Window.getWindows()) if (candidate instanceof ClanBrowserWindow && candidate != window && candidate.isDisplayable()) opened[0]=(ClanBrowserWindow)candidate;
                 assertNotNull(opened[0]); assertEquals("Reval · Clan Points Leaderboard",opened[0].getTitle());
                 assertEquals(BrowserTheme.GOLD,button(opened[0],"Points").getForeground());
+                opened[0].setExtendedState(JFrame.ICONIFIED);
                 button(sidebar,"Open full leaderboard").doClick(0);
             });
             assertEquals("leaderboard",loaded.poll(5,TimeUnit.SECONDS).kind);
-            SwingUtilities.invokeAndWait(() -> assertTrue("Repeated shortcut clicks must reuse the same window",opened[0].isDisplayable()));
+            SwingUtilities.invokeAndWait(() -> {
+                assertTrue("Repeated shortcut clicks must reuse the same window",opened[0].isDisplayable());
+                assertEquals("The shortcut must restore a minimized browser",0,opened[0].getExtendedState() & JFrame.ICONIFIED);
+            });
             assertEquals("The second shortcut click must use the cached Points board",2,reads.get());
         } finally {
             manager.shutDown(); SwingUtilities.invokeAndWait(() -> {});
