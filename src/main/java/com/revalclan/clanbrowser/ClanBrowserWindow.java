@@ -452,7 +452,12 @@ public final class ClanBrowserWindow extends JDialog {
         title.text = "Reval · Command guide"; title.repaint(); setTitle("Reval · Command guide"); body.removeAll();
         tools.setVisible(false); choices.setVisible(false); statistics.setVisible(false);
         modeButtons.values().forEach(button -> highlight(button, false));
-        body.add(BrowserTheme.scroll(new BrowserHelpView()), BorderLayout.CENTER); body.revalidate(); body.repaint();
+        javax.swing.JScrollPane guide = BrowserTheme.scroll(new BrowserHelpView()); guide.setFocusable(true);
+        body.add(guide, BorderLayout.CENTER); body.revalidate(); body.repaint();
+        SwingUtilities.invokeLater(() -> {
+            if (!guide.isShowing()) return;
+            guide.requestFocusInWindow(); guide.getViewport().setViewPosition(new java.awt.Point(0, 0));
+        });
     }
     private void cancel() { if (dataCall != null) dataCall.cancel(); if (catalogueCall != null) catalogueCall.cancel(); }
     BrowserModels.View currentView() { return loading.isVisible() ? null : data; }
