@@ -485,6 +485,60 @@ public class CollectionLogManager {
 		}
 	}
 
+	/** Counter-only payload for pages touched by these items; null means all pages. */
+	public Map<String, Map<String, Integer>> getCounterSnapshot(Collection<Integer> itemIds) {
+		Set<String> pages = new HashSet<>();
+		if (itemIds == null) {
+			pages.addAll(categoryKCMap.keySet());
+			pages.addAll(additionalKCMap.keySet());
+		} else {
+			for (Map.Entry<String, Integer> page : categoryStructIdMap.entrySet()) {
+				Set<Integer> items = categoryItemMap.get(page.getValue());
+				if (items != null && !Collections.disjoint(items, itemIds)) pages.add(page.getKey());
+			}
+			// Shared clue pages need all six counters to retain a meaningful total.
+			if (pages.stream().anyMatch(page -> page.contains("treasure_trail") || page.equals("scroll_cases"))) {
+				for (String page : categoryKCMap.keySet()) {
+					if (page.contains("treasure_trail")) pages.add(page);
+				}
+			}
+		}
+		if (pages.contains("the_nightmare")) pages.add("phosanis_nightmare");
+		Map<String, Map<String, Integer>> result = new HashMap<>();
+		for (String page : pages) {
+			Map<String, Integer> values = new HashMap<>();
+			readCounter(values, "kc", categoryKCMap.get(page));
+			for (Map.Entry<String, KCSource> entry : additionalKCMap.getOrDefault(page, Collections.emptyMap()).entrySet()) {
+				readCounter(values, entry.getKey(), entry.getValue());
+			}
+			for (Map.Entry<String, String[]> entry : derivedKCMap.getOrDefault(page, Collections.emptyMap()).entrySet()) {
+				String[] sources = entry.getValue();
+				if (values.containsKey(sources[0]) && values.containsKey(sources[1])) {
+					int value = values.get(sources[0]) - values.get(sources[1]);
+					if (value >= 0) values.put(entry.getKey(), value);
+				}
+			}
+			for (Map.Entry<String, String[]> entry : summedKCMap.getOrDefault(page, Collections.emptyMap()).entrySet()) {
+				if (Arrays.stream(entry.getValue()).allMatch(values::containsKey)) {
+					values.put(entry.getKey(), Arrays.stream(entry.getValue()).mapToInt(values::get).sum());
+				}
+			}
+			values.keySet().removeIf(key -> key.endsWith("_combined_kc"));
+			if (!values.isEmpty()) result.put(page, values);
+		}
+		return result;
+	}
+
+	private void readCounter(Map<String, Integer> values, String key, KCSource source) {
+		if (source == null) return;
+		try {
+			int value = source.isVarbit ? client.getVarbitValue(source.id) : client.getVarpValue(source.id);
+			if (value >= 0) values.put(key, value);
+		} catch (RuntimeException ignored) {
+			// Unavailable is not a zero-count completion.
+		}
+	}
+
 	/**
 	 * Add additional KCs including derived and summed calculations
 	 */

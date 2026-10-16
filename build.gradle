@@ -80,3 +80,18 @@ tasks.register('runClient', JavaExec) {
 	jvmArgs = ['-ea', '-Xmx1g', '--add-exports=java.desktop/com.apple.eawt=ALL-UNNAMED', '--add-opens=java.desktop/com.apple.eawt=ALL-UNNAMED']
 	args = ['--developer-mode']
 }
+
+// Native clan-browser previews. API override is for a local read-only development server.
+['runBrowserPreview': 'com.revalclan.clanbrowser.BrowserDesktopPreview',
+ 'runBrowserClient': 'com.revalclan.clanbrowser.BrowserClientPreview'].each { taskName, entrypoint ->
+	tasks.register(taskName, JavaExec) {
+		group = 'application'
+		classpath = sourceSets.test.runtimeClasspath
+		mainClass = entrypoint
+		jvmArgs = ['-ea', '-Xmx1g', '--add-exports=java.desktop/com.apple.eawt=ALL-UNNAMED', '--add-opens=java.desktop/com.apple.eawt=ALL-UNNAMED']
+		if (taskName == 'runBrowserClient') args = ['--developer-mode']
+		['Api', 'Command', 'Atlas', 'Screenshot'].each { suffix ->
+			if (project.hasProperty('revalBrowser' + suffix)) systemProperty('reval.browser' + suffix, project.property('revalBrowser' + suffix))
+		}
+	}
+}

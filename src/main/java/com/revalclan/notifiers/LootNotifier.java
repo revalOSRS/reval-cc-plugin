@@ -1,6 +1,8 @@
 package com.revalclan.notifiers;
 
 import com.revalclan.session.SessionTracker;
+import com.revalclan.collectionlog.CollectionLogManager;
+import com.revalclan.collectionlog.GreenlogCounterSnapshot;
 import com.revalclan.util.RaidPartyTracker;
 import com.revalclan.util.RaidRewardLedger;
 import net.runelite.api.Item;
@@ -32,6 +34,8 @@ import java.util.regex.Pattern;
 public class LootNotifier extends BaseNotifier {
 	@Inject
 	private SessionTracker sessionTracker;
+	@Inject private CollectionLogManager collectionLogManager;
+	@Inject private GreenlogCounterSnapshot greenlogCounterSnapshot;
 
 	@Inject
 	private RaidPartyTracker raidPartyTracker;
@@ -644,6 +648,16 @@ public class LootNotifier extends BaseNotifier {
 							}
 						}
 
+						try {
+							Set<Integer> clogIds = new HashSet<>();
+							for (Map<String, Object> item : cleanItems) {
+								int id = ((Number) item.get("id")).intValue();
+								if (collectionLogManager.getAllCollectionLogItems().contains(id)) clogIds.add(id);
+							}
+							if (!clogIds.isEmpty()) pending.lootData.put("greenlogCounters", greenlogCounterSnapshot.capture(clogIds));
+						} catch (RuntimeException ignored) {
+							// Optional counters must never prevent the loot event.
+						}
 						sendNotification(pending.lootData);
 					} catch (Exception ignored) {
 						// Never let one payload break the tick dispatch for

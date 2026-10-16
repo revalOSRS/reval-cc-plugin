@@ -4,6 +4,54 @@ A comprehensive RuneLite plugin for the Reval clan in Old School RuneScape. Feat
 
 ## Features
 
+### In-game clan browser
+
+Type `::reval` or `::reval help` to open the command guide. Commands open a resizable native window;
+the game remains usable while it is open. Categories and statistics have searchable autocomplete.
+
+| Command | View |
+| --- | --- |
+| `::reval clog forestry` | Your synced collection log, using your logged-in account |
+| `::reval clog forestry Valgusruum` | Another clan account’s collection log |
+| `::reval clog clues Phosani55555` | All clue pages, including rare and shared rewards |
+| `::reval luck vorkath` | Lowest saved greenlog completion counters first |
+| `::reval deserved vorkath` | Highest saved greenlog completion counters first |
+| `::reval dryboard vorkath` | Kills since the last recorded unique, including duplicates |
+| `::reval leaderboard xp` | Full clan standings for a statistic |
+| `::reval leaderboard clues hard` | A specific clue tier; omit the tier for all seven tabs |
+| `::reval leaderboard bosses toa` | A specific boss or raid; omit the boss for all bosses |
+
+Leaderboard statistics: `clog`, `pets`, `points`, `greenlogs`, `monthly-clog`, `monthly-points`,
+`clues`, `combat`, `bosses`, and `xp`. Boss aliases include `cox`, `tob`, `toa`, and `bandos`.
+Player names containing spaces can be quoted, or supplied with `--player "Love Yourz"`.
+
+Standings include every available account and retain their original ranks when searched. Global
+statistics and Dryboard have separate Mains, Ironman + GIM + UIM, and Hardcore Ironman columns.
+Luck and Deserved use one account per linked member. Categories with no counter tie completed logs
+at #1; otherwise completed logs without a comparable counter remain visible without a numeric rank.
+When fewer than ten members have completed a category, the remaining places show the closest
+unfinished logs. Double-click a category-board row to open that account’s collection log.
+
+Collection logs use RuneLite’s cached item sprites, adaptive cell sizes, hover names, and obtained /
+missing filters. Completion counters remain frozen at their saved greenlog value; `~` marks an
+estimated value. Dryboard uses recorded drop history and omits accounts without comparable current
+and last-drop counters. These views read clan data and do not trigger a sync or modify points.
+
+For local development, start the backend’s read-only `scripts/dev-clan-browser.ts` server with a
+read-only database URL, then run:
+
+```sh
+JAVA_HOME=$(/usr/libexec/java_home -v 21) ./gradlew runBrowserClient \
+  -PrevalBrowserApi=http://127.0.0.1:4786/plugin \
+  '-PrevalBrowserCommand=clog forestry Valgusruum'
+```
+
+`runBrowserClient` starts the real RuneLite client with Reval loaded and invokes the same command
+event as in-game chat. `runBrowserPreview` opens just the native window without a game login;
+its optional `revalBrowserAtlas` points to a local sprite atlas for visual QA. Without an API
+override, the plugin uses the normal Reval backend. The backend clan-browser endpoints must be
+deployed before an owner-managed plugin release.
+
 ### 🖥️ Sidepanel UI (Planned)
 A dedicated panel for Reval clan members with:
 - **Profile**: View your clan rank, points progress, milestones, and achievements
