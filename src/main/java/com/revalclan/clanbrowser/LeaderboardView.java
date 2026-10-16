@@ -14,7 +14,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.function.Consumer;
 import javax.swing.BorderFactory;
-import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
@@ -43,15 +42,15 @@ final class LeaderboardView extends JPanel {
             JTabbedPane tabs = new JTabbedPane(); tabs.setFont(BrowserTheme.font(21, true)); tabs.setForeground(BrowserTheme.TEXT); tabs.setBackground(BrowserTheme.HEADER);
             for (BrowserModels.Section section : view.sections) {
                 String label = section.tier == null || section.tier.equals("all") ? "Total" : section.tier.substring(0, 1).toUpperCase(Locale.ROOT) + section.tier.substring(1);
-                tabs.addTab(label, null, section(null, section.panels, openLog), section.label);
+                tabs.addTab(label, null, section(section.panels, openLog), section.label);
             }
             body.add(tabs);
         } else if (view.panels != null && !view.panels.isEmpty()) {
-            body.add(section(null, view.panels, openLog));
+            body.add(section(view.panels, openLog));
         } else {
             BrowserModels.Panel panel = new BrowserModels.Panel(); panel.label = view.page != null ? view.page.label : "Clan standings";
             panel.rows = view.rows; panel.color = "#ffbb48"; panel.total = view.rows.size();
-            body.add(section(null, java.util.Collections.singletonList(panel), openLog));
+            body.add(section(java.util.Collections.singletonList(panel), openLog));
         }
         add(body, BorderLayout.CENTER);
     }
@@ -61,12 +60,8 @@ final class LeaderboardView extends JPanel {
         return "xp".equals(kind) ? "XP" : "clues".equals(kind) ? "Clues" : "completions".equals(kind) ? "Completions" : "Kills";
     }
 
-    private JPanel section(String label, List<BrowserModels.Panel> panels, Consumer<String> openLog) {
+    private JPanel section(List<BrowserModels.Panel> panels, Consumer<String> openLog) {
         JPanel section = new JPanel(new BorderLayout(0, 6)); section.setOpaque(false);
-        if (label != null) {
-            JLabel heading = new JLabel(label); heading.setFont(BrowserTheme.font(26, true)); heading.setForeground(BrowserTheme.GOLD);
-            heading.setBorder(BorderFactory.createEmptyBorder(8, 3, 2, 3)); section.add(heading, BorderLayout.NORTH);
-        }
         JPanel columns = new JPanel(new GridLayout(1, Math.max(1, panels.size()), 12, 0)); columns.setOpaque(false);
         for (BrowserModels.Panel panel : panels) {
             JPanel card = new JPanel(new BorderLayout()); card.setBackground(BrowserTheme.PANEL); card.setBorder(BorderFactory.createLineBorder(BrowserTheme.BORDER));
@@ -100,7 +95,7 @@ final class LeaderboardView extends JPanel {
                     if (event.getClickCount() == 2 && row >= 0 && row < model.visible.size() && !"section".equals(model.visible.get(row).status)) openLog.accept(model.visible.get(row).player);
                 }
             });
-            JScrollPane scroll = BrowserTheme.scroll(table); scroll.setBorder(null); scroll.setPreferredSize(new Dimension(300, label != null ? 325 : 480));
+            JScrollPane scroll = BrowserTheme.scroll(table); scroll.setBorder(null); scroll.setPreferredSize(new Dimension(300, 480));
             if (panel.rows.isEmpty()) {
                 JLabel empty = new JLabel(dry ? "No comparable drop KC yet" : "No recorded scores", SwingConstants.CENTER);
                 empty.setFont(BrowserTheme.font(22, false)); empty.setForeground(BrowserTheme.MUTED); card.add(empty, BorderLayout.CENTER);
