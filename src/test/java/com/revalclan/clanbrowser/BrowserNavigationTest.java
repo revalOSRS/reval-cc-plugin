@@ -28,11 +28,13 @@ import org.junit.Before;
 import org.junit.Test;
 import static org.junit.Assert.*;
 import static org.junit.Assume.assumeFalse;
+import static org.mockito.Mockito.*;
 
 /** Exercises the real window/API call path with a deliberately held item response. */
 public class BrowserNavigationTest {
     private HttpServer server;
     private OkHttpClient http;
+    private BrowserApi api;
     private ClanBrowserWindow window;
     private JFrame gameWindow;
     private String previous;
@@ -59,18 +61,19 @@ public class BrowserNavigationTest {
             if (boss) try { releaseBoss.await(5,TimeUnit.SECONDS); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
             String query=exchange.getRequestURI().getQuery();
             String selected = boss ? page("vorkath","Vorkath","Bosses") : query.contains("category=zulrah") ? page("zulrah","Zulrah","Bosses") : page("forestry","Forestry","Other");
-            String kind=query.contains("command=deserved") ? "deserved" : query.contains("command=luck") ? "luck" : "clog";
+            String kind=url.queryParameter("command");
+            if (kind.equals("leaderboard")) selected = "null";
             boolean failure = boss && failBoss.get();
             boolean loggedOut = kind.equals("clog") && url.queryParameter("player") == null && url.queryParameter("accountHash") == null;
             String account = "otherguy".equalsIgnoreCase(url.queryParameter("player")) ? "OtherGuy" : url.queryParameter("player") == null ? "My Account" : "Valgusruum";
             byte[] body = (loggedOut ? "{\"status\":\"error\",\"message\":\"Log in to view your log, or enter a clan member’s OSRS name.\"}" : failure ? "{\"status\":\"error\",\"message\":\"Temporarily unavailable\"}" :
-                "{\"status\":\"success\",\"data\":{\"kind\":\""+kind+"\",\"completedPages\":[{\"category\":\"Other\",\"subcategory\":\"Forestry\"},{\"category\":\"Bosses\",\"subcategory\":\"Zulrah\"}],\"page\":"+selected+",\"account\":{\"osrs_nickname\":\""+account+"\",\"obtained\":141,\"total\":1717},\"groups\":[],\"rows\":[{\"player\":\"Clan Member\",\"rank\":1,\"value\":812,\"status\":\"complete\"}]}}").getBytes(StandardCharsets.UTF_8);
+                "{\"status\":\"success\",\"data\":{\"kind\":\""+kind+"\",\"title\":\"Clan Points Leaderboard\",\"completedPages\":[{\"category\":\"Other\",\"subcategory\":\"Forestry\"},{\"category\":\"Bosses\",\"subcategory\":\"Zulrah\"}],\"page\":"+selected+",\"account\":{\"osrs_nickname\":\""+account+"\",\"obtained\":141,\"total\":1717},\"groups\":[],\"rows\":[{\"player\":\"Clan Member\",\"rank\":1,\"value\":812,\"status\":\"complete\"}]}}").getBytes(StandardCharsets.UTF_8);
             exchange.sendResponseHeaders(loggedOut ? 400 : failure ? 500 : 200,body.length); exchange.getResponseBody().write(body); exchange.close();
         });
         server.start();
         System.setProperty("reval.browserApi","http://127.0.0.1:"+server.getAddress().getPort()+"/plugin");
         http = new OkHttpClient();
-        BrowserApi api = new BrowserApi(http,new Gson()) {
+        api = new BrowserApi(http,new Gson()) {
             @Override public Call view(BrowserCommand command,long hash,boolean refresh,Consumer<BrowserModels.View> success,Consumer<String> failure) {
                 return super.view(command,hash,refresh,data -> { success.accept(data); loaded.offer(data); },error -> { failure.accept(error); errors.offer(error); });
             }
@@ -203,6 +206,36 @@ public class BrowserNavigationTest {
             assertNull("The game must not own a dialog that stays above it",window.getOwner());
             assertFalse(window.isAlwaysOnTop());
         });
+    }
+
+    @Test public void sidebarShortcutOpensTheSharedBrowserAtTotalPointsAndReusesIt() throws Exception {
+        net.runelite.api.Client client = mock(net.runelite.api.Client.class);
+        when(client.getCanvas()).thenReturn(new java.awt.Canvas());
+        net.runelite.client.callback.ClientThread clientThread = mock(net.runelite.client.callback.ClientThread.class);
+        doAnswer(invocation -> { ((Runnable)invocation.getArgument(0)).run(); return null; }).when(clientThread).invoke(any(Runnable.class));
+        ClanBrowserManager manager = new ClanBrowserManager(client,clientThread,mock(net.runelite.client.game.ItemManager.class),api);
+        com.revalclan.ui.LeaderboardPanel sidebar = new com.revalclan.ui.LeaderboardPanel();
+        try {
+            SwingUtilities.invokeAndWait(() -> {
+                manager.startUp(); sidebar.setOnOpenBrowser(manager::openPointsLeaderboard);
+                button(sidebar,"Open full leaderboard").doClick(0);
+            });
+            assertEquals("leaderboard",loaded.poll(5,TimeUnit.SECONDS).kind);
+            okhttp3.HttpUrl query = queries.poll(5,TimeUnit.SECONDS);
+            assertEquals("leaderboard",query.queryParameter("command")); assertEquals("points",query.queryParameter("metric"));
+            final ClanBrowserWindow[] opened = new ClanBrowserWindow[1];
+            SwingUtilities.invokeAndWait(() -> {
+                for (java.awt.Window candidate : java.awt.Window.getWindows()) if (candidate instanceof ClanBrowserWindow && candidate != window && candidate.isDisplayable()) opened[0]=(ClanBrowserWindow)candidate;
+                assertNotNull(opened[0]); assertEquals("Reval · Clan Points Leaderboard",opened[0].getTitle());
+                assertEquals(BrowserTheme.GOLD,button(opened[0],"Points").getForeground());
+                button(sidebar,"Open full leaderboard").doClick(0);
+            });
+            assertEquals("leaderboard",loaded.poll(5,TimeUnit.SECONDS).kind);
+            SwingUtilities.invokeAndWait(() -> assertTrue("Repeated shortcut clicks must reuse the same window",opened[0].isDisplayable()));
+            assertEquals("The second shortcut click must use the cached Points board",2,reads.get());
+        } finally {
+            manager.shutDown(); SwingUtilities.invokeAndWait(() -> {});
+        }
     }
 
     private static JLabel messageLabel(Container root,String prefix) {

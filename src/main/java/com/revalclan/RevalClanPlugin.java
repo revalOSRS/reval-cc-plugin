@@ -3,7 +3,6 @@ package com.revalclan;
 import com.revalclan.api.RevalApiService;
 import com.revalclan.combat.KillTracker;
 import com.revalclan.clanbrowser.ClanBrowserManager;
-import com.revalclan.clanbrowser.BrowserCommand;
 import com.revalclan.collectionlog.CollectionLogManager;
 import com.revalclan.collectionlog.CollectionLogSyncButton;
 import com.revalclan.collectionlog.SyncGuide;
@@ -210,7 +209,7 @@ public class RevalClanPlugin extends Plugin {
 			revalPanel = new RevalPanel();
 			revalPanel.init(revalApiService, client, uiAssetLoader, itemManager, spriteManager, config,
 				rankIconResolver);
-			revalPanel.getLeaderboardPanel().setOnOpenBrowser(() -> clanBrowserManager.open(BrowserCommand.parse("reval leaderboard points")));
+			revalPanel.getLeaderboardPanel().setOnOpenBrowser(clanBrowserManager::openPointsLeaderboard);
 			revalPanel.getEventsPanel().setLeaguesBingoPanel(injector.getInstance(LeaguesBingoPanel.class));
 			revalPanel.setOnSyncGuide(() -> {
 				syncGuide.arm();

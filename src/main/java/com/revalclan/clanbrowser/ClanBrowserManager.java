@@ -48,6 +48,7 @@ public class ClanBrowserManager {
     @Subscribe public void onMenuEntryAdded(MenuEntryAdded event) { if (running) chatLinks.menuEntryAdded(event); }
     @Subscribe public void onPostMenuSort(PostMenuSort event) { if (running) chatLinks.prioritize(); }
     public void open(BrowserCommand command) { openShared(command, null); }
+    public void openPointsLeaderboard() { open(BrowserCommand.parse("reval leaderboard points")); }
     private void openShared(BrowserCommand command, String sender) {
         if (!running) return;
         clientThread.invoke(() -> {
