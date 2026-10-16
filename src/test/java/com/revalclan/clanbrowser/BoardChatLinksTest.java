@@ -17,6 +17,35 @@ import static org.mockito.Mockito.*;
 import static org.mockito.ArgumentMatchers.*;
 
 public class BoardChatLinksTest {
+    @Test public void readableLabelsKeepTheOriginalBoardAndRestoreTheOriginalChatText() {
+        for (String[] example : new String[][] {
+            {"luck araxxor", "Araxxor luck board"},
+            {"deserved general graardor", "General Graardor deserved board"},
+            {"dryboard vorkath", "Vorkath dryboard"},
+            {"clog forestry", "collection log: Forestry"},
+            {"clog forestry player:Valgusruum", "collection log: Forestry (Valgusruum)"},
+            {"clog forestry Valgusruum", "collection log: Forestry Valgusruum"},
+            {"leaderboard points", "Total points leaderboard"},
+            {"leaderboard xp", "Total XP leaderboard"},
+            {"leaderboard clues hard", "Hard clues leaderboard"},
+            {"leaderboard bosses vorkath", "Vorkath kills leaderboard"}
+        }) {
+            Fixture f = new Fixture(); PublicMenu menu = new PublicMenu(f);
+            String original = "<col=0000ff>!Reval " + example[0] + "</col>";
+            f.text.set(original); f.links.startUp();
+            String expected = "<col=ffcf63><u>Click to view " + example[1] + "</u></col>";
+            assertEquals(expected, f.text.get());
+            f.links.rebuild(); assertEquals(expected, f.text.get());
+            f.links.prioritize(); menu.click.get().accept(menu.link);
+            assertEquals(BoardChatLinks.parse(original).parameters(0), f.command.get().parameters(0));
+            assertEquals("Alice Smith", f.author.get());
+            f.links.clear(); assertEquals(original, f.text.get());
+        }
+        Fixture ordinary = new Fixture(); PublicMenu menu = new PublicMenu(ordinary);
+        ordinary.text.set("Click to view Araxxor luck board"); ordinary.links.startUp(); ordinary.links.prioritize();
+        verify(menu.menu, never()).createMenuEntry(anyInt());
+    }
+
     @Test public void timestampedPublicSharesRegisterLinksAndKeepTheActualSender() {
         for (String name : Arrays.asList("Valgusruum", "Alice Smith")) {
             for (String time : Arrays.asList("[16:14]", "[16:14:02]", "[4:14 PM]", "[4:14:02 PM]", "2026-10-16 16:14:02", "16:14")) {
@@ -27,7 +56,7 @@ public class BoardChatLinksTest {
                     when(f.row.getName()).thenReturn("<col=ffffff><img=2>" + name + "</col>");
                     f.text.set("<col=0000ff>!Reval " + command + "</col>");
                     f.links.startUp();
-                    assertTrue("Timestamped shares should be visibly linked", f.text.get().contains("<u>!Reval " + command + "</u>"));
+                    assertTrue("Timestamped shares should be visibly linked", f.text.get().contains("<u>Click to view "));
                     f.links.prioritize();
                     verify(menu.menu).createMenuEntry(-1);
                     menu.click.get().accept(menu.link);
@@ -76,6 +105,14 @@ public class BoardChatLinksTest {
         verify(menu.menu,never()).createMenuEntry(anyInt()); assertEquals(0,f.opened.get());
     }
 
+    @Test public void aReadableLabelDoesNotCarryItsCommandIntoAnotherAccountsRecycledRow() {
+        Fixture f = new Fixture(); PublicMenu menu = new PublicMenu(f); f.links.startUp();
+        when(f.row.getName()).thenReturn("SomeoneElse");
+        f.links.prioritize();
+        verify(menu.menu, never()).createMenuEntry(anyInt());
+        assertEquals(0, f.opened.get());
+    }
+
     @Test public void sharedCommandsKeepThePageAndUseTheSenderOnlyWhenNoAccountWasSpecified() {
         BrowserModels.Page forestry = new BrowserModels.Page(); forestry.value="forestry"; forestry.label="Forestry";
         BrowserCommand self = BoardChatLinks.parse("<col=ff00ff>!reval clog forestry</col>").resolveShared(Arrays.asList(forestry),"Alice Smith");
@@ -89,7 +126,7 @@ public class BoardChatLinksTest {
 
     @Test public void decoratingChatDoesNotOpenAnythingOrOverwriteRecycledMessages() {
         Fixture f = new Fixture(); f.links.startUp();
-        assertEquals(0,f.opened.get()); assertTrue(f.text.get().contains("<u>!reval clog forestry</u>"));
+        assertEquals(0,f.opened.get()); assertTrue(f.text.get().contains("<u>Click to view collection log: Forestry</u>"));
         f.links.rebuild(); assertEquals(1,count(f.text.get(),"<u>"));
         f.text.set("An ordinary new message"); f.links.rebuild(); assertEquals("An ordinary new message",f.text.get());
         f.text.set("!reval dryboard vorkath"); f.links.rebuild(); f.links.clear();
@@ -115,7 +152,8 @@ public class BoardChatLinksTest {
         doAnswer(i->{entries.set(i.getArgument(0));return null;}).when(menu).setMenuEntries(any());
         MenuEntryAdded event=new MenuEntryAdded(report);
         f.text.set("An ordinary message"); f.links.menuEntryAdded(event); verify(menu,never()).createMenuEntry(anyInt());
-        f.text.set("!reval clog forestry"); f.links.menuEntryAdded(event); f.links.menuEntryAdded(event);
+        f.text.set("!reval clog forestry"); f.links.rebuild();
+        f.links.menuEntryAdded(event); f.links.menuEntryAdded(event);
         verify(menu,times(1)).createMenuEntry(-1); assertEquals(0,f.opened.get());
         verify(link).setForceLeftClick(true); verify(link).setOption("Open Reval board");
         entries.set(new MenuEntry[]{report,link,copy}); f.links.prioritize(); assertSame(link,entries.get()[2]);

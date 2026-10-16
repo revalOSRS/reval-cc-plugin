@@ -53,8 +53,9 @@ pages not yet opened. The selected greenlog has a brighter highlight. Completion
 to the selected account and uses the same cached log response without extra database reads.
 
 Share a board through regular public chat or clan chat with `!reval luck araxxor`, `!reval leaderboard clues hard`,
-or `!reval clog forestry`. Updated Reval clients underline the message and offer **Open Reval
-board** on left-click or in its right-click menu. A clog without an explicit player opens the
+or `!reval clog forestry`. Updated Reval clients show an underlined link such as
+**Click to view Araxxor luck board**, with **Open Reval board** on left-click or in its
+right-click menu. The original command remains attached to the link. A clog without an explicit player opens the
 sender's account; add a player name to share another account. Sharing selects the same page and
 account, using the recipient's normal cache; it is not a frozen snapshot. Messages remain ordinary
 chat for players without the update. Receiving a share does not fetch data or open a window until

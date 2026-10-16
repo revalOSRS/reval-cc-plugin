@@ -2,6 +2,7 @@ package com.revalclan.clanbrowser;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import net.runelite.api.Client;
@@ -70,19 +71,19 @@ final class BoardChatLinks {
         if (index < 0 || children == null || index + 1 >= children.length) return;
         Widget message = children[index + 1];
         if (message == null || message.isHidden()) return;
-        BrowserCommand command = parse(message.getText());
+        BrowserCommand command = command(message);
         String sender = author(row);
         if (command == null || !BrowserCommand.validPlayer(sender)) return;
         Menu menu = client.getMenu();
         for (MenuEntry entry : menu.getMenuEntries()) if (isOurEntry(entry)) return;
-        addEntry(menu, command, sender, message);
+        addEntry(menu, command, sender);
     }
 
-    private void addEntry(Menu menu, BrowserCommand command, String sender, Widget message) {
+    private void addEntry(Menu menu, BrowserCommand command, String sender) {
         int version = generation;
         // Capture the command and sender now: chat widgets may be recycled while the menu is open.
         boardClick = entry -> { if (enabled && version == generation) open.accept(command, sender); };
-        boardEntry = menu.createMenuEntry(-1).setOption(OPEN).setTarget("<col=ffcf63>" + clean(message.getText()) + "</col>")
+        boardEntry = menu.createMenuEntry(-1).setOption(OPEN).setTarget("<col=ffcf63>" + label(command) + "</col>")
             .setType(MenuAction.RUNELITE).setForceLeftClick(true)
             .onClick(boardClick);
     }
@@ -109,9 +110,9 @@ final class BoardChatLinks {
         for (Link link : links) {
             Widget message = link.widget;
             if (message.isHidden() || !message.getBounds().contains(mouse.getX(), mouse.getY())) continue;
-            BrowserCommand command = parse(message.getText());
+            BrowserCommand command = link.command();
             String sender = author(link.sender);
-            if (command != null && BrowserCommand.validPlayer(sender)) addEntry(menu, command, sender, message);
+            if (command != null && BrowserCommand.validPlayer(sender)) addEntry(menu, command, sender);
             return;
         }
     }
@@ -119,6 +120,48 @@ final class BoardChatLinks {
     void clear() { enabled = false; generation++; boardEntry = null; boardClick = null; restoreText(); }
 
     private boolean isOurEntry(MenuEntry entry) { return entry == boardEntry && boardClick != null && entry.onClick() == boardClick; }
+
+    private BrowserCommand command(Widget message) {
+        for (Link link : links) if (link.widget == message) return link.command();
+        return parse(message.getText());
+    }
+
+    private static String label(BrowserCommand command) {
+        switch (command.kind) {
+            case "clog": return "collection log: " + title(command.category) + (command.player == null ? "" : " (" + command.player + ")");
+            case "luck": return title(command.category) + " luck board";
+            case "deserved": return title(command.category) + " deserved board";
+            case "dryboard": return title(command.category) + " dryboard";
+            default:
+                String metric;
+                switch (command.metric) {
+                    case "clog": metric = "Collection log"; break;
+                    case "pets": metric = "Pets"; break;
+                    case "points": metric = "Total points"; break;
+                    case "greenlogs": metric = "Greenlogs"; break;
+                    case "monthly-clog": metric = "Monthly collection log"; break;
+                    case "monthly-points": metric = "Monthly points"; break;
+                    case "clues": metric = command.tier == null || command.tier.equals("all") ? "All clues" : title(command.tier) + " clues"; break;
+                    case "combat": metric = "Combat Achievements"; break;
+                    case "bosses":
+                        metric = command.boss == null || java.util.Arrays.asList("all", "overall", "all bosses").contains(command.boss.toLowerCase(Locale.ROOT))
+                            ? "Boss kills" : title(command.boss) + " kills";
+                        break;
+                    default: metric = "Total XP";
+                }
+                return metric + " leaderboard";
+        }
+    }
+
+    private static String title(String value) {
+        StringBuilder result = new StringBuilder();
+        for (String word : value.replace('-', ' ').split("\\s+")) {
+            if (word.isEmpty()) continue;
+            if (result.length() > 0) result.append(' ');
+            result.append(word.substring(0, 1).toUpperCase(Locale.ROOT)).append(word.substring(1));
+        }
+        return result.toString();
+    }
 
     private void restoreText() {
         for (Link link : links) if (link.decorated.equals(link.widget.getText())) link.widget.setText(link.text);
@@ -131,10 +174,18 @@ final class BoardChatLinks {
     private static String clean(String value) { return value == null ? "" : Text.removeTags(value).replace('\u00a0', ' ').trim(); }
     private static final class Link {
         final Widget widget, sender;
-        final String text, decorated;
+        final String text, decorated, account;
         Link(Widget widget, Widget sender) {
             this.widget = widget; this.sender = sender; text = widget.getText();
-            decorated = "<col=ffcf63><u>" + clean(text) + "</u></col>";
+            account = author(sender);
+            decorated = "<col=ffcf63><u>Click to view " + label(parse(text)) + "</u></col>";
+        }
+        BrowserCommand command() {
+            String current = widget.getText();
+            // A readable label carries the original command only while it still
+            // belongs to this exact row/account. Ordinary recycled text stays ordinary.
+            if (decorated.equals(current)) return account.equals(author(sender)) ? parse(text) : null;
+            return parse(current);
         }
     }
 }
