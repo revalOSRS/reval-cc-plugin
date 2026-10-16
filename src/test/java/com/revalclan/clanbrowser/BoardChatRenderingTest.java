@@ -1,6 +1,11 @@
 package com.revalclan.clanbrowser;
 
 import java.lang.reflect.Constructor;
+import com.revalclan.RevalClanConfig;
+import java.util.concurrent.atomic.AtomicReference;
+import net.runelite.api.events.CommandExecuted;
+import net.runelite.api.events.PostMenuSort;
+import net.runelite.client.events.ConfigChanged;
 import java.util.HashMap;
 import java.util.Map;
 import net.runelite.api.ChatMessageType;
@@ -58,15 +63,52 @@ public class BoardChatRenderingTest {
         verify(f.client,times(2)).refreshChat();
     }
 
+    @Test public void chatSettingTakesEffectImmediatelyAndPrivateCommandsStillWork() throws Exception {
+        Fixture f = new Fixture();
+        f.add(1,ChatMessageType.PUBLICCHAT,"Valgusruum","!reval luck araxxor");
+        assertTrue(f.render(1).contains("Click to view Araxxor luck board"));
+        when(f.config.enableChatCommands()).thenReturn(false);
+        f.configChanged("anotherPlugin","enableChatCommands");
+        f.configChanged("revalclan","showAnnouncements");
+        assertTrue("Unrelated settings must leave the current link mode unchanged",f.render(1).contains("Click to view"));
+        f.configChanged("revalclan","enableChatCommands");
+        assertEquals("!reval luck araxxor",f.render(1));
+        f.events.post(new PostMenuSort());verify(f.client,never()).getMenu();
+        f.events.post(new CommandExecuted("reval",new String[]{"leaderboard","points"}));
+        assertEquals("leaderboard",f.privateCommand.get().kind);assertEquals("points",f.privateCommand.get().metric);
+        when(f.config.enableChatCommands()).thenReturn(true);f.configChanged("revalclan","enableChatCommands");
+        assertTrue("Re-enabling must format existing history without receiving a new message",f.render(1).contains("Click to view Araxxor luck board"));
+        verify(f.client,times(3)).refreshChat();
+        verify(f.nodes.get(1),never()).setValue(anyString());
+    }
+
+    @Test public void aClientStartingWithChatCommandsDisabledKeepsPrivateCommandsAvailable() throws Exception {
+        Fixture f = new Fixture(false);
+        f.add(1,ChatMessageType.CLAN_CHAT,"Valgusruum","!reval clog forestry");
+        assertEquals("!reval clog forestry",f.render(1));
+        f.events.post(new PostMenuSort());verify(f.client,never()).getMenu();
+        f.events.post(new CommandExecuted("reval",new String[]{"clog","forestry"}));
+        assertEquals("clog",f.privateCommand.get().kind);assertEquals("forestry",f.privateCommand.get().category);
+        verify(f.client,never()).refreshChat();
+        when(f.config.enableChatCommands()).thenReturn(true);
+        f.events.post(new net.runelite.client.events.ProfileChanged());
+        assertTrue("Changing RuneLite profiles must use that profile's chat preference",f.render(1).contains("Click to view collection log"));
+        verify(f.client).refreshChat();
+    }
+
     private static class Fixture {
         final Client client=mock(Client.class);
+        final RevalClanConfig config=mock(RevalClanConfig.class);
+        final AtomicReference<BrowserCommand> privateCommand=new AtomicReference<>();
         final ClientThread clientThread=mock(ClientThread.class);
         final EventBus events=new EventBus();
         final Map<Integer,MessageNode> nodes=new HashMap<>();
         final Object[] stack=new Object[4];
         final int[] ints=new int[2];
         final ClanBrowserManager manager;
-        @SuppressWarnings("unchecked") Fixture() throws Exception {
+        Fixture() throws Exception { this(true); }
+        @SuppressWarnings("unchecked") Fixture(boolean enabled) throws Exception {
+            when(config.enableChatCommands()).thenReturn(enabled);
             IterableHashTable<MessageNode> messages=mock(IterableHashTable.class);
             when(client.getMessages()).thenReturn(messages);
             when(messages.get(anyLong())).thenAnswer(i->nodes.get(((Long)i.getArgument(0)).intValue()));
@@ -76,8 +118,13 @@ public class BoardChatRenderingTest {
             doAnswer(i->{((Runnable)i.getArgument(0)).run();return null;}).when(clientThread).invoke(any(Runnable.class));
             Constructor<ChatMessageManager> core=ChatMessageManager.class.getDeclaredConstructor(Client.class, ChatColorConfig.class, ClientThread.class, EventBus.class);
             core.setAccessible(true);core.newInstance(client,mock(ChatColorConfig.class),clientThread,events);
-            manager=new ClanBrowserManager(client,clientThread,mock(ItemManager.class),mock(BrowserApi.class));
+            manager=new ClanBrowserManager(client,clientThread,mock(ItemManager.class),mock(BrowserApi.class),config) {
+                @Override public void open(BrowserCommand command) { privateCommand.set(command); }
+            };
             events.register(manager);manager.startUp();
+        }
+        void configChanged(String group,String key) {
+            ConfigChanged event=new ConfigChanged();event.setGroup(group);event.setKey(key);events.post(event);
         }
         void add(int uid,ChatMessageType type,String name,String text) {
             MessageNode node=mock(MessageNode.class);when(node.getId()).thenReturn(uid);when(node.getType()).thenReturn(type);

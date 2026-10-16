@@ -63,6 +63,10 @@ clicked, and the plugin never sends a chat message automatically. Links are form
 game lays out each message, so they appear immediately and survive notifications, scrolling and
 chat-filter changes. Original history text stays unchanged.
 
+In **Reval Clan → Clan browser**, **Enable !reval chat commands** is on by default.
+Switch it off to leave shared commands as ordinary text without board-click actions.
+Changes apply immediately to existing chat history; private `::reval` commands remain available.
+
 For local development, start the backend’s read-only `scripts/dev-clan-browser.ts` server with a
 read-only database URL, then run:
 

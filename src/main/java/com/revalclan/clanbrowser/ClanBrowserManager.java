@@ -1,5 +1,6 @@
 package com.revalclan.clanbrowser;
 
+import com.revalclan.RevalClanConfig;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import javax.swing.SwingUtilities;
@@ -14,6 +15,8 @@ import net.runelite.api.events.MenuEntryAdded;
 import net.runelite.api.events.PostMenuSort;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.events.ConfigChanged;
+import net.runelite.client.events.ProfileChanged;
 import net.runelite.client.game.ItemManager;
 
 /** Owns the command subscription and native window lifecycle, not game data or calculations. */
@@ -23,20 +26,32 @@ public class ClanBrowserManager {
     private final ClientThread clientThread;
     private final ItemManager items;
     private final BrowserApi api;
+    private final RevalClanConfig config;
     private final BoardChatLinks chatLinks;
     private ClanBrowserWindow window;
     private volatile boolean running;
+    private boolean chatEnabled;
 
-    @Inject public ClanBrowserManager(Client client, ClientThread clientThread, ItemManager items, BrowserApi api) {
-        this.client = client; this.clientThread = clientThread; this.items = items; this.api = api;
+    @Inject public ClanBrowserManager(Client client, ClientThread clientThread, ItemManager items, BrowserApi api, RevalClanConfig config) {
+        this.client = client; this.clientThread = clientThread; this.items = items; this.api = api; this.config = config;
         chatLinks = new BoardChatLinks(client, this::openShared);
     }
-    public void startUp() { running = true; clientThread.invoke(() -> { if (running) chatLinks.startUp(); }); }
+    public void startUp() { running = true; clientThread.invoke(this::applyChatSetting); }
     public void shutDown() {
         running = false;
-        clientThread.invoke(chatLinks::clear);
+        clientThread.invoke(() -> { chatEnabled = false; chatLinks.clear(); });
         SwingUtilities.invokeLater(() -> { if (window != null) { window.dispose(); window = null; } });
     }
+    private void applyChatSetting() {
+        boolean enabled = running && config.enableChatCommands();
+        if (enabled == chatEnabled) return;
+        chatEnabled = enabled;
+        if (enabled) chatLinks.startUp(); else chatLinks.clear();
+    }
+    @Subscribe public void onConfigChanged(ConfigChanged event) {
+        if (running && "revalclan".equals(event.getGroup()) && "enableChatCommands".equals(event.getKey())) clientThread.invoke(this::applyChatSetting);
+    }
+    @Subscribe public void onProfileChanged(ProfileChanged event) { if (running) clientThread.invoke(this::applyChatSetting); }
     @Subscribe public void onCommandExecuted(CommandExecuted event) {
         if (!running || !"reval".equalsIgnoreCase(event.getCommand())) return;
         String command = "reval " + String.join(" ", event.getArguments());
@@ -44,16 +59,16 @@ public class ClanBrowserManager {
         catch (IllegalArgumentException error) { open(BrowserCommand.parse("reval help")); }
     }
     @Subscribe public void onScriptPreFired(ScriptPreFired event) {
-        if (running && event.getScriptId() == BoardChatLinks.CHAT_BUILDER) chatLinks.beginBuild();
+        if (running && chatEnabled && event.getScriptId() == BoardChatLinks.CHAT_BUILDER) chatLinks.beginBuild();
     }
     @Subscribe(priority = -100) public void onScriptCallbackEvent(ScriptCallbackEvent event) {
-        if (running) chatLinks.format(event);
+        if (running && chatEnabled) chatLinks.format(event);
     }
     @Subscribe public void onScriptPostFired(ScriptPostFired event) {
-        if (running && event.getScriptId() == BoardChatLinks.CHAT_BUILDER) chatLinks.finishBuild();
+        if (running && chatEnabled && event.getScriptId() == BoardChatLinks.CHAT_BUILDER) chatLinks.finishBuild();
     }
-    @Subscribe public void onMenuEntryAdded(MenuEntryAdded event) { if (running) chatLinks.menuEntryAdded(event); }
-    @Subscribe public void onPostMenuSort(PostMenuSort event) { if (running) chatLinks.prioritize(); }
+    @Subscribe public void onMenuEntryAdded(MenuEntryAdded event) { if (running && chatEnabled) chatLinks.menuEntryAdded(event); }
+    @Subscribe public void onPostMenuSort(PostMenuSort event) { if (running && chatEnabled) chatLinks.prioritize(); }
     public void open(BrowserCommand command) { openShared(command, null); }
     public void openPointsLeaderboard() { open(BrowserCommand.parse("reval leaderboard points")); }
     private void openShared(BrowserCommand command, String sender) {

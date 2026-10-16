@@ -237,7 +237,7 @@ public class BrowserNavigationTest {
         when(client.getCanvas()).thenReturn(new java.awt.Canvas());
         net.runelite.client.callback.ClientThread clientThread = mock(net.runelite.client.callback.ClientThread.class);
         doAnswer(invocation -> { ((Runnable)invocation.getArgument(0)).run(); return null; }).when(clientThread).invoke(any(Runnable.class));
-        ClanBrowserManager manager = new ClanBrowserManager(client,clientThread,mock(net.runelite.client.game.ItemManager.class),api);
+        ClanBrowserManager manager = new ClanBrowserManager(client,clientThread,mock(net.runelite.client.game.ItemManager.class),api,new com.revalclan.RevalClanConfig() {});
         com.revalclan.ui.LeaderboardPanel sidebar = new com.revalclan.ui.LeaderboardPanel();
         try {
             SwingUtilities.invokeAndWait(() -> {

@@ -148,4 +148,22 @@ public interface RevalClanConfig extends Config {
 	default boolean notifyLeagues() {
 		return true;
 	}
+
+	@ConfigSection(
+		name = "Clan browser",
+		description = "Collection logs and shared clan leaderboards",
+		position = 4
+	)
+	String clanBrowserSection = "clanBrowserSection";
+
+	@ConfigItem(
+		keyName = "enableChatCommands",
+		name = "Enable !reval chat commands",
+		description = "Show clickable !reval boards in public and clan chat. Turn off to leave messages as ordinary text. Private ::reval commands still work.",
+		section = clanBrowserSection,
+		position = 0
+	)
+	default boolean enableChatCommands() {
+		return true;
+	}
 }
