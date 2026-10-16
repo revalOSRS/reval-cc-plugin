@@ -8,6 +8,8 @@
 package com.revalclan.notifiers;
 
 import javax.inject.Singleton;
+import javax.inject.Inject;
+import com.revalclan.collectionlog.GreenlogCounterSnapshot;
 import net.runelite.api.gameval.VarPlayerID;
 
 import java.util.HashMap;
@@ -17,6 +19,7 @@ import java.util.regex.Pattern;
 
 @Singleton
 public class CollectionNotifier extends BaseNotifier {
+	@Inject private GreenlogCounterSnapshot greenlogCounterSnapshot;
 	private static final Pattern COLLECTION_PATTERN = Pattern.compile(
 		"New item added to your collection log: (?<item>.+)",
 		Pattern.CASE_INSENSITIVE
@@ -45,6 +48,11 @@ public class CollectionNotifier extends BaseNotifier {
 	private void handleCollectionItem(String itemName) {
 		Map<String, Object> collectionData = new HashMap<>();
 		collectionData.put("item", itemName);
+		try {
+			collectionData.put("greenlogCounters", greenlogCounterSnapshot.capture(null));
+		} catch (RuntimeException ignored) {
+			// Optional counters must never prevent the collection event.
+		}
 		// Total slot count, so the server derives the Gilded rung from live data
 		// when judging this drop for a rank milestone
 		int totalSlots = client.getVarpValue(VarPlayerID.COLLECTION_COUNT_MAX);

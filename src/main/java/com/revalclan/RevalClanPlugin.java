@@ -2,6 +2,7 @@ package com.revalclan;
 
 import com.revalclan.api.RevalApiService;
 import com.revalclan.combat.KillTracker;
+import com.revalclan.clanbrowser.ClanBrowserManager;
 import com.revalclan.collectionlog.CollectionLogManager;
 import com.revalclan.collectionlog.CollectionLogSyncButton;
 import com.revalclan.collectionlog.SyncGuide;
@@ -13,6 +14,7 @@ import com.revalclan.teams.ClanTeamColors;
 import com.revalclan.ui.leaguesbingo.LeaguesBingoPanel;
 import com.revalclan.notifiers.*;
 import com.revalclan.pbs.ClogPersonalBestCapture;
+import com.revalclan.pbs.CombatAchievementPersonalBestCapture;
 import com.revalclan.session.SessionTracker;
 import com.revalclan.util.ClanMembership;
 import com.revalclan.ui.RevalPanel;
@@ -67,6 +69,7 @@ import net.runelite.client.ui.overlay.OverlayManager;
 )
 public class RevalClanPlugin extends Plugin {
 	@Inject private Client client;
+	@Inject private ClanBrowserManager clanBrowserManager;
 
 	@Inject	private CollectionLogManager collectionLogManager;
 
@@ -84,6 +87,7 @@ public class RevalClanPlugin extends Plugin {
 	@Inject	private VarbitNotifier varbitNotifier;
 
 	@Inject	private ClogPersonalBestCapture clogPersonalBestCapture;
+	@Inject	private CombatAchievementPersonalBestCapture combatAchievementPersonalBestCapture;
 
 	@Inject	private PetNotifier petNotifier;
 
@@ -190,7 +194,10 @@ public class RevalClanPlugin extends Plugin {
 		sessionTracker.recoverPersistedSessions(0);
 
 		eventBus.register(lootNotifier);
+		eventBus.register(clanBrowserManager);
+		clanBrowserManager.startUp();
 		eventBus.register(clogPersonalBestCapture);
+		eventBus.register(combatAchievementPersonalBestCapture);
 		eventBus.register(clanTeamColors);
 		clanTeamColors.startUp();
 		overlayManager.add(registrationMarksOverlay);
@@ -202,6 +209,7 @@ public class RevalClanPlugin extends Plugin {
 			revalPanel = new RevalPanel();
 			revalPanel.init(revalApiService, client, uiAssetLoader, itemManager, spriteManager, config,
 				rankIconResolver);
+			revalPanel.getLeaderboardPanel().setOnOpenBrowser(clanBrowserManager::openPointsLeaderboard);
 			revalPanel.getEventsPanel().setLeaguesBingoPanel(injector.getInstance(LeaguesBingoPanel.class));
 			revalPanel.setOnSyncGuide(() -> {
 				syncGuide.arm();
@@ -243,7 +251,10 @@ public class RevalClanPlugin extends Plugin {
 		}
 
 		eventBus.unregister(lootNotifier);
+		eventBus.unregister(clanBrowserManager);
+		clanBrowserManager.shutDown();
 		eventBus.unregister(clogPersonalBestCapture);
+		eventBus.unregister(combatAchievementPersonalBestCapture);
 		eventBus.unregister(clanTeamColors);
 		clanTeamColors.shutDown();
 		revalApiService.resetEventsSession();
@@ -533,5 +544,4 @@ public class RevalClanPlugin extends Plugin {
 		return configManager.getConfig(RevalClanConfig.class);
 	}
 }
-
 

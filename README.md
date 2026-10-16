@@ -4,6 +4,92 @@ A comprehensive RuneLite plugin for the Reval clan in Old School RuneScape. Feat
 
 ## Features
 
+### In-game clan browser
+
+Send `!reval` or `!reval help` in public or clan chat, then click its link to open the command guide.
+Commands open a resizable native window when clicked;
+the game remains usable while it is open. Collection Log uses boxed subcategories under the main
+category tabs. Luck and Deserved use the same tabs and sidebar with standings in the content area;
+Dryboard has category autocomplete. Leaderboard statistics are selected with buttons below member
+search. The `?` button opens a guide with syntax, examples, and chat-sharing instructions.
+
+| Command | View |
+| --- | --- |
+| `!reval clog forestry` | Your synced collection log, using your logged-in account |
+| `!reval clog forestry Valgusruum` | Another clan account’s collection log |
+| `!reval clog clues Phosani55555` | All clue pages, including rare and shared rewards |
+| `!reval luck vorkath` | Lowest saved greenlog completion counters first |
+| `!reval deserved vorkath` | Highest saved greenlog completion counters first |
+| `!reval dryboard vorkath` | Kills since the last recorded unique, including duplicates |
+| `!reval leaderboard xp` | Full clan standings for a statistic |
+| `!reval leaderboard clues hard` | A specific clue tier; omit the tier for all seven tabs |
+| `!reval leaderboard bosses toa` | A specific boss or raid; omit the boss for all bosses |
+
+Leaderboard statistics: `clog`, `pets`, `points`, `greenlogs`, `monthly-clog`, `monthly-points`,
+`clues`, `combat`, `bosses`, and `xp`. Boss aliases include `cox`, `tob`, `toa`, and `bandos`.
+Player names containing spaces can be quoted, or supplied with `--player "Love Yourz"`.
+
+Standings include every available account and retain their original ranks when searched. Global
+statistics and Dryboard have separate Mains, Ironman + GIM + UIM, and Hardcore Ironman columns.
+Luck and Deserved use one account per linked member. Categories with no counter tie completed logs
+at #1; otherwise completed logs without a comparable counter remain visible without a numeric rank.
+When fewer than ten members have completed a category, the remaining places show the closest
+unfinished logs. Double-click a category-board row to open that account’s collection log.
+
+Collection logs use RuneLite’s cached item sprites, adaptive cell sizes, and hover names.
+Enter an account in **Find a clan member** and press Enter to load its log; **Find me** returns to your own. Completion counters remain frozen at their saved greenlog value; `~` marks an
+estimated value. Dryboard uses recorded drop history and omits accounts without comparable current
+and last-drop counters. These views read clan data and do not trigger a sync or modify points.
+
+The client keeps its 64 most recently viewed selections in memory for the session. Reopening a
+cached view makes no HTTP or database request; leaderboard searches are local too. Refresh
+reloads the selected view from clan data, bypassing both the client and backend view caches.
+Restarting the client or evicting an older selection requires another read. Refresh does not sync
+the game account. The category catalogue and RuneLite item sprites are also cached.
+Cached pages switch immediately without a loading frame. While a new collection page loads,
+the account header, main tabs, and category buttons stay visible; only its item area shows loading
+or a retryable error.
+Completed collection categories have green text, borders, and backgrounds in the sidebar, including
+pages not yet opened. The selected greenlog has a brighter highlight. Completion status is scoped
+to the selected account and uses the same cached log response without extra database reads.
+
+Share a board through regular public chat or clan chat with `!reval luck araxxor`, `!reval leaderboard clues hard`,
+or `!reval clog forestry`. Updated Reval clients show a teal link such as
+**Click to view Araxxor luck board** or **Click to view Valgusruum's collection log: Forestry**, with **Open Reval board** on left-click or in its
+right-click menu. The original command remains attached to the link. A clog without an explicit player opens the
+sender's account; add a player name to share another account. Sharing selects the same page and
+account, using the recipient's normal cache; it is not a frozen snapshot. Messages remain ordinary
+chat for players without the update. Shares, including your own, do not fetch data or open a window until
+clicked. History redraws never open a window, and the plugin never sends an extra chat message
+automatically. Links are formatted before the
+game lays out each message, so they appear immediately and survive notifications, scrolling and
+chat-filter changes. Original history text stays unchanged.
+
+In **Reval Clan → Clan browser**, **Enable !reval chat commands** is on by default.
+Switch it off to leave shared commands as ordinary text without board-click actions.
+Changes apply immediately to existing chat history. Sidebar browser access remains available
+when chat commands are disabled.
+
+For local development, start the backend’s read-only `scripts/dev-clan-browser.ts` server with a
+read-only database URL, then run:
+
+```sh
+JAVA_HOME=$(/usr/libexec/java_home -v 21) ./gradlew runBrowserClient \
+  -PrevalBrowserApi=http://127.0.0.1:4786/plugin \
+  '-PrevalBrowserCommand=clog forestry Valgusruum'
+```
+
+`runBrowserClient` starts the real RuneLite client with Reval loaded and opens the selected browser
+page directly without sending chat. `runBrowserPreview` opens just the native window without a game login;
+its optional `revalBrowserAtlas` points to a local sprite atlas for visual QA. Without an API
+override, the plugin uses the normal Reval backend. The backend clan-browser endpoints must be
+deployed before an owner-managed plugin release.
+
+Local launchers and their logging config live in `src/dev`. `./gradlew build` creates the plugin
+jar from `src/main`; `./gradlew shadowJar` creates the standalone development client with its
+RuneLite runtime. Use `./gradlew runClient` to launch the client normally. Neither jar includes
+automated test classes or test-framework dependencies.
+
 ### 🖥️ Sidepanel UI (Planned)
 A dedicated panel for Reval clan members with:
 - **Profile**: View your clan rank, points progress, milestones, and achievements
@@ -18,6 +104,7 @@ A dedicated panel for Reval clan members with:
 ### 📊 Player Data Sync
 - **Combat Achievements**: Full tracking of all 625 tasks with completion status, points, and tier progress
 - **Collection Log**: Complete item tracking with obtained items, kill counts, and category organization
+- **Personal Bests**: Capture game-recorded times from visited Collection Log and Combat Achievements boss pages, including separate raid modes
 - **Achievement Diaries**: Progress tracking for all regions and difficulty tiers
 - **Quest Completion**: Full quest state tracking with completion counts
 - **Player Metadata**: Account type, combat level, total level, and experience tracking
@@ -81,6 +168,11 @@ Choose where the "View Reval Profile" right-click option appears: on players in 
 
 ### Automatic Sync on Logout
 When you log out, the plugin automatically collects and sends all player data to your configured webhook endpoint.
+
+### Personal Best Times
+Visit boss pages in Collection Log or **Combat Achievements → Bosses** to capture their current personal bests. Combat Achievements includes times such as Jad, Zuk, and raid modes that Collection Log does not display. These pages provide overall times for each mode; team-size variants are captured only when a source identifies the team size.
+
+Captured times are included in the next player-data sync or logout. Bosses with no recorded time or no completions are skipped, and unvisited pages are not scanned automatically.
 
 ## Support
 
