@@ -1,12 +1,12 @@
 /*
-
-import com.revalclan.session.SessionScoped;
-import com.revalclan.session.SessionState;
  * Portions of this file are derived from or inspired by the RuneProfile plugin
  * Copyright (c) RuneProfile
  * Licensed under the BSD 2-Clause License
  */
 package com.revalclan.collectionlog;
+
+import com.revalclan.session.SessionScoped;
+import com.revalclan.session.SessionState;
 
 import com.revalclan.notifiers.SyncNotifier;
 import com.revalclan.util.ClanMembership;
