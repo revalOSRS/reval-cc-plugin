@@ -30,6 +30,7 @@ import com.revalclan.util.SyncStateManager;
 import com.revalclan.util.UIAssetLoader;
 import com.revalclan.util.Worlds;
 import com.revalclan.util.WebhookService;
+import com.revalclan.util.ScreenshotService;
 import com.revalclan.util.RequestScope;
 import com.google.inject.Provides;
 import com.google.gson.JsonObject;
@@ -166,6 +167,7 @@ public class RevalClanPlugin extends Plugin {
 
 	@Inject	private RevalClanConfig config;
 	@Inject private WebhookService webhookService;
+	@Inject private ScreenshotService screenshotService;
 
 	private RevalPanel revalPanel;
 	private NavigationButton navButton;
@@ -183,6 +185,7 @@ public class RevalClanPlugin extends Plugin {
 		RequestScope owner = lifecycle = new RequestScope();
 		revalApiService.startUp();
 		webhookService.startUp();
+		screenshotService.startUp();
 		sessionTracker.startUp();
 		log.info("Reval Clan plugin started!");
 		wasLoggedIn = false;
@@ -281,6 +284,7 @@ public class RevalClanPlugin extends Plugin {
 		lifecycle.cancel();
 		pendingLoginNotification = false;
 		webhookService.shutDown();
+		screenshotService.shutDown();
 		sessionTracker.shutDown();
 		sessionTracker.setOnHeartbeatResponse(null);
 		eventFilterManager.resetSession();
