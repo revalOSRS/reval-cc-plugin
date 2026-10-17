@@ -14,6 +14,8 @@ import java.util.Map;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.Semaphore;
 import java.util.zip.GZIPOutputStream;
 
 /**
@@ -21,6 +23,10 @@ import java.util.zip.GZIPOutputStream;
  * A slow preparation can delay other scheduled work; no client state is read here.
  * A send completes with a parsed response, or exceptionally on failure/cancellation.
  * Successful responses without version hints remain distinct from failed delivery.
+ * At most 64 deliveries retain payloads. Cancelled preparation keeps its slot
+ * until dequeued, bounding retained payloads across rapid plugin restarts while
+ * the worker is blocked. Rejected ordinary events have no durable replay;
+ * persisted sessions remain recoverable.
  */
 @Slf4j
 @Singleton
@@ -32,6 +38,7 @@ public class WebhookService {
 	private final OkHttpClient httpClient;
 	private final Gson gson;
 	private final ScheduledExecutorService executor;
+	private final Semaphore capacity = new Semaphore(64);
 	private volatile RequestScope scope = new RequestScope();
 
 	@Inject
@@ -52,14 +59,26 @@ public class WebhookService {
 	public CompletableFuture<JsonObject> sendDataAsync(Map<String, Object> data, byte[] screenshot) {
 		RequestScope owner = scope;
 		CompletableFuture<JsonObject> result = owner.track(new CompletableFuture<>());
+		if (result.isDone()) return result;
+		if (!capacity.tryAcquire()) {
+			result.completeExceptionally(new RejectedExecutionException("Webhook backlog is full"));
+			return result;
+		}
+		CompletableFuture<Void> prepared = new CompletableFuture<>();
+		// Cancellation finishes the caller immediately; queued preparation must
+		// also leave the executor before its retained payload frees a slot.
+		prepared.thenCombine(result.handle((response, error) -> null), (a, b) -> {
+			capacity.release();
+			return null;
+		});
 		result.whenComplete((response, error) -> {
 			if (error != null && !(error instanceof CancellationException)) log.warn("Webhook delivery failed: {}", error.toString());
 		});
-		if (result.isDone()) return result;
+		if (result.isDone()) { prepared.complete(null); return result; }
 		try {
 			executor.execute(() -> {
-				if (result.isDone()) return;
 				try {
+					if (result.isDone()) return;
 					Request request = prepare(data, screenshot);
 					if (result.isDone()) return;
 					CompletableFuture<JsonObject> delivery = owner.request(httpClient, request, response -> {
@@ -74,8 +93,12 @@ public class WebhookService {
 						if (error == null) result.complete(response); else result.completeExceptionally(error);
 					});
 				} catch (Exception error) { result.completeExceptionally(error); }
+				finally { prepared.complete(null); }
 			});
-		} catch (RuntimeException error) { result.completeExceptionally(error); }
+		} catch (RuntimeException error) {
+			result.completeExceptionally(error);
+			prepared.complete(null);
+		}
 		return result;
 	}
 
