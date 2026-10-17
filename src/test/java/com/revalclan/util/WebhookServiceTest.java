@@ -154,4 +154,37 @@ public class WebhookServiceTest {
 	}
 
 	private void drain() { while (!tasks.isEmpty()) tasks.remove().run(); }
+	@Test public void offlineBurstsRetainAtMostSixtyFourPayloads() {
+		for (int i = 0; i < 64; i++) assertFalse(service.sendDataAsync(Map.of("eventType", "SESSION_HEARTBEAT")).isDone());
+		for (int i = 0; i < 1000; i++) assertTrue(service.sendDataAsync(Map.of("eventType", "SESSION_HEARTBEAT")).isCompletedExceptionally());
+		assertEquals(64, tasks.size());
+		service.shutDown();
+		drain();
+	}
+
+	@Test public void networkFailuresReleaseTheDeliveryLimit() {
+		for (int i = 0; i < 64; i++) service.sendDataAsync(Map.of("eventType", "SESSION_HEARTBEAT"));
+		drain();
+		ArgumentCaptor<Callback> callbacks = ArgumentCaptor.forClass(Callback.class);
+		verify(call, times(64)).enqueue(callbacks.capture());
+		for (Callback callback : callbacks.getAllValues()) callback.onFailure(call, new IOException("offline"));
+		for (int i = 0; i < 64; i++) assertFalse(service.sendDataAsync(Map.of("eventType", "SESSION_HEARTBEAT")).isDone());
+		assertEquals(64, tasks.size());
+		service.shutDown();
+		drain();
+	}
+
+	@Test public void repeatedRestartsCannotAccumulatePayloadsOnABlockedWorker() {
+		for (int i = 0; i < 1000; i++) {
+			service.sendDataAsync(Map.of("eventType", "LOGIN"));
+			service.shutDown();
+			service.startUp();
+		}
+		assertEquals(64, tasks.size());
+		drain();
+		verifyNoInteractions(http);
+		assertFalse(service.sendDataAsync(Map.of("eventType", "LOGIN")).isDone());
+		service.shutDown();
+		drain();
+	}
 }
