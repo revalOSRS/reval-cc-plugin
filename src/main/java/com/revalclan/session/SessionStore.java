@@ -14,16 +14,23 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.ArrayDeque;
 import java.util.List;
+import java.util.Queue;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.function.Consumer;
 
 /**
  * Crash-safe persistence for in-progress sessions: one JSON file per session
- * under {@code ~/.runelite/reval-clan/sessions/}, written synchronously.
+ * under {@code ~/.runelite/reval-clan/sessions/}. Disk operations run in order
+ * on RuneLite's executor, never on the game or Swing thread.
  *
  * Why not the RuneLite config store: it buffers in memory and only reaches
  * disk on a 5-minute timer or a graceful exit. Verified 2026-09-10 — three
  * consecutive hard kills lost three sessions and resurrected a deleted one.
- * A file written on every persist survives everything short of power loss.
+ * Completed writes survive a client crash. A snapshot still waiting for its
+ * worker when the process is killed has not reached disk yet.
  */
 @Slf4j
 @Singleton
@@ -32,7 +39,51 @@ public class SessionStore {
 	/** Undelivered files older than this are dropped at recovery */
 	private static final long MAX_AGE_MS = 14L * 24 * 60 * 60 * 1000;
 
-	@Inject private Gson gson;
+	private final Gson gson;
+	private final Executor executor;
+	private final File directory;
+	private final Queue<Runnable> tasks = new ArrayDeque<>();
+	private boolean draining;
+
+	@Inject
+	public SessionStore(Gson gson, ScheduledExecutorService executor) {
+		this(gson, executor, new File(RuneLite.RUNELITE_DIR, DIR_NAME));
+	}
+
+	SessionStore(Gson gson, Executor executor, File directory) {
+		this.gson = gson;
+		this.executor = executor;
+		this.directory = directory;
+	}
+
+	/** One worker preserves write/delete/recovery order without owning a thread. */
+	private synchronized void enqueue(Runnable task) {
+		tasks.add(task);
+		if (draining) return;
+		draining = true;
+		try {
+			executor.execute(this::drain);
+		} catch (RuntimeException error) {
+			draining = false;
+			tasks.remove(task);
+			throw error;
+		}
+	}
+
+	private void drain() {
+		while (true) {
+			Runnable task;
+			synchronized (this) {
+				task = tasks.poll();
+				if (task == null) { draining = false; return; }
+			}
+			try {
+				task.run();
+			} catch (RuntimeException error) {
+				log.warn("Session store operation failed", error);
+			}
+		}
+	}
 
 	/** Persisted shape. {@code summary} stays a JsonObject so numbers survive exactly. */
 	public static class PersistedSession {
@@ -62,7 +113,7 @@ public class SessionStore {
 	}
 
 	private File dir() {
-		File d = new File(RuneLite.RUNELITE_DIR, DIR_NAME);
+		File d = directory;
 		if (!d.exists() && !d.mkdirs()) {
 			log.warn("Could not create session store directory {}", d);
 		}
@@ -75,6 +126,10 @@ public class SessionStore {
 
 	/** Atomic write: temp file then move, so a crash mid-write never leaves a torn file. */
 	public void write(PersistedSession session) {
+		enqueue(() -> writeNow(session));
+	}
+
+	private void writeNow(PersistedSession session) {
 		String id = session.sessionId();
 		if (id == null) return;
 		Path target = fileFor(id).toPath();
@@ -93,6 +148,10 @@ public class SessionStore {
 
 	public void delete(String sessionId) {
 		if (sessionId == null) return;
+		enqueue(() -> deleteNow(sessionId));
+	}
+
+	private void deleteNow(String sessionId) {
 		try {
 			Files.deleteIfExists(fileFor(sessionId).toPath());
 		} catch (IOException e) {
@@ -100,8 +159,13 @@ public class SessionStore {
 		}
 	}
 
+	/** Reads after all earlier writes/deletes. The callback runs on the worker. */
+	public void readAll(Consumer<List<PersistedSession>> callback) {
+		enqueue(() -> callback.accept(readAllNow()));
+	}
+
 	/** Every readable persisted session, newest first. Unreadable or expired files are removed. */
-	public List<PersistedSession> readAll() {
+	private List<PersistedSession> readAllNow() {
 		List<PersistedSession> out = new ArrayList<>();
 		File[] files = dir().listFiles((d, name) -> name.endsWith(".json"));
 		if (files == null) return out;

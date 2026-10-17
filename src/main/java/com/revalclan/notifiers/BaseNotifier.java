@@ -69,7 +69,7 @@ public abstract class BaseNotifier {
 
 	/**
 	 * Send, optionally handing the parsed JSON response to the consumer.
-	 * Consumer runs on the HTTP thread — must not touch the client.
+	 * Consumer runs on a worker (or immediately on rejection) — must not touch the client.
 	 */
 	protected void sendNotification(Map<String, Object> data, Consumer<JsonObject> onResponse) {
 		sendNotification(getEventType(), data, onResponse);

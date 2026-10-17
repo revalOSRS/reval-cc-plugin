@@ -38,7 +38,7 @@ import java.util.UUID;
  *   <li>A <b>SESSION_SUMMARY</b> replay of any session whose final summary the
  *       server never acknowledged — at startup and at every login.</li>
  * </ul>
- * Every persist goes straight to disk ({@link SessionStore}); the local copy is
+ * Every persist queues an ordered disk write ({@link SessionStore}); the local copy is
  * deleted only when the server answers {@code sessionStored} = stored, duplicate
  * or rejected. The server dedupes on sessionId, so a replay can never double-store.
  *
@@ -100,6 +100,7 @@ public class SessionTracker {
 
 	/** Summaries sent and not yet answered — a login right after startup must not send them twice */
 	private final Set<String> inFlight = new HashSet<>();
+	private volatile int recoveryGeneration;
 
 	// ------------------------------------------------------------------ lifecycle
 
@@ -154,6 +155,7 @@ public class SessionTracker {
 
 	/** In-memory only — a persisted session replays as 'recovered' later. */
 	public void reset() {
+		recoveryGeneration++;
 		active = false;
 		resetState();
 	}
@@ -265,11 +267,15 @@ public class SessionTracker {
 	 * @param provenAccountHash the account that just proved membership, or 0 at startup
 	 */
 	public void recoverPersistedSessions(long provenAccountHash) {
-		for (PersistedSession persisted : store.readAll()) {
-			String id = persisted.sessionId();
-			if (id.equals(sessionId) || inFlight.contains(id)) continue;
-			if (persisted.member || persisted.accountHash == provenAccountHash) send(persisted);
-		}
+		int generation = recoveryGeneration;
+		store.readAll(sessions -> clientThread.invokeLater(() -> {
+			if (generation != recoveryGeneration) return;
+			for (PersistedSession persisted : sessions) {
+				String id = persisted.sessionId();
+				if (id == null || id.equals(sessionId) || inFlight.contains(id)) continue;
+				if (persisted.member || persisted.accountHash == provenAccountHash) send(persisted);
+			}
+		}));
 	}
 
 	/** The one delivery path for standalone summaries: hop cuts and replays alike. */

@@ -11,6 +11,12 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.zip.GZIPOutputStream;
 
@@ -21,17 +27,40 @@ public class WebhookService {
 	private static final MediaType GZIP = MediaType.parse("application/gzip");
 	private static final MediaType JPEG = MediaType.parse("image/jpeg");
 	private static final String WEBHOOK_URL = "https://api.revalosrs.ee/reval-webhook";
+	private static final int MAX_PENDING = 64;
+
+	private final OkHttpClient httpClient;
+	private final Gson gson;
+	private final ScheduledExecutorService executor;
+	// Includes preparation and queued/running HTTP calls, not just compression tasks.
+	private final Semaphore capacity = new Semaphore(MAX_PENDING);
+	private final Set<Delivery> pending = ConcurrentHashMap.newKeySet();
+	private final AtomicBoolean backlogWarning = new AtomicBoolean();
+	private volatile boolean running = true;
 
 	@Inject
-	private OkHttpClient httpClient;
+	public WebhookService(OkHttpClient httpClient, Gson gson, ScheduledExecutorService executor) {
+		this.httpClient = httpClient;
+		this.gson = gson;
+		this.executor = executor;
+	}
 
-	@Inject
-	private Gson gson;
+	public void startUp() {
+		running = true;
+	}
+
+	/** Cancel only Reval's deliveries; RuneLite owns the shared HTTP client and executor. */
+	public void shutDown() {
+		running = false;
+		for (Delivery delivery : pending) delivery.cancel();
+	}
 
 	/**
-	 * Async send; hands the parsed JSON response to the consumer on success
-	 * (null consumer = fire and forget).
-	 * Consumer runs on the HTTP thread — do not touch the client from it.
+	 * Async send; the consumer receives the parsed response or null on failure,
+	 * rejection or cancellation (null consumer = fire and forget). Callers hand
+	 * over a detached payload and must not mutate it after calling this method.
+	 * Consumer runs off the client thread, except immediate rejection: never
+	 * touch the client directly from it.
 	 */
 	public void sendDataAsync(Map<String, Object> data, Consumer<JsonObject> onResponse) {
 		sendDataAsync(data, null, onResponse);
@@ -48,55 +77,126 @@ public class WebhookService {
 	 * @param onResponse Optional consumer for the parsed JSON response body
 	 */
 	public void sendDataAsync(Map<String, Object> data, byte[] screenshotJpeg, Consumer<JsonObject> onResponse) {
+		if (!running) {
+			notifyResponse(onResponse, null);
+			return;
+		}
+		if (!capacity.tryAcquire()) {
+			if (backlogWarning.compareAndSet(false, true)) log.warn("Webhook backlog full; dropping new events until deliveries finish");
+			notifyResponse(onResponse, null);
+			return;
+		}
+		Delivery delivery = new Delivery(data, screenshotJpeg, onResponse);
+		pending.add(delivery);
+		if (!running) {
+			delivery.cancel();
+			return;
+		}
 		try {
-			byte[] payload = gzip(gson.toJson(data).getBytes(StandardCharsets.UTF_8));
+			executor.execute(delivery::send);
+		} catch (RuntimeException error) {
+			delivery.finish(null);
+			log.warn("Could not schedule webhook", error);
+		}
+	}
 
-			Request.Builder request = new Request.Builder()
-				.url(WEBHOOK_URL)
-				.addHeader("User-Agent", PluginVersion.userAgent());
+	private final class Delivery {
+		private Map<String, Object> data;
+		private byte[] screenshot;
+		private Consumer<JsonObject> onResponse;
+		private final AtomicBoolean finished = new AtomicBoolean();
+		private volatile Call call;
 
-			if (screenshotJpeg == null) {
-				request.post(RequestBody.create(JSON, payload))
-					.addHeader("Content-Type", "application/json")
-					.addHeader("Content-Encoding", "gzip");
-			} else {
-				request.post(new MultipartBody.Builder()
-					.setType(MultipartBody.FORM)
-					.addFormDataPart("payload", "payload.json.gz", RequestBody.create(GZIP, payload))
-					.addFormDataPart("screenshot", "screenshot.jpg", RequestBody.create(JPEG, screenshotJpeg))
-					.build());
-			}
+		private Delivery(Map<String, Object> data, byte[] screenshot, Consumer<JsonObject> onResponse) {
+			this.data = data;
+			this.screenshot = screenshot;
+			this.onResponse = onResponse;
+		}
 
-			httpClient.newCall(request.build()).enqueue(new Callback() {
-				@Override
-				public void onFailure(Call call, IOException e) {
-					log.error("Failed to send data to webhook: {}", e.getMessage());
+		private void send() {
+			if (finished.get()) return;
+			try {
+				Map<String, Object> snapshot = data;
+				byte[] image = screenshot;
+				if (finished.get()) return;
+				byte[] payload = gzip(gson.toJson(snapshot).getBytes(StandardCharsets.UTF_8));
+
+				Request.Builder request = new Request.Builder()
+					.url(WEBHOOK_URL)
+					.addHeader("User-Agent", PluginVersion.userAgent());
+
+				if (image == null) {
+					request.post(RequestBody.create(JSON, payload))
+						.addHeader("Content-Type", "application/json")
+						.addHeader("Content-Encoding", "gzip");
+				} else {
+					request.post(new MultipartBody.Builder()
+						.setType(MultipartBody.FORM)
+						.addFormDataPart("payload", "payload.json.gz", RequestBody.create(GZIP, payload))
+						.addFormDataPart("screenshot", "screenshot.jpg", RequestBody.create(JPEG, image))
+						.build());
 				}
+				data = null;
+				screenshot = null;
 
-				@Override
-				public void onResponse(Call call, Response response) {
-					try {
-						if (!response.isSuccessful()) {
-							log.warn("Webhook returned non-successful status: {}", response.code());
-							return;
-						}
-						if (onResponse == null || response.body() == null) return;
-						JsonObject parsed = parseJsonOrNull(response);
-						if (parsed == null) return;
-						try {
-							onResponse.accept(parsed);
-						} catch (Exception e) {
-							log.warn("Webhook response handler failed: {}", e.getMessage());
-						}
-					} finally {
-						response.close();
+				call = httpClient.newCall(request.build());
+				call.timeout().timeout(30, TimeUnit.SECONDS);
+				if (finished.get()) {
+					call.cancel();
+					return;
+				}
+				call.enqueue(new Callback() {
+					@Override
+					public void onFailure(Call call, IOException e) {
+						if (!call.isCanceled()) log.warn("Failed to send data to webhook: {}", e.getMessage());
+						finish(null);
 					}
-				}
-			});
-		} catch (IOException e) {
-			log.error("Failed to prepare webhook data: {}", e.getMessage());
-		} catch (Exception e) {
-			log.error("Unexpected error preparing webhook", e);
+
+					@Override
+					public void onResponse(Call call, Response response) {
+						JsonObject parsed = null;
+						try (Response closed = response) {
+							if (!response.isSuccessful()) {
+								log.warn("Webhook returned non-successful status: {}", response.code());
+								return;
+							}
+							if (onResponse != null && closed.body() != null) parsed = parseJsonOrNull(closed);
+						} finally {
+							finish(parsed);
+						}
+					}
+				});
+			} catch (Exception error) {
+				finish(null);
+				log.warn("Failed to prepare webhook", error);
+			}
+		}
+
+		private void cancel() {
+			finish(null);
+			Call current = call;
+			if (current != null) current.cancel();
+		}
+
+		private void finish(JsonObject response) {
+			if (!finished.compareAndSet(false, true)) return;
+			Consumer<JsonObject> callback = onResponse;
+			data = null;
+			screenshot = null;
+			onResponse = null;
+			pending.remove(this);
+			capacity.release();
+			backlogWarning.set(false);
+			notifyResponse(callback, response);
+		}
+	}
+
+	private void notifyResponse(Consumer<JsonObject> callback, JsonObject response) {
+		if (callback == null) return;
+		try {
+			callback.accept(response);
+		} catch (Exception error) {
+			log.warn("Webhook response handler failed: {}", error.getMessage());
 		}
 	}
 
