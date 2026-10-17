@@ -28,6 +28,11 @@ public class ActiveTeamColors {
 
 	/** Standardized nickname -> team color */
 	private volatile Map<String, Color> colors = Map.of();
+	private boolean fetchInProgress;
+	private long refreshAfter;
+	private int generation;
+	private static final long REFRESH_MS = 5 * 60_000L;
+	private static final long RETRY_MS = 60_000L;
 
 	@Inject
 	public ActiveTeamColors(RevalApiService apiService) {
@@ -38,8 +43,11 @@ public class ActiveTeamColors {
 		return playerName != null ? colors.get(Text.standardize(playerName)) : null;
 	}
 
-	/** Rebuild the derived roster; the service cache throttles the network. */
-	public void refresh() {
+	/** Redraws reuse the derived map, including while a request is pending or failing. */
+	public synchronized void refresh() {
+		if (fetchInProgress || System.currentTimeMillis() < refreshAfter) return;
+		fetchInProgress = true;
+		int requestGeneration = generation;
 		apiService.fetchActiveTeams(
 			response -> {
 				Map<String, Color> map = new HashMap<>();
@@ -55,10 +63,29 @@ public class ActiveTeamColors {
 						}
 					}
 				}
-				colors = map;
+				synchronized (ActiveTeamColors.this) {
+					if (requestGeneration != generation) return;
+					colors = map;
+					fetchInProgress = false;
+					refreshAfter = System.currentTimeMillis() + REFRESH_MS;
+				}
 			},
-			error -> log.debug("Failed to fetch active event teams", error)
+			error -> {
+				synchronized (ActiveTeamColors.this) {
+					if (requestGeneration != generation) return;
+					fetchInProgress = false;
+					refreshAfter = System.currentTimeMillis() + RETRY_MS;
+				}
+				log.debug("Failed to fetch active event teams", error);
+			}
 		);
+	}
+
+	public synchronized void reset() {
+		generation++;
+		colors = Map.of();
+		fetchInProgress = false;
+		refreshAfter = 0;
 	}
 
 }

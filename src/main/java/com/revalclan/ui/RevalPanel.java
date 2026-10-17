@@ -67,6 +67,8 @@ public class RevalPanel extends PluginPanel {
 	private final Map<String, Runnable> memberClickLoads = new HashMap<>();
 	private final Set<String> memberTabsLoaded = new HashSet<>();
 	private boolean clanValidated;
+	private boolean disposed;
+	private Timer adminRetry;
 
 	// Admin
 	private AdminManager adminManager;
@@ -457,15 +459,16 @@ public class RevalPanel extends PluginPanel {
 	}
 
 	private void checkAdminEligibility(int attempt) {
-		if (attempt > 10) return;
+		if (disposed || !clanValidated || attempt > 10) return;
+		if (adminRetry != null) { adminRetry.stop(); adminRetry = null; }
 
 		ClanChannel clanChannel = client.getClanChannel();
 		String playerName = client.getLocalPlayer() != null ? client.getLocalPlayer().getName() : null;
 		if (clanChannel == null || playerName == null) {
 			// Clan channel not ready yet — retry with delay
-			Timer timer = new Timer(attempt * 1000, e -> checkAdminEligibility(attempt + 1));
-			timer.setRepeats(false);
-			timer.start();
+			adminRetry = new Timer(Math.max(1, attempt) * 1000, e -> checkAdminEligibility(attempt + 1));
+			adminRetry.setRepeats(false);
+			adminRetry.start();
 			return;
 		}
 
@@ -484,7 +487,11 @@ public class RevalPanel extends PluginPanel {
 
 	/** Tears down anything living outside the panel tree (detached windows). */
 	public void shutDown() {
-		profilePanel.disposeAlbum();
+		disposed = true;
+		clanValidated = false;
+		if (adminRetry != null) { adminRetry.stop(); adminRetry = null; }
+		profilePanel.shutDown();
+		eventsPanel.onLoggedOut();
 	}
 
 	public void setAdminEnabled(boolean enabled) {
@@ -497,6 +504,7 @@ public class RevalPanel extends PluginPanel {
 
 	public void onLoggedIn() {
 		SwingUtilities.invokeLater(() -> {
+			if (disposed) return;
 			clanValidated = true;
 			memberTabsLoaded.clear();
 			profilePanel.refresh();
@@ -507,6 +515,8 @@ public class RevalPanel extends PluginPanel {
 
 	public void onLoggedOut() {
 		SwingUtilities.invokeLater(() -> {
+			if (disposed) return;
+			if (adminRetry != null) { adminRetry.stop(); adminRetry = null; }
 			clanValidated = false;
 			memberTabsLoaded.clear();
 			competitionsPanel.onLoggedOut();

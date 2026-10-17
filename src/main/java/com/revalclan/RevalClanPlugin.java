@@ -27,6 +27,8 @@ import com.revalclan.util.RaidPartyTracker;
 import com.revalclan.util.SyncStateManager;
 import com.revalclan.util.UIAssetLoader;
 import com.revalclan.util.Worlds;
+import com.revalclan.util.ScreenshotService;
+import com.revalclan.util.WebhookService;
 import com.google.inject.Provides;
 import com.google.gson.JsonObject;
 
@@ -156,18 +158,25 @@ public class RevalClanPlugin extends Plugin {
 	@Inject	private UIAssetLoader uiAssetLoader;
 
 	@Inject	private RevalClanConfig config;
+	@Inject private ScreenshotService screenshotService;
+	@Inject private WebhookService webhookService;
 
 	private RevalPanel revalPanel;
 	private NavigationButton navButton;
 
 	private boolean wasLoggedIn = false;
 	private boolean pendingLoginNotification = false;
+	private volatile long lifecycleGeneration;
 
 	private static final Pattern COL_OPEN = Pattern.compile("<col=[0-9a-fA-F]+>");
 	private static final Pattern COL_CLOSE = Pattern.compile("</col>");
 
 	@Override
 	protected void startUp() throws Exception {
+		long generation = ++lifecycleGeneration;
+		revalApiService.startUp();
+		webhookService.startUp();
+		screenshotService.startUp();
 		log.info("Reval Clan plugin started!");
 		wasLoggedIn = false;
 		pendingLoginNotification = false;
@@ -175,6 +184,7 @@ public class RevalClanPlugin extends Plugin {
 		sessionTracker.setOnHeartbeatResponse(this::onChanges);
 
 		clientThread.invoke(() -> {
+			if (generation != lifecycleGeneration) return true;
 			if (client.getIndexConfig() == null || client.getGameState().ordinal() < GameState.LOGIN_SCREEN.ordinal()) {
 				return false;
 			}
@@ -261,12 +271,21 @@ public class RevalClanPlugin extends Plugin {
 
 	@Override
 	protected void shutDown() throws Exception {
+		lifecycleGeneration++;
+		pendingLoginNotification = false;
+		screenshotService.shutDown();
+		webhookService.shutDown();
+		sessionTracker.setOnHeartbeatResponse(null);
 		eventFilterManager.resetSession();
 		log.info("Reval Clan plugin stopped!");
 		clanMembership.reset();
 		wasLoggedIn = false;
 
-		collectionLogManager.clearObtainedItems();
+		clientThread.invoke(() -> {
+			collectionLogManager.clearObtainedItems();
+			resetNotifiers();
+			sessionTracker.reset();
+		});
 		syncButton.shutDown();
 		overlayManager.remove(syncGuideOverlay);
 		if (revalPanel != null) {
@@ -282,15 +301,28 @@ public class RevalClanPlugin extends Plugin {
 		eventBus.unregister(clanTeamColors);
 		clanTeamColors.shutDown();
 		revalApiService.resetEventsSession();
+		revalApiService.shutDown();
 		overlayManager.remove(registrationMarksOverlay);
 		eventBus.unregister(playerCardManager);
 		playerCardManager.shutDown();
 		overlayManager.remove(playerCardOverlay);
 
-		// In-memory only — the persisted copy replays at the next startUp/login
-		sessionTracker.reset();
-
 		announcementService.reset();
+
+		// Remove the side panel
+		if (navButton != null) {
+			clientToolbar.removeNavigation(navButton);
+			navButton = null;
+		}
+	}
+
+	/** Session-owned buffers and actor references must never cross accounts or plugin restarts. */
+	private void resetNotifiers() {
+		lootNotifier.reset();
+		varbitNotifier.reset();
+		petNotifier.reset();
+		deathNotifier.reset();
+		diaryNotifier.reset();
 		levelNotifier.reset();
 		clueNotifier.reset();
 		killCountNotifier.reset();
@@ -298,12 +330,7 @@ public class RevalClanPlugin extends Plugin {
 		raidPartyTracker.reset();
 		leaguesNotifier.reset();
 		leaguesSyncNotifier.reset();
-
-		// Remove the side panel
-		if (navButton != null) {
-			clientToolbar.removeNavigation(navButton);
-			navButton = null;
-		}
+		syncButton.reset();
 	}
 
 	@Subscribe
@@ -333,11 +360,7 @@ public class RevalClanPlugin extends Plugin {
 				clanMembership.reset();
 				pendingLoginNotification = false;
 				announcementService.reset();
-				leaguesNotifier.reset();
-				leaguesSyncNotifier.reset();
-				lootNotifier.reset();
-				varbitNotifier.reset();
-				raidPartyTracker.reset();
+				resetNotifiers();
 
 				if (wasLoggedIn) {
 					if (wasInClan) {

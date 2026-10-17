@@ -30,9 +30,16 @@ public class BrowserApi {
 
     @Inject public BrowserApi(OkHttpClient http, Gson gson) { this.http = http; this.gson = gson; }
 
+    public void clearCache() {
+        synchronized (views) { views.clear(); }
+        cached = null;
+        cachedAt = 0;
+    }
+
     public Call catalogue(Consumer<BrowserModels.Catalogue> success, Consumer<String> failure) {
-        if (cached != null && System.currentTimeMillis() - cachedAt < 3600_000) {
-            SwingUtilities.invokeLater(() -> success.accept(cached));
+        BrowserModels.Catalogue saved = cached;
+        if (saved != null && System.currentTimeMillis() - cachedAt < 3600_000) {
+            SwingUtilities.invokeLater(() -> success.accept(saved));
             return null;
         }
         return get("catalogue", null, BrowserModels.Catalogue.class, data -> {
@@ -83,6 +90,7 @@ public class BrowserApi {
         Request request = new Request.Builder().url(endpoint(path, parameters))
             .header("Accept", "application/json").header("User-Agent", PluginVersion.userAgent()).get().build();
         Call call = http.newCall(request);
+        call.timeout().timeout(30, java.util.concurrent.TimeUnit.SECONDS);
         call.enqueue(new Callback() {
             @Override public void onFailure(Call ignored, IOException error) {
                 deliver(call, () -> failure.accept("The clan browser could not connect. Please try again."));

@@ -67,6 +67,14 @@ public class CollectionLogSyncButton {
 		eventBus.unregister(this);
 	}
 
+	public void reset() {
+		pendingSyncTick = -1;
+		lastAttemptedSync = -1;
+		baseMenuHeight = -1;
+		syncGuide.disarm();
+		syncGuide.setSyncButtonWidget(null);
+	}
+
 	@Subscribe
 	public void onScriptPreFired(ScriptPreFired event) {
 		if (event.getScriptId() != DRAW_BURGER_MENU) {

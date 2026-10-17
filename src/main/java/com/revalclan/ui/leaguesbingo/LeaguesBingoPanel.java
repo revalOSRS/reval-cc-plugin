@@ -71,6 +71,7 @@ public class LeaguesBingoPanel extends JPanel {
 	private long loadedAt;
 	private boolean loading;
 	private boolean picking;
+	private int generation;
 	private String loadError;
 
 	private View view = View.TEAMS;
@@ -138,6 +139,9 @@ public class LeaguesBingoPanel extends JPanel {
 
 	/** Forget everything, including who may pick: the next account starts clean. */
 	public void reset() {
+		generation++;
+		loading = false;
+		picking = false;
 		event = null;
 		payload = null;
 		me = null;
@@ -147,6 +151,10 @@ public class LeaguesBingoPanel extends JPanel {
 		region = null;
 		tileId = null;
 		view = View.TEAMS;
+		grid = null;
+		tileDetailHolder = null;
+		body.removeAll();
+		refreshButton.setLoading(false);
 	}
 
 	private void back() {
@@ -183,12 +191,14 @@ public class LeaguesBingoPanel extends JPanel {
 	// ==================== Loading ====================
 
 	private void load() {
+		int requestGeneration = ++generation;
 		loading = true;
 		loadError = null;
 		refreshButton.setLoading(true);
 		loadViewer();
 		api.fetchLeaguesBingoEvent(event.getId(),
 			response -> SwingUtilities.invokeLater(() -> {
+				if (requestGeneration != generation) return;
 				loading = false;
 				refreshButton.setLoading(false);
 				payload = response.getData();
@@ -196,6 +206,7 @@ public class LeaguesBingoPanel extends JPanel {
 				render(false);
 			}),
 			error -> SwingUtilities.invokeLater(() -> {
+				if (requestGeneration != generation) return;
 				loading = false;
 				refreshButton.setLoading(false);
 				loadError = error.getMessage();
@@ -205,14 +216,18 @@ public class LeaguesBingoPanel extends JPanel {
 
 	/** Ask the backend what this account may do; a failure just hides the pick buttons. */
 	private void loadViewer() {
+		int requestGeneration = generation;
 		long accountHash = client != null ? client.getAccountHash() : -1;
 		if (accountHash == -1) return;
 		api.fetchLeaguesBingoMe(event.getId(), accountHash,
 			response -> SwingUtilities.invokeLater(() -> {
+				if (requestGeneration != generation) return;
 				me = response.getData();
 				if (view != View.TEAMS) render(false);
 			}),
-			error -> SwingUtilities.invokeLater(() -> me = null));
+			error -> SwingUtilities.invokeLater(() -> {
+				if (requestGeneration == generation) me = null;
+			}));
 	}
 
 	// ==================== Rendering ====================
@@ -422,8 +437,10 @@ public class LeaguesBingoPanel extends JPanel {
 		render(false);
 		// Pickers act for their own team; only a superadmin names another team.
 		String targetTeam = me.isOwnTeam(team.getId()) ? null : team.getId();
+		int requestGeneration = generation;
 		api.pickLeaguesBingoRegion(event.getId(), accountHash, board.getRegion(), targetTeam,
 			response -> SwingUtilities.invokeLater(() -> {
+				if (requestGeneration != generation) return;
 				picking = false;
 				if (response.getData() != null && response.getData().getMe() != null) me = response.getData().getMe();
 				load();
@@ -431,6 +448,7 @@ public class LeaguesBingoPanel extends JPanel {
 					"Region unlocked", JOptionPane.INFORMATION_MESSAGE);
 			}),
 			error -> SwingUtilities.invokeLater(() -> {
+				if (requestGeneration != generation) return;
 				picking = false;
 				render(false);
 				JOptionPane.showMessageDialog(this, "Could not unlock: " + error.getMessage(), "Unlock failed", JOptionPane.WARNING_MESSAGE);

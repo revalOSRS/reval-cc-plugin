@@ -17,8 +17,11 @@ import javax.inject.Singleton;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
+import java.lang.ref.WeakReference;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Singleton
@@ -30,50 +33,120 @@ public class ScreenshotService {
 	@Inject private Client client;
 	@Inject private ClientThread clientThread;
 	@Inject private ScheduledExecutorService executor;
+	private Capture pending;
+	private boolean running = true;
+
+	private static final class Capture {
+		final CompletableFuture<byte[]> result = new CompletableFuture<>();
+		ScheduledFuture<?> timeout;
+		Runnable watcher;
+		Widget chat, pm;
+		boolean frameQueued, frameReceived, encoderPending, restoreQueued;
+	}
+
+	public synchronized void startUp() {
+		running = true;
+		if (pending != null) drawManager.registerEveryFrameListener(pending.watcher);
+	}
+
+	public synchronized void shutDown() {
+		running = false;
+		if (pending != null) {
+			Capture capture = pending;
+			finish(capture, null);
+			drawManager.unregisterEveryFrameListener(capture.watcher);
+		}
+	}
 
 	/** JPEG bytes of the next frame, or null when the capture failed. */
-	public CompletableFuture<byte[]> captureScreenshot() {
-		CompletableFuture<byte[]> result = new CompletableFuture<>();
-
-		clientThread.invoke(() -> {
-			Widget chat = client.getWidget(InterfaceID.Chatbox.CHATAREA);
-			Widget pm = client.getWidget(InterfaceID.PmChat.CONTAINER);
-
-			boolean chatWasVisible = chat != null && !chat.isHidden();
-			boolean pmWasVisible = pm != null && !pm.isHidden();
-
-			if (chatWasVisible) chat.setHidden(true);
-			if (pmWasVisible) pm.setHidden(true);
-
-			drawManager.requestNextFrameListener(image -> {
-				if (chatWasVisible || pmWasVisible) {
-					clientThread.invoke(() -> {
-						if (chatWasVisible && chat != null) chat.setHidden(false);
-						if (pmWasVisible && pm != null) pm.setHidden(false);
-						return true;
+	public synchronized CompletableFuture<byte[]> captureScreenshot() {
+		if (!running) return CompletableFuture.completedFuture(null);
+		if (pending != null) return pending.result;
+		Capture capture = new Capture();
+		pending = capture;
+		// RuneLite cannot remove a next-frame listener and can discard it on a
+		// failed image read. Keep at most one, with a weak owner, until drawing
+		// resumes; the watcher then releases a timed-out capture even in that case.
+		WeakReference<ScreenshotService> owner = new WeakReference<>(this);
+		capture.watcher = () -> {
+			ScreenshotService service = owner.get();
+			if (service != null) service.onDraw(capture);
+		};
+		try {
+			drawManager.registerEveryFrameListener(capture.watcher);
+			capture.timeout = executor.schedule(() -> finish(capture, null), 5, TimeUnit.SECONDS);
+			clientThread.invoke(() -> {
+				synchronized (ScreenshotService.this) {
+					if (capture.result.isDone()) return;
+					Widget chat = client.getWidget(InterfaceID.Chatbox.CHATAREA);
+					Widget pm = client.getWidget(InterfaceID.PmChat.CONTAINER);
+					if (chat != null && !chat.isHidden()) { capture.chat = chat; chat.setHidden(true); }
+					if (pm != null && !pm.isHidden()) { capture.pm = pm; pm.setHidden(true); }
+					capture.frameQueued = true;
+					drawManager.requestNextFrameListener(image -> {
+						ScreenshotService service = owner.get();
+						if (service != null) service.onFrame(capture, image);
 					});
 				}
-
-				executor.submit(() -> {
-					if (image == null) {
-						result.complete(null);
-						return;
-					}
-					try {
-						BufferedImage screenshot = toBufferedImage(image);
-						screenshot = resizeIfNeeded(screenshot);
-						result.complete(compress(screenshot));
-					} catch (Exception e) {
-						log.error("Error processing screenshot", e);
-						result.complete(null);
-					}
-				});
 			});
+		} catch (RuntimeException error) {
+			finish(capture, null);
+		}
+		return capture.result;
+	}
 
-			return true;
+	private synchronized void onDraw(Capture capture) {
+		if (capture.result.isDone() && !capture.encoderPending) {
+			drawManager.unregisterEveryFrameListener(capture.watcher);
+			if (pending == capture) pending = null;
+		}
+	}
+
+	private synchronized void onFrame(Capture capture, Image image) {
+		if (pending != capture) return;
+		capture.frameReceived = true;
+		if (capture.result.isDone()) { onDraw(capture); return; }
+		restoreChat(capture);
+		capture.encoderPending = true;
+		try {
+			executor.execute(() -> {
+				byte[] bytes = null;
+				try {
+					if (!capture.result.isDone() && image != null) bytes = compress(resizeIfNeeded(toBufferedImage(image)));
+				} catch (Exception error) {
+					log.warn("Error processing screenshot", error);
+				} finally {
+					synchronized (ScreenshotService.this) {
+						capture.encoderPending = false;
+						finish(capture, bytes);
+						onDraw(capture);
+					}
+				}
+			});
+		} catch (RuntimeException error) {
+			capture.encoderPending = false;
+			finish(capture, null);
+		}
+	}
+
+	private synchronized void finish(Capture capture, byte[] bytes) {
+		if (capture.result.isDone()) return;
+		restoreChat(capture);
+		if (capture.timeout != null) capture.timeout.cancel(false);
+		if ((capture.frameReceived && !capture.encoderPending) || !capture.frameQueued) {
+			drawManager.unregisterEveryFrameListener(capture.watcher);
+			if (pending == capture) pending = null;
+		}
+		capture.result.complete(bytes);
+	}
+
+	private void restoreChat(Capture capture) {
+		if (capture.restoreQueued) return;
+		capture.restoreQueued = true;
+		clientThread.invoke(() -> {
+			if (capture.chat != null) { capture.chat.setHidden(false); capture.chat = null; }
+			if (capture.pm != null) { capture.pm.setHidden(false); capture.pm = null; }
 		});
-
-		return result;
 	}
 
 	/**

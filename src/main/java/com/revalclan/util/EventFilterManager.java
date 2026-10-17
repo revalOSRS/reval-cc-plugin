@@ -28,6 +28,7 @@ public class EventFilterManager{
 	@Getter private volatile EventFilters filters;
 	private String appliedVersion;
 	private boolean fetchInProgress;
+	private Call pendingCall;
 	private int generation;
 	private int ticksRemaining;
 	private static final int DAILY_TICKS = 144_000;
@@ -92,6 +93,7 @@ public class EventFilterManager{
 	
 	public synchronized void resetSession() {
 		generation++;
+		if (pendingCall != null) { pendingCall.cancel(); pendingCall = null; }
 		fetchInProgress = false;
 		appliedVersion = null;
 		ticksRemaining = 0;
@@ -112,10 +114,13 @@ public class EventFilterManager{
 		final int requestGeneration = generation;
 		Request request = new Request.Builder().url(FILTERS_URL).get()
 			.addHeader("User-Agent", PluginVersion.userAgent()).build();
-		httpClient.newCall(request).enqueue(new Callback() {
+		pendingCall = httpClient.newCall(request);
+		pendingCall.timeout().timeout(30, java.util.concurrent.TimeUnit.SECONDS);
+		pendingCall.enqueue(new Callback() {
 			@Override public void onFailure(Call call, IOException error) {
 				synchronized (EventFilterManager.this) {
 					if (requestGeneration != generation) return;
+					pendingCall = null;
 					fetchInProgress = false;
 					ticksRemaining = RETRY_TICKS;
 				}
@@ -130,6 +135,7 @@ public class EventFilterManager{
 					Runnable listener;
 					synchronized (EventFilterManager.this) {
 						if (requestGeneration != generation) return;
+						pendingCall = null;
 						fetchInProgress = false;
 						ticksRemaining = RETRY_TICKS;
 						if (parsed == null) return;

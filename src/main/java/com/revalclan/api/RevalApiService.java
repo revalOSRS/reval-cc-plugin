@@ -39,8 +39,11 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Service for fetching data from the Reval Plugin API.
@@ -51,6 +54,27 @@ public class RevalApiService {
 
     private final Gson gson;
     private final OkHttpClient httpClient;
+    private final Set<Call> calls = ConcurrentHashMap.newKeySet();
+    private volatile boolean running = true;
+    private volatile int generation;
+
+    public synchronized void startUp() {
+        running = true;
+        generation++;
+    }
+
+    public synchronized void shutDown() {
+        running = false;
+        generation++;
+        for (Call call : calls) call.cancel();
+        calls.clear();
+        clearCache();
+    }
+
+    // Callbacks can acquire other service locks: never invoke them under this monitor.
+    private void deliver(int requestGeneration, Runnable callback) {
+        if (running && requestGeneration == generation) callback.run();
+    }
 
     // Cache durations
     private static final long CACHE_DURATION_MS = 5 * 60 * 1000;
@@ -528,15 +552,26 @@ public class RevalApiService {
             }
         }
 
-        httpClient.newCall(requestBuilder.build()).enqueue(new Callback() {
+        final Call requestCall;
+        final int requestGeneration;
+        synchronized (this) {
+            if (!running) return;
+            requestGeneration = generation;
+            requestCall = httpClient.newCall(requestBuilder.build());
+            requestCall.timeout().timeout(30, TimeUnit.SECONDS);
+            calls.add(requestCall);
+        }
+        Callback callback = new Callback() {
             @Override
             public void onFailure(Call call, IOException e) {
-                onError.accept(e);
+                calls.remove(call);
+                if (!call.isCanceled()) deliver(requestGeneration, () -> onError.accept(e));
             }
 
             @Override
             public void onResponse(Call call, Response response) {
                 try {
+                    if (call.isCanceled()) return;
                     if (!response.isSuccessful()) {
                         String errorBody = response.body() != null ? response.body().string() : null;
                         T errorResponse = null;
@@ -545,13 +580,14 @@ public class RevalApiService {
                                 errorResponse = gson.fromJson(errorBody, responseClass);
                             } catch (Exception ignored) {}
                         }
-                        onError.accept(new Exception(errorResponse != null && errorResponse.getErrorMessage() != null
-                            ? errorResponse.getErrorMessage() : "HTTP " + response.code()));
+                        Exception error = new Exception(errorResponse != null && errorResponse.getErrorMessage() != null
+                            ? errorResponse.getErrorMessage() : "HTTP " + response.code());
+                        deliver(requestGeneration, () -> onError.accept(error));
                         return;
                     }
 
                     if (response.body() == null) {
-                        onError.accept(new Exception("Empty response body"));
+                        deliver(requestGeneration, () -> onError.accept(new Exception("Empty response body")));
                         return;
                     }
 
@@ -559,19 +595,26 @@ public class RevalApiService {
                     T parsedResponse = gson.fromJson(jsonResponse, responseClass);
                     
                     if (parsedResponse == null) {
-                        onError.accept(new Exception("Failed to parse response"));
+                        deliver(requestGeneration, () -> onError.accept(new Exception("Failed to parse response")));
                     } else if (!parsedResponse.isSuccess()) {
-                        onError.accept(new Exception(parsedResponse.getErrorMessage() != null
-                            ? parsedResponse.getErrorMessage() : "Request failed"));
+                        deliver(requestGeneration, () -> onError.accept(new Exception(parsedResponse.getErrorMessage() != null
+                            ? parsedResponse.getErrorMessage() : "Request failed")));
                     } else {
-                        onSuccess.accept(parsedResponse);
+                        deliver(requestGeneration, () -> onSuccess.accept(parsedResponse));
                     }
                 } catch (Exception e) {
-                    onError.accept(e);
+                    deliver(requestGeneration, () -> onError.accept(e));
                 } finally {
+                    calls.remove(call);
                     response.close();
                 }
             }
-        });
+        };
+        try {
+            requestCall.enqueue(callback);
+        } catch (RuntimeException error) {
+            calls.remove(requestCall);
+            deliver(requestGeneration, () -> onError.accept(error));
+        }
     }
 }
