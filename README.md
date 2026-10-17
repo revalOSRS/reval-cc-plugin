@@ -4,6 +4,21 @@ A comprehensive RuneLite plugin for the Reval clan in Old School RuneScape. Feat
 
 ## Features
 
+### Raid party deaths
+
+Raid loot and completion events include known per-member death counts in
+`party.members[].deaths`. ToB and ToA use the game's named death messages, including
+logout penalties, without assigning the team-wide total to an individual. CoX/CM
+records the local player's deaths; teammates outside the loaded scene remain unknown.
+Tracking runs independently of the **Send player deaths to Discord** setting.
+
+An explicit raid start establishes coverage. Enabling the plugin mid-raid, missing
+death messages, reconnecting, hopping, or restarting leaves affected counts unknown,
+so absent values must not be interpreted as zero. A completed party snapshot stays
+with later outside-chest claims during the same uninterrupted login, without the
+ten-minute limit used by the names-only final-boss fallback. Counts reset for each
+new raid and do not include deaths after completion.
+
 ### In-game clan browser
 
 Send `!reval` or `!reval help` in public or clan chat, then click its link to open the command guide.

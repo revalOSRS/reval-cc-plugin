@@ -309,6 +309,7 @@ public class RevalClanPlugin extends Plugin {
 	@Subscribe
 	public void onGameStateChanged(GameStateChanged gameStateChanged) {
 		diaryNotifier.onGameStateChanged(gameStateChanged);
+		raidPartyTracker.onGameStateChanged(gameStateChanged.getGameState());
 
 		switch (gameStateChanged.getGameState()) {
 			case LOGGED_IN:
@@ -419,6 +420,7 @@ public class RevalClanPlugin extends Plugin {
 		// The session and its kill attribution record regardless of clan state — only sending is gated
 		sessionTracker.onGameTick();
 		killTracker.onGameTick(gameTick);
+		raidPartyTracker.onGameTick();
 
 		// Re-read the clan sources; flips to member exactly once per login
 		if (clanMembership.refresh()) onClanValidated();
@@ -470,6 +472,7 @@ public class RevalClanPlugin extends Plugin {
 
 	@Subscribe
 	public void onChatMessage(ChatMessage event) {
+		raidPartyTracker.onChatMessage(event.getType(), event.getMessage());
 		if (!clanMembership.isMember()) return;
 
 		String message = event.getMessage();

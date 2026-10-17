@@ -1,7 +1,9 @@
 package com.revalclan.util;
 
 import net.runelite.api.Actor;
+import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
+import net.runelite.api.GameState;
 import net.runelite.api.NPC;
 import net.runelite.api.Player;
 import net.runelite.api.WorldView;
@@ -21,14 +23,16 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * The party behind a raid's loot and completion count (CoX, ToB, ToA), with
  * each member marked as a Reval member or a guest.
  *
- * The party is read live while the player is inside the raid. It is also saved
- * when the final boss dies: a ToB or ToA reward can be claimed later from the
- * chest outside the raid, where the party interface can already be empty.
+ * The party is read live and frozen, with known per-member deaths, at completion.
+ * ToB/ToA rewards claimed later outside the raid keep that snapshot until an
+ * observation gap. Final boss deaths also save a names-only fallback.
  * Call on the client thread.
  */
 @Singleton
@@ -49,15 +53,22 @@ public class RaidPartyTracker {
 	static final long SAVED_PARTY_TTL_MS = 10 * 60_000L;
 
 	/** Where a party was read. */
-	public enum Origin { LIVE, FINAL_BOSS }
+	public enum Origin { LIVE, FINAL_BOSS, COMPLETION }
+
+	private static final Pattern COMPLETED = Pattern.compile(
+		"^Your completed (Chambers of Xeric(?: Challenge Mode)?|Theatre of Blood(?::[^:]*)?|Tombs of Amascut(?::[^:]*)?) count is:");
 
 	@Inject private Client client;
+	@Inject private RaidDeathTracker deathTracker;
+	private final Map<String, Party> completedParties = new LinkedHashMap<>();
 
 	private Party savedParty;
+	private Party pendingCompletion;
 	private long savedAtMs;
 
 	/** Save the party when a raid's final boss dies. Not gated on membership: it only records. */
 	public void onActorDeath(ActorDeath event) {
+		deathTracker.onActorDeath(event);
 		Actor actor = event.getActor();
 		if (!(actor instanceof NPC)) return;
 		String raid = raidForFinalBoss(actor.getName());
@@ -65,7 +76,9 @@ public class RaidPartyTracker {
 
 		Party party = readParty(raid, Origin.FINAL_BOSS);
 		if (party != null) {
-			savedParty = party;
+			// An NPC name can be a Warden's earlier phase. Only the completion
+			// message freezes death counts; this fallback saves names alone.
+			savedParty = party.withDeaths(Map.of());
 			savedAtMs = System.currentTimeMillis();
 		}
 	}
@@ -78,17 +91,80 @@ public class RaidPartyTracker {
 	public Party partyFor(String source) {
 		String raid = raidOf(source);
 		if (raid == null) return null;
+		Party completed = completedParties.get(raid);
+		if (completed != null && deathTracker.isCompleted(raid)) return completed;
 
-		WorldView world = client.getTopLevelWorldView();
-		boolean insideRaid = world != null && world.isInstance();
-		return choose(raid, readParty(raid, Origin.LIVE), insideRaid, savedParty,
+		boolean insideRaid = deathTracker.isInside(raid);
+		Party live = readParty(raid, Origin.LIVE);
+		// Keep each raid's completed reward across scene changes and long breaks
+		// in this login. An observation gap clears the cache: an offline raid
+		// could otherwise leave us annotating a new reward with an old count.
+		if (!insideRaid) {
+			if (completed != null) return completed;
+			if (live != null) live = live.withDeaths(Map.of());
+		}
+		return choose(raid, live, insideRaid, savedParty,
 			System.currentTimeMillis() - savedAtMs);
 	}
 
-	/** Forget the saved party (logout, plugin stop). */
+	/** Observe game messages before notification settings or clan validation can filter them. */
+	public void onChatMessage(ChatMessageType type, String rawMessage) {
+		if (type != ChatMessageType.GAMEMESSAGE && type != ChatMessageType.FRIENDSCHATNOTIFICATION
+			&& type != ChatMessageType.SPAM && type != ChatMessageType.ENGINE) return;
+		String message = sanitize(rawMessage);
+		if (deathTracker.onChatMessage(message)) {
+			savedParty = null;
+			savedAtMs = 0;
+		}
+		String raid = null;
+		Matcher completed = COMPLETED.matcher(message);
+		if (completed.find()) raid = raidOf(completed.group(1));
+		if (message.startsWith("Congratulations - your raid is complete!")) raid = CHAMBERS_OF_XERIC;
+		if (message.startsWith("Challenge complete: The Wardens.")) raid = TOMBS_OF_AMASCUT;
+		if (raid == null) return;
+		if (deathTracker.isCompleted(raid) && completedParties.containsKey(raid)) return;
+
+		Party party = readParty(raid, Origin.COMPLETION);
+		if (party == null && savedParty != null && savedParty.raid.equals(raid)
+			&& System.currentTimeMillis() - savedAtMs <= SAVED_PARTY_TTL_MS) {
+			party = new Party(raid, Origin.COMPLETION, savedParty.names, savedParty.revalMembers,
+				savedParty.deaths).withDeaths(deathTracker.countsFor(raid, savedParty.names));
+		}
+		deathTracker.complete(raid);
+		if (party == null) {
+			completedParties.remove(raid);
+			if (savedParty != null && savedParty.raid.equals(raid)) savedParty = null;
+		} else {
+			savedParty = party;
+			savedAtMs = System.currentTimeMillis();
+			completedParties.put(raid, party);
+			pendingCompletion = party;
+		}
+	}
+
+	public void onGameTick() {
+		// Finish the server tick before freezing: a final death and completion
+		// can arrive in either order. Buffered loot/KC retain this same snapshot.
+		if (pendingCompletion != null) {
+			if (deathTracker.isCompleted(pendingCompletion.raid)) {
+				pendingCompletion.updateDeaths(deathTracker.countsFor(pendingCompletion.raid, pendingCompletion.names));
+			}
+			pendingCompletion = null;
+		}
+		deathTracker.onGameTick();
+	}
+
+	public void onGameStateChanged(GameState state) {
+		if (state == GameState.CONNECTION_LOST || state == GameState.HOPPING || state == GameState.LOGIN_SCREEN) reset();
+	}
+
+	/** Forget observation after logout/plugin stop; a later unmatched reward has unknown counts. */
 	public void reset() {
 		savedParty = null;
+		pendingCompletion = null;
 		savedAtMs = 0;
+		deathTracker.reset();
+		completedParties.clear();
 	}
 
 	/**
@@ -136,7 +212,8 @@ public class RaidPartyTracker {
 		} else {
 			names = varcNames(TOA_MEMBER_NAME_VARC, TOA_PARTY_MAX_SIZE);
 		}
-		return names.isEmpty() ? null : Party.of(raid, origin, names, revalRoster());
+		return names.isEmpty() ? null : Party.of(raid, origin, names, revalRoster())
+			.withDeaths(deathTracker.countsFor(raid, names));
 	}
 
 	/**
@@ -206,7 +283,7 @@ public class RaidPartyTracker {
 
 	/** RuneScape treats space, underscore and hyphen in a name as the same character. */
 	static String nameKey(String name) {
-		return sanitize(name).toLowerCase(Locale.ROOT).replaceAll("[ _-]", "");
+		return sanitize(name).toLowerCase(Locale.ROOT).replace('_', ' ').replace('-', ' ');
 	}
 
 	/** One raid party: its members in party order and whether each is in Reval. */
@@ -216,20 +293,35 @@ public class RaidPartyTracker {
 		final List<String> names;
 		/** Parallel to names; a null entry means the Reval roster was not loaded. */
 		final List<Boolean> revalMembers;
+		/** Parallel to names; null means the full raid count is unknown. */
+		final List<Integer> deaths;
 
-		private Party(String raid, Origin origin, List<String> names, List<Boolean> revalMembers) {
+		private Party(String raid, Origin origin, List<String> names, List<Boolean> revalMembers, List<Integer> deaths) {
 			this.raid = raid;
 			this.origin = origin;
 			this.names = names;
 			this.revalMembers = revalMembers;
+			this.deaths = deaths;
 		}
 
 		static Party of(String raid, Origin origin, List<String> names, Set<String> revalRoster) {
 			List<Boolean> flags = new ArrayList<>(names.size());
+			List<Integer> deaths = new ArrayList<>(names.size());
 			for (String name : names) {
 				flags.add(revalRoster == null ? null : revalRoster.contains(nameKey(name)));
+				deaths.add(null);
 			}
-			return new Party(raid, origin, names, flags);
+			return new Party(raid, origin, names, flags, deaths);
+		}
+
+		private Party withDeaths(Map<String, Integer> counts) {
+			List<Integer> values = new ArrayList<>(names.size());
+			for (String name : names) values.add(counts.get(nameKey(name)));
+			return new Party(raid, origin, names, revalMembers, values);
+		}
+
+		private void updateDeaths(Map<String, Integer> counts) {
+			for (int i = 0; i < names.size(); i++) deaths.set(i, counts.get(nameKey(names.get(i))));
 		}
 
 		/**
@@ -245,11 +337,12 @@ public class RaidPartyTracker {
 				Map<String, Object> member = new LinkedHashMap<>();
 				member.put("name", names.get(i));
 				if (revalMembers.get(i) != null) member.put("clanMember", revalMembers.get(i));
+				if (deaths.get(i) != null) member.put("deaths", deaths.get(i));
 				members.add(member);
 			}
 
 			Map<String, Object> party = new LinkedHashMap<>();
-			party.put("origin", origin == Origin.FINAL_BOSS ? "final_boss" : "live");
+			party.put("origin", origin.name().toLowerCase(Locale.ROOT));
 			party.put("members", members);
 			data.put("party", party);
 		}
