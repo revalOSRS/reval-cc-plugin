@@ -1,5 +1,8 @@
 package com.revalclan.notifiers;
 
+import com.revalclan.session.SessionScoped;
+import com.revalclan.session.SessionState;
+
 import com.google.gson.JsonObject;
 import com.revalclan.RevalClanConfig;
 import com.revalclan.util.ClanMembership;
@@ -21,12 +24,17 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Base class for all notification types (loot, death, pets, etc.)
  */
 @Slf4j
-public abstract class BaseNotifier {
+public abstract class BaseNotifier implements SessionScoped {
+	@Inject final void registerSessionState(SessionState state) { state.register(this); }
+
+	/** Stateless notifiers need no cleanup; buffered subclasses override this hook. */
+	@Override public void reset() {}
 	@Inject protected Client client;
 
 	@Inject protected WebhookService webhookService;
@@ -69,7 +77,7 @@ public abstract class BaseNotifier {
 
 	/**
 	 * Send, optionally handing the parsed JSON response to the consumer.
-	 * Consumer runs on the HTTP thread — must not touch the client.
+	 * Only successful responses reach the consumer; client access must be marshalled to ClientThread.
 	 */
 	protected void sendNotification(Map<String, Object> data, Consumer<JsonObject> onResponse) {
 		sendNotification(getEventType(), data, onResponse);
@@ -79,7 +87,8 @@ public abstract class BaseNotifier {
 	private void sendNotification(String eventType, Map<String, Object> data, Consumer<JsonObject> onResponse) {
 		if (!passesClanCheck()) return;
 		addEventMetadata(eventType, data, true);
-		webhookService.sendDataAsync(data, onResponse);
+		CompletableFuture<JsonObject> delivery = webhookService.sendDataAsync(data);
+		if (onResponse != null) delivery.thenAccept(onResponse);
 	}
 
 	/**
@@ -91,7 +100,7 @@ public abstract class BaseNotifier {
 	protected void sendCompactNotification(String eventType, Map<String, Object> data) {
 		if (!passesClanCheck()) return;
 		addEventMetadata(eventType, data, false);
-		webhookService.sendDataAsync(data, null);
+		webhookService.sendDataAsync(data);
 	}
 
 	/**
@@ -105,7 +114,7 @@ public abstract class BaseNotifier {
 		addEventMetadata(getEventType(), data, true);
 
 		screenshotService.captureScreenshot()
-			.thenAccept(screenshot -> webhookService.sendDataAsync(data, screenshot, null));
+			.thenAccept(screenshot -> webhookService.sendDataAsync(data, screenshot));
 	}
 
 	/**

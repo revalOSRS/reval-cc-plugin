@@ -2,6 +2,7 @@ package com.revalclan.teams;
 
 import com.revalclan.api.RevalApiService;
 import com.revalclan.util.TeamColor;
+import com.revalclan.util.RequestScope;
 import com.revalclan.api.events.ActiveTeamsResponse;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.client.util.Text;
@@ -28,6 +29,8 @@ public class ActiveTeamColors {
 
 	/** Standardized nickname -> team color */
 	private volatile Map<String, Color> colors = Map.of();
+	private ActiveTeamsResponse source;
+	private volatile RequestScope scope = new RequestScope();
 
 	@Inject
 	public ActiveTeamColors(RevalApiService apiService) {
@@ -38,27 +41,25 @@ public class ActiveTeamColors {
 		return playerName != null ? colors.get(Text.standardize(playerName)) : null;
 	}
 
-	/** Rebuild the derived roster; the service cache throttles the network. */
+	/** Network coalescing and expiry belong to the shared API cache. */
 	public void refresh() {
-		apiService.fetchActiveTeams(
-			response -> {
-				Map<String, Color> map = new HashMap<>();
-				if (response.getData() != null && response.getData().getTeams() != null) {
-					for (ActiveTeamsResponse.Team team : response.getData().getTeams()) {
-						if (team.getMembers() == null) {
-							continue;
-						}
-						Color color = TeamColor.parse(team.getColor());
-						for (String member : team.getMembers()) {
-							// Newest event first in the response; first match wins
-							map.putIfAbsent(Text.standardize(member), color);
-						}
-					}
-				}
-				colors = map;
-			},
-			error -> log.debug("Failed to fetch active event teams", error)
-		);
+		RequestScope owner = scope;
+		apiService.fetchActiveTeams(response -> apply(owner, response), error -> log.debug("Failed to fetch active event teams", error));
 	}
 
+	private synchronized void apply(RequestScope owner, ActiveTeamsResponse response) {
+		if (!owner.isActive() || response == source) return;
+		Map<String, Color> map = new HashMap<>();
+		if (response.getData() != null && response.getData().getTeams() != null) {
+			for (ActiveTeamsResponse.Team team : response.getData().getTeams()) {
+				if (team.getMembers() == null) continue;
+				Color color = TeamColor.parse(team.getColor());
+				for (String member : team.getMembers()) map.putIfAbsent(Text.standardize(member), color);
+			}
+		}
+		source = response;
+		colors = map;
+	}
+
+	public synchronized void reset() { scope.cancel(); scope = new RequestScope(); source = null; colors = Map.of(); }
 }

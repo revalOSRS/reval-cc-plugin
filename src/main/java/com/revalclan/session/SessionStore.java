@@ -14,16 +14,24 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.List;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ScheduledExecutorService;
 
 /**
  * Crash-safe persistence for in-progress sessions: one JSON file per session
- * under {@code ~/.runelite/reval-clan/sessions/}, written synchronously.
+ * under {@code ~/.runelite/reval-clan/sessions/}. Disk operations run in order
+ * on RuneLite's executor, never on the game or Swing thread.
  *
  * Why not the RuneLite config store: it buffers in memory and only reaches
  * disk on a 5-minute timer or a graceful exit. Verified 2026-09-10 — three
  * consecutive hard kills lost three sessions and resurrected a deleted one.
- * A file written on every persist survives everything short of power loss.
+ * Completed writes survive a client crash. A snapshot still waiting for its
+ * worker when the process is killed has not reached disk yet.
  */
 @Slf4j
 @Singleton
@@ -32,7 +40,73 @@ public class SessionStore {
 	/** Undelivered files older than this are dropped at recovery */
 	private static final long MAX_AGE_MS = 14L * 24 * 60 * 60 * 1000;
 
-	@Inject private Gson gson;
+	private final Gson gson;
+	private final Executor executor;
+	private final File directory;
+	// One pending value per session; a delete tombstone supersedes queued snapshots.
+	private final Map<String, Optional<PersistedSession>> pending = new LinkedHashMap<>();
+	private boolean scheduled;
+	private CompletableFuture<Void> flushed = CompletableFuture.completedFuture(null);
+
+	@Inject
+	public SessionStore(Gson gson, ScheduledExecutorService executor) {
+		this(gson, executor, new File(RuneLite.RUNELITE_DIR, DIR_NAME));
+	}
+
+	SessionStore(Gson gson, Executor executor, File directory) {
+		this.gson = gson;
+		this.executor = executor;
+		this.directory = directory;
+	}
+
+	private void update(String id, Optional<PersistedSession> value) {
+		if (id == null) return;
+		synchronized (this) { pending.put(id, value); }
+		flush();
+	}
+
+	/**
+	 * Completes after pending snapshots reach disk. ClientShutdown registers this
+	 * future with RuneLite's graceful-exit wait; a hard kill can still lose queued work.
+	 * RuneLite's shared executor serializes disk access without a second task queue.
+	 */
+	public CompletableFuture<Void> flush() {
+		CompletableFuture<Void> result;
+		synchronized (this) {
+			if (scheduled || pending.isEmpty()) return flushed;
+			scheduled = true;
+			result = flushed = new CompletableFuture<>();
+		}
+		try { executor.execute(() -> drain(result)); }
+		catch (RuntimeException error) {
+			synchronized (this) { scheduled = false; }
+			log.warn("Could not schedule session persistence", error);
+			result.completeExceptionally(error);
+		}
+		return result;
+	}
+
+	private void drain(CompletableFuture<Void> result) {
+		Exception failure = null;
+		while (true) {
+			Map<String, Optional<PersistedSession>> batch;
+			synchronized (this) {
+				if (pending.isEmpty()) { scheduled = false; break; }
+				batch = new LinkedHashMap<>(pending);
+				pending.clear();
+			}
+			for (Map.Entry<String, Optional<PersistedSession>> entry : batch.entrySet()) {
+				try {
+					if (entry.getValue().isPresent()) writeNow(entry.getValue().get());
+					else deleteNow(entry.getKey());
+				} catch (IOException | RuntimeException error) {
+					failure = error;
+					log.warn("Session persistence failed for {}", entry.getKey(), error);
+				}
+			}
+		}
+		if (failure == null) result.complete(null); else result.completeExceptionally(failure);
+	}
 
 	/** Persisted shape. {@code summary} stays a JsonObject so numbers survive exactly. */
 	public static class PersistedSession {
@@ -62,7 +136,7 @@ public class SessionStore {
 	}
 
 	private File dir() {
-		File d = new File(RuneLite.RUNELITE_DIR, DIR_NAME);
+		File d = directory;
 		if (!d.exists() && !d.mkdirs()) {
 			log.warn("Could not create session store directory {}", d);
 		}
@@ -75,6 +149,10 @@ public class SessionStore {
 
 	/** Atomic write: temp file then move, so a crash mid-write never leaves a torn file. */
 	public void write(PersistedSession session) {
+		update(session.sessionId(), Optional.of(session));
+	}
+
+	private void writeNow(PersistedSession session) throws IOException {
 		String id = session.sessionId();
 		if (id == null) return;
 		Path target = fileFor(id).toPath();
@@ -86,22 +164,36 @@ public class SessionStore {
 			} catch (IOException atomicUnsupported) {
 				Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING);
 			}
-		} catch (IOException e) {
-			log.warn("Failed to persist session {}: {}", id, e.getMessage());
-		}
+		} finally { Files.deleteIfExists(tmp); }
 	}
 
 	public void delete(String sessionId) {
 		if (sessionId == null) return;
-		try {
-			Files.deleteIfExists(fileFor(sessionId).toPath());
-		} catch (IOException e) {
-			log.warn("Failed to delete persisted session {}: {}", sessionId, e.getMessage());
-		}
+		update(sessionId, Optional.empty());
+	}
+
+	private void deleteNow(String sessionId) throws IOException {
+		Files.deleteIfExists(fileFor(sessionId).toPath());
+	}
+
+	/** Reads on the shared single worker after preceding writes and tombstones. */
+	public CompletableFuture<List<PersistedSession>> readAll() {
+		CompletableFuture<List<PersistedSession>> result = new CompletableFuture<>();
+		flush().whenComplete((ignored, failure) -> {
+			if (failure != null) { result.completeExceptionally(failure); return; }
+			try {
+				executor.execute(() -> {
+					if (result.isDone()) return;
+					try { result.complete(readAllNow()); }
+					catch (RuntimeException error) { result.completeExceptionally(error); }
+				});
+			} catch (RuntimeException error) { result.completeExceptionally(error); }
+		});
+		return result;
 	}
 
 	/** Every readable persisted session, newest first. Unreadable or expired files are removed. */
-	public List<PersistedSession> readAll() {
+	private List<PersistedSession> readAllNow() {
 		List<PersistedSession> out = new ArrayList<>();
 		File[] files = dir().listFiles((d, name) -> name.endsWith(".json"));
 		if (files == null) return out;

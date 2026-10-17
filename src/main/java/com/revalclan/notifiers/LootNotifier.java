@@ -497,10 +497,16 @@ public class LootNotifier extends BaseNotifier {
 
 	/** Forget everything tied to the session that just ended. */
 	public void reset() {
+		pendingLoot.clear();
+		recentClogItems.clear();
+		recentSelfDrops.clear();
+		recentUnequips.clear();
+		equipmentSnapshot.clear();
 		lastInventory.clear();
 		lastInventoryKnown = false;
 		recentRealLootSources.clear();
 		lastLocalDeathTick = -1;
+		tickCounter = 0;
 	}
 
 	/**
