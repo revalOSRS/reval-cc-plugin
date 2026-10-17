@@ -9,6 +9,9 @@ import okhttp3.*;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import javax.inject.Named;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CancellationException;
 import java.io.IOException;
 import java.util.*;
 import java.util.List;
@@ -21,15 +24,14 @@ import java.util.List;
 public class EventFilterManager{
 	private static final String FILTERS_URL = "https://api.revalosrs.ee/event-filters";
 	
-	@Inject private OkHttpClient httpClient;
+	private final OkHttpClient httpClient;
 	
-	@Inject private Gson gson;
+	private final Gson gson;
 	
 	@Getter private volatile EventFilters filters;
 	private String appliedVersion;
-	private boolean fetchInProgress;
-	private Call pendingCall;
-	private int generation;
+	private CompletableFuture<LoadedFilters> pending;
+	private RequestScope scope = new RequestScope();
 	private int ticksRemaining;
 	private static final int DAILY_TICKS = 144_000;
 	private static final int RETRY_TICKS = 100; // One minute after a failed fetch.
@@ -86,70 +88,80 @@ public class EventFilterManager{
 		@Getter private boolean leaguesEnabled = false;
 	}
 	
-	public EventFilterManager() {
-		// Initialize with defaults
+	@Inject
+	public EventFilterManager(@Named("reval-http") OkHttpClient httpClient, Gson gson) {
+		this.httpClient = httpClient;
+		this.gson = gson;
 		filters = new EventFilters();
 	}
-	
-	public synchronized void resetSession() {
-		generation++;
-		if (pendingCall != null) { pendingCall.cancel(); pendingCall = null; }
-		fetchInProgress = false;
-		appliedVersion = null;
-		ticksRemaining = 0;
+
+	public void resetSession() {
+		RequestScope old;
+		synchronized (this) {
+			old = scope;
+			scope = new RequestScope();
+			pending = null;
+			appliedVersion = null;
+			ticksRemaining = 0;
+		}
+		old.cancel();
 	}
 
-	public synchronized void onGameTick() {
-		if (!fetchInProgress && --ticksRemaining <= 0) fetchFiltersAsync();
+	public void onGameTick() {
+		boolean fetch;
+		synchronized (this) { fetch = pending == null && --ticksRemaining <= 0; }
+		if (fetch) fetchFiltersAsync();
 	}
 
-	/** A missing hint falls back to heartbeat-paced fetching during rollout/outages. */
-	public synchronized void onServerVersion(String version) {
-		if (version == null || !version.equals(appliedVersion)) fetchFiltersAsync();
+	/** Missing version hints only reach here after a successful delivery. */
+	public void onServerVersion(String version) {
+		boolean fetch;
+		synchronized (this) { fetch = version == null || !version.equals(appliedVersion); }
+		if (fetch) fetchFiltersAsync();
 	}
 
-	public synchronized void fetchFiltersAsync() {
-		if (fetchInProgress) return;
-		fetchInProgress = true;
-		final int requestGeneration = generation;
+	public void fetchFiltersAsync() {
+		RequestScope owner;
+		CompletableFuture<LoadedFilters> result;
+		synchronized (this) {
+			if (pending != null) return;
+			owner = scope;
+			result = pending = new CompletableFuture<>();
+		}
+		owner.track(result);
+		result.whenComplete((loaded, error) -> {
+			Runnable listener = null;
+			synchronized (this) {
+				if (!owner.isActive() || pending != result) return;
+				pending = null;
+				ticksRemaining = RETRY_TICKS;
+				if (error == null) {
+					filters = loaded.filters;
+					appliedVersion = loaded.version;
+					ticksRemaining = DAILY_TICKS;
+					listener = onFiltersApplied;
+				}
+			}
+			if (error != null && !(error instanceof CancellationException)) log.warn("Failed to fetch filters", error);
+			if (listener != null) owner.guard(listener).run();
+		});
 		Request request = new Request.Builder().url(FILTERS_URL).get()
 			.addHeader("User-Agent", PluginVersion.userAgent()).build();
-		pendingCall = httpClient.newCall(request);
-		pendingCall.timeout().timeout(30, java.util.concurrent.TimeUnit.SECONDS);
-		pendingCall.enqueue(new Callback() {
-			@Override public void onFailure(Call call, IOException error) {
-				synchronized (EventFilterManager.this) {
-					if (requestGeneration != generation) return;
-					pendingCall = null;
-					fetchInProgress = false;
-					ticksRemaining = RETRY_TICKS;
-				}
-				log.warn("Failed to fetch filters", error);
-			}
-
-			@Override public void onResponse(Call call, Response response) {
-				try (Response closeable = response) {
-					JsonObject json = response.isSuccessful() && response.body() != null
-						? gson.fromJson(response.body().string(), JsonObject.class) : null;
-					EventFilters parsed = json == null ? null : parseFilters(json);
-					Runnable listener;
-					synchronized (EventFilterManager.this) {
-						if (requestGeneration != generation) return;
-						pendingCall = null;
-						fetchInProgress = false;
-						ticksRemaining = RETRY_TICKS;
-						if (parsed == null) return;
-						filters = parsed;
-						appliedVersion = response.header("X-Reval-Filters-Version");
-						ticksRemaining = DAILY_TICKS;
-						listener = onFiltersApplied;
-					}
-					if (listener != null) listener.run();
-				} catch (Exception error) {
-					onFailure(call, new IOException("Invalid filter response", error));
-				}
-			}
+		owner.request(httpClient, request, response -> {
+			if (!response.isSuccessful() || response.body() == null) throw new IOException("HTTP " + response.code());
+			JsonObject json = gson.fromJson(response.body().string(), JsonObject.class);
+			EventFilters parsed = json == null ? null : parseFilters(json);
+			if (parsed == null) throw new IOException("Invalid filter response");
+			return new LoadedFilters(parsed, response.header("X-Reval-Filters-Version"));
+		}).whenComplete((loaded, error) -> {
+			if (error == null) result.complete(loaded); else result.completeExceptionally(error);
 		});
+	}
+
+	private static final class LoadedFilters {
+		final EventFilters filters;
+		final String version;
+		LoadedFilters(EventFilters filters, String version) { this.filters = filters; this.version = version; }
 	}
 
 	/**

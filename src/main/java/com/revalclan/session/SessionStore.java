@@ -14,12 +14,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
-import java.util.ArrayDeque;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.List;
-import java.util.Queue;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.function.Consumer;
 
 /**
  * Crash-safe persistence for in-progress sessions: one JSON file per session
@@ -42,8 +43,10 @@ public class SessionStore {
 	private final Gson gson;
 	private final Executor executor;
 	private final File directory;
-	private final Queue<Runnable> tasks = new ArrayDeque<>();
-	private boolean draining;
+	// One pending value per session; a delete tombstone supersedes queued snapshots.
+	private final Map<String, Optional<PersistedSession>> pending = new LinkedHashMap<>();
+	private boolean scheduled;
+	private CompletableFuture<Void> flushed = CompletableFuture.completedFuture(null);
 
 	@Inject
 	public SessionStore(Gson gson, ScheduledExecutorService executor) {
@@ -56,33 +59,53 @@ public class SessionStore {
 		this.directory = directory;
 	}
 
-	/** One worker preserves write/delete/recovery order without owning a thread. */
-	private synchronized void enqueue(Runnable task) {
-		tasks.add(task);
-		if (draining) return;
-		draining = true;
-		try {
-			executor.execute(this::drain);
-		} catch (RuntimeException error) {
-			draining = false;
-			tasks.remove(task);
-			throw error;
-		}
+	private void update(String id, Optional<PersistedSession> value) {
+		if (id == null) return;
+		synchronized (this) { pending.put(id, value); }
+		flush();
 	}
 
-	private void drain() {
+	/**
+	 * Completes after pending snapshots reach disk. ClientShutdown registers this
+	 * future with RuneLite's graceful-exit wait; a hard kill can still lose queued work.
+	 * RuneLite's shared executor serializes disk access without a second task queue.
+	 */
+	public CompletableFuture<Void> flush() {
+		CompletableFuture<Void> result;
+		synchronized (this) {
+			if (scheduled || pending.isEmpty()) return flushed;
+			scheduled = true;
+			result = flushed = new CompletableFuture<>();
+		}
+		try { executor.execute(() -> drain(result)); }
+		catch (RuntimeException error) {
+			synchronized (this) { scheduled = false; }
+			log.warn("Could not schedule session persistence", error);
+			result.completeExceptionally(error);
+		}
+		return result;
+	}
+
+	private void drain(CompletableFuture<Void> result) {
+		Exception failure = null;
 		while (true) {
-			Runnable task;
+			Map<String, Optional<PersistedSession>> batch;
 			synchronized (this) {
-				task = tasks.poll();
-				if (task == null) { draining = false; return; }
+				if (pending.isEmpty()) { scheduled = false; break; }
+				batch = new LinkedHashMap<>(pending);
+				pending.clear();
 			}
-			try {
-				task.run();
-			} catch (RuntimeException error) {
-				log.warn("Session store operation failed", error);
+			for (Map.Entry<String, Optional<PersistedSession>> entry : batch.entrySet()) {
+				try {
+					if (entry.getValue().isPresent()) writeNow(entry.getValue().get());
+					else deleteNow(entry.getKey());
+				} catch (IOException | RuntimeException error) {
+					failure = error;
+					log.warn("Session persistence failed for {}", entry.getKey(), error);
+				}
 			}
 		}
+		if (failure == null) result.complete(null); else result.completeExceptionally(failure);
 	}
 
 	/** Persisted shape. {@code summary} stays a JsonObject so numbers survive exactly. */
@@ -126,10 +149,10 @@ public class SessionStore {
 
 	/** Atomic write: temp file then move, so a crash mid-write never leaves a torn file. */
 	public void write(PersistedSession session) {
-		enqueue(() -> writeNow(session));
+		update(session.sessionId(), Optional.of(session));
 	}
 
-	private void writeNow(PersistedSession session) {
+	private void writeNow(PersistedSession session) throws IOException {
 		String id = session.sessionId();
 		if (id == null) return;
 		Path target = fileFor(id).toPath();
@@ -141,27 +164,32 @@ public class SessionStore {
 			} catch (IOException atomicUnsupported) {
 				Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING);
 			}
-		} catch (IOException e) {
-			log.warn("Failed to persist session {}: {}", id, e.getMessage());
-		}
+		} finally { Files.deleteIfExists(tmp); }
 	}
 
 	public void delete(String sessionId) {
 		if (sessionId == null) return;
-		enqueue(() -> deleteNow(sessionId));
+		update(sessionId, Optional.empty());
 	}
 
-	private void deleteNow(String sessionId) {
-		try {
-			Files.deleteIfExists(fileFor(sessionId).toPath());
-		} catch (IOException e) {
-			log.warn("Failed to delete persisted session {}: {}", sessionId, e.getMessage());
-		}
+	private void deleteNow(String sessionId) throws IOException {
+		Files.deleteIfExists(fileFor(sessionId).toPath());
 	}
 
-	/** Reads after all earlier writes/deletes. The callback runs on the worker. */
-	public void readAll(Consumer<List<PersistedSession>> callback) {
-		enqueue(() -> callback.accept(readAllNow()));
+	/** Reads on the shared single worker after preceding writes and tombstones. */
+	public CompletableFuture<List<PersistedSession>> readAll() {
+		CompletableFuture<List<PersistedSession>> result = new CompletableFuture<>();
+		flush().whenComplete((ignored, failure) -> {
+			if (failure != null) { result.completeExceptionally(failure); return; }
+			try {
+				executor.execute(() -> {
+					if (result.isDone()) return;
+					try { result.complete(readAllNow()); }
+					catch (RuntimeException error) { result.completeExceptionally(error); }
+				});
+			} catch (RuntimeException error) { result.completeExceptionally(error); }
+		});
+		return result;
 	}
 
 	/** Every readable persisted session, newest first. Unreadable or expired files are removed. */

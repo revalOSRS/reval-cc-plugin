@@ -10,6 +10,7 @@ import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.function.Consumer;
 import javax.inject.Inject;
+import javax.inject.Named;
 import javax.inject.Singleton;
 import javax.swing.SwingUtilities;
 import okhttp3.Call;
@@ -28,7 +29,7 @@ public class BrowserApi {
     private volatile long cachedAt;
     private final Map<String, BrowserModels.View> views = new LinkedHashMap<>(16, .75f, true);
 
-    @Inject public BrowserApi(OkHttpClient http, Gson gson) { this.http = http; this.gson = gson; }
+    @Inject public BrowserApi(@Named("reval-http") OkHttpClient http, Gson gson) { this.http = http; this.gson = gson; }
 
     public void clearCache() {
         synchronized (views) { views.clear(); }
@@ -90,7 +91,6 @@ public class BrowserApi {
         Request request = new Request.Builder().url(endpoint(path, parameters))
             .header("Accept", "application/json").header("User-Agent", PluginVersion.userAgent()).get().build();
         Call call = http.newCall(request);
-        call.timeout().timeout(30, java.util.concurrent.TimeUnit.SECONDS);
         call.enqueue(new Callback() {
             @Override public void onFailure(Call ignored, IOException error) {
                 deliver(call, () -> failure.accept("The clan browser could not connect. Please try again."));

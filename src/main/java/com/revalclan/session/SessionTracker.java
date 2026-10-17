@@ -5,6 +5,7 @@ import com.google.gson.JsonObject;
 import com.revalclan.session.SessionStore.PersistedSession;
 import com.revalclan.util.ClanMembership;
 import com.revalclan.util.WebhookService;
+import com.revalclan.util.RequestScope;
 import com.revalclan.util.Worlds;
 import lombok.extern.slf4j.Slf4j;
 import lombok.Setter;
@@ -18,6 +19,7 @@ import net.runelite.client.callback.ClientThread;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.function.Consumer;
+import java.util.concurrent.CompletableFuture;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -68,12 +70,23 @@ public class SessionTracker {
 		COUNTER_VARPS.put("coinsLost", VarPlayerID.TRACKING_COINS_LOST);
 	}
 
-	@Inject private Client client;
-	@Inject private ClientThread clientThread;
-	@Inject private Gson gson;
-	@Inject private WebhookService webhookService;
-	@Inject private SessionStore store;
-	@Inject private ClanMembership membership;
+	private final Client client;
+	private final ClientThread clientThread;
+	private final Gson gson;
+	private final WebhookService webhookService;
+	private final SessionStore store;
+	private final ClanMembership membership;
+
+	@Inject
+	public SessionTracker(Client client, ClientThread clientThread, Gson gson,
+		WebhookService webhookService, SessionStore store, ClanMembership membership) {
+		this.client = client;
+		this.clientThread = clientThread;
+		this.gson = gson;
+		this.webhookService = webhookService;
+		this.store = store;
+		this.membership = membership;
+	}
 
 	@Setter private Consumer<JsonObject> onHeartbeatResponse;
 	private boolean active = false;
@@ -100,7 +113,12 @@ public class SessionTracker {
 
 	/** Summaries sent and not yet answered — a login right after startup must not send them twice */
 	private final Set<String> inFlight = new HashSet<>();
-	private volatile int recoveryGeneration;
+	private volatile RequestScope recovery = new RequestScope();
+
+	public void startUp() { recovery.cancel(); recovery = new RequestScope(); }
+	public void shutDown() { recovery.cancel(); }
+
+	public CompletableFuture<Void> flush() { return store.flush(); }
 
 	// ------------------------------------------------------------------ lifecycle
 
@@ -155,7 +173,6 @@ public class SessionTracker {
 
 	/** In-memory only — a persisted session replays as 'recovered' later. */
 	public void reset() {
-		recoveryGeneration++;
 		active = false;
 		resetState();
 	}
@@ -267,15 +284,14 @@ public class SessionTracker {
 	 * @param provenAccountHash the account that just proved membership, or 0 at startup
 	 */
 	public void recoverPersistedSessions(long provenAccountHash) {
-		int generation = recoveryGeneration;
-		store.readAll(sessions -> clientThread.invokeLater(() -> {
-			if (generation != recoveryGeneration) return;
+		RequestScope owner = recovery;
+		owner.track(store.readAll()).thenAccept(sessions -> clientThread.invokeLater(owner.guard(() -> {
 			for (PersistedSession persisted : sessions) {
 				String id = persisted.sessionId();
 				if (id == null || id.equals(sessionId) || inFlight.contains(id)) continue;
 				if (persisted.member || persisted.accountHash == provenAccountHash) send(persisted);
 			}
-		}));
+		})));
 	}
 
 	/** The one delivery path for standalone summaries: hop cuts and replays alike. */
@@ -284,7 +300,7 @@ public class SessionTracker {
 		inFlight.add(id);
 		Map<String, Object> payload = envelope("SESSION_SUMMARY", persisted.username, persisted.accountHash, persisted.world, persisted.worldFlags);
 		payload.put("sessionSummary", persisted.summary);
-		webhookService.sendDataAsync(payload, response -> confirmDelivered(id, response));
+		webhookService.sendDataAsync(payload).whenComplete((response, error) -> confirmDelivered(id, response));
 		log.info("Sending session {} ({})", id, persisted.summary.get("endReason"));
 	}
 
@@ -294,7 +310,7 @@ public class SessionTracker {
 		String id = sessionId;
 		Consumer<JsonObject> changeHandler = onHeartbeatResponse;
 		log.info("Session {} heartbeat after {} min", id, (lastUpdateMs - startedAtMs) / 60000);
-		webhookService.sendDataAsync(payload, response -> {
+		webhookService.sendDataAsync(payload).thenAccept(response -> {
 			clientThread.invokeLater(() -> {
 				if (!active || !id.equals(sessionId)) return;
 				if (changeHandler != null) changeHandler.accept(response);

@@ -7,7 +7,8 @@ import java.util.ArrayDeque;
 import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.function.Consumer;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CancellationException;
 import okhttp3.Call;
 import okhttp3.Callback;
 import okhttp3.OkHttpClient;
@@ -42,69 +43,53 @@ public class WebhookServiceTest {
 	}
 
 	@Test public void payloadPreparationIsDeferred() {
-		service.sendDataAsync(Map.of("eventType", "SYNC"), null);
+		service.sendDataAsync(Map.of("eventType", "SYNC"));
 		verifyNoInteractions(http);
 		drain();
 		verify(http).newCall(any(Request.class));
 	}
 
 	@Test public void failedDeliveryReleasesTheSessionRecoveryCallback() {
-		Consumer<JsonObject> result = mock(Consumer.class);
-		service.sendDataAsync(Map.of("eventType", "SESSION_SUMMARY"), result);
+		CompletableFuture<JsonObject> result;
+		result = service.sendDataAsync(Map.of("eventType", "SESSION_SUMMARY"));
 		drain();
 		ArgumentCaptor<Callback> callback = ArgumentCaptor.forClass(Callback.class);
 		verify(call).enqueue(callback.capture());
 		callback.getValue().onFailure(call, new IOException("offline"));
-		verify(result).accept(null);
+		assertTrue(result.isCompletedExceptionally());
 	}
 
-	@Test public void anOfflineBurstCannotQueueUnboundedPayloads() {
-		for (int i = 0; i < 1000; i++) service.sendDataAsync(Map.of("eventType", "CHAT"), null);
-		assertTrue("Preparation backlog must be bounded", tasks.size() <= 64);
-		drain();
-		verify(http, atMost(64)).newCall(any(Request.class));
-	}
 
 	@Test public void shutdownDropsQueuedPayloadsAndAllowsRestart() {
-		Consumer<JsonObject> result = mock(Consumer.class);
-		service.sendDataAsync(Map.of("eventType", "SESSION_SUMMARY"), result);
+		CompletableFuture<JsonObject> result;
+		result = service.sendDataAsync(Map.of("eventType", "SESSION_SUMMARY"));
 		service.shutDown();
 		drain();
 		verifyNoInteractions(http);
-		verify(result).accept(null);
+		assertTrue(result.isCompletedExceptionally());
 		service.startUp();
-		service.sendDataAsync(Map.of("eventType", "CHAT"), null);
+		service.sendDataAsync(Map.of("eventType", "CHAT"));
 		drain();
 		verify(http).newCall(any(Request.class));
 	}
 
 	@Test public void shutdownCancelsOnlyOwnedRequestsAndCompletesOnce() {
-		Consumer<JsonObject> result = mock(Consumer.class);
-		service.sendDataAsync(Map.of("eventType", "SESSION_SUMMARY"), result);
+		CompletableFuture<JsonObject> result;
+		result = service.sendDataAsync(Map.of("eventType", "SESSION_SUMMARY"));
 		drain();
 		ArgumentCaptor<Callback> callback = ArgumentCaptor.forClass(Callback.class);
 		verify(call).enqueue(callback.capture());
 		service.shutDown();
 		callback.getValue().onFailure(call, new IOException("canceled"));
 		verify(call).cancel();
-		verify(result, times(1)).accept(null);
+		assertTrue(result.isCancelled());
 		verify(http).newCall(any(Request.class));
 		verifyNoMoreInteractions(http);
 	}
 
-	@Test public void failureReleasesCapacityForTheNextBurst() {
-		for (int i = 0; i < 64; i++) service.sendDataAsync(Map.of("eventType", "CHAT"), null);
-		drain();
-		ArgumentCaptor<Callback> callback = ArgumentCaptor.forClass(Callback.class);
-		verify(call, times(64)).enqueue(callback.capture());
-		for (Callback pending : callback.getAllValues()) pending.onFailure(call, new IOException("offline"));
-		for (int i = 0; i < 64; i++) service.sendDataAsync(Map.of("eventType", "CHAT"), null);
-		drain();
-		verify(http, times(128)).newCall(any(Request.class));
-	}
 
 	@Test public void payloadStillUsesTheExistingGzipWireFormat() throws Exception {
-		service.sendDataAsync(Map.of("eventType", "SYNC", "quantity", 12), null);
+		service.sendDataAsync(Map.of("eventType", "SYNC", "quantity", 12));
 		drain();
 		ArgumentCaptor<Request> request = ArgumentCaptor.forClass(Request.class);
 		verify(http).newCall(request.capture());
@@ -120,7 +105,7 @@ public class WebhookServiceTest {
 
 	@Test public void screenshotsRemainRawMultipartBytes() throws Exception {
 		byte[] screenshot = {1, 2, 3, 4};
-		service.sendDataAsync(Map.of("eventType", "PET"), screenshot, null);
+		service.sendDataAsync(Map.of("eventType", "PET"), screenshot);
 		drain();
 		ArgumentCaptor<Request> request = ArgumentCaptor.forClass(Request.class);
 		verify(http).newCall(request.capture());
@@ -134,8 +119,8 @@ public class WebhookServiceTest {
 	@Test public void unsuccessfulOrInvalidResponsesStillReleaseRecovery() throws Exception {
 		for (int status : new int[] {500, 200}) {
 			clearInvocations(call);
-			Consumer<JsonObject> result = mock(Consumer.class);
-			service.sendDataAsync(Map.of("eventType", "SESSION_SUMMARY"), result);
+			CompletableFuture<JsonObject> result;
+			result = service.sendDataAsync(Map.of("eventType", "SESSION_SUMMARY"));
 			drain();
 			ArgumentCaptor<Callback> callback = ArgumentCaptor.forClass(Callback.class);
 			verify(call).enqueue(callback.capture());
@@ -143,16 +128,29 @@ public class WebhookServiceTest {
 				.request(new Request.Builder().url("https://example.invalid").build())
 				.protocol(Protocol.HTTP_1_1).code(status).message("test")
 				.body(ResponseBody.create(null, "invalid json")).build());
-			verify(result).accept(null);
+			assertTrue(result.isCompletedExceptionally());
 		}
 	}
 
 	@Test public void rejectedExecutorCompletesTheCallback() {
 		doThrow(new java.util.concurrent.RejectedExecutionException()).when(executor).execute(any(Runnable.class));
-		Consumer<JsonObject> result = mock(Consumer.class);
-		service.sendDataAsync(Map.of("eventType", "SESSION_SUMMARY"), result);
-		verify(result).accept(null);
+		CompletableFuture<JsonObject> result;
+		result = service.sendDataAsync(Map.of("eventType", "SESSION_SUMMARY"));
+		assertTrue(result.isCompletedExceptionally());
 		verifyNoInteractions(http);
+	}
+
+	@Test public void successfulResponsesWithoutHintsAreDifferentFromDeliveryFailure() throws Exception {
+		CompletableFuture<JsonObject> result = service.sendDataAsync(Map.of("eventType", "LOGIN"));
+		drain();
+		ArgumentCaptor<Callback> callback = ArgumentCaptor.forClass(Callback.class);
+		verify(call).enqueue(callback.capture());
+		callback.getValue().onResponse(call, new Response.Builder()
+			.request(new Request.Builder().url("https://example.invalid").build())
+			.protocol(Protocol.HTTP_1_1).code(200).message("OK")
+			.body(ResponseBody.create(null, "{}")).build());
+		assertNotNull(result.join());
+		assertEquals(0, result.join().size());
 	}
 
 	private void drain() { while (!tasks.isEmpty()) tasks.remove().run(); }

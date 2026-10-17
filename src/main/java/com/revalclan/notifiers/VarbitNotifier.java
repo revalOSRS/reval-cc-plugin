@@ -34,7 +34,9 @@ public class VarbitNotifier extends BaseNotifier {
 	private final Map<Integer, Integer> sent = new HashMap<>();
 	private int ticksSinceFlush = 0;
 
-	@Inject private ClientThread clientThread;
+	private final ClientThread clientThread;
+
+	@Inject public VarbitNotifier(ClientThread clientThread) { this.clientThread = clientThread; }
 
 	/**
 	 * Send the current value of every watched varbit. A varbit only raises an

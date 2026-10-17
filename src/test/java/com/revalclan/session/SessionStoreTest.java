@@ -33,7 +33,7 @@ public class SessionStoreTest {
 		AtomicReference<List<SessionStore.PersistedSession>> recovered = new AtomicReference<>();
 		store.write(session("acked"));
 		store.delete("acked");
-		store.readAll(recovered::set);
+		store.readAll().thenAccept(recovered::set);
 		assertNull(recovered.get());
 		assertEquals("Only one disk worker may run at once", 1, tasks.size());
 		while (!tasks.isEmpty()) tasks.remove().run();
@@ -51,9 +51,38 @@ public class SessionStoreTest {
 		AtomicReference<List<SessionStore.PersistedSession>> recovered = new AtomicReference<>();
 		store.write(first);
 		store.write(last);
-		store.readAll(recovered::set);
+		store.readAll().thenAccept(recovered::set);
 		while (!tasks.isEmpty()) tasks.remove().run();
 		assertEquals(20, recovered.get().get(0).summary.get("totalLootValue").getAsInt());
+	}
+
+	@Test public void repeatedSnapshotsSerializeOnlyTheLatestAndFlushWaitsForDisk() throws Exception {
+		Queue<Runnable> tasks = new ArrayDeque<>();
+		java.util.concurrent.atomic.AtomicInteger serializations = new java.util.concurrent.atomic.AtomicInteger();
+		Gson gson = new com.google.gson.GsonBuilder().registerTypeAdapter(SessionStore.PersistedSession.class,
+			(com.google.gson.JsonSerializer<SessionStore.PersistedSession>) (session, type, context) -> {
+				serializations.incrementAndGet();
+				return new Gson().toJsonTree(session);
+			}).create();
+		SessionStore store = new SessionStore(gson, tasks::add, temporary.newFolder());
+		for (int i = 0; i < 1000; i++) store.write(session("same"));
+		java.util.concurrent.CompletableFuture<Void> flushed = store.flush();
+		assertFalse(flushed.isDone());
+		assertEquals(1, tasks.size());
+		while (!tasks.isEmpty()) tasks.remove().run();
+		flushed.join();
+		assertEquals(1, serializations.get());
+	}
+
+	@Test public void rejectedWorkerDoesNotThrowFromTicksAndCanBeRetried() throws Exception {
+		java.util.concurrent.Executor executor = org.mockito.Mockito.mock(java.util.concurrent.Executor.class);
+		org.mockito.Mockito.doThrow(new java.util.concurrent.RejectedExecutionException()).when(executor).execute(org.mockito.ArgumentMatchers.any());
+		SessionStore store = new SessionStore(new Gson(), executor, temporary.newFolder());
+		store.write(session("retry"));
+		assertTrue(store.flush().isCompletedExceptionally());
+		org.mockito.Mockito.doAnswer(call -> { call.<Runnable>getArgument(0).run(); return null; }).when(executor).execute(org.mockito.ArgumentMatchers.any());
+		store.flush().join();
+		assertEquals(1, store.readAll().join().size());
 	}
 
 	static SessionStore.PersistedSession session(String id) {

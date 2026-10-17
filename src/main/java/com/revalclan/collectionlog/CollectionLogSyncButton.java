@@ -1,4 +1,7 @@
 /*
+
+import com.revalclan.session.SessionScoped;
+import com.revalclan.session.SessionState;
  * Portions of this file are derived from or inspired by the RuneProfile plugin
  * Copyright (c) RuneProfile
  * Licensed under the BSD 2-Clause License
@@ -30,7 +33,8 @@ import java.util.*;
  */
 @Slf4j
 @Singleton
-public class CollectionLogSyncButton {
+public class CollectionLogSyncButton implements SessionScoped {
+	@Inject void registerSessionState(SessionState state) { state.register(this); }
 	private static final int DRAW_BURGER_MENU = 7812;
 	private static final int FONT_COLOR = 0xFF981F;
 	private static final int FONT_COLOR_ACTIVE = 0xFFFFFF;

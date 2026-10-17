@@ -1,43 +1,35 @@
 package com.revalclan;
 
-import com.revalclan.notifiers.DeathNotifier;
-import com.revalclan.notifiers.LootNotifier;
-import com.revalclan.notifiers.PetNotifier;
 import com.revalclan.session.SessionTracker;
-import java.lang.reflect.Field;
-import java.util.ArrayDeque;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Queue;
-import javax.inject.Inject;
-import net.runelite.client.callback.ClientThread;
+import java.util.concurrent.CompletableFuture;
+import net.runelite.client.events.ClientShutdown;
+import okhttp3.OkHttpClient;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.MockitoJUnitRunner;
 import static org.junit.Assert.*;
-import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+@RunWith(MockitoJUnitRunner.class)
 public class RevalClanPluginTest {
-	@Test public void shutdownReleasesNotifierStateOnTheClientThread() throws Exception {
-		RevalClanPlugin plugin = new RevalClanPlugin();
-		Map<Class<?>, Object> injected = new HashMap<>();
-		for (Field field : RevalClanPlugin.class.getDeclaredFields()) {
-			if (!field.isAnnotationPresent(Inject.class)) continue;
-			Object dependency = mock(field.getType());
-			field.setAccessible(true);
-			field.set(plugin, dependency);
-			injected.put(field.getType(), dependency);
-		}
-		ClientThread clientThread = (ClientThread) injected.get(ClientThread.class);
-		Queue<Runnable> tasks = new ArrayDeque<>();
-		doAnswer(invocation -> tasks.add(invocation.getArgument(0))).when(clientThread).invoke(any(Runnable.class));
-		plugin.shutDown();
-		LootNotifier loot = (LootNotifier) injected.get(LootNotifier.class);
-		verify(loot, never()).reset();
-		assertEquals(1, tasks.size());
-		tasks.remove().run();
-		verify(loot).reset();
-		verify((DeathNotifier) injected.get(DeathNotifier.class)).reset();
-		verify((PetNotifier) injected.get(PetNotifier.class)).reset();
-		verify((SessionTracker) injected.get(SessionTracker.class)).reset();
+	@Mock private SessionTracker sessions;
+	@InjectMocks private RevalClanPlugin plugin;
+
+	@Test public void gracefulExitRegistersThePersistenceBarrier() {
+		CompletableFuture<Void> flushed = new CompletableFuture<>();
+		when(sessions.flush()).thenReturn(flushed);
+		ClientShutdown event = new ClientShutdown();
+		plugin.onClientShutdown(event);
+		assertTrue(event.getTasks().contains(flushed));
+	}
+
+	@Test public void pluginHttpPolicySharesRuneLiteResources() {
+		OkHttpClient shared = new OkHttpClient();
+		OkHttpClient derived = plugin.provideHttpClient(shared);
+		assertSame(shared.dispatcher(), derived.dispatcher());
+		assertSame(shared.connectionPool(), derived.connectionPool());
+		assertEquals(30_000, derived.callTimeoutMillis());
 	}
 }

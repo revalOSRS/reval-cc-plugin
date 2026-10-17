@@ -1,6 +1,5 @@
 package com.revalclan.notifiers;
 
-import com.revalclan.TestSupport;
 import com.revalclan.util.EventFilterManager;
 import java.util.ArrayList;
 import java.util.List;
@@ -17,16 +16,15 @@ import static org.mockito.Mockito.*;
 public class VarbitNotifierTest {
 	@Test public void removedWatchesAreNotRetainedAndFlushedInLaterBatches() throws Exception {
 		List<Map<String, Object>> sent = new ArrayList<>();
-		VarbitNotifier notifier = new VarbitNotifier() {
+		ClientThread clientThread = mock(ClientThread.class);
+		VarbitNotifier notifier = new VarbitNotifier(clientThread) {
 			@Override protected void sendCompactNotification(String eventType, Map<String, Object> data) { sent.add(data); }
 		};
-		notifier.filterManager = new EventFilterManager();
+		notifier.filterManager = new EventFilterManager(mock(okhttp3.OkHttpClient.class), new com.google.gson.Gson());
 		notifier.client = mock(Client.class);
 		when(notifier.client.getGameState()).thenReturn(GameState.LOGGED_IN);
-		ClientThread clientThread = mock(ClientThread.class);
 		doAnswer(invocation -> { invocation.<Runnable>getArgument(0).run(); return null; })
 			.when(clientThread).invokeLater(any(Runnable.class));
-		TestSupport.inject(notifier, "clientThread", clientThread);
 		notifier.filterManager.getFilters().getVarbitWatch().add(1);
 		notifier.syncBaselines();
 		VarbitChanged change = new VarbitChanged();

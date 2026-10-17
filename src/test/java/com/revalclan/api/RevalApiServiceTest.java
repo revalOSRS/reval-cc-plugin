@@ -40,7 +40,9 @@ public class RevalApiServiceTest {
 			.protocol(Protocol.HTTP_1_1).code(200).message("OK")
 			.body(ResponseBody.create(null, "{\"status\":\"success\",\"data\":{}}")).build());
 		callback.getValue().onFailure(call, new IOException("canceled"));
-		verifyNoInteractions(success, failure);
+		verifyNoInteractions(success);
+		verify(failure).accept(isA(java.util.concurrent.CancellationException.class));
+		verifyNoMoreInteractions(failure);
 		verify(http).newCall(any(Request.class));
 		verifyNoMoreInteractions(http);
 	}
@@ -64,4 +66,26 @@ public class RevalApiServiceTest {
 			.body(ResponseBody.create(null, "{\"status\":\"success\",\"data\":{}}")).build());
 		assertTrue(delivered.get());
 	}
+	@Test public void allSharedDefinitionsCoalesceAndBackOffAtTheApiBoundary() {
+		OkHttpClient http = mock(OkHttpClient.class);
+		Call call = mock(Call.class);
+		when(http.newCall(any(Request.class))).thenReturn(call);
+		RevalApiService api = new RevalApiService(http, new Gson());
+		Runnable fetch = () -> {
+			api.fetchPoints(response -> {}, error -> {});
+			api.fetchAccount(123L, response -> {}, error -> {});
+			api.fetchActiveTeams(response -> {}, error -> {});
+			api.fetchAchievementDefinitions(response -> {}, error -> {});
+			api.fetchDiaries(response -> {}, error -> {});
+			api.fetchChallenges(response -> {}, error -> {});
+			api.fetchLeaguesConfig(response -> {}, error -> {});
+		};
+		for (int i = 0; i < 1000; i++) fetch.run();
+		ArgumentCaptor<Callback> callbacks = ArgumentCaptor.forClass(Callback.class);
+		verify(call, times(7)).enqueue(callbacks.capture());
+		for (Callback callback : callbacks.getAllValues()) callback.onFailure(call, new IOException("offline"));
+		for (int i = 0; i < 1000; i++) fetch.run();
+		verify(http, times(7)).newCall(any());
+	}
+
 }

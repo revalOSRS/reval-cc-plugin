@@ -1,5 +1,7 @@
 package com.revalclan.ui;
 
+import com.revalclan.util.RequestScope;
+
 import com.revalclan.RevalClanConfig;
 import com.revalclan.api.RevalApiService;
 import com.revalclan.api.account.AccountResponse;
@@ -47,8 +49,8 @@ public class ProfilePanel extends JPanel {
 	private PointsResponse.PointsData pointsData;
 	private List<AccountResponse.PointsLogEntry> pointsLog;
 	private boolean isLoading = false;
-	private boolean disposed;
-	private int requestGeneration;
+	private final RequestScope viewScope = new RequestScope();
+	private RequestScope accountScope = new RequestScope();
 	private Timer accountRetry;
 	private Timer syncLabelReset;
 
@@ -127,7 +129,7 @@ public class ProfilePanel extends JPanel {
 		if (apiService == null) return;
 		apiService.fetchPoints(
 			response -> SwingUtilities.invokeLater(() -> {
-				if (disposed) return;
+				if (!viewScope.isActive()) return;
 				if (response.getData() != null) {
 					pointsData = response.getData();
 					if (response.getData().getRanks() != null) {
@@ -143,7 +145,8 @@ public class ProfilePanel extends JPanel {
 	}
 
 	public void onLoggedOut() {
-		requestGeneration++;
+		accountScope.cancel();
+		accountScope = new RequestScope();
 		isLoading = false;
 		currentAccount = null;
 		pointsLog = null;
@@ -154,7 +157,7 @@ public class ProfilePanel extends JPanel {
 	}
 
 	public void shutDown() {
-		disposed = true;
+		viewScope.cancel();
 		onLoggedOut();
 		pointsData = null;
 		ranks = null;
@@ -166,7 +169,7 @@ public class ProfilePanel extends JPanel {
 	}
 
 	public void loadCurrentAccount(boolean retry) {
-		if (disposed) return;
+		if (!viewScope.isActive()) return;
 		if (accountRetry != null) { accountRetry.stop(); accountRetry = null; }
 		if (client == null || apiService == null) {
 			showNotLoggedIn();
@@ -189,8 +192,9 @@ public class ProfilePanel extends JPanel {
 	}
 
 	public void loadAccount(long accountHash) {
-		if (disposed || isLoading) return;
-		int generation = ++requestGeneration;
+		if (!viewScope.isActive() || isLoading) return;
+		accountScope.cancel();
+		RequestScope owner = accountScope = new RequestScope();
 		isLoading = true;
 		showLoading();
 		if (pointsData == null) fetchRanks();
@@ -198,7 +202,7 @@ public class ProfilePanel extends JPanel {
 		apiService.fetchAccount(accountHash,
 			response -> {
 				SwingUtilities.invokeLater(() -> {
-					if (disposed || generation != requestGeneration) return;
+					if (!viewScope.isActive() || !owner.isActive()) return;
 					isLoading = false;
 					currentAccount = response.getData();
 					if (currentAccount != null) {
@@ -210,7 +214,7 @@ public class ProfilePanel extends JPanel {
 			},
 			error -> {
 				SwingUtilities.invokeLater(() -> {
-					if (disposed || generation != requestGeneration) return;
+					if (!viewScope.isActive() || !owner.isActive()) return;
 					isLoading = false;
 					showError(error.getMessage() != null ? error.getMessage() : "Failed to fetch account data");
 				});
@@ -219,8 +223,9 @@ public class ProfilePanel extends JPanel {
 	}
 
 	public void loadAccountById(int osrsAccountId) {
-		if (disposed || isLoading) return;
-		int generation = ++requestGeneration;
+		if (!viewScope.isActive() || isLoading) return;
+		accountScope.cancel();
+		RequestScope owner = accountScope = new RequestScope();
 		isLoading = true;
 		showLoading();
 		if (pointsData == null) fetchRanks();
@@ -228,7 +233,7 @@ public class ProfilePanel extends JPanel {
 		apiService.fetchAccountById(osrsAccountId,
 			response -> {
 				SwingUtilities.invokeLater(() -> {
-					if (disposed || generation != requestGeneration) return;
+					if (!viewScope.isActive() || !owner.isActive()) return;
 					isLoading = false;
 					currentAccount = response.getData();
 					if (currentAccount != null) pointsLog = currentAccount.getPointsLog();
@@ -237,7 +242,7 @@ public class ProfilePanel extends JPanel {
 			},
 			error -> {
 				SwingUtilities.invokeLater(() -> {
-					if (disposed || generation != requestGeneration) return;
+					if (!viewScope.isActive() || !owner.isActive()) return;
 					isLoading = false;
 					showError(error.getMessage() != null ? error.getMessage() : "Player not found");
 				});
@@ -258,7 +263,7 @@ public class ProfilePanel extends JPanel {
 	 */
 	public void rebuild() {
 		if (currentAccount != null && pointsData != null) {
-			SwingUtilities.invokeLater(this::buildProfile);
+			SwingUtilities.invokeLater(viewScope.guard(this::buildProfile));
 		}
 	}
 
