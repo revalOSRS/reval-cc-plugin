@@ -15,7 +15,6 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.Semaphore;
 import java.util.zip.GZIPOutputStream;
 
 /**
@@ -23,10 +22,11 @@ import java.util.zip.GZIPOutputStream;
  * A slow preparation can delay other scheduled work; no client state is read here.
  * A send completes with a parsed response, or exceptionally on failure/cancellation.
  * Successful responses without version hints remain distinct from failed delivery.
- * At most 64 deliveries retain payloads. Cancelled preparation keeps its slot
- * until dequeued, bounding retained payloads across rapid plugin restarts while
- * the worker is blocked. Rejected ordinary events have no durable replay;
- * persisted sessions remain recoverable.
+ * At most 64 deliveries are admitted, with 16 slots reserved for login/logout,
+ * sync and session events. Rejected ordinary events have no durable replay;
+ * persisted sessions remain recoverable. A saturation warning rearms only once
+ * all work drains. Cancelled preparation keeps its slot until dequeued, bounding
+ * retained payloads even across rapid plugin restarts while the worker is blocked.
  */
 @Slf4j
 @Singleton
@@ -38,7 +38,8 @@ public class WebhookService {
 	private final OkHttpClient httpClient;
 	private final Gson gson;
 	private final ScheduledExecutorService executor;
-	private final Semaphore capacity = new Semaphore(64);
+	private final WebhookCapacity capacity = new WebhookCapacity(() ->
+		log.warn("Webhook backlog is full; rejecting new events until capacity is available"));
 	private volatile RequestScope scope = new RequestScope();
 
 	@Inject
@@ -60,7 +61,8 @@ public class WebhookService {
 		RequestScope owner = scope;
 		CompletableFuture<JsonObject> result = owner.track(new CompletableFuture<>());
 		if (result.isDone()) return result;
-		if (!capacity.tryAcquire()) {
+		boolean critical = WebhookCapacity.isCritical(data.get("eventType"));
+		if (!capacity.acquire(critical)) {
 			result.completeExceptionally(new RejectedExecutionException("Webhook backlog is full"));
 			return result;
 		}
@@ -68,7 +70,7 @@ public class WebhookService {
 		// Cancellation finishes the caller immediately; queued preparation must
 		// also leave the executor before its retained payload frees a slot.
 		prepared.thenCombine(result.handle((response, error) -> null), (a, b) -> {
-			capacity.release();
+			capacity.release(critical);
 			return null;
 		});
 		result.whenComplete((response, error) -> {
