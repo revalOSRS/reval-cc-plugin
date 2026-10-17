@@ -124,12 +124,14 @@ public class LootNotifier extends BaseNotifier {
 		final List<Map<String, Object>> items;
 		final int lootTick;
 		final int sendOnTick;
+		final RaidPartyTracker.Party party;
 
-		PendingLoot(Map<String, Object> lootData, List<Map<String, Object>> items, int lootTick, int sendOnTick) {
+		PendingLoot(Map<String, Object> lootData, List<Map<String, Object>> items, int lootTick, int sendOnTick, RaidPartyTracker.Party party) {
 			this.lootData = lootData;
 			this.items = items;
 			this.lootTick = lootTick;
 			this.sendOnTick = sendOnTick;
+			this.party = party;
 		}
 	}
 
@@ -658,6 +660,7 @@ public class LootNotifier extends BaseNotifier {
 						} catch (RuntimeException ignored) {
 							// Optional counters must never prevent the loot event.
 						}
+						if (pending.party != null) pending.party.addTo(pending.lootData);
 						sendNotification(pending.lootData);
 					} catch (Exception ignored) {
 						// Never let one payload break the tick dispatch for
@@ -769,15 +772,12 @@ public class LootNotifier extends BaseNotifier {
 		if (sourceId != null) {
 			lootData.put("sourceId", sourceId);
 		}
-		if (party != null) {
-			party.addTo(lootData);
-		}
 		lootData.put("totalGEValue", totalGEValue);
 		lootData.put("totalHAValue", totalHAValue);
 		lootData.put("items", itemsList);
 
 		// Buffer for the clog correlation window instead of sending immediately;
 		// onGameTick stamps isNewCollectionLogItem on each item and sends
-		pendingLoot.add(new PendingLoot(lootData, itemsList, tickCounter, tickCounter + LOOT_BUFFER_TICKS));
+		pendingLoot.add(new PendingLoot(lootData, itemsList, tickCounter, tickCounter + LOOT_BUFFER_TICKS, party));
 	}
 }
