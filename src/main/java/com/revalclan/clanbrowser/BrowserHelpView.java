@@ -18,7 +18,7 @@ final class BrowserHelpView extends JPanel implements Scrollable {
         setLayout(new BoxLayout(this,BoxLayout.Y_AXIS)); setBackground(BrowserTheme.BACKGROUND);
         setBorder(BorderFactory.createEmptyBorder(14,14,14,14));
         JPanel intro=card("Start here",BrowserTheme.GOLD);
-        intro.add(text("Send !reval in public or clan chat, then click its link.\nUse the browser buttons to change views without sending more messages.",20,BrowserTheme.TEXT,2));
+        intro.add(text("Send !reval in public, clan or private chat.\nClick its link, then choose Open Reval board.\nUse browser buttons to browse without sending more messages.",20,BrowserTheme.TEXT,3));
         add(intro); gap(10);
         add(text("<...> = a value you choose     [...] = optional     Do not type the brackets.",18,BrowserTheme.MUTED,1)); gap(12);
 
@@ -45,9 +45,9 @@ final class BrowserHelpView extends JPanel implements Scrollable {
         boards.add(text("Statistics: clog, pets, points, greenlogs, xp,\nmonthly-clog, monthly-points, clues, combat, bosses.\nClue tiers: beginner, easy, medium, hard, elite, master.",17,BrowserTheme.MUTED,3));
 
         JPanel sharing=card("Share a board in chat",BrowserTheme.GREEN);
-        sharing.add(text("Send a command, then click its chat link.",18,BrowserTheme.TEXT,1)); gap(sharing,8);
+        sharing.add(text("Send a command in public, clan or private chat.",18,BrowserTheme.TEXT,2)); gap(sharing,8);
         sharing.add(code("!reval luck araxxor\n!reval clog forestry\n!reval leaderboard clues hard",3));
-        sharing.add(text("Other updated Reval clients can click the message\nto open the same board. A shared clog uses your account\nunless you add a different player's name.",18,BrowserTheme.TEXT,3)); gap(sharing,6);
+        sharing.add(text("Click or right-click the message and choose\nOpen Reval board. A shared clog uses your account\nunless you add a different player's name.",18,BrowserTheme.TEXT,3)); gap(sharing,6);
         sharing.add(text("Use buttons to browse without sending more messages.\nPlayers need the updated Reval plugin to open shares.",17,BrowserTheme.MUTED,2));
         add(row(boards,sharing)); gap(12);
         add(text("Useful aliases: cox, tob, toa, bandos. Category suggestions accept names too.\nViews are cached. Refresh reloads the current view. Monthly boards use the clan's Tallinn calendar month.",18,BrowserTheme.MUTED,2));
