@@ -1,6 +1,7 @@
 package com.revalclan.notifiers;
 
 import lombok.extern.slf4j.Slf4j;
+import net.runelite.client.util.Text;
 
 import javax.inject.Singleton;
 import java.util.HashMap;
@@ -44,12 +45,20 @@ public class PetNotifier extends BaseNotifier {
 	 * - "Username has a funny feeling like she would have been followed: Pet name at 114 completions."
 	 * - "Username has a funny feeling like she's being followed: Pet name at 50 kills."
 	 * - "Username feels something weird sneaking into her backpack: Pet name at 100 kills."
-	 * Note: Handles icons/special characters before username (e.g., Ironman helmet icons)
+	 * - "Username feels like he's acquired something special: Abyssal orphan"
+	 * Sentence punctuation is optional; periods belonging to a pet name are preserved.
 	 */
 	private static final Pattern CLAN_REGEX = Pattern.compile(
-		"(?:[^\\w\\s]*)?(?<user>[\\w\\s]+?) (?:has a funny feeling like .+? (?:would have been followed|being followed)|feels something weird sneaking into .+? backpack|feels like .+? acquired something special): (?<pet>.+?)(?: at (?<milestone>.+))?\\.$",
+		"^(?<user>[\\w -]+?) (?:has a funny feeling like .+? (?:would have been followed|being followed)|feels something weird sneaking into .+? backpack|feels like .+? acquired something special): (?<pet>.+?)(?: at (?<milestone>.+?))?$",
 		Pattern.CASE_INSENSITIVE
 	);
+
+	private static final Pattern CLAN_COLLECTION_LOG_PATTERN = Pattern.compile(
+		"^(?<user>[\\w -]+?) received a new collection log item: (?<item>.+?)(?: \\(\\d+/\\d+\\))?\\.?$",
+		Pattern.CASE_INSENSITIVE
+	);
+
+	private static final Pattern PET_SOURCE_SUFFIX = Pattern.compile("\\s+from\\s+.+$", Pattern.CASE_INSENSITIVE);
 
 	/**
 	 * Maximum number of ticks to wait for pet name before sending notification without it
@@ -92,7 +101,7 @@ public class PetNotifier extends BaseNotifier {
 	}
 
 	/**
-	 * Handle chat messages - looks for initial pet message and follow-up messages with pet name
+	 * Handle plain game messages from RevalClanPlugin: personal confirmation and item names.
 	 */
 	public void onChatMessage(String message) {
 		if (!isEnabled()) return;
@@ -106,68 +115,51 @@ public class PetNotifier extends BaseNotifier {
 			return;
 		}
 
-		// If we've seen a pet message, look for follow-up messages with pet name
-		if (this.seenGameMessage && this.petName == null) {
-			// Check for untradeable drop message (new pets only, not duplicates)
-			Matcher untradeableMatcher = UNTRADEABLE_PATTERN.matcher(message);
-			if (untradeableMatcher.find()) {
-				String itemName = untradeableMatcher.group(1).trim();
-				if (isPetItem(itemName)) {
-					this.petName = itemName;
-					return;
-				}
-			}
-
-			// Check for collection log message (new pets only, not duplicates)
-			Matcher collectionMatcher = COLLECTION_LOG_PATTERN.matcher(message);
-			if (collectionMatcher.find()) {
-				String itemName = collectionMatcher.group(1).trim();
-				if (isPetItem(itemName)) {
-					this.petName = itemName;
-					return;
-				}
-			}
-		}
+		Matcher untradeableMatcher = UNTRADEABLE_PATTERN.matcher(message);
+		if (untradeableMatcher.find()) offerItemName(untradeableMatcher.group(1));
+		Matcher collectionMatcher = COLLECTION_LOG_PATTERN.matcher(message);
+		if (collectionMatcher.find()) offerItemName(collectionMatcher.group(1));
 	}
 
 	/**
-	 * Handle clan notifications - extracts pet name and kill count for the current player
+	 * Handle plain system clan broadcasts from RevalClanPlugin for the current player.
 	 * This is especially important for duplicate pets where there's no "Untradeable drop:" message
 	 */
 	public void onClanNotification(String message) {
 		if (!isEnabled()) return;
 
-		String normalized = message.replace('\u00A0', ' ');
-		Matcher clanMatcher = CLAN_REGEX.matcher(normalized);
-		if (clanMatcher.find()) {
-			String user = cleanUsername(clanMatcher.group("user"));
-			String playerName = cleanUsername(getPlayerName());
-			
-			if (user.equalsIgnoreCase(playerName)) {
-				String pet = null;
-				String milestone = null;
-				
-				try {
-					pet = clanMatcher.group("pet");
-					milestone = clanMatcher.group("milestone");
-				} catch (IllegalArgumentException e) {
-					return;
-				}
-
-				if (pet != null && !pet.trim().isEmpty()) {
-					this.petName = pet.trim();
-				}
-				if (milestone != null && !milestone.trim().isEmpty()) {
-					this.killCount = milestone.trim();
-				}
-
-				// If we haven't seen the game message yet, mark that we've seen clan info
-				// The game message should arrive soon (or may have already arrived)
-				if (!seenGameMessage) {
-					this.ticksWaited.set(0);
-				}
-			}
+		Matcher collectionMatcher = CLAN_COLLECTION_LOG_PATTERN.matcher(message);
+		if (collectionMatcher.matches()) {
+			if (isLocalPlayer(collectionMatcher.group("user"))) offerItemName(collectionMatcher.group("item"));
+			return;
 		}
+
+		Matcher clanMatcher = CLAN_REGEX.matcher(message);
+		if (!clanMatcher.matches() || !isLocalPlayer(clanMatcher.group("user"))) return;
+		this.petName = broadcastPetName(clanMatcher.group("pet"));
+		String milestone = clanMatcher.group("milestone");
+		if (milestone != null && !milestone.trim().isEmpty()) {
+			milestone = milestone.trim();
+			this.killCount = milestone.endsWith(".")
+				? milestone.substring(0, milestone.length() - 1) : milestone;
+		}
+
+		// Clan info can arrive before the personal confirmation.
+		if (!seenGameMessage) {
+			this.ticksWaited.set(0);
+		}
+	}
+
+	/** Item messages can only name a pending personal pet drop. */
+	private void offerItemName(String item) {
+		String name = item.trim();
+		if (seenGameMessage && petName == null && isPetItem(name)) petName = name;
+	}
+
+	/** Trust system broadcasts; the catalogue only disambiguates a pet's own final period. */
+	private String broadcastPetName(String rawName) {
+		String name = PET_SOURCE_SUFFIX.matcher(rawName.trim()).replaceFirst("");
+		return isPetItem(name) || !name.endsWith(".") ? name : name.substring(0, name.length() - 1).trim();
 	}
 
 	/**
@@ -250,8 +242,10 @@ public class PetNotifier extends BaseNotifier {
 	static {
 		// Boss pets
 		PET_NAMES.add("abyssal orphan");
+		PET_NAMES.add("aggy");
 		PET_NAMES.add("baby mole");
 		PET_NAMES.add("baron");
+		PET_NAMES.add("beef");
 		PET_NAMES.add("bran");
 		PET_NAMES.add("butch");
 		PET_NAMES.add("callisto cub");
@@ -265,7 +259,9 @@ public class PetNotifier extends BaseNotifier {
 		PET_NAMES.add("lil' zik");
 		PET_NAMES.add("lil'viathan");
 		PET_NAMES.add("little nightmare");
+		PET_NAMES.add("maggot marquess");
 		PET_NAMES.add("moxi");
+		PET_NAMES.add("mr mcgroot");
 		PET_NAMES.add("muphin");
 		PET_NAMES.add("nexling");
 		PET_NAMES.add("nid");
@@ -345,29 +341,8 @@ public class PetNotifier extends BaseNotifier {
 		return false;
 	}
 
-	/** Pre-compiled patterns for cleaning usernames (avoids recompiling on every call). */
-	private static final Pattern LEADING_NON_WORD = Pattern.compile("^[^\\w\\s]+");
-	private static final Pattern CONTROL_CHARS = Pattern.compile("[\\u0000-\\u001F\\u007F-\\u009F]");
-	private static final Pattern GENERAL_PUNCTUATION = Pattern.compile("[\\u2000-\\u206F]");
-	private static final Pattern CURRENCY_SYMBOLS = Pattern.compile("[\\u20A0-\\u20CF]");
-	private static final Pattern ARROWS = Pattern.compile("[\\u2190-\\u21FF]");
-	private static final Pattern MISC_SYMBOLS = Pattern.compile("[\\u2600-\\u26FF]");
-	private static final Pattern DINGBATS = Pattern.compile("[\\u2700-\\u27BF]");
-
-	/**
-	 * Clean username by removing icons, special characters, and extra whitespace.
-	 * Handles Ironman icons and other special characters that appear before usernames.
-	 */
-	private String cleanUsername(String username) {
-		if (username == null) return "";
-
-		String cleaned = LEADING_NON_WORD.matcher(username).replaceAll("");
-		cleaned = CONTROL_CHARS.matcher(cleaned).replaceAll("");
-		cleaned = GENERAL_PUNCTUATION.matcher(cleaned).replaceAll("");
-		cleaned = CURRENCY_SYMBOLS.matcher(cleaned).replaceAll("");
-		cleaned = ARROWS.matcher(cleaned).replaceAll("");
-		cleaned = MISC_SYMBOLS.matcher(cleaned).replaceAll("");
-		cleaned = DINGBATS.matcher(cleaned).replaceAll("");
-		return cleaned.trim();
+	private boolean isLocalPlayer(String name) {
+		String playerName = getPlayerName();
+		return playerName != null && Text.toJagexName(name).equalsIgnoreCase(Text.toJagexName(playerName));
 	}
 }

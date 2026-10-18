@@ -32,7 +32,6 @@ import com.google.gson.JsonObject;
 
 import java.awt.image.BufferedImage;
 import java.time.LocalDate;
-import java.util.regex.Pattern;
 
 import javax.inject.Inject;
 import javax.swing.SwingUtilities;
@@ -66,6 +65,7 @@ import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.ClientToolbar;
 import net.runelite.client.ui.NavigationButton;
 import net.runelite.client.ui.overlay.OverlayManager;
+import net.runelite.client.util.Text;
 
 @Slf4j
 @PluginDescriptor(
@@ -162,9 +162,6 @@ public class RevalClanPlugin extends Plugin {
 
 	private boolean wasLoggedIn = false;
 	private boolean pendingLoginNotification = false;
-
-	private static final Pattern COL_OPEN = Pattern.compile("<col=[0-9a-fA-F]+>");
-	private static final Pattern COL_CLOSE = Pattern.compile("</col>");
 
 	@Override
 	protected void startUp() throws Exception {
@@ -475,8 +472,8 @@ public class RevalClanPlugin extends Plugin {
 		raidPartyTracker.onChatMessage(event.getType(), event.getMessage());
 		if (!clanMembership.isMember()) return;
 
-		String message = event.getMessage();
-		String cleanMessage = COL_CLOSE.matcher(COL_OPEN.matcher(message).replaceAll("")).replaceAll("");
+		String cleanMessage = Text.removeTags(event.getMessage().replace("<br>", " "))
+			.replace('\u00A0', ' ').trim();
 
 		ChatMessageType type = event.getType();
 
@@ -492,9 +489,7 @@ public class RevalClanPlugin extends Plugin {
 			combatAchievementNotifier.onChatMessage(cleanMessage);
 			collectionNotifier.onChatMessage(cleanMessage);
 			leaguesNotifier.onChatMessage(cleanMessage);
-		} else if (type == ChatMessageType.CLAN_MESSAGE ||
-			type == ChatMessageType.CLAN_CHAT ||
-			type == ChatMessageType.CLAN_GUEST_CHAT) {
+		} else if (type == ChatMessageType.CLAN_MESSAGE) {
 			petNotifier.onClanNotification(cleanMessage);
 		}
 	}
