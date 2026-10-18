@@ -54,7 +54,7 @@ public class PetNotifier extends BaseNotifier {
 	);
 
 	private static final Pattern CLAN_COLLECTION_LOG_PATTERN = Pattern.compile(
-		"^(?<user>[\\w -]+?) received a new collection log item: (?<pet>.+?)(?: \\(\\d+/\\d+\\))?\\.?$",
+		"^(?<user>[\\w -]+?) received a new collection log item: (?<item>.+?)(?: \\(\\d+/\\d+\\))?\\.?$",
 		Pattern.CASE_INSENSITIVE
 	);
 
@@ -101,11 +101,10 @@ public class PetNotifier extends BaseNotifier {
 	}
 
 	/**
-	 * Handle chat messages - looks for initial pet message and follow-up messages with pet name
+	 * Handle plain game messages from RevalClanPlugin: personal confirmation and item names.
 	 */
 	public void onChatMessage(String message) {
 		if (!isEnabled()) return;
-		message = normalizeMessage(message);
 
 		// Check for the personal pet drop message
 		Matcher petMatcher = PET_PATTERN.matcher(message);
@@ -116,55 +115,29 @@ public class PetNotifier extends BaseNotifier {
 			return;
 		}
 
-		// If we've seen a pet message, look for follow-up messages with pet name
-		if (this.seenGameMessage && this.petName == null) {
-			// Check for untradeable drop message (new pets only, not duplicates)
-			Matcher untradeableMatcher = UNTRADEABLE_PATTERN.matcher(message);
-			if (untradeableMatcher.find()) {
-				String itemName = untradeableMatcher.group(1).trim();
-				if (isPetItem(itemName)) {
-					this.petName = itemName;
-					return;
-				}
-			}
-
-			// Check for collection log message (new pets only, not duplicates)
-			Matcher collectionMatcher = COLLECTION_LOG_PATTERN.matcher(message);
-			if (collectionMatcher.find()) {
-				String itemName = collectionMatcher.group(1).trim();
-				if (isPetItem(itemName)) {
-					this.petName = itemName;
-					return;
-				}
-			}
-		}
+		Matcher untradeableMatcher = UNTRADEABLE_PATTERN.matcher(message);
+		if (untradeableMatcher.find()) offerItemName(untradeableMatcher.group(1));
+		Matcher collectionMatcher = COLLECTION_LOG_PATTERN.matcher(message);
+		if (collectionMatcher.find()) offerItemName(collectionMatcher.group(1));
 	}
 
 	/**
-	 * Handle clan notifications - extracts pet name and kill count for the current player
+	 * Handle plain system clan broadcasts from RevalClanPlugin for the current player.
 	 * This is especially important for duplicate pets where there's no "Untradeable drop:" message
 	 */
 	public void onClanNotification(String message) {
 		if (!isEnabled()) return;
 
-		String normalized = normalizeMessage(message);
-		Matcher clanMatcher = CLAN_REGEX.matcher(normalized);
-		boolean petBroadcast = clanMatcher.matches();
-		if (!petBroadcast) {
-			// A collection-log broadcast can name a pending personal pet drop,
-			// but cannot confirm a new drop on its own.
-			if (!this.seenGameMessage || this.petName != null) return;
-			clanMatcher = CLAN_COLLECTION_LOG_PATTERN.matcher(normalized);
-			if (!clanMatcher.matches()) return;
+		Matcher collectionMatcher = CLAN_COLLECTION_LOG_PATTERN.matcher(message);
+		if (collectionMatcher.matches()) {
+			if (isLocalPlayer(collectionMatcher.group("user"))) offerItemName(collectionMatcher.group("item"));
+			return;
 		}
-		String user = cleanUsername(clanMatcher.group("user"));
-		String playerName = cleanUsername(getPlayerName());
-		if (!user.equalsIgnoreCase(playerName)) return;
 
-		String resolved = resolvePetName(clanMatcher.group("pet"));
-		if (resolved == null) return;
-		this.petName = resolved;
-		String milestone = petBroadcast ? clanMatcher.group("milestone") : null;
+		Matcher clanMatcher = CLAN_REGEX.matcher(message);
+		if (!clanMatcher.matches() || !isLocalPlayer(clanMatcher.group("user"))) return;
+		this.petName = broadcastPetName(clanMatcher.group("pet"));
+		String milestone = clanMatcher.group("milestone");
 		if (milestone != null && !milestone.trim().isEmpty()) {
 			milestone = milestone.trim();
 			this.killCount = milestone.endsWith(".")
@@ -177,19 +150,16 @@ public class PetNotifier extends BaseNotifier {
 		}
 	}
 
-	private static String normalizeMessage(String message) {
-		return Text.removeTags(message).replace('\u00A0', ' ').trim();
+	/** Item messages can only name a pending personal pet drop. */
+	private void offerItemName(String item) {
+		String name = item.trim();
+		if (seenGameMessage && petName == null && isPetItem(name)) petName = name;
 	}
 
-	private String resolvePetName(String rawName) {
+	/** Trust system broadcasts; the catalogue only disambiguates a pet's own final period. */
+	private String broadcastPetName(String rawName) {
 		String name = PET_SOURCE_SUFFIX.matcher(rawName.trim()).replaceFirst("");
-		if (isPetItem(name)) return name;
-		// Test the full name first so "Vet'ion jr." keeps its own period.
-		if (name.endsWith(".")) {
-			String withoutPeriod = name.substring(0, name.length() - 1).trim();
-			if (isPetItem(withoutPeriod)) return withoutPeriod;
-		}
-		return null;
+		return isPetItem(name) || !name.endsWith(".") ? name : name.substring(0, name.length() - 1).trim();
 	}
 
 	/**
@@ -272,6 +242,7 @@ public class PetNotifier extends BaseNotifier {
 	static {
 		// Boss pets
 		PET_NAMES.add("abyssal orphan");
+		PET_NAMES.add("aggy");
 		PET_NAMES.add("baby mole");
 		PET_NAMES.add("baron");
 		PET_NAMES.add("beef");
@@ -290,6 +261,7 @@ public class PetNotifier extends BaseNotifier {
 		PET_NAMES.add("little nightmare");
 		PET_NAMES.add("maggot marquess");
 		PET_NAMES.add("moxi");
+		PET_NAMES.add("mr mcgroot");
 		PET_NAMES.add("muphin");
 		PET_NAMES.add("nexling");
 		PET_NAMES.add("nid");
@@ -369,29 +341,8 @@ public class PetNotifier extends BaseNotifier {
 		return false;
 	}
 
-	/** Pre-compiled patterns for cleaning usernames (avoids recompiling on every call). */
-	private static final Pattern LEADING_NON_WORD = Pattern.compile("^[^\\w\\s]+");
-	private static final Pattern CONTROL_CHARS = Pattern.compile("[\\u0000-\\u001F\\u007F-\\u009F]");
-	private static final Pattern GENERAL_PUNCTUATION = Pattern.compile("[\\u2000-\\u206F]");
-	private static final Pattern CURRENCY_SYMBOLS = Pattern.compile("[\\u20A0-\\u20CF]");
-	private static final Pattern ARROWS = Pattern.compile("[\\u2190-\\u21FF]");
-	private static final Pattern MISC_SYMBOLS = Pattern.compile("[\\u2600-\\u26FF]");
-	private static final Pattern DINGBATS = Pattern.compile("[\\u2700-\\u27BF]");
-
-	/**
-	 * Clean username by removing icons, special characters, and extra whitespace.
-	 * Handles Ironman icons and other special characters that appear before usernames.
-	 */
-	private String cleanUsername(String username) {
-		if (username == null) return "";
-
-		String cleaned = LEADING_NON_WORD.matcher(normalizeMessage(username)).replaceAll("");
-		cleaned = CONTROL_CHARS.matcher(cleaned).replaceAll("");
-		cleaned = GENERAL_PUNCTUATION.matcher(cleaned).replaceAll("");
-		cleaned = CURRENCY_SYMBOLS.matcher(cleaned).replaceAll("");
-		cleaned = ARROWS.matcher(cleaned).replaceAll("");
-		cleaned = MISC_SYMBOLS.matcher(cleaned).replaceAll("");
-		cleaned = DINGBATS.matcher(cleaned).replaceAll("");
-		return cleaned.trim();
+	private boolean isLocalPlayer(String name) {
+		String playerName = getPlayerName();
+		return playerName != null && Text.toJagexName(name).equalsIgnoreCase(Text.toJagexName(playerName));
 	}
 }
