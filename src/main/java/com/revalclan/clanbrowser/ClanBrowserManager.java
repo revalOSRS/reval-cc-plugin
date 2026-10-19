@@ -60,13 +60,13 @@ public class ClanBrowserManager {
     }
     @Subscribe public void onProfileChanged(ProfileChanged event) { if (running) clientThread.invoke(this::applyChatSetting); }
     @Subscribe public void onScriptPreFired(ScriptPreFired event) {
-        if (running && chatEnabled && event.getScriptId() == BoardChatLinks.CHAT_BUILDER) chatLinks.beginBuild();
+        if (running && chatEnabled) chatLinks.beginBuild(event.getScriptId());
     }
     @Subscribe(priority = -100) public void onScriptCallbackEvent(ScriptCallbackEvent event) {
         if (running && chatEnabled) chatLinks.format(event);
     }
     @Subscribe public void onScriptPostFired(ScriptPostFired event) {
-        if (running && chatEnabled && event.getScriptId() == BoardChatLinks.CHAT_BUILDER) chatLinks.finishBuild();
+        if (running && chatEnabled) chatLinks.finishBuild(event.getScriptId());
     }
     @Subscribe public void onMenuEntryAdded(MenuEntryAdded event) { if (running && chatEnabled) chatLinks.menuEntryAdded(event); }
     @Subscribe public void onPostMenuSort(PostMenuSort event) { if (running && chatEnabled) chatLinks.prioritize(); }

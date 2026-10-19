@@ -52,7 +52,7 @@ final class CollectionGrid extends JComponent implements Scrollable, javax.acces
         int gap = count > 80 ? 7 : 10, padding = 12;
         int columns = Math.max(1, Math.min(Math.max(1, count), (width - padding * 2 + gap) / (target + gap)));
         if (count > 0 && count <= 6 && (width - padding * 2 - (count - 1) * gap) / count >= 96) columns = count;
-        int size = Math.min(200, (width - padding * 2 - (columns - 1) * gap) / columns);
+        int size = Math.min(target, (width - padding * 2 - (columns - 1) * gap) / columns);
         if (groups.size() == 1 && count <= 30 && count > 0 && viewportHeight > 0) {
             // Reflow into more columns before shrinking cells; this avoids the
             // wide side gutters left by centering a height-limited fixed grid.
@@ -61,7 +61,7 @@ final class CollectionGrid extends JComponent implements Scrollable, javax.acces
                 if (rows * size + (rows - 1) * gap + padding * 2 <= viewportHeight) break;
                 int next = (width - padding * 2 - columns * gap) / (columns + 1);
                 if (next < 72) break;
-                columns++; size = Math.min(200, next);
+                columns++; size = Math.min(target, next);
             }
             int rows = (count + columns - 1) / columns;
             int fitting = (viewportHeight - padding * 2 - (rows - 1) * gap) / rows;
@@ -96,6 +96,9 @@ final class CollectionGrid extends JComponent implements Scrollable, javax.acces
     @Override public Dimension getPreferredSize() { layoutCells(); return new Dimension(900, layoutHeight); }
     @Override protected void paintComponent(Graphics graphics) {
         super.paintComponent(graphics); layoutCells(); Graphics2D g = (Graphics2D) graphics.create(); BrowserTheme.pixel(g);
+        // A bare JComponent has no UI delegate to clear an opaque background.
+        // Paint it ourselves so viewport blits cannot retain the previous page.
+        g.setColor(getBackground()); g.fillRect(0, 0, getWidth(), getHeight());
         Rectangle clip = g.getClipBounds();
         for (Heading heading : headings) {
             if (heading.y + 64 < clip.y || heading.y > clip.y + clip.height) continue;
@@ -114,7 +117,7 @@ final class CollectionGrid extends JComponent implements Scrollable, javax.acces
             if (icon != null) {
                 Rectangle bounds = bounds(cell.item.id, icon);
                 float alpha = received ? 1f : .22f; g.setComposite(AlphaComposite.SrcOver.derive(alpha));
-                int scale = cell.size >= 100 ? 3 : cell.size >= 80 ? 2 : 1;
+                int scale = cell.size >= 80 ? 2 : 1;
                 int w = Math.min(bounds.width * scale, cell.size - 12), h = Math.min(bounds.height * scale, cell.size - 12);
                 double factor = Math.min((double) w / bounds.width, (double) h / bounds.height);
                 w = (int) (bounds.width * factor); h = (int) (bounds.height * factor);

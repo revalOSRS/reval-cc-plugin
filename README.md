@@ -21,8 +21,8 @@ new raid and do not include deaths after completion.
 
 ### In-game clan browser
 
-Send `!reval` or `!reval help` in public or clan chat, then click its link to open the command guide.
-Commands open a resizable native window when clicked;
+Send `!reval` or `!reval help` in public, clan or private chat, then click its link and choose **Open Reval board** to open the command guide.
+Commands open a resizable native window after choosing that menu option;
 the game remains usable while it is open. Collection Log uses boxed subcategories under the main
 category tabs. Luck and Deserved use the same tabs and sidebar with standings in the content area;
 Dryboard has category autocomplete. Leaderboard statistics are selected with buttons below member
@@ -68,14 +68,16 @@ Completed collection categories have green text, borders, and backgrounds in the
 pages not yet opened. The selected greenlog has a brighter highlight. Completion status is scoped
 to the selected account and uses the same cached log response without extra database reads.
 
-Share a board through regular public chat or clan chat with `!reval luck araxxor`, `!reval leaderboard clues hard`,
+Share a board through regular public, clan or private chat with `!reval luck araxxor`, `!reval leaderboard clues hard`,
 or `!reval clog forestry`. Updated Reval clients show a teal link such as
-**Click to view Araxxor luck board** or **Click to view Valgusruum's collection log: Forestry**, with **Open Reval board** on left-click or in its
-right-click menu. The original command remains attached to the link. A clog without an explicit player opens the
+**Click to view Araxxor luck board** or **Click to view Valgusruum's collection log: Forestry**.
+Left-clicking opens the chat menu; choose **Open Reval board** to open the window. The same option is available on right-click.
+Private messages use the same labels in both the chatbox and split private chat, including your own sent messages.
+The original command remains attached to the link. A clog without an explicit player opens the
 sender's account; add a player name to share another account. Sharing selects the same page and
 account, using the recipient's normal cache; it is not a frozen snapshot. Messages remain ordinary
 chat for players without the update. Shares, including your own, do not fetch data or open a window until
-clicked. History redraws never open a window, and the plugin never sends an extra chat message
+**Open Reval board** is selected. History redraws never open a window, and the plugin never sends an extra chat message
 automatically. Links are formatted before the
 game lays out each message, so they appear immediately and survive notifications, scrolling and
 chat-filter changes. Original history text stays unchanged.
