@@ -114,18 +114,23 @@ JAVA_HOME=$(/usr/libexec/java_home -v 21) ./gradlew runRaceClient
 ```
 
 This reads the same public featured-race feed as the homepage, without requiring a game login.
-It shows the three first-drop rewards, Top 10 KC rewards, and real KC standings. A featured draft
+It shows the three first-drop rewards, Top 10 KC rewards, and the Top 5 KC standings. A featured draft
 appears as upcoming while the exact release time and tracking targets are pending; viewing it
 does not activate scoring. Refresh fetches the latest results, and the native detail view shows
 all standings returned by the feed. Add `-PrevalRaceScreenshot=/absolute/path/sidebar.png` to save
 the visible sidebar and the complete race card (`sidebar-card.png`) for visual QA.
 Add `-PrevalRaceDemo=true` to preview all three first drops claimed and twelve sample KC standings.
+Add `-PrevalRaceNoImage=true` alongside the demo flag to preview the plain header when no artwork is set.
+Demo captures also check the five-row overview, full twelve-row detail, and Back action.
 This dev-only mode is visibly marked as sample data, keeps event settings and rewards from the
 live feed, and never writes sample winners or scores to the backend. Omit the flag for real results.
 Release time, event state, objective titles/rewards/winners, and KC results come from the backend.
 In Race admin, clear the pending-time checkbox and save the confirmed UTC release time; saving
 updates both the race and its linked KC competition. The plugin picks up the change on Refresh.
-Artwork, icons, and layout are bundled UI assets, rather than backend configuration.
+Optional event artwork comes from the backend's `imageUrl`. An unset or unavailable image uses
+a compact plain header; downloaded artwork is cropped proportionally without side padding.
+RuneScape icons and layout remain bundled UI assets. Clicking the Top 5 table or its button
+opens all returned standings in the native detail page.
 
 ### 🖥️ Sidepanel UI (Planned)
 A dedicated panel for Reval clan members with:

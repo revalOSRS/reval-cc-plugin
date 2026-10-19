@@ -20,6 +20,7 @@ public class FeaturedRaceResponse extends PublicApiResponse {
     public static class Race {
         private String id;
         private String name;
+        private String imageUrl;
         private String state;
         private String plannedStartDate;
         private String startDate;

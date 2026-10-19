@@ -16,12 +16,14 @@ import com.revalclan.ui.components.LoginPrompt;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
+import java.awt.image.BufferedImage;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 public class CompetitionsPanel extends JPanel {
 	private static final Color MEDAL_GOLD = new Color(255, 215, 0);
@@ -49,6 +51,9 @@ public class CompetitionsPanel extends JPanel {
 	private boolean memberLoading;
 	private boolean memberContentAvailable;
 	private String selectedRaceId;
+	private BufferedImage raceArtwork;
+	private String raceArtworkUrl;
+	private boolean artworkLoading;
 
 	public CompetitionsPanel() {
 		setLayout(new BorderLayout());
@@ -128,21 +133,46 @@ public class CompetitionsPanel extends JPanel {
 			raceLoading = false;
 			updateLoading();
 			featuredRace = response.getData() == null ? null : response.getData().getRace();
-			buildContent();
-			if (selectedRaceId != null) {
-				if (featuredRace != null && selectedRaceId.equals(featuredRace.getId())) {
-					showRaceDetails(featuredRace);
-				} else {
-					selectedRaceId = null;
-					cardLayout.show(cardContainer, "LIST");
-				}
-			}
+			refreshArtwork();
+			renderRace();
 		}), error -> SwingUtilities.invokeLater(() -> {
 			if (generation != raceGeneration) return;
 			raceLoading = false;
 			updateLoading();
 			buildContent();
 		}));
+	}
+
+	private void refreshArtwork() {
+		String url = featuredRace == null ? null : featuredRace.getImageUrl();
+		url = url == null || url.trim().isEmpty() ? null : url.trim();
+		if (!Objects.equals(url, raceArtworkUrl)) {
+			raceArtworkUrl = url;
+			raceArtwork = null;
+			artworkLoading = false;
+		}
+		if (url == null || raceArtwork != null || artworkLoading) return;
+		artworkLoading = true;
+		final String requestedUrl = url;
+		apiService.fetchRaceArtwork(url, image -> SwingUtilities.invokeLater(() -> {
+			if (!Objects.equals(requestedUrl, raceArtworkUrl)) return;
+			artworkLoading = false;
+			raceArtwork = image;
+			renderRace();
+		}), error -> SwingUtilities.invokeLater(() -> {
+			if (Objects.equals(requestedUrl, raceArtworkUrl)) artworkLoading = false;
+		}));
+	}
+
+	private void renderRace() {
+		buildContent();
+		if (selectedRaceId == null) return;
+		if (featuredRace != null && selectedRaceId.equals(featuredRace.getId())) {
+			showRaceDetails(featuredRace);
+		} else {
+			selectedRaceId = null;
+			cardLayout.show(cardContainer, "LIST");
+		}
 	}
 
 	private void loadData(boolean showLoadingState) {
@@ -247,7 +277,7 @@ public class CompetitionsPanel extends JPanel {
 		if (featuredRace != null) {
 			hasContent = true;
 			addSection("Race events");
-			contentPanel.add(new RaceEventCard(featuredRace, false, () -> showRaceDetails(featuredRace)));
+			contentPanel.add(new RaceEventCard(featuredRace, raceArtwork, false, () -> showRaceDetails(featuredRace)));
 			contentPanel.add(Box.createVerticalStrut(12));
 		}
 
@@ -309,7 +339,7 @@ public class CompetitionsPanel extends JPanel {
 		body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
 		body.setBackground(UIConstants.BACKGROUND);
 		body.setBorder(new EmptyBorder(8, 8, 8, 8));
-		body.add(new RaceEventCard(race, true, null));
+		body.add(new RaceEventCard(race, raceArtwork, true, null));
 		detailViewPanel.add(ScrollWrap.of(body), BorderLayout.CENTER);
 		cardLayout.show(cardContainer, "DETAIL");
 		detailViewPanel.revalidate();

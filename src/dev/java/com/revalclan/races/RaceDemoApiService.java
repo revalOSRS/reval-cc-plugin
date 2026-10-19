@@ -4,6 +4,9 @@ import com.google.gson.Gson;
 import com.revalclan.api.RevalApiService;
 import com.revalclan.api.competitions.FeaturedRaceResponse;
 import okhttp3.OkHttpClient;
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.IOException;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -31,8 +34,20 @@ final class RaceDemoApiService extends RevalApiService {
         }, onError);
     }
 
+    @Override
+    public void fetchRaceArtwork(String imageUrl, Consumer<BufferedImage> onSuccess, Consumer<Exception> onError) {
+        if (!"sample:archive".equals(imageUrl)) {
+            super.fetchRaceArtwork(imageUrl, onSuccess, onError);
+            return;
+        }
+        try {
+            onSuccess.accept(ImageIO.read(RaceDemoApiService.class.getResource("/com/revalclan/races/archive.png")));
+        } catch (IOException error) { onError.accept(error); }
+    }
+
     private static void populate(FeaturedRaceResponse.Race race) {
         race.setState("active");
+        race.setImageUrl(Boolean.getBoolean("reval.raceNoImage") ? null : "sample:archive");
         if (race.getObjectives() != null) {
             for (FeaturedRaceResponse.Objective objective : race.getObjectives()) {
                 FeaturedRaceResponse.Winner winner = new FeaturedRaceResponse.Winner();

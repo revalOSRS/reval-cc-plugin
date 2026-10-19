@@ -1,9 +1,9 @@
 package com.revalclan.ui;
 
 import com.revalclan.api.competitions.FeaturedRaceResponse;
+import com.revalclan.ui.components.Clickable;
 import com.revalclan.ui.constants.UIConstants;
 import net.runelite.client.ui.FontManager;
-import net.runelite.client.util.LinkBrowser;
 
 import javax.imageio.ImageIO;
 import javax.swing.*;
@@ -16,18 +16,20 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
 /** A native inventory-style race card, backed by the same verified results as the homepage. */
 public final class RaceEventCard extends JPanel {
-    private static final BufferedImage ART = image("archive.png");
     private static final BufferedImage PET = image("pet.png"), UNIQUE = image("unique.png"), PURPLE = image("purple.png");
     private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("d MMM", Locale.ENGLISH);
     private final FeaturedRaceResponse.Race race;
+    private final BufferedImage artwork;
 
-    public RaceEventCard(FeaturedRaceResponse.Race race, boolean details, Runnable open) {
+    public RaceEventCard(FeaturedRaceResponse.Race race, BufferedImage artwork, boolean details, Runnable open) {
         this.race = race;
+        this.artwork = artwork;
         setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
         setBackground(UIConstants.CARD_BG);
         setBorder(BorderFactory.createLineBorder(UIConstants.ACCENT_GOLD));
@@ -46,18 +48,18 @@ public final class RaceEventCard extends JPanel {
         body.add(section("Top 10 raid KC"));
         body.add(rewards());
         body.add(Box.createVerticalStrut(10));
-        body.add(section("KC leaderboard"));
-        body.add(standings(details));
-        body.add(Box.createVerticalStrut(10));
-        if (details) {
-            body.add(button("Open event on website", () -> LinkBrowser.browse("https://www.revalosrs.ee/")));
-        } else {
-            body.add(button("View the race >", open));
+        body.add(section(details ? "KC leaderboard" : "Top 5 raid KC"));
+        JPanel table = standings(details);
+        body.add(table);
+        if (!details) {
+            makeClickable(table, open);
+            body.add(Box.createVerticalStrut(10));
+            body.add(button("Full KC leaderboard >", open));
         }
-        setMaximumSize(new Dimension(Integer.MAX_VALUE, super.getPreferredSize().height));
     }
 
     @Override public Dimension getPreferredSize() { return new Dimension(1, super.getPreferredSize().height); }
+    @Override public Dimension getMaximumSize() { return new Dimension(Integer.MAX_VALUE, super.getPreferredSize().height); }
 
     private JPanel objectiveRow(FeaturedRaceResponse.Objective objective) {
         JPanel row = new JPanel(new BorderLayout(6, 0));
@@ -73,7 +75,7 @@ public final class RaceEventCard extends JPanel {
         JPanel copy = column();
         copy.add(label(objective.getTitle(), FontManager.getRunescapeSmallFont(), UIConstants.TEXT_PRIMARY));
         String result = objective.getWinner() == null ? "Unclaimed" : objective.getWinner().getName();
-        JLabel winner = label(result, FontManager.getRunescapeSmallFont().deriveFont(12f),
+        JLabel winner = label(result, objective.getWinner() == null ? FontManager.getRunescapeSmallFont().deriveFont(12f) : FontManager.getRunescapeSmallFont(),
             objective.getWinner() == null ? UIConstants.TEXT_SECONDARY : UIConstants.ACCENT_GREEN);
         winner.setToolTipText(result);
         copy.add(winner);
@@ -114,7 +116,7 @@ public final class RaceEventCard extends JPanel {
             empty.setBorder(new EmptyBorder(12, 6, 12, 6));
             table.add(empty);
         } else {
-            int count = details ? rows.size() : Math.min(10, rows.size());
+            int count = details ? rows.size() : Math.min(5, rows.size());
             for (int i = 0; i < count; i++) {
                 FeaturedRaceResponse.Standing player = rows.get(i);
                 table.add(standingRow(String.valueOf(player.getRank()), player.getName(),
@@ -128,6 +130,7 @@ public final class RaceEventCard extends JPanel {
 
     private JPanel standingRow(String rank, String name, String kc, String points, boolean header, boolean stripe) {
         JPanel row = new JPanel(new BorderLayout(3, 0));
+        row.setName(header ? "race-kc-header" : "race-kc-row");
         row.setOpaque(header || stripe);
         row.setBackground(header ? UIConstants.CARD_HOVER : UIConstants.ROW_BG);
         row.setBorder(new EmptyBorder(5, 5, 5, 5));
@@ -154,50 +157,86 @@ public final class RaceEventCard extends JPanel {
     }
 
     private final class RaceHeader extends JPanel {
+        private final Font titleFont = FontManager.getRunescapeBoldFont().deriveFont(21f);
+
         RaceHeader() {
-            setOpaque(false);
+            setOpaque(true);
+            setBackground(UIConstants.ROW_BG);
             setAlignmentX(Component.LEFT_ALIGNMENT);
-            setPreferredSize(new Dimension(1, 139));
-            setMaximumSize(new Dimension(Integer.MAX_VALUE, 139));
+            setToolTipText("Event dates and times are shown in " + race.getTimeZone());
+        }
+
+        private List<String> titleLines() {
+            int width = getWidth() > 24 ? getWidth() - 24 : 190;
+            FontMetrics metrics = getFontMetrics(titleFont);
+            List<String> lines = new ArrayList<>();
+            String line = "";
+            for (String word : race.getName().split("\\s+")) {
+                String candidate = line.isEmpty() ? word : line + " " + word;
+                if (!line.isEmpty() && metrics.stringWidth(candidate) > width) {
+                    lines.add(line);
+                    line = word;
+                } else line = candidate;
+            }
+            lines.add(line);
+            return lines;
+        }
+
+        @Override public Dimension getPreferredSize() {
+            int height = 54 + titleLines().size() * 23;
+            if ("upcoming".equals(race.getState()) && race.getStartDate() == null) height += 17;
+            return new Dimension(1, height);
+        }
+        @Override public Dimension getMaximumSize() { return new Dimension(Integer.MAX_VALUE, getPreferredSize().height); }
+        @Override public void setBounds(int x, int y, int width, int height) {
+            boolean changed = width != getWidth();
+            super.setBounds(x, y, width, height);
+            if (changed) SwingUtilities.invokeLater(() -> RaceEventCard.this.revalidate());
         }
         @Override protected void paintComponent(Graphics graphics) {
             super.paintComponent(graphics);
             Graphics2D g = (Graphics2D) graphics.create();
-            if (ART != null) {
+            if (artwork != null) {
                 g.setComposite(AlphaComposite.SrcOver.derive(.65f));
-                double scale = Math.max((double) getWidth() / ART.getWidth(), (double) getHeight() / ART.getHeight());
-                int width = (int) Math.ceil(ART.getWidth() * scale);
-                int height = (int) Math.ceil(ART.getHeight() * scale);
+                double scale = Math.max((double) getWidth() / artwork.getWidth(), (double) getHeight() / artwork.getHeight());
+                int width = (int) Math.ceil(artwork.getWidth() * scale);
+                int height = (int) Math.ceil(artwork.getHeight() * scale);
                 g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-                g.drawImage(ART, (getWidth() - width) / 2, (getHeight() - height) / 2, width, height, null);
+                g.drawImage(artwork, (getWidth() - width) / 2, (getHeight() - height) / 2, width, height, null);
                 g.setComposite(AlphaComposite.SrcOver);
             }
             g.setFont(FontManager.getRunescapeSmallFont().deriveFont(12f));
             g.setColor(UIConstants.ACCENT_GOLD);
             String phase = "active".equals(race.getState()) ? "RACE IN PROGRESS" : "completed".equals(race.getState()) ? "RACE RESULTS"
                 : "paused".equals(race.getState()) ? "RACE PAUSED" : "UPCOMING RACE";
-            g.drawString(phase, 12, 20);
-            g.setFont(FontManager.getRunescapeBoldFont().deriveFont(21f));
+            g.drawString(phase, 12, 17);
+            g.setFont(titleFont);
             g.setColor(UIConstants.TEXT_PRIMARY);
-            String line = ""; int y = 43;
-            for (String word : race.getName().split("\\s+")) {
-                String candidate = line.isEmpty() ? word : line + " " + word;
-                if (!line.isEmpty() && g.getFontMetrics().stringWidth(candidate) > getWidth() - 24) {
-                    g.drawString(line, 12, y); y += 23; line = word;
-                } else line = candidate;
+            int y = 39;
+            for (String line : titleLines()) {
+                g.drawString(line, 12, y);
+                y += 23;
             }
-            g.drawString(line, 12, y);
             g.setFont(FontManager.getRunescapeSmallFont().deriveFont(13f));
             g.setColor(UIConstants.TEXT_SECONDARY);
             ZoneId zone = ZoneId.of(race.getTimeZone());
-            String period = DAY.format(LocalDate.parse(race.getPlannedStartDate())) + " - " + DAY.format(Instant.parse(race.getEndDate()).atZone(zone));
-            g.drawString(period, 12, 92);
-            String start = race.getStartDate() == null ? "Starts at raid release - time TBC"
-                : "Starts " + DateTimeFormatter.ofPattern("HH:mm").format(Instant.parse(race.getStartDate()).atZone(zone)) + " Estonian time";
-            if ("upcoming".equals(race.getState())) g.drawString(start, 12, 109);
-            g.drawString("Ends " + DateTimeFormatter.ofPattern("HH:mm").format(Instant.parse(race.getEndDate()).atZone(zone)) + " Estonian time", 12, 126);
+            DateTimeFormatter dateTime = DateTimeFormatter.ofPattern("d MMM HH:mm", Locale.ENGLISH);
+            String start = race.getStartDate() == null ? DAY.format(LocalDate.parse(race.getPlannedStartDate()))
+                : dateTime.format(Instant.parse(race.getStartDate()).atZone(zone));
+            String period = start + " - " + dateTime.format(Instant.parse(race.getEndDate()).atZone(zone)) + " (EE)";
+            while (g.getFontMetrics().stringWidth(period) > getWidth() - 24 && g.getFont().getSize2D() > 11f)
+                g.setFont(g.getFont().deriveFont(g.getFont().getSize2D() - .5f));
+            g.drawString(period, 12, y);
+            if ("upcoming".equals(race.getState()) && race.getStartDate() == null)
+                g.drawString("Starts at raid release - time TBC", 12, y + 17);
             g.dispose();
         }
+    }
+
+    private static void makeClickable(JComponent component, Runnable action) {
+        Clickable.onPress(component, action);
+        for (Component child : component.getComponents())
+            if (child instanceof JComponent) makeClickable((JComponent) child, action);
     }
 
     private static JLabel section(String value) {
@@ -224,8 +263,7 @@ public final class RaceEventCard extends JPanel {
         return button;
     }
     private static BufferedImage image(String name) {
-        try {
-            java.net.URL resource = RaceEventCard.class.getResource("/com/revalclan/races/" + name);
+        try (java.io.InputStream resource = RaceEventCard.class.getResourceAsStream("/com/revalclan/races/" + name)) {
             return resource == null ? null : ImageIO.read(resource);
         } catch (IOException error) { return null; }
     }

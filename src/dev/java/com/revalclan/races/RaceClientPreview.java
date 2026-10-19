@@ -46,7 +46,8 @@ public final class RaceClientPreview {
                 panel.showTab("COMPETITIONS");
                 for (Window window : Window.getWindows()) if (window instanceof JFrame && window.isShowing()) {
                     JFrame frame = (JFrame) window;
-                    frame.setTitle("Reval - Raid race preview" + (DEMO ? " [SAMPLE DATA]" : ""));
+                    frame.setTitle("Reval - Raid race preview" + (DEMO ? " [SAMPLE DATA]" : "")
+                        + (Boolean.getBoolean("reval.raceNoImage") ? " [NO IMAGE]" : ""));
                     Rectangle screen = frame.getGraphicsConfiguration().getBounds();
                     Insets insets = Toolkit.getDefaultToolkit().getScreenInsets(frame.getGraphicsConfiguration());
                     int height = Math.min(920, screen.height - insets.top - insets.bottom);
@@ -94,27 +95,76 @@ public final class RaceClientPreview {
             RaceEventCard card = findRace(panel);
             if (card == null || panel.getWidth() <= 0 || panel.getHeight() <= 0) return;
             try {
-                BufferedImage image = new BufferedImage(panel.getWidth(), panel.getHeight(), BufferedImage.TYPE_INT_ARGB);
-                Graphics2D graphics = image.createGraphics(); panel.printAll(graphics); graphics.dispose();
-                ImageIO.write(image, "png", Path.of(destination).toFile());
-                int markerHeight = DEMO ? 24 : 0;
-                BufferedImage fullCard = new BufferedImage(card.getWidth(), card.getHeight() + markerHeight, BufferedImage.TYPE_INT_ARGB);
-                Graphics2D cardGraphics = fullCard.createGraphics();
-                if (DEMO) {
-                    cardGraphics.setColor(UIConstants.CARD_BG);
-                    cardGraphics.fillRect(0, 0, fullCard.getWidth(), markerHeight);
-                    cardGraphics.setFont(FontManager.getRunescapeSmallFont());
-                    cardGraphics.setColor(UIConstants.ACCENT_GOLD);
-                    cardGraphics.drawString("SAMPLE DATA - PREVIEW ONLY", 8, 16);
-                    cardGraphics.translate(0, markerHeight);
-                }
-                card.printAll(cardGraphics);
-                cardGraphics.dispose();
-                Path cardPath = Path.of(destination.replaceFirst("\\.png$", "-card.png"));
-                ImageIO.write(fullCard, "png", cardPath.toFile());
+                saveCapture(panel, card, destination);
                 System.out.println("Race sidebar screenshot saved: " + destination); timer.stop();
+                if (DEMO) captureDetails(panel, card, destination);
             } catch (Exception error) { throw new IllegalStateException(error); }
         });
         timer.start();
+    }
+
+    private static void saveCapture(RevalPanel panel, RaceEventCard card, String destination) throws Exception {
+        BufferedImage image = new BufferedImage(panel.getWidth(), panel.getHeight(), BufferedImage.TYPE_INT_ARGB);
+        Graphics2D graphics = image.createGraphics(); panel.printAll(graphics); graphics.dispose();
+        ImageIO.write(image, "png", Path.of(destination).toFile());
+        int markerHeight = DEMO ? 24 : 0;
+        BufferedImage fullCard = new BufferedImage(card.getWidth(), card.getHeight() + markerHeight, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D cardGraphics = fullCard.createGraphics();
+        if (DEMO) {
+            cardGraphics.setColor(UIConstants.CARD_BG);
+            cardGraphics.fillRect(0, 0, fullCard.getWidth(), markerHeight);
+            cardGraphics.setFont(FontManager.getRunescapeSmallFont());
+            cardGraphics.setColor(UIConstants.ACCENT_GOLD);
+            cardGraphics.drawString("SAMPLE DATA - PREVIEW ONLY", 8, 16);
+            cardGraphics.translate(0, markerHeight);
+        }
+        card.printAll(cardGraphics);
+        cardGraphics.dispose();
+        ImageIO.write(fullCard, "png", Path.of(destination.replaceFirst("\\.png$", "-card.png")).toFile());
+    }
+
+    private static JButton findButton(Container parent, String text) {
+        for (Component child : parent.getComponents()) {
+            if (child instanceof JButton && child.isShowing() && text.equals(((JButton) child).getText())) return (JButton) child;
+            if (child instanceof Container) {
+                JButton found = findButton((Container) child, text);
+                if (found != null) return found;
+            }
+        }
+        return null;
+    }
+
+    private static int countStandings(Container parent) {
+        int count = 0;
+        for (Component child : parent.getComponents()) {
+            if ("race-kc-row".equals(child.getName())) count++;
+            if (child instanceof Container) count += countStandings((Container) child);
+        }
+        return count;
+    }
+
+    /** Component-level navigation check using the same buttons the user sees. */
+    private static void captureDetails(RevalPanel panel, RaceEventCard overview, String destination) {
+        if (countStandings(overview) != 5) throw new IllegalStateException("Overview must show five sample standings");
+        JButton open = findButton(panel, "Full KC leaderboard >");
+        if (open == null) throw new IllegalStateException("Full standings action missing");
+        open.doClick(0);
+        Timer detail = new Timer(350, null);
+        detail.addActionListener(event -> {
+            RaceEventCard card = findRace(panel);
+            if (card == null || card == overview) return;
+            try {
+                if (countStandings(card) != 12) throw new IllegalStateException("Detail must show all twelve sample standings");
+                if (findButton(panel, "Open event on website") != null) throw new IllegalStateException("Website action should be removed");
+                saveCapture(panel, card, destination.replaceFirst("\\.png$", "-details.png"));
+                JButton back = findButton(panel, "< Competitions");
+                if (back == null) throw new IllegalStateException("Back action missing");
+                back.doClick(0);
+                if (countStandings(findRace(panel)) != 5) throw new IllegalStateException("Back did not restore overview");
+                System.out.println("Verified native race navigation: five-row overview, twelve-row detail, back to overview");
+                detail.stop();
+            } catch (Exception error) { detail.stop(); throw new IllegalStateException(error); }
+        });
+        detail.start();
     }
 }

@@ -96,6 +96,7 @@ tasks.register('runRaceClient', JavaExec) {
 	args = ['--developer-mode']
 	if (project.hasProperty('revalRaceScreenshot')) systemProperty('reval.raceScreenshot', project.property('revalRaceScreenshot'))
 	if (project.hasProperty('revalRaceDemo')) systemProperty('reval.raceDemo', project.property('revalRaceDemo'))
+	if (project.hasProperty('revalRaceNoImage')) systemProperty('reval.raceNoImage', project.property('revalRaceNoImage'))
 }
 
 // Native clan-browser previews. API override is for a local read-only development server.
