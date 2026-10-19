@@ -99,6 +99,15 @@ tasks.register('runRaceClient', JavaExec) {
 	if (project.hasProperty('revalRaceNoImage')) systemProperty('reval.raceNoImage', project.property('revalRaceNoImage'))
 }
 
+tasks.register('checkRaceCardLayout', JavaExec) {
+	group = 'verification'
+	description = 'Check race inventory icon bounds and party layout in narrow sidebars'
+	classpath = sourceSets.dev.runtimeClasspath
+	mainClass = 'com.revalclan.races.RaceCardLayoutCheck'
+	systemProperty('java.awt.headless', 'true')
+}
+tasks.named('check') { dependsOn tasks.named('checkRaceCardLayout') }
+
 // Native clan-browser previews. API override is for a local read-only development server.
 ['runBrowserPreview': 'com.revalclan.clanbrowser.BrowserDesktopPreview',
  'runBrowserClient': 'com.revalclan.clanbrowser.BrowserClientPreview'].each { taskName, entrypoint ->

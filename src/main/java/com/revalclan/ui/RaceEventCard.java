@@ -22,7 +22,7 @@ import java.util.Locale;
 
 /** A native inventory-style race card, backed by the same verified results as the homepage. */
 public final class RaceEventCard extends JPanel {
-    private static final BufferedImage PET = image("pet.png"), UNIQUE = image("unique.png"), PURPLE = image("purple.png");
+    private static final BufferedImage PET = image("pet.png"), UNIQUE = image("unique.png"), PURPLE = image("purple.png"), COMPLETION = image("completion.png");
     private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("d MMM", Locale.ENGLISH);
     private final FeaturedRaceResponse.Race race;
     private final BufferedImage artwork;
@@ -38,10 +38,10 @@ public final class RaceEventCard extends JPanel {
         JPanel body = column();
         body.setBorder(new EmptyBorder(4, 8, 10, 8));
         add(body);
-        body.add(section("First drops"));
+        body.add(section("Race firsts"));
         List<FeaturedRaceResponse.Objective> objectives = race.getObjectives() == null ? Collections.emptyList() : race.getObjectives();
         for (FeaturedRaceResponse.Objective objective : objectives) {
-            body.add(objectiveRow(objective));
+            body.add(objectiveRow(objective, details));
             body.add(Box.createVerticalStrut(5));
         }
         body.add(Box.createVerticalStrut(8));
@@ -61,26 +61,46 @@ public final class RaceEventCard extends JPanel {
     @Override public Dimension getPreferredSize() { return new Dimension(1, super.getPreferredSize().height); }
     @Override public Dimension getMaximumSize() { return new Dimension(Integer.MAX_VALUE, super.getPreferredSize().height); }
 
-    private JPanel objectiveRow(FeaturedRaceResponse.Objective objective) {
+    private JPanel objectiveRow(FeaturedRaceResponse.Objective objective, boolean details) {
         JPanel row = new JPanel(new BorderLayout(6, 0));
+        row.setName("race-objective-" + objective.getKind());
         row.setBackground(UIConstants.ROW_BG);
         row.setBorder(new EmptyBorder(6, 5, 6, 5));
         row.setAlignmentX(Component.LEFT_ALIGNMENT);
-        row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 51));
-        row.setPreferredSize(new Dimension(1, 51));
-        BufferedImage icon = "pet".equals(objective.getKind()) ? PET : "purple".equals(objective.getKind()) ? PURPLE : UNIQUE;
+        boolean partyObjective = objective.isClanPartyOnly();
+        List<String> members = objective.getWinner() == null ? null : objective.getWinner().getMembers();
+        int height = partyObjective ? 82 + (details && members != null ? members.size() * 17 : 0) : 51;
+        row.setMaximumSize(new Dimension(Integer.MAX_VALUE, height));
+        row.setPreferredSize(new Dimension(1, height));
+        BufferedImage icon = "completion".equals(objective.getKind()) ? COMPLETION : "pet".equals(objective.getKind()) ? PET : "purple".equals(objective.getKind()) ? PURPLE : UNIQUE;
         JLabel slot = new JLabel(icon == null ? null : new ImageIcon(icon));
         slot.setBorder(BorderFactory.createLineBorder(UIConstants.BORDER_COLOR));
         row.add(slot, BorderLayout.WEST);
         JPanel copy = column();
-        copy.add(label(objective.getTitle(), FontManager.getRunescapeSmallFont(), UIConstants.TEXT_PRIMARY));
-        String result = objective.getWinner() == null ? "Unclaimed" : objective.getWinner().getName();
+        if (partyObjective) {
+            JTextArea title = new JTextArea(objective.getTitle());
+            title.setFont(FontManager.getRunescapeSmallFont()); title.setForeground(UIConstants.TEXT_PRIMARY);
+            title.setOpaque(false); title.setEditable(false); title.setFocusable(false);
+            title.setLineWrap(true); title.setWrapStyleWord(true);
+            title.setPreferredSize(new Dimension(1, 32)); title.setMaximumSize(new Dimension(Integer.MAX_VALUE, 32));
+            title.setAlignmentX(Component.LEFT_ALIGNMENT); copy.add(title);
+        } else copy.add(label(objective.getTitle(), FontManager.getRunescapeSmallFont(), UIConstants.TEXT_PRIMARY));
+        String result = objective.getWinner() == null ? "Unclaimed" : partyObjective && members != null
+            ? "Clan party (" + members.size() + ")" : objective.getWinner().getName();
         JLabel winner = label(result, objective.getWinner() == null ? FontManager.getRunescapeSmallFont().deriveFont(12f) : FontManager.getRunescapeSmallFont(),
             objective.getWinner() == null ? UIConstants.TEXT_SECONDARY : UIConstants.ACCENT_GREEN);
-        winner.setToolTipText(result);
+        winner.setToolTipText(objective.getWinner() == null ? result : objective.getWinner().getName());
         copy.add(winner);
+        if (partyObjective) copy.add(label("All-Reval party", FontManager.getRunescapeSmallFont().deriveFont(12f), UIConstants.TEXT_SECONDARY));
+        if (partyObjective && details && members != null) {
+            for (String member : members) copy.add(label(member, FontManager.getRunescapeSmallFont(), UIConstants.ACCENT_GREEN));
+        }
         row.add(copy, BorderLayout.CENTER);
-        row.add(label("+" + objective.getPoints() + " pts", FontManager.getRunescapeBoldFont(), UIConstants.ACCENT_GOLD), BorderLayout.EAST);
+        JPanel reward = column();
+        reward.add(label("+" + objective.getPoints() + " pts", FontManager.getRunescapeBoldFont(), UIConstants.ACCENT_GOLD));
+        if (partyObjective) reward.add(label("each player", FontManager.getRunescapeSmallFont().deriveFont(12f), UIConstants.ACCENT_GOLD));
+        row.add(reward, BorderLayout.EAST);
+        if (partyObjective && members != null && !members.isEmpty()) row.setToolTipText(objective.getWinner().getName());
         return row;
     }
 
@@ -264,7 +284,14 @@ public final class RaceEventCard extends JPanel {
     }
     private static BufferedImage image(String name) {
         try (java.io.InputStream resource = RaceEventCard.class.getResourceAsStream("/com/revalclan/races/" + name)) {
-            return resource == null ? null : ImageIO.read(resource);
+            BufferedImage source = resource == null ? null : ImageIO.read(resource);
+            if (source == null || Math.max(source.getWidth(), source.getHeight()) <= 32) return source;
+            double scale = 32d / Math.max(source.getWidth(), source.getHeight());
+            BufferedImage icon = new BufferedImage(Math.max(1, (int) (source.getWidth() * scale)), Math.max(1, (int) (source.getHeight() * scale)), BufferedImage.TYPE_INT_ARGB);
+            Graphics2D g = icon.createGraphics();
+            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+            g.drawImage(source, 0, 0, icon.getWidth(), icon.getHeight(), null); g.dispose();
+            return icon;
         } catch (IOException error) { return null; }
     }
 }
