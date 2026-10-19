@@ -47,8 +47,8 @@ public final class RaceCardLayoutCheck {
                 if (slot.getWidth() > 36 || copy.getWidth() < 60 || reward.getX() < copy.getX() + copy.getWidth())
                     throw new AssertionError("First completion artwork or points obscure the text");
                 if (((Container) copy).getComponentCount() != 2) throw new AssertionError("Only the title and claimer should be visible");
-                JLabel title = (JLabel) ((Container) copy).getComponent(0);
-                if (title.getFontMetrics(title.getFont()).stringWidth(title.getText()) > copy.getWidth()) throw new AssertionError("First completion title is clipped");
+                JTextArea title = (JTextArea) ((Container) copy).getComponent(0);
+                if (!title.getLineWrap() || title.getHeight() < 2 * title.getFontMetrics(title.getFont()).getHeight()) throw new AssertionError("First completion title has no space to wrap");
             }
             if (child instanceof Container) check((Container) child);
         }

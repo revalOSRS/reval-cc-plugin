@@ -69,6 +69,7 @@ public final class RaceEventCard extends JPanel {
         row.setAlignmentX(Component.LEFT_ALIGNMENT);
         boolean partyObjective = objective.isClanPartyOnly();
         List<String> members = objective.getWinner() == null ? null : objective.getWinner().getMembers();
+        if (partyObjective) row.setBorder(new EmptyBorder(3, 5, 3, 5));
         row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 51));
         row.setPreferredSize(new Dimension(1, 51));
         BufferedImage icon = "completion".equals(objective.getKind()) ? COMPLETION : "pet".equals(objective.getKind()) ? PET : "purple".equals(objective.getKind()) ? PURPLE : UNIQUE;
@@ -77,7 +78,15 @@ public final class RaceEventCard extends JPanel {
         slot.setPreferredSize(new Dimension(34, 39));
         row.add(slot, BorderLayout.WEST);
         JPanel copy = column();
-        copy.add(label(objective.getTitle(), partyObjective ? FontManager.getRunescapeSmallFont().deriveFont(12f) : FontManager.getRunescapeSmallFont(), UIConstants.TEXT_PRIMARY));
+        if (partyObjective) {
+            JTextArea title = new JTextArea(objective.getTitle());
+            title.setFont(FontManager.getRunescapeSmallFont().deriveFont(12f)); title.setForeground(UIConstants.TEXT_PRIMARY);
+            title.setOpaque(false); title.setEditable(false); title.setFocusable(false); title.setBorder(null);
+            title.setMargin(new Insets(0, 0, 0, 0)); title.setLineWrap(true); title.setWrapStyleWord(true);
+            int height = 2 * title.getFontMetrics(title.getFont()).getHeight();
+            title.setPreferredSize(new Dimension(1, height)); title.setMaximumSize(new Dimension(Integer.MAX_VALUE, height));
+            title.setAlignmentX(Component.LEFT_ALIGNMENT); copy.add(title);
+        } else copy.add(label(objective.getTitle(), FontManager.getRunescapeSmallFont(), UIConstants.TEXT_PRIMARY));
         String result = objective.getWinner() == null ? "Unclaimed" : partyObjective && members != null
             ? "Clan party (" + members.size() + ")" : objective.getWinner().getName();
         JLabel winner = label(result, objective.getWinner() == null ? FontManager.getRunescapeSmallFont().deriveFont(12f) : FontManager.getRunescapeSmallFont(),
