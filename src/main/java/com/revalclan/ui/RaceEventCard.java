@@ -41,7 +41,7 @@ public final class RaceEventCard extends JPanel {
         body.add(section("Race firsts"));
         List<FeaturedRaceResponse.Objective> objectives = race.getObjectives() == null ? Collections.emptyList() : race.getObjectives();
         for (FeaturedRaceResponse.Objective objective : objectives) {
-            body.add(objectiveRow(objective, details));
+            body.add(objectiveRow(objective));
             body.add(Box.createVerticalStrut(5));
         }
         body.add(Box.createVerticalStrut(8));
@@ -61,7 +61,7 @@ public final class RaceEventCard extends JPanel {
     @Override public Dimension getPreferredSize() { return new Dimension(1, super.getPreferredSize().height); }
     @Override public Dimension getMaximumSize() { return new Dimension(Integer.MAX_VALUE, super.getPreferredSize().height); }
 
-    private JPanel objectiveRow(FeaturedRaceResponse.Objective objective, boolean details) {
+    private JPanel objectiveRow(FeaturedRaceResponse.Objective objective) {
         JPanel row = new JPanel(new BorderLayout(6, 0));
         row.setName("race-objective-" + objective.getKind());
         row.setBackground(UIConstants.ROW_BG);
@@ -69,37 +69,23 @@ public final class RaceEventCard extends JPanel {
         row.setAlignmentX(Component.LEFT_ALIGNMENT);
         boolean partyObjective = objective.isClanPartyOnly();
         List<String> members = objective.getWinner() == null ? null : objective.getWinner().getMembers();
-        int height = partyObjective ? 82 + (details && members != null ? members.size() * 17 : 0) : 51;
-        row.setMaximumSize(new Dimension(Integer.MAX_VALUE, height));
-        row.setPreferredSize(new Dimension(1, height));
+        row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 51));
+        row.setPreferredSize(new Dimension(1, 51));
         BufferedImage icon = "completion".equals(objective.getKind()) ? COMPLETION : "pet".equals(objective.getKind()) ? PET : "purple".equals(objective.getKind()) ? PURPLE : UNIQUE;
         JLabel slot = new JLabel(icon == null ? null : new ImageIcon(icon));
         slot.setBorder(BorderFactory.createLineBorder(UIConstants.BORDER_COLOR));
+        slot.setPreferredSize(new Dimension(34, 39));
         row.add(slot, BorderLayout.WEST);
         JPanel copy = column();
-        if (partyObjective) {
-            JTextArea title = new JTextArea(objective.getTitle());
-            title.setFont(FontManager.getRunescapeSmallFont()); title.setForeground(UIConstants.TEXT_PRIMARY);
-            title.setOpaque(false); title.setEditable(false); title.setFocusable(false);
-            title.setLineWrap(true); title.setWrapStyleWord(true);
-            title.setPreferredSize(new Dimension(1, 32)); title.setMaximumSize(new Dimension(Integer.MAX_VALUE, 32));
-            title.setAlignmentX(Component.LEFT_ALIGNMENT); copy.add(title);
-        } else copy.add(label(objective.getTitle(), FontManager.getRunescapeSmallFont(), UIConstants.TEXT_PRIMARY));
+        copy.add(label(objective.getTitle(), partyObjective ? FontManager.getRunescapeSmallFont().deriveFont(12f) : FontManager.getRunescapeSmallFont(), UIConstants.TEXT_PRIMARY));
         String result = objective.getWinner() == null ? "Unclaimed" : partyObjective && members != null
             ? "Clan party (" + members.size() + ")" : objective.getWinner().getName();
         JLabel winner = label(result, objective.getWinner() == null ? FontManager.getRunescapeSmallFont().deriveFont(12f) : FontManager.getRunescapeSmallFont(),
             objective.getWinner() == null ? UIConstants.TEXT_SECONDARY : UIConstants.ACCENT_GREEN);
         winner.setToolTipText(objective.getWinner() == null ? result : objective.getWinner().getName());
         copy.add(winner);
-        if (partyObjective) copy.add(label("All-Reval party", FontManager.getRunescapeSmallFont().deriveFont(12f), UIConstants.TEXT_SECONDARY));
-        if (partyObjective && details && members != null) {
-            for (String member : members) copy.add(label(member, FontManager.getRunescapeSmallFont(), UIConstants.ACCENT_GREEN));
-        }
         row.add(copy, BorderLayout.CENTER);
-        JPanel reward = column();
-        reward.add(label("+" + objective.getPoints() + " pts", FontManager.getRunescapeBoldFont(), UIConstants.ACCENT_GOLD));
-        if (partyObjective) reward.add(label("each player", FontManager.getRunescapeSmallFont().deriveFont(12f), UIConstants.ACCENT_GOLD));
-        row.add(reward, BorderLayout.EAST);
+        row.add(label("+" + objective.getPoints() + " pts", FontManager.getRunescapeBoldFont(), UIConstants.ACCENT_GOLD), BorderLayout.EAST);
         if (partyObjective && members != null && !members.isEmpty()) row.setToolTipText(objective.getWinner().getName());
         return row;
     }

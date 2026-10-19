@@ -17,13 +17,12 @@ public final class RaceCardLayoutCheck {
                     card.setSize(width, card.getPreferredSize().height);
                     layout(card);
                     check(card);
-                    if (details) for (String member : List.of("Clan One", "Clan Two", "Clan Three", "Clan Four")) {
-                        if (!hasLabel(card, member)) throw new AssertionError("Missing winning party member: " + member);
-                    }
+                    if (!hasLabel(card, "Clan party (4)")) throw new AssertionError("Missing compact party claimer");
+                    if (hasLabel(card, "each player") || hasLabel(card, "All-Reval party")) throw new AssertionError("Unnecessary completion captions are visible");
                 }
             }
         });
-        System.out.println("Verified race cards at 219px and 300px: bounded icons, readable copy, and full winning party in details");
+        System.out.println("Verified race cards at 219px and 300px: bounded icons, equal row heights, and compact party claimer");
     }
 
     private static void layout(Container container) {
@@ -37,6 +36,8 @@ public final class RaceCardLayoutCheck {
                 Icon icon = ((JLabel) child).getIcon();
                 if (icon.getIconWidth() > 32 || icon.getIconHeight() > 32) throw new AssertionError("Objective artwork exceeds its inventory slot");
             }
+            if (child.getName() != null && child.getName().startsWith("race-objective-") && child.getHeight() != 51)
+                throw new AssertionError("Race objective rows must have the same 51px height");
             if ("race-objective-completion".equals(child.getName())) {
                 Container row = (Container) child;
                 BorderLayout border = (BorderLayout) row.getLayout();
@@ -45,6 +46,9 @@ public final class RaceCardLayoutCheck {
                 Component reward = border.getLayoutComponent(BorderLayout.EAST);
                 if (slot.getWidth() > 36 || copy.getWidth() < 60 || reward.getX() < copy.getX() + copy.getWidth())
                     throw new AssertionError("First completion artwork or points obscure the text");
+                if (((Container) copy).getComponentCount() != 2) throw new AssertionError("Only the title and claimer should be visible");
+                JLabel title = (JLabel) ((Container) copy).getComponent(0);
+                if (title.getFontMetrics(title.getFont()).stringWidth(title.getText()) > copy.getWidth()) throw new AssertionError("First completion title is clipped");
             }
             if (child instanceof Container) check((Container) child);
         }
