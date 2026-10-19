@@ -87,27 +87,6 @@ tasks.register('runClient', JavaExec) {
 	args = ['--developer-mode']
 }
 
-tasks.register('runRaceClient', JavaExec) {
-	group = 'application'
-	description = 'Launch RuneLite on the Competitions tab with the real featured race'
-	classpath = sourceSets.dev.runtimeClasspath
-	mainClass = 'com.revalclan.races.RaceClientPreview'
-	jvmArgs = ['-ea', '-Xmx1g', '--add-exports=java.desktop/com.apple.eawt=ALL-UNNAMED', '--add-opens=java.desktop/com.apple.eawt=ALL-UNNAMED']
-	args = ['--developer-mode']
-	if (project.hasProperty('revalRaceScreenshot')) systemProperty('reval.raceScreenshot', project.property('revalRaceScreenshot'))
-	if (project.hasProperty('revalRaceDemo')) systemProperty('reval.raceDemo', project.property('revalRaceDemo'))
-	if (project.hasProperty('revalRaceNoImage')) systemProperty('reval.raceNoImage', project.property('revalRaceNoImage'))
-}
-
-tasks.register('checkRaceCardLayout', JavaExec) {
-	group = 'verification'
-	description = 'Check race inventory icon bounds and party layout in narrow sidebars'
-	classpath = sourceSets.dev.runtimeClasspath
-	mainClass = 'com.revalclan.races.RaceCardLayoutCheck'
-	systemProperty('java.awt.headless', 'true')
-}
-tasks.named('check') { dependsOn tasks.named('checkRaceCardLayout') }
-
 // Native clan-browser previews. API override is for a local read-only development server.
 ['runBrowserPreview': 'com.revalclan.clanbrowser.BrowserDesktopPreview',
  'runBrowserClient': 'com.revalclan.clanbrowser.BrowserClientPreview'].each { taskName, entrypoint ->

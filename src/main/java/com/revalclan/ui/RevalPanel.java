@@ -436,7 +436,7 @@ public class RevalPanel extends PluginPanel {
 		profilePanel.setOnOpenRanks(() -> selectTab("RANKING"));
 		leaderboardPanel.init(apiService, assetLoader, itemManager, rankIconResolver);
 		achievementsPanel.init(apiService, client);
-		competitionsPanel.init(apiService, client);
+		competitionsPanel.init(apiService, client, itemManager);
 		eventsPanel.init(apiService, client);
 		diaryPanel.init(apiService, client, assetLoader);
 		publicLoads.put("RANKING", rankingPanel::load);
