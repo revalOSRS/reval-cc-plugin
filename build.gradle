@@ -95,6 +95,7 @@ tasks.register('runRaceClient', JavaExec) {
 	jvmArgs = ['-ea', '-Xmx1g', '--add-exports=java.desktop/com.apple.eawt=ALL-UNNAMED', '--add-opens=java.desktop/com.apple.eawt=ALL-UNNAMED']
 	args = ['--developer-mode']
 	if (project.hasProperty('revalRaceScreenshot')) systemProperty('reval.raceScreenshot', project.property('revalRaceScreenshot'))
+	if (project.hasProperty('revalRaceDemo')) systemProperty('reval.raceDemo', project.property('revalRaceDemo'))
 }
 
 // Native clan-browser previews. API override is for a local read-only development server.
