@@ -50,7 +50,7 @@ final class RaceDemoApiService extends RevalApiService {
         race.setImageUrl(Boolean.getBoolean("reval.raceNoImage") ? null : "sample:archive");
         if (race.getObjectives() != null && race.getObjectives().stream().noneMatch(objective -> "completion".equals(objective.getKind()))) {
             FeaturedRaceResponse.Objective clear = new FeaturedRaceResponse.Objective();
-            clear.setId("sample-first-clear"); clear.setKind("completion"); clear.setTitle("First raid completion");
+            clear.setId("sample-first-clear"); clear.setKind("completion"); clear.setTitle("First raid KC");
             clear.setPoints(100); clear.setClanPartyOnly(true);
             race.getObjectives().add(0, clear);
         }

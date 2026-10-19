@@ -47,8 +47,9 @@ public final class RaceCardLayoutCheck {
                 if (slot.getWidth() > 36 || copy.getWidth() < 60 || reward.getX() < copy.getX() + copy.getWidth())
                     throw new AssertionError("First completion artwork or points obscure the text");
                 if (((Container) copy).getComponentCount() != 2) throw new AssertionError("Only the title and claimer should be visible");
-                JTextArea title = (JTextArea) ((Container) copy).getComponent(0);
-                if (!title.getLineWrap() || title.getHeight() < 2 * title.getFontMetrics(title.getFont()).getHeight()) throw new AssertionError("First completion title has no space to wrap");
+                JLabel title = (JLabel) ((Container) copy).getComponent(0);
+                if (title.getFontMetrics(title.getFont()).stringWidth(title.getText()) > title.getWidth())
+                    throw new AssertionError("First raid KC title is clipped");
             }
             if (child instanceof Container) check((Container) child);
         }
@@ -68,7 +69,7 @@ public final class RaceCardLayoutCheck {
         race.setPlannedStartDate("2026-10-20"); race.setEndDate("2026-11-01T21:59:59.999Z");
         List<FeaturedRaceResponse.Objective> objectives = new ArrayList<>();
         String[] kinds = {"completion", "pet", "unique", "purple"};
-        String[] titles = {"First raid completion", "First raid pet", "First unique", "First purple"};
+        String[] titles = {"First raid KC", "First raid pet", "First unique", "First purple"};
         for (int i = 0; i < kinds.length; i++) {
             FeaturedRaceResponse.Objective objective = new FeaturedRaceResponse.Objective();
             objective.setKind(kinds[i]); objective.setTitle(titles[i]); objective.setPoints(100);
