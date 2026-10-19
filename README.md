@@ -107,6 +107,19 @@ jar from `src/main`; `./gradlew shadowJar` creates the standalone development cl
 RuneLite runtime. Use `./gradlew runClient` to launch the client normally. Neither jar includes
 automated test classes or test-framework dependencies.
 
+To preview the featured raid race in the real RuneLite Competitions tab:
+
+```sh
+JAVA_HOME=$(/usr/libexec/java_home -v 21) ./gradlew runRaceClient
+```
+
+This reads the same public featured-race feed as the homepage, without requiring a game login.
+It shows the three first-drop rewards, Top 10 KC rewards, and real KC standings. A featured draft
+appears as upcoming while the exact release time and tracking targets are pending; viewing it
+does not activate scoring. Refresh fetches the latest results, and the native detail view shows
+all standings returned by the feed. Add `-PrevalRaceScreenshot=/absolute/path/sidebar.png` to save
+the visible sidebar and the complete race card (`sidebar-card.png`) for visual QA.
+
 ### 🖥️ Sidepanel UI (Planned)
 A dedicated panel for Reval clan members with:
 - **Profile**: View your clan rank, points progress, milestones, and achievements

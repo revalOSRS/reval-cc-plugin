@@ -43,6 +43,12 @@ public class CompetitionsPanel extends JPanel {
 	private Map<String, String> myVotes = new HashMap<>();
 
 	private int loadGeneration;
+	private int raceGeneration;
+	private FeaturedRaceResponse.Race featuredRace;
+	private boolean raceLoading;
+	private boolean memberLoading;
+	private boolean memberContentAvailable;
+	private String selectedRaceId;
 
 	public CompetitionsPanel() {
 		setLayout(new BorderLayout());
@@ -94,16 +100,49 @@ public class CompetitionsPanel extends JPanel {
 		activeVotes = new ArrayList<>();
 		activeCompetitions = new ArrayList<>();
 		scheduledCompetitions = new ArrayList<>();
-		refreshButton.setLoading(false);
+		memberLoading = false;
+		updateLoading();
+		memberContentAvailable = false;
+		selectedRaceId = null;
 		cardLayout.show(cardContainer, "LIST");
-		contentPanel.removeAll();
-		contentPanel.add(new LoginPrompt("Competitions"));
-		contentPanel.revalidate();
-		contentPanel.repaint();
+		buildContent();
 	}
 
 	public void refresh() {
+		refreshRace();
 		loadData(false);
+	}
+
+	private void updateLoading() {
+		refreshButton.setLoading(raceLoading || memberLoading);
+	}
+
+	/** Public data is useful before release and does not require a game login. */
+	public void refreshRace() {
+		if (apiService == null || raceLoading) return;
+		final int generation = ++raceGeneration;
+		raceLoading = true;
+		updateLoading();
+		apiService.fetchFeaturedRace(response -> SwingUtilities.invokeLater(() -> {
+			if (generation != raceGeneration) return;
+			raceLoading = false;
+			updateLoading();
+			featuredRace = response.getData() == null ? null : response.getData().getRace();
+			buildContent();
+			if (selectedRaceId != null) {
+				if (featuredRace != null && selectedRaceId.equals(featuredRace.getId())) {
+					showRaceDetails(featuredRace);
+				} else {
+					selectedRaceId = null;
+					cardLayout.show(cardContainer, "LIST");
+				}
+			}
+		}), error -> SwingUtilities.invokeLater(() -> {
+			if (generation != raceGeneration) return;
+			raceLoading = false;
+			updateLoading();
+			buildContent();
+		}));
 	}
 
 	private void loadData(boolean showLoadingState) {
@@ -113,13 +152,16 @@ public class CompetitionsPanel extends JPanel {
 			return;
 		}
 		final int generation = ++loadGeneration;
+		memberContentAvailable = true;
 		if (showLoadingState) showLoading();
-		refreshButton.setLoading(true);
+		memberLoading = true;
+		updateLoading();
 
 		final boolean[] loaded = {false, false, false};
 		Runnable checkComplete = () -> {
 			if (loaded[0] && loaded[1] && loaded[2]) {
-				refreshButton.setLoading(false);
+				memberLoading = false;
+				updateLoading();
 				buildContent();
 			}
 		};
@@ -202,6 +244,12 @@ public class CompetitionsPanel extends JPanel {
 	private void buildContent() {
 		contentPanel.removeAll();
 		boolean hasContent = false;
+		if (featuredRace != null) {
+			hasContent = true;
+			addSection("Race events");
+			contentPanel.add(new RaceEventCard(featuredRace, false, () -> showRaceDetails(featuredRace)));
+			contentPanel.add(Box.createVerticalStrut(12));
+		}
 
 		if (!activeVotes.isEmpty()) {
 			hasContent = true;
@@ -232,7 +280,9 @@ public class CompetitionsPanel extends JPanel {
 			}
 		}
 
-		if (!hasContent) {
+		if (!memberContentAvailable && featuredRace == null) {
+			contentPanel.add(new LoginPrompt("Competitions"));
+		} else if (!hasContent) {
 			contentPanel.add(Box.createVerticalStrut(30));
 			contentPanel.add(label("No active competitions or votes", FontManager.getRunescapeSmallFont(), UIConstants.TEXT_SECONDARY, Component.CENTER_ALIGNMENT));
 		}
@@ -241,6 +291,29 @@ public class CompetitionsPanel extends JPanel {
 		contentPanel.repaint();
 
 
+	}
+
+	private void showRaceDetails(FeaturedRaceResponse.Race race) {
+		selectedRaceId = race.getId();
+		detailViewPanel.removeAll();
+		JPanel top = new JPanel(new BorderLayout());
+		top.setBackground(UIConstants.CARD_BG);
+		top.setBorder(new EmptyBorder(8, 8, 8, 8));
+		top.add(new BackButton("< Competitions", () -> {
+			selectedRaceId = null;
+			cardLayout.show(cardContainer, "LIST");
+		}), BorderLayout.WEST);
+		top.add(new RefreshButton(this::refreshRace), BorderLayout.EAST);
+		detailViewPanel.add(top, BorderLayout.NORTH);
+		JPanel body = new JPanel();
+		body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
+		body.setBackground(UIConstants.BACKGROUND);
+		body.setBorder(new EmptyBorder(8, 8, 8, 8));
+		body.add(new RaceEventCard(race, true, null));
+		detailViewPanel.add(ScrollWrap.of(body), BorderLayout.CENTER);
+		cardLayout.show(cardContainer, "DETAIL");
+		detailViewPanel.revalidate();
+		detailViewPanel.repaint();
 	}
 
 	private void addSection(String text) {

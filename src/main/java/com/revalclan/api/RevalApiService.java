@@ -317,6 +317,10 @@ public class RevalApiService {
 
     // ==================== COMPETITIONS API ====================
 
+    public void fetchFeaturedRace(Consumer<FeaturedRaceResponse> onSuccess, Consumer<Exception> onError) {
+        getPublic(ApiEndpoints.publicUrl(ApiEndpoints.PUBLIC_FEATURED_RACE), FeaturedRaceResponse.class, onSuccess, onError);
+    }
+
     public void fetchCompetitions(String status, Consumer<CompetitionsResponse> onSuccess, Consumer<Exception> onError) {
         String endpoint = status != null 
             ? ApiEndpoints.COMPETITIONS + "?status=" + status
