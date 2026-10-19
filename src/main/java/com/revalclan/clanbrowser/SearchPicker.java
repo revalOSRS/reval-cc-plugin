@@ -106,7 +106,8 @@ final class SearchPicker extends JPanel {
     }
     private void updatePopup(boolean all) {
         List<BrowserModels.Choice> matches = matches(choices, all ? "" : field.getText());
-        model.clear(); matches.stream().limit(40).forEach(model::addElement);
+        // Limit the popup height below, not the results: the full catalogue must be scrollable.
+        model.clear(); matches.forEach(model::addElement);
         if (model.isEmpty() || !isShowing()) { popup.setVisible(false); return; }
         list.setSelectedIndex(0);
         popup.setPopupSize(new Dimension(Math.max(240, getWidth()), Math.min(285, model.size() * 32 + 4)));
