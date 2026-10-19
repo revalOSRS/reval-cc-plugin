@@ -48,11 +48,21 @@ final class RaceDemoApiService extends RevalApiService {
     private static void populate(FeaturedRaceResponse.Race race) {
         race.setState("active");
         race.setImageUrl(Boolean.getBoolean("reval.raceNoImage") ? null : "sample:archive");
+        if (race.getObjectives() != null && race.getObjectives().stream().noneMatch(objective -> "completion".equals(objective.getKind()))) {
+            FeaturedRaceResponse.Objective clear = new FeaturedRaceResponse.Objective();
+            clear.setId("sample-first-clear"); clear.setKind("completion"); clear.setTitle("First raid completion");
+            clear.setPoints(100); clear.setClanPartyOnly(true);
+            race.getObjectives().add(0, clear);
+        }
         if (race.getObjectives() != null) {
             for (FeaturedRaceResponse.Objective objective : race.getObjectives()) {
                 FeaturedRaceResponse.Winner winner = new FeaturedRaceResponse.Winner();
                 winner.setName("pet".equals(objective.getKind()) ? "Arctic Vaggy"
                     : "purple".equals(objective.getKind()) ? "Kahur111" : "Love Yourz");
+                if (objective.isClanPartyOnly()) {
+                    winner.setMembers(List.of("Arctic Vaggy", "Love Yourz", "Kahur111", "PhosaniSpoon"));
+                    winner.setName(String.join(", ", winner.getMembers()));
+                }
                 objective.setWinner(winner);
             }
         }

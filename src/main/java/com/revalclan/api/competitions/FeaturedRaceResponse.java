@@ -36,12 +36,14 @@ public class FeaturedRaceResponse extends PublicApiResponse {
         private String title;
         private int points;
         private boolean trackingReady;
+        private boolean clanPartyOnly;
         private Winner winner;
     }
     @Data
     public static class Winner {
         private String name;
         private String completedAt;
+        private List<String> members;
     }
 
     @Data
