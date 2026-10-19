@@ -441,6 +441,7 @@ public class RevalPanel extends PluginPanel {
 		diaryPanel.init(apiService, client, assetLoader);
 		publicLoads.put("RANKING", rankingPanel::load);
 		publicLoads.put("LEADERBOARD", leaderboardPanel::refresh);
+		publicLoads.put("COMPETITIONS", competitionsPanel::refreshRace);
 		memberLoads.put("ACHIEVEMENTS", achievementsPanel::refresh);
 		memberLoads.put("COMPETITIONS", competitionsPanel::refresh);
 		memberClickLoads.put("EVENTS", eventsPanel::load);

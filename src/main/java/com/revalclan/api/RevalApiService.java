@@ -33,6 +33,8 @@ import okhttp3.*;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -316,6 +318,31 @@ public class RevalApiService {
     }
 
     // ==================== COMPETITIONS API ====================
+
+    public void fetchFeaturedRace(Consumer<FeaturedRaceResponse> onSuccess, Consumer<Exception> onError) {
+        getPublic(ApiEndpoints.publicUrl(ApiEndpoints.PUBLIC_FEATURED_RACE), FeaturedRaceResponse.class, onSuccess, onError);
+    }
+
+    /** Event artwork is optional; decoding and network IO stay off the Swing thread. */
+    public void fetchRaceArtwork(String imageUrl, Consumer<BufferedImage> onSuccess, Consumer<Exception> onError) {
+        String source = imageUrl.trim();
+        HttpUrl url = HttpUrl.parse(source.startsWith("/") ? "https://www.revalosrs.ee" + source : source);
+        if (url == null || !"https".equals(url.scheme())) {
+            onError.accept(new IOException("Invalid event image URL"));
+            return;
+        }
+        httpClient.newCall(new Request.Builder().url(url).build()).enqueue(new Callback() {
+            @Override public void onFailure(Call call, IOException error) { onError.accept(error); }
+            @Override public void onResponse(Call call, Response response) {
+                try (Response result = response) {
+                    if (!result.isSuccessful() || result.body() == null) throw new IOException("Event image unavailable");
+                    BufferedImage image = ImageIO.read(result.body().byteStream());
+                    if (image == null) throw new IOException("Unsupported event image format");
+                    onSuccess.accept(image);
+                } catch (IOException error) { onError.accept(error); }
+            }
+        });
+    }
 
     public void fetchCompetitions(String status, Consumer<CompetitionsResponse> onSuccess, Consumer<Exception> onError) {
         String endpoint = status != null 

@@ -9,6 +9,7 @@ public final class ApiEndpoints {
     // ── Public API (no auth, no /plugin prefix) — build with publicUrl() ──
     public static final String PUBLIC_BASE_URL = "https://api.revalosrs.ee";
     public static final String PUBLIC_LEAGUES_BINGO_EVENT = "/leagues-bingo/events/%s";
+    public static final String PUBLIC_FEATURED_RACE = "/races/featured";
 
     // Points (includes ranks)
     public static final String POINTS = "/points";
