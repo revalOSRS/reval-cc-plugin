@@ -323,8 +323,8 @@ public class RevalApiService {
         getPublic(ApiEndpoints.publicUrl(ApiEndpoints.PUBLIC_FEATURED_RACE), FeaturedRaceResponse.class, onSuccess, onError);
     }
 
-    /** Event artwork is optional; decoding and network IO stay off the Swing thread. */
-    public void fetchRaceArtwork(String imageUrl, Consumer<BufferedImage> onSuccess, Consumer<Exception> onError) {
+    /** Banner and task artwork is optional; decoding and network IO stay off the Swing thread. */
+    public void fetchCompetitionArtwork(String imageUrl, Consumer<BufferedImage> onSuccess, Consumer<Exception> onError) {
         String source = imageUrl.trim();
         HttpUrl url = HttpUrl.parse(source.startsWith("/") ? "https://www.revalosrs.ee" + source : source);
         if (url == null || !"https".equals(url.scheme())) {

@@ -10,6 +10,7 @@ import com.revalclan.ui.components.ScrollWrap;
 import com.revalclan.ui.constants.UIConstants;
 import com.revalclan.util.DateTimeUtil;
 import net.runelite.api.Client;
+import net.runelite.client.game.ItemManager;
 import net.runelite.client.ui.FontManager;
 
 import com.revalclan.ui.components.LoginPrompt;
@@ -24,6 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Consumer;
 
 public class CompetitionsPanel extends JPanel {
 	private static final Color MEDAL_GOLD = new Color(255, 215, 0);
@@ -32,6 +34,7 @@ public class CompetitionsPanel extends JPanel {
 
 	private RevalApiService apiService;
 	private Client client;
+	private ItemManager itemManager;
 	private RefreshButton refreshButton;
 
 	private final CardLayout cardLayout;
@@ -54,6 +57,8 @@ public class CompetitionsPanel extends JPanel {
 	private BufferedImage raceArtwork;
 	private String raceArtworkUrl;
 	private boolean artworkLoading;
+	private final Map<String, BufferedImage> objectiveArtwork = new HashMap<>();
+	private final Map<String, List<Consumer<BufferedImage>>> objectiveArtworkCallbacks = new HashMap<>();
 
 	public CompetitionsPanel() {
 		setLayout(new BorderLayout());
@@ -94,9 +99,10 @@ public class CompetitionsPanel extends JPanel {
 		return header;
 	}
 
-	public void init(RevalApiService apiService, Client client) {
+	public void init(RevalApiService apiService, Client client, ItemManager itemManager) {
 		this.apiService = apiService;
 		this.client = client;
+		this.itemManager = itemManager;
 	}
 
 	public void onLoggedOut() {
@@ -133,6 +139,7 @@ public class CompetitionsPanel extends JPanel {
 			raceLoading = false;
 			updateLoading();
 			featuredRace = response.getData() == null ? null : response.getData().getRace();
+			objectiveArtwork.clear();
 			refreshArtwork();
 			renderRace();
 		}), error -> SwingUtilities.invokeLater(() -> {
@@ -154,7 +161,7 @@ public class CompetitionsPanel extends JPanel {
 		if (url == null || raceArtwork != null || artworkLoading) return;
 		artworkLoading = true;
 		final String requestedUrl = url;
-		apiService.fetchRaceArtwork(url, image -> SwingUtilities.invokeLater(() -> {
+		apiService.fetchCompetitionArtwork(url, image -> SwingUtilities.invokeLater(() -> {
 			if (!Objects.equals(requestedUrl, raceArtworkUrl)) return;
 			artworkLoading = false;
 			raceArtwork = image;
@@ -162,6 +169,29 @@ public class CompetitionsPanel extends JPanel {
 		}), error -> SwingUtilities.invokeLater(() -> {
 			if (Objects.equals(requestedUrl, raceArtworkUrl)) artworkLoading = false;
 		}));
+	}
+
+	/** Cache optional task artwork across the overview and detail card. Callbacks run on the EDT. */
+	private void loadObjectiveArtwork(String imageUrl, Consumer<BufferedImage> onSuccess) {
+		String url = imageUrl.trim();
+		BufferedImage cached = objectiveArtwork.get(url);
+		if (cached != null) {
+			onSuccess.accept(cached);
+			return;
+		}
+		List<Consumer<BufferedImage>> callbacks = objectiveArtworkCallbacks.get(url);
+		if (callbacks != null) {
+			callbacks.add(onSuccess);
+			return;
+		}
+		callbacks = new ArrayList<>();
+		callbacks.add(onSuccess);
+		objectiveArtworkCallbacks.put(url, callbacks);
+		apiService.fetchCompetitionArtwork(url, image -> SwingUtilities.invokeLater(() -> {
+			objectiveArtwork.put(url, image);
+			List<Consumer<BufferedImage>> waiting = objectiveArtworkCallbacks.remove(url);
+			if (waiting != null) waiting.forEach(callback -> callback.accept(image));
+		}), error -> SwingUtilities.invokeLater(() -> objectiveArtworkCallbacks.remove(url)));
 	}
 
 	private void renderRace() {
@@ -277,7 +307,7 @@ public class CompetitionsPanel extends JPanel {
 		if (featuredRace != null) {
 			hasContent = true;
 			addSection("Race events");
-			contentPanel.add(new RaceEventCard(featuredRace, raceArtwork, false, () -> showRaceDetails(featuredRace)));
+			contentPanel.add(new RaceEventCard(featuredRace, raceArtwork, itemManager, this::loadObjectiveArtwork, false, () -> showRaceDetails(featuredRace)));
 			contentPanel.add(Box.createVerticalStrut(12));
 		}
 
@@ -339,7 +369,7 @@ public class CompetitionsPanel extends JPanel {
 		body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
 		body.setBackground(UIConstants.BACKGROUND);
 		body.setBorder(new EmptyBorder(8, 8, 8, 8));
-		body.add(new RaceEventCard(race, raceArtwork, true, null));
+		body.add(new RaceEventCard(race, raceArtwork, itemManager, this::loadObjectiveArtwork, true, null));
 		detailViewPanel.add(ScrollWrap.of(body), BorderLayout.CENTER);
 		cardLayout.show(cardContainer, "DETAIL");
 		detailViewPanel.revalidate();

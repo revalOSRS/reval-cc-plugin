@@ -3,14 +3,16 @@ package com.revalclan.ui;
 import com.revalclan.api.competitions.FeaturedRaceResponse;
 import com.revalclan.ui.components.Clickable;
 import com.revalclan.ui.constants.UIConstants;
+import com.revalclan.util.SpriteIcons;
+import net.runelite.api.gameval.ItemID;
+import net.runelite.client.game.ItemManager;
 import net.runelite.client.ui.FontManager;
+import net.runelite.client.util.AsyncBufferedImage;
 
-import javax.imageio.ImageIO;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.image.BufferedImage;
-import java.io.IOException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -19,17 +21,23 @@ import java.util.Collections;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 /** A native inventory-style race card, backed by the same verified results as the homepage. */
 public final class RaceEventCard extends JPanel {
-    private static final BufferedImage PET = image("pet.png"), UNIQUE = image("unique.png"), PURPLE = image("purple.png"), COMPLETION = image("completion.png");
     private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("d MMM", Locale.ENGLISH);
     private final FeaturedRaceResponse.Race race;
     private final BufferedImage artwork;
+    private final ItemManager itemManager;
+    private final BiConsumer<String, Consumer<BufferedImage>> imageLoader;
 
-    public RaceEventCard(FeaturedRaceResponse.Race race, BufferedImage artwork, boolean details, Runnable open) {
+    public RaceEventCard(FeaturedRaceResponse.Race race, BufferedImage artwork, ItemManager itemManager,
+                         BiConsumer<String, Consumer<BufferedImage>> imageLoader, boolean details, Runnable open) {
         this.race = race;
         this.artwork = artwork;
+        this.itemManager = itemManager;
+        this.imageLoader = imageLoader;
         setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
         setBackground(UIConstants.CARD_BG);
         setBorder(BorderFactory.createLineBorder(UIConstants.ACCENT_GOLD));
@@ -71,10 +79,10 @@ public final class RaceEventCard extends JPanel {
         List<String> members = objective.getWinner() == null ? null : objective.getWinner().getMembers();
         row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 51));
         row.setPreferredSize(new Dimension(1, 51));
-        BufferedImage icon = "completion".equals(objective.getKind()) ? COMPLETION : "pet".equals(objective.getKind()) ? PET : "purple".equals(objective.getKind()) ? PURPLE : UNIQUE;
-        JLabel slot = new JLabel(icon == null ? null : new ImageIcon(icon));
+        JLabel slot = new JLabel();
         slot.setBorder(BorderFactory.createLineBorder(UIConstants.BORDER_COLOR));
         slot.setPreferredSize(new Dimension(34, 39));
+        loadObjectiveIcon(objective, slot);
         row.add(slot, BorderLayout.WEST);
         JPanel copy = column();
         copy.add(label(objective.getTitle(), FontManager.getRunescapeSmallFont(), UIConstants.TEXT_PRIMARY));
@@ -88,6 +96,30 @@ public final class RaceEventCard extends JPanel {
         row.add(label("+" + objective.getPoints() + " pts", FontManager.getRunescapeBoldFont(), UIConstants.ACCENT_GOLD), BorderLayout.EAST);
         if (partyObjective && members != null && !members.isEmpty()) row.setToolTipText(objective.getWinner().getName());
         return row;
+    }
+
+    private void loadObjectiveIcon(FeaturedRaceResponse.Objective objective, JLabel slot) {
+        int fallbackId = "completion".equals(objective.getKind()) ? ItemID.CA_BOOK
+            : "pet".equals(objective.getKind()) ? ItemID.CHAOSELEPET
+            : "purple".equals(objective.getKind()) ? ItemID.BIRTHDAY_CAKE : ItemID.COLLECTION_LOG;
+        int itemId = objective.getIconItemId() != null && objective.getIconItemId() > 0 ? objective.getIconItemId() : fallbackId;
+        boolean[] customLoaded = {false};
+        if (itemManager != null) {
+            try {
+                AsyncBufferedImage image = itemManager.getImage(itemId);
+                image.onLoaded(() -> SwingUtilities.invokeLater(() -> {
+                    if (!customLoaded[0]) slot.setIcon(SpriteIcons.fit(image, 32));
+                }));
+            } catch (RuntimeException ignored) {
+                // An unavailable cache item must not prevent the race from rendering.
+            }
+        }
+        if (imageLoader != null && objective.getImageUrl() != null && !objective.getImageUrl().trim().isEmpty()) {
+            imageLoader.accept(objective.getImageUrl(), image -> {
+                customLoaded[0] = true;
+                slot.setIcon(SpriteIcons.fit(image, 32));
+            });
+        }
     }
 
     private JPanel rewards() {
@@ -267,17 +299,5 @@ public final class RaceEventCard extends JPanel {
         button.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
         button.addActionListener(event -> action.run());
         return button;
-    }
-    private static BufferedImage image(String name) {
-        try (java.io.InputStream resource = RaceEventCard.class.getResourceAsStream("/com/revalclan/races/" + name)) {
-            BufferedImage source = resource == null ? null : ImageIO.read(resource);
-            if (source == null || Math.max(source.getWidth(), source.getHeight()) <= 32) return source;
-            double scale = 32d / Math.max(source.getWidth(), source.getHeight());
-            BufferedImage icon = new BufferedImage(Math.max(1, (int) (source.getWidth() * scale)), Math.max(1, (int) (source.getHeight() * scale)), BufferedImage.TYPE_INT_ARGB);
-            Graphics2D g = icon.createGraphics();
-            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
-            g.drawImage(source, 0, 0, icon.getWidth(), icon.getHeight(), null); g.dispose();
-            return icon;
-        } catch (IOException error) { return null; }
     }
 }

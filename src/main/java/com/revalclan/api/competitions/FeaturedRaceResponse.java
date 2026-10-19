@@ -34,6 +34,8 @@ public class FeaturedRaceResponse extends PublicApiResponse {
         private String id;
         private String kind;
         private String title;
+        private Integer iconItemId;
+        private String imageUrl;
         private int points;
         private boolean trackingReady;
         private boolean clanPartyOnly;
