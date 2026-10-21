@@ -36,6 +36,7 @@ public class BrowserApi {
             return null;
         }
         return get("catalogue", null, BrowserModels.Catalogue.class, data -> {
+            BrowserAliases.apply(data);
             cached = data; cachedAt = System.currentTimeMillis(); success.accept(data);
         }, failure);
     }

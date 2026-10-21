@@ -50,7 +50,7 @@ final class BrowserHelpView extends JPanel implements Scrollable {
         sharing.add(text("Click or right-click the message and choose\nOpen Reval board. A shared clog uses your account\nunless you add a different player's name.",18,BrowserTheme.TEXT,3)); gap(sharing,6);
         sharing.add(text("Use buttons to browse without sending more messages.\nPlayers need the updated Reval plugin to open shares.",17,BrowserTheme.MUTED,2));
         add(row(boards,sharing)); gap(12);
-        add(text("Useful aliases: cox, tob, toa, bandos. Category suggestions accept names too.\nViews are cached. Refresh reloads the current view. Monthly boards use the clan's Tallinn calendar month.",18,BrowserTheme.MUTED,2));
+        add(text("Collection Log shortcuts work here too: amox, cox, tob, toa, bandos, wt, gotr.\nViews are cached. Refresh reloads the current view. Monthly boards use the clan's Tallinn calendar month.",18,BrowserTheme.MUTED,2));
     }
 
     private void gap(int size) { gap(this,size); }
