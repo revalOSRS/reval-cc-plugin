@@ -269,6 +269,8 @@ public class CollectionLogManager {
 		kc("chambers_of_xeric")
 			.primaryKC(1532)
 			.additionalKC("challenge_mode", 1735);
+
+		kc("the_fractured_archive").primaryKC(VarPlayerID.TOTAL_COMPLETED_THEFRACTUREDARCHIVE);
 		
 		kc("theatre_of_blood")
 			.primaryKC(1748)

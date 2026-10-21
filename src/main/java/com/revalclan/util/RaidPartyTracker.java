@@ -27,12 +27,13 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * The party behind a raid's loot and completion count (CoX, ToB, ToA), with
+ * The party behind a raid's loot and completion count, with
  * each member marked as a Reval member or a guest.
  *
  * The party is read live and frozen, with known per-member deaths, at completion.
- * ToB/ToA rewards claimed later outside the raid keep that snapshot until an
- * observation gap. Final boss deaths also save a names-only fallback.
+ * CoX/ToB/ToA use final-boss and completion snapshots. Their delayed rewards
+ * retain those snapshots until an observation gap. ArchiveRoster owns native
+ * Archive evidence, including its run boundaries and reward retention.
  * Call on the client thread.
  */
 @Singleton
@@ -40,6 +41,7 @@ public class RaidPartyTracker {
 	static final String CHAMBERS_OF_XERIC = "Chambers of Xeric";
 	static final String THEATRE_OF_BLOOD = "Theatre of Blood";
 	static final String TOMBS_OF_AMASCUT = "Tombs of Amascut";
+	public static final String FRACTURED_ARCHIVE = "The Fractured Archive";
 
 	/** First VarClientStr holding a ToB party member name (5 consecutive slots). */
 	private static final int TOB_MEMBER_NAME_VARC = 330;
@@ -56,10 +58,11 @@ public class RaidPartyTracker {
 	public enum Origin { LIVE, FINAL_BOSS, COMPLETION }
 
 	private static final Pattern COMPLETED = Pattern.compile(
-		"^Your completed (Chambers of Xeric(?: Challenge Mode)?|Theatre of Blood(?::[^:]*)?|Tombs of Amascut(?::[^:]*)?) count is:");
+		"^Your completed (.+?) count is: ([\\d,]+)\\.?$", Pattern.CASE_INSENSITIVE);
 
 	@Inject private Client client;
 	@Inject private RaidDeathTracker deathTracker;
+	@Inject private ArchiveRoster archiveRoster;
 	private final Map<String, Party> completedParties = new LinkedHashMap<>();
 
 	private Party savedParty;
@@ -91,6 +94,7 @@ public class RaidPartyTracker {
 	public Party partyFor(String source) {
 		String raid = raidOf(source);
 		if (raid == null) return null;
+		if (FRACTURED_ARCHIVE.equals(raid)) return archiveRoster.party(revalRoster());
 		Party completed = completedParties.get(raid);
 		if (completed != null && deathTracker.isCompleted(raid)) return completed;
 
@@ -119,6 +123,12 @@ public class RaidPartyTracker {
 		String raid = null;
 		Matcher completed = COMPLETED.matcher(message);
 		if (completed.find()) raid = raidOf(completed.group(1));
+		if (FRACTURED_ARCHIVE.equals(raid)) {
+			try {
+				archiveRoster.complete(Integer.parseInt(completed.group(2).replace(",", "")));
+			} catch (NumberFormatException ignored) {}
+			return;
+		}
 		if (message.startsWith("Congratulations - your raid is complete!")) raid = CHAMBERS_OF_XERIC;
 		if (message.startsWith("Challenge complete: The Wardens.")) raid = TOMBS_OF_AMASCUT;
 		if (raid == null) return;
@@ -143,6 +153,7 @@ public class RaidPartyTracker {
 	}
 
 	public void onGameTick() {
+		archiveRoster.observe();
 		// Finish the server tick before freezing: a final death and completion
 		// can arrive in either order. Buffered loot/KC retain this same snapshot.
 		if (pendingCompletion != null) {
@@ -165,6 +176,7 @@ public class RaidPartyTracker {
 		savedAtMs = 0;
 		deathTracker.reset();
 		completedParties.clear();
+		archiveRoster.reset();
 	}
 
 	/**
@@ -180,11 +192,13 @@ public class RaidPartyTracker {
 	}
 
 	/** The raid a loot or completion source belongs to, or null. */
-	static String raidOf(String source) {
+	public static String raidOf(String source) {
 		if (source == null) return null;
-		if (source.startsWith(CHAMBERS_OF_XERIC)) return CHAMBERS_OF_XERIC;
-		if (source.startsWith(THEATRE_OF_BLOOD)) return THEATRE_OF_BLOOD;
-		if (source.startsWith(TOMBS_OF_AMASCUT)) return TOMBS_OF_AMASCUT;
+		String name = sanitize(source).toLowerCase(Locale.ROOT);
+		if (name.startsWith(CHAMBERS_OF_XERIC.toLowerCase(Locale.ROOT))) return CHAMBERS_OF_XERIC;
+		if (name.startsWith(THEATRE_OF_BLOOD.toLowerCase(Locale.ROOT))) return THEATRE_OF_BLOOD;
+		if (name.startsWith(TOMBS_OF_AMASCUT.toLowerCase(Locale.ROOT))) return TOMBS_OF_AMASCUT;
+		if (name.equals(FRACTURED_ARCHIVE.toLowerCase(Locale.ROOT)) || name.equals("fractured archive")) return FRACTURED_ARCHIVE;
 		return null;
 	}
 
@@ -209,8 +223,10 @@ public class RaidPartyTracker {
 			names = chambersNames();
 		} else if (THEATRE_OF_BLOOD.equals(raid)) {
 			names = varcNames(TOB_MEMBER_NAME_VARC, TOB_PARTY_MAX_SIZE);
-		} else {
+		} else if (TOMBS_OF_AMASCUT.equals(raid)) {
 			names = varcNames(TOA_MEMBER_NAME_VARC, TOA_PARTY_MAX_SIZE);
+		} else {
+			return null;
 		}
 		return names.isEmpty() ? null : Party.of(raid, origin, names, revalRoster())
 			.withDeaths(deathTracker.countsFor(raid, names));
@@ -295,13 +311,22 @@ public class RaidPartyTracker {
 		final List<Boolean> revalMembers;
 		/** Parallel to names; null means the full raid count is unknown. */
 		final List<Integer> deaths;
+		private final Integer size;
+		private final Boolean rosterComplete;
 
 		private Party(String raid, Origin origin, List<String> names, List<Boolean> revalMembers, List<Integer> deaths) {
+			this(raid, origin, names, revalMembers, deaths, null, null);
+		}
+
+		private Party(String raid, Origin origin, List<String> names, List<Boolean> revalMembers, List<Integer> deaths,
+			Integer size, Boolean rosterComplete) {
 			this.raid = raid;
 			this.origin = origin;
 			this.names = names;
 			this.revalMembers = revalMembers;
 			this.deaths = deaths;
+			this.size = size;
+			this.rosterComplete = rosterComplete;
 		}
 
 		static Party of(String raid, Origin origin, List<String> names, Set<String> revalRoster) {
@@ -317,7 +342,11 @@ public class RaidPartyTracker {
 		private Party withDeaths(Map<String, Integer> counts) {
 			List<Integer> values = new ArrayList<>(names.size());
 			for (String name : names) values.add(counts.get(nameKey(name)));
-			return new Party(raid, origin, names, revalMembers, values);
+			return new Party(raid, origin, names, revalMembers, values, size, rosterComplete);
+		}
+
+		Party withRosterEvidence(int size, boolean complete) {
+			return new Party(raid, origin, names, revalMembers, deaths, size, complete);
 		}
 
 		private void updateDeaths(Map<String, Integer> counts) {
@@ -344,6 +373,8 @@ public class RaidPartyTracker {
 			Map<String, Object> party = new LinkedHashMap<>();
 			party.put("origin", origin.name().toLowerCase(Locale.ROOT));
 			party.put("members", members);
+			if (size != null) party.put("size", size);
+			if (rosterComplete != null) party.put("rosterComplete", rosterComplete);
 			data.put("party", party);
 		}
 	}
