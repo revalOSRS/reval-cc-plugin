@@ -14,7 +14,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Keeps a ToB or ToA reward from being reported again when its chest is reopened.
+ * Keeps a ToB, ToA or Fractured Archive reward from being reported again when its chest is reopened.
  *
  * RuneLite's loot tracker reports a raid chest each time it opens after the player
  * has moved between an instance and the normal world (runelite/runelite#18427). A
@@ -34,7 +34,7 @@ public class RaidRewardLedger {
 
 	/** "Your completed Tombs of Amascut: Expert Mode count is: 12." — any mode of either raid. */
 	private static final Pattern COMPLETION = Pattern.compile(
-		"Your completed (Theatre of Blood|Tombs of Amascut)(?::[^:]*)? count is");
+		"Your completed (Theatre of Blood|Tombs of Amascut|(?:The )?Fractured Archive)(?::[^:]*)? count is");
 
 	@Inject private ConfigManager configManager;
 
@@ -47,7 +47,7 @@ public class RaidRewardLedger {
 	}
 
 	/**
-	 * Record a loot report. False only for a ToB or ToA chest holding nothing beyond the
+	 * Record a loot report. False only for a guarded raid chest holding nothing beyond the
 	 * reward reported since the raid was last completed; loot from anything else is always
 	 * new and is not recorded.
 	 */
@@ -73,7 +73,7 @@ public class RaidRewardLedger {
 	static String completedRaid(String message) {
 		if (message == null) return null;
 		Matcher matcher = COMPLETION.matcher(message);
-		return matcher.find() ? matcher.group(1) : null;
+		return matcher.find() ? RaidPartyTracker.raidOf(matcher.group(1)) : null;
 	}
 
 	/** Item id → quantity, merging split stacks and skipping empty slots. */

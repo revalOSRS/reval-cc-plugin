@@ -267,6 +267,7 @@ public class PetNotifier extends BaseNotifier {
 		PET_NAMES.add("nid");
 		PET_NAMES.add("noon");
 		PET_NAMES.add("olmlet");
+		PET_NAMES.add("orion");
 		PET_NAMES.add("pet chaos elemental");
 		PET_NAMES.add("pet dagannoth prime");
 		PET_NAMES.add("pet dagannoth rex");

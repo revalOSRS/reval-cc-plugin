@@ -11,6 +11,8 @@ import net.runelite.api.clan.ClanMember;
 import net.runelite.api.clan.ClanSettings;
 import net.runelite.api.events.ActorDeath;
 import net.runelite.api.gameval.InterfaceID;
+import net.runelite.api.gameval.VarbitID;
+import net.runelite.api.gameval.VarClientID;
 import net.runelite.api.widgets.Widget;
 import net.runelite.client.util.Text;
 
@@ -27,7 +29,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * The party behind a raid's loot and completion count (CoX, ToB, ToA), with
+ * The party behind a raid's loot and completion count, with
  * each member marked as a Reval member or a guest.
  *
  * The party is read live and frozen, with known per-member deaths, at completion.
@@ -40,6 +42,7 @@ public class RaidPartyTracker {
 	static final String CHAMBERS_OF_XERIC = "Chambers of Xeric";
 	static final String THEATRE_OF_BLOOD = "Theatre of Blood";
 	static final String TOMBS_OF_AMASCUT = "Tombs of Amascut";
+	public static final String FRACTURED_ARCHIVE = "The Fractured Archive";
 
 	/** First VarClientStr holding a ToB party member name (5 consecutive slots). */
 	private static final int TOB_MEMBER_NAME_VARC = 330;
@@ -48,6 +51,9 @@ public class RaidPartyTracker {
 	/** First VarClientStr holding a ToA party member name (8 consecutive slots). */
 	private static final int TOA_MEMBER_NAME_VARC = 1099;
 	private static final int TOA_PARTY_MAX_SIZE = 8;
+	private static final int ARCHIVE_PARTY_MAX_SIZE = 8;
+	private static final Pattern ARCHIVE_COMPLETED = Pattern.compile(
+		"^Your completed (?:The )?Fractured Archive count is: ([\\d,]+)\\.?$", Pattern.CASE_INSENSITIVE);
 
 	/** A saved party applies to rewards claimed up to this long after the final boss died. */
 	static final long SAVED_PARTY_TTL_MS = 10 * 60_000L;
@@ -65,6 +71,15 @@ public class RaidPartyTracker {
 	private Party savedParty;
 	private Party pendingCompletion;
 	private long savedAtMs;
+	private final Map<String, String> archiveNames = new LinkedHashMap<>();
+	private Party archiveParty;
+	private int archiveMaxSize;
+	private int archiveVerifiedSize;
+	private int archiveCompletionCount = -1;
+	private boolean archiveInside;
+	private boolean archiveCompleted;
+	private boolean archiveRosterOverflow;
+	private long archiveLastActiveAt;
 
 	/** Save the party when a raid's final boss dies. Not gated on membership: it only records. */
 	public void onActorDeath(ActorDeath event) {
@@ -91,6 +106,10 @@ public class RaidPartyTracker {
 	public Party partyFor(String source) {
 		String raid = raidOf(source);
 		if (raid == null) return null;
+		if (FRACTURED_ARCHIVE.equals(raid)) {
+			observeArchive();
+			return archiveParty;
+		}
 		Party completed = completedParties.get(raid);
 		if (completed != null && deathTracker.isCompleted(raid)) return completed;
 
@@ -112,6 +131,12 @@ public class RaidPartyTracker {
 		if (type != ChatMessageType.GAMEMESSAGE && type != ChatMessageType.FRIENDSCHATNOTIFICATION
 			&& type != ChatMessageType.SPAM && type != ChatMessageType.ENGINE) return;
 		String message = sanitize(rawMessage);
+		Matcher archiveCompletion = ARCHIVE_COMPLETED.matcher(message);
+		if (archiveCompletion.matches()) {
+			observeArchive();
+			completeArchive(archiveCompletion.group(1));
+			return;
+		}
 		if (deathTracker.onChatMessage(message)) {
 			savedParty = null;
 			savedAtMs = 0;
@@ -143,6 +168,7 @@ public class RaidPartyTracker {
 	}
 
 	public void onGameTick() {
+		observeArchive();
 		// Finish the server tick before freezing: a final death and completion
 		// can arrive in either order. Buffered loot/KC retain this same snapshot.
 		if (pendingCompletion != null) {
@@ -165,6 +191,84 @@ public class RaidPartyTracker {
 		savedAtMs = 0;
 		deathTracker.reset();
 		completedParties.clear();
+		clearArchiveParty();
+		archiveInside = false;
+		archiveCompletionCount = -1;
+	}
+
+	/** TFA's native party slots survive room changes; nearby players are never roster evidence. */
+	private void observeArchive() {
+		if (client.getGameState() != GameState.LOGGED_IN) return;
+		int status = client.getVarbitValue(VarbitID.TFA_CLIENT_PARTYSTATUS);
+		WorldView world = client.getTopLevelWorldView();
+		boolean inside = (status == 2 || status == 3) && world != null && world.isInstance();
+		long now = System.currentTimeMillis();
+		if (inside && !archiveInside) clearArchiveParty();
+		archiveInside = inside;
+		if (!inside) {
+			if (now - archiveLastActiveAt > SAVED_PARTY_TTL_MS) clearArchiveParty();
+			return;
+		}
+		if (archiveCompleted) return;
+
+		int size = 0;
+		Set<String> liveNames = new HashSet<>();
+		Set<String> occupiedNames = new HashSet<>();
+		for (int i = 0; i < ARCHIVE_PARTY_MAX_SIZE; i++) {
+			boolean occupied = client.getVarbitValue(VarbitID.TFA_CLIENT_P0 + i) > 0;
+			if (occupied) size++;
+			String name = sanitize(client.getVarcStrValue(VarClientID.TFA_CLIENT_NAME0 + i));
+			String key = nameKey(name);
+			if (!name.matches("[a-zA-Z0-9 _-]{1,12}") || key.trim().isEmpty()) continue;
+			liveNames.add(key);
+			if (occupied) occupiedNames.add(key);
+			if (archiveNames.size() < ARCHIVE_PARTY_MAX_SIZE || archiveNames.containsKey(key)) {
+				archiveNames.putIfAbsent(key, name);
+			} else {
+				archiveRosterOverflow = true;
+			}
+		}
+		archiveMaxSize = Math.max(archiveMaxSize, size);
+		// Verify names and occupied slots together; stale names in empty slots cannot fill a gap.
+		if (size > 0 && occupiedNames.size() == size && occupiedNames.equals(liveNames)) {
+			archiveVerifiedSize = Math.max(archiveVerifiedSize, size);
+		}
+		archiveLastActiveAt = now;
+		if (archiveNames.isEmpty()) return;
+		Player local = client.getLocalPlayer();
+		boolean complete = !archiveRosterOverflow && archiveMaxSize > 0 && archiveVerifiedSize == archiveMaxSize
+			&& archiveNames.size() == archiveMaxSize
+			&& local != null && archiveNames.containsKey(nameKey(local.getName()));
+		archiveParty = Party.of(FRACTURED_ARCHIVE, Origin.LIVE, new ArrayList<>(archiveNames.values()), revalRoster())
+			.withRosterEvidence(archiveMaxSize, complete);
+	}
+
+	private void completeArchive(String countText) {
+		final int count;
+		try {
+			count = Integer.parseInt(countText.replace(",", ""));
+		} catch (NumberFormatException e) {
+			return;
+		}
+		if (count <= archiveCompletionCount) return;
+		archiveCompletionCount = count;
+		// Without an observed new entry, a second completion must not reuse the previous party.
+		if (archiveCompleted) archiveParty = null;
+		archiveCompleted = true;
+		if (archiveParty != null) {
+			archiveParty = archiveParty.withOrigin(Origin.COMPLETION);
+			archiveLastActiveAt = System.currentTimeMillis();
+		}
+	}
+
+	private void clearArchiveParty() {
+		archiveNames.clear();
+		archiveParty = null;
+		archiveMaxSize = 0;
+		archiveVerifiedSize = 0;
+		archiveRosterOverflow = false;
+		archiveCompleted = false;
+		archiveLastActiveAt = 0;
 	}
 
 	/**
@@ -185,6 +289,7 @@ public class RaidPartyTracker {
 		if (source.startsWith(CHAMBERS_OF_XERIC)) return CHAMBERS_OF_XERIC;
 		if (source.startsWith(THEATRE_OF_BLOOD)) return THEATRE_OF_BLOOD;
 		if (source.startsWith(TOMBS_OF_AMASCUT)) return TOMBS_OF_AMASCUT;
+		if (source.equalsIgnoreCase(FRACTURED_ARCHIVE) || source.equalsIgnoreCase("Fractured Archive")) return FRACTURED_ARCHIVE;
 		return null;
 	}
 
@@ -209,8 +314,10 @@ public class RaidPartyTracker {
 			names = chambersNames();
 		} else if (THEATRE_OF_BLOOD.equals(raid)) {
 			names = varcNames(TOB_MEMBER_NAME_VARC, TOB_PARTY_MAX_SIZE);
-		} else {
+		} else if (TOMBS_OF_AMASCUT.equals(raid)) {
 			names = varcNames(TOA_MEMBER_NAME_VARC, TOA_PARTY_MAX_SIZE);
+		} else {
+			return null;
 		}
 		return names.isEmpty() ? null : Party.of(raid, origin, names, revalRoster())
 			.withDeaths(deathTracker.countsFor(raid, names));
@@ -295,13 +402,22 @@ public class RaidPartyTracker {
 		final List<Boolean> revalMembers;
 		/** Parallel to names; null means the full raid count is unknown. */
 		final List<Integer> deaths;
+		private final Integer size;
+		private final Boolean rosterComplete;
 
 		private Party(String raid, Origin origin, List<String> names, List<Boolean> revalMembers, List<Integer> deaths) {
+			this(raid, origin, names, revalMembers, deaths, null, null);
+		}
+
+		private Party(String raid, Origin origin, List<String> names, List<Boolean> revalMembers, List<Integer> deaths,
+			Integer size, Boolean rosterComplete) {
 			this.raid = raid;
 			this.origin = origin;
 			this.names = names;
 			this.revalMembers = revalMembers;
 			this.deaths = deaths;
+			this.size = size;
+			this.rosterComplete = rosterComplete;
 		}
 
 		static Party of(String raid, Origin origin, List<String> names, Set<String> revalRoster) {
@@ -317,7 +433,15 @@ public class RaidPartyTracker {
 		private Party withDeaths(Map<String, Integer> counts) {
 			List<Integer> values = new ArrayList<>(names.size());
 			for (String name : names) values.add(counts.get(nameKey(name)));
-			return new Party(raid, origin, names, revalMembers, values);
+			return new Party(raid, origin, names, revalMembers, values, size, rosterComplete);
+		}
+
+		private Party withRosterEvidence(int size, boolean complete) {
+			return new Party(raid, origin, names, revalMembers, deaths, size, complete);
+		}
+
+		private Party withOrigin(Origin origin) {
+			return new Party(raid, origin, names, revalMembers, deaths, size, rosterComplete);
 		}
 
 		private void updateDeaths(Map<String, Integer> counts) {
@@ -344,6 +468,8 @@ public class RaidPartyTracker {
 			Map<String, Object> party = new LinkedHashMap<>();
 			party.put("origin", origin.name().toLowerCase(Locale.ROOT));
 			party.put("members", members);
+			if (size != null) party.put("size", size);
+			if (rosterComplete != null) party.put("rosterComplete", rosterComplete);
 			data.put("party", party);
 		}
 	}
