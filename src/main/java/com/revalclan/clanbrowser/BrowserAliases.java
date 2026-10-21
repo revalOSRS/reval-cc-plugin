@@ -7,14 +7,10 @@ import java.util.Map;
 
 /** Collection Log command shortcuts, resolved against the backend's current catalogue. */
 final class BrowserAliases {
-    // Collection Log's aliasPageName list, adapted to our collection page labels:
-    // https://github.com/evansloan/collection-log/blob/da62ba7d9c3a6dd28b708af545c54ad0e0701d88/src/main/java/com/evansloan/collectionlog/CollectionLogPage.java
-    // Newer boss shortcuts follow RuneLite's ChatCommandsPlugin.longBossName.
-    // Attribution and BSD terms are in META-INF/LICENSE-collection-log-aliases.txt.
     private static final String[][] COMMON = {
         {"Abyssal Sire", "sire"},
         {"Alchemical Hydra", "hydra"},
-        {"Bryophyta", "byro"},
+        {"Bryophyta", "bryo"},
         {"Barrows Chests", "barrows"},
         {"Cerberus", "cerb"},
         {"Chaos Elemental", "chaos ele"},
