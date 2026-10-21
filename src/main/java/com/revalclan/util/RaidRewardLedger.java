@@ -32,9 +32,9 @@ public class RaidRewardLedger {
 	private static final String CONFIG_GROUP = "revalclan";
 	private static final String CONFIG_KEY_PREFIX = "raidReward_";
 
-	/** "Your completed Tombs of Amascut: Expert Mode count is: 12." — any mode of either raid. */
+	/** Completed-count messages resolve through the same raid identity as the reward source. */
 	private static final Pattern COMPLETION = Pattern.compile(
-		"Your completed (Theatre of Blood|Tombs of Amascut|(?:The )?Fractured Archive)(?::[^:]*)? count is");
+		"^Your completed (.+?) count is: [\\d,]+\\b", Pattern.CASE_INSENSITIVE);
 
 	@Inject private ConfigManager configManager;
 
@@ -73,7 +73,7 @@ public class RaidRewardLedger {
 	static String completedRaid(String message) {
 		if (message == null) return null;
 		Matcher matcher = COMPLETION.matcher(message);
-		return matcher.find() ? RaidPartyTracker.raidOf(matcher.group(1)) : null;
+		return matcher.find() ? guardedRaid(matcher.group(1)) : null;
 	}
 
 	/** Item id → quantity, merging split stacks and skipping empty slots. */

@@ -8,6 +8,7 @@ import javax.inject.Singleton;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -35,6 +36,8 @@ public class KillCountNotifier extends BaseNotifier {
 		"(?:Duration|time|Subdued in):?\\s*(?<time>[\\d:]+(?:\\.\\d+)?)\\.?(?:\\s*\\(new personal best\\))?(?:\\s*Personal best:\\s*(?<pbtime>[\\d:]+(?:\\.\\d+)?))?",
 		Pattern.CASE_INSENSITIVE
 	);
+	private static final Pattern RAID_TOTAL_TIME = Pattern.compile(
+		"^(.+?): Total completion time:", Pattern.CASE_INSENSITIVE);
 
 	@Inject
 	private RaidPartyTracker raidPartyTracker;
@@ -43,7 +46,7 @@ public class KillCountNotifier extends BaseNotifier {
 	private Integer pendingCount = null;
 	private Duration pendingTime = null;
 	private boolean pendingIsPb = false;
-	private boolean pendingArchiveTime = false;
+	private String pendingTimeRaid = null;
 	private RaidPartyTracker.Party pendingParty = null;
 	private int badTicks = 0;
 	private static final int MAX_BAD_TICKS = 10;
@@ -101,7 +104,6 @@ public class KillCountNotifier extends BaseNotifier {
 			if (boss != null) {
 				try {
 					int count = Integer.parseInt(countStr);
-					keepTimeForBoss(boss);
 					pendingBoss = boss;
 					pendingCount = count;
 					badTicks = 0; // Reset bad tick counter
@@ -122,7 +124,6 @@ public class KillCountNotifier extends BaseNotifier {
 			if (boss != null) {
 				try {
 					int count = Integer.parseInt(countStr);
-					keepTimeForBoss(boss);
 					pendingBoss = boss;
 					pendingCount = count;
 					// Capture the raid party (CoX side panel, ToB/ToA varcs) while it is
@@ -136,20 +137,7 @@ public class KillCountNotifier extends BaseNotifier {
 		}
 	}
 
-	/** A room split is not the Archive's total; its total must not leak into another boss. */
-	private void keepTimeForBoss(String boss) {
-		if (RaidPartyTracker.FRACTURED_ARCHIVE.equals(boss) != pendingArchiveTime) {
-			pendingTime = null;
-			pendingIsPb = false;
-			pendingArchiveTime = false;
-		}
-	}
-	
 	private void parseTime(String message) {
-		boolean archiveTotal = message.startsWith("The Fractured Archive: Total completion time:")
-			|| message.startsWith("Fractured Archive: Total completion time:");
-		if (!archiveTotal && (pendingArchiveTime || RaidPartyTracker.FRACTURED_ARCHIVE.equals(pendingBoss))) return;
-		if (archiveTotal && pendingBoss != null && !RaidPartyTracker.FRACTURED_ARCHIVE.equals(pendingBoss)) reset();
 		// TOB special case: skip wave duration, get challenge time
 		String msg = message;
 		if (message.startsWith("Wave")) {
@@ -163,6 +151,10 @@ public class KillCountNotifier extends BaseNotifier {
 			}
 		}
 		
+		Matcher total = RAID_TOTAL_TIME.matcher(msg);
+		String scope = total.find() ? RaidPartyTracker.raidOf(total.group(1)) : null;
+		// A room split cannot replace a known raid total.
+		if (scope == null && pendingTimeRaid != null) return;
 		Matcher matcher = TIME_REGEX.matcher(msg);
 		if (matcher.find()) {
 			String timeStr = matcher.group("time");
@@ -171,7 +163,7 @@ public class KillCountNotifier extends BaseNotifier {
 			
 			if (duration != null) {
 				pendingTime = duration;
-				pendingArchiveTime = archiveTotal;
+				pendingTimeRaid = scope;
 				pendingIsPb = msg.toLowerCase().contains("(new personal best)") || 
 				              msg.toLowerCase().contains("new personal best");
 				badTicks = 0;
@@ -219,9 +211,8 @@ public class KillCountNotifier extends BaseNotifier {
 		if (raid == null) return null;
 		
 		if ("Wintertodt".equalsIgnoreCase(raid)) return "Wintertodt";
-		if (raid.equalsIgnoreCase("Fractured Archive") || raid.equalsIgnoreCase(RaidPartyTracker.FRACTURED_ARCHIVE)) {
-			return RaidPartyTracker.FRACTURED_ARCHIVE;
-		}
+		String resolved = RaidPartyTracker.raidOf(raid);
+		if (RaidPartyTracker.FRACTURED_ARCHIVE.equals(resolved)) return resolved;
 		
 		// Handle raid modes (e.g., "Theatre of Blood: Entry Mode")
 		int modeSeparator = raid.lastIndexOf(':');
@@ -269,12 +260,15 @@ public class KillCountNotifier extends BaseNotifier {
 		kcData.put("boss", pendingBoss);
 		kcData.put("killCount", pendingCount);
 		
-		if (pendingTime != null) {
+		String raid = RaidPartyTracker.raidOf(pendingBoss);
+		boolean timeApplies = Objects.equals(pendingTimeRaid,
+			RaidPartyTracker.FRACTURED_ARCHIVE.equals(raid) ? raid : null);
+		if (pendingTime != null && timeApplies) {
 			kcData.put("time", formatDuration(pendingTime));
 			kcData.put("timeSeconds", pendingTime.getSeconds() + (pendingTime.getNano() / 1_000_000_000.0));
 		}
 		
-		if (pendingIsPb) {
+		if (pendingIsPb && timeApplies) {
 			kcData.put("personalBest", true);
 		}
 
@@ -307,7 +301,7 @@ public class KillCountNotifier extends BaseNotifier {
 		pendingCount = null;
 		pendingTime = null;
 		pendingIsPb = false;
-		pendingArchiveTime = false;
+		pendingTimeRaid = null;
 		pendingParty = null;
 		badTicks = 0;
 	}
