@@ -32,6 +32,7 @@ final class ArchiveRoster {
 	private int completionCount = -1;
 	private boolean inside;
 	private boolean completed;
+	private RaidPartyTracker.Party completedParty;
 	private long lastActiveAt;
 
 	/** Capture native names and occupied slots; no clan lookup or Party allocation on ticks. */
@@ -71,14 +72,18 @@ final class ArchiveRoster {
 		lastActiveAt = now;
 	}
 
-	void complete(int count) {
+	RaidPartyTracker.Party complete(int count) {
 		observe();
-		if (count <= completionCount) return;
+		if (count <= completionCount) return null;
 		completionCount = count;
 		// A second completion without an observed new entry has unknown participants.
 		if (completed) names.clear();
 		completed = true;
 		if (!names.isEmpty()) lastActiveAt = System.currentTimeMillis();
+		// Keep the final tick's death snapshot with the names until this reward expires.
+		completedParty = names.isEmpty() ? null : RaidPartyTracker.Party.of(RaidPartyTracker.FRACTURED_ARCHIVE,
+			RaidPartyTracker.Origin.COMPLETION, new ArrayList<>(names.values()), null);
+		return completedParty;
 	}
 
 	RaidPartyTracker.Party party(Set<String> revalRoster) {
@@ -87,9 +92,10 @@ final class ArchiveRoster {
 		Player local = client.getLocalPlayer();
 		boolean complete = maxSize > 0 && verifiedSize == maxSize && names.size() == maxSize
 			&& local != null && names.containsKey(RaidPartyTracker.nameKey(local.getName()));
-		return RaidPartyTracker.Party.of(RaidPartyTracker.FRACTURED_ARCHIVE,
-			completed ? RaidPartyTracker.Origin.COMPLETION : RaidPartyTracker.Origin.LIVE,
-			new ArrayList<>(names.values()), revalRoster).withRosterEvidence(maxSize, complete);
+		RaidPartyTracker.Party party = completedParty != null ? completedParty.withClanRoster(revalRoster)
+			: RaidPartyTracker.Party.of(RaidPartyTracker.FRACTURED_ARCHIVE,
+				RaidPartyTracker.Origin.LIVE, new ArrayList<>(names.values()), revalRoster);
+		return party.withRosterEvidence(maxSize, complete);
 	}
 
 	void reset() {
@@ -103,6 +109,7 @@ final class ArchiveRoster {
 		maxSize = 0;
 		verifiedSize = 0;
 		completed = false;
+		completedParty = null;
 		lastActiveAt = 0;
 	}
 }

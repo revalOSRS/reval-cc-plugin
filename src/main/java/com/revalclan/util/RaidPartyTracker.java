@@ -94,7 +94,11 @@ public class RaidPartyTracker {
 	public Party partyFor(String source) {
 		String raid = raidOf(source);
 		if (raid == null) return null;
-		if (FRACTURED_ARCHIVE.equals(raid)) return archiveRoster.party(revalRoster());
+		if (FRACTURED_ARCHIVE.equals(raid)) {
+			Party party = archiveRoster.party(revalRoster());
+			return party != null && party.origin == Origin.LIVE
+				? party.withDeaths(deathTracker.countsFor(raid, party.names)) : party;
+		}
 		Party completed = completedParties.get(raid);
 		if (completed != null && deathTracker.isCompleted(raid)) return completed;
 
@@ -119,13 +123,19 @@ public class RaidPartyTracker {
 		if (deathTracker.onChatMessage(message)) {
 			savedParty = null;
 			savedAtMs = 0;
+			if (RaidDeathTracker.ARCHIVE_START_MESSAGE.equals(message)) archiveRoster.reset();
 		}
 		String raid = null;
 		Matcher completed = COMPLETED.matcher(message);
 		if (completed.find()) raid = raidOf(completed.group(1));
 		if (FRACTURED_ARCHIVE.equals(raid)) {
 			try {
-				archiveRoster.complete(Integer.parseInt(completed.group(2).replace(",", "")));
+				Party party = archiveRoster.complete(Integer.parseInt(completed.group(2).replace(",", "")));
+				deathTracker.complete(raid);
+				if (party != null) {
+					party.updateDeaths(deathTracker.countsFor(raid, party.names));
+					pendingCompletion = party;
+				}
 			} catch (NumberFormatException ignored) {}
 			return;
 		}
@@ -337,6 +347,13 @@ public class RaidPartyTracker {
 				deaths.add(null);
 			}
 			return new Party(raid, origin, names, flags, deaths);
+		}
+
+		/** Share completion deaths so the final-tick update reaches every membership view. */
+		Party withClanRoster(Set<String> revalRoster) {
+			List<Boolean> flags = new ArrayList<>(names.size());
+			for (String name : names) flags.add(revalRoster == null ? null : revalRoster.contains(nameKey(name)));
+			return new Party(raid, origin, names, flags, deaths, size, rosterComplete);
 		}
 
 		private Party withDeaths(Map<String, Integer> counts) {
