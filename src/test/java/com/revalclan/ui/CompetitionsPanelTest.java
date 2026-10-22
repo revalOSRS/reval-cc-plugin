@@ -8,6 +8,7 @@ import org.junit.Test;
 
 import javax.swing.*;
 import java.awt.*;
+import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -28,8 +29,12 @@ public class CompetitionsPanelTest {
         api.scheduled = Arrays.asList(competition("kc-id", "boss_kills", 0), competition("other-race", "boss_kills", 0));
         CompetitionsPanel panel = panel(api);
         assertEquals(1, find(panel, RaceEventCard.class, c -> true).size());
-        assertEquals(3, find(panel, CompetitionStandings.class, c -> true).size());
-        assertEquals(2, buttons(panel, "Full leaderboard >").size());
+        // The race card and the unrelated active competition have standings; the upcoming
+        // "other-race" stays listed but gets no table or full view until it has entries.
+        assertEquals(2, find(panel, CompetitionStandings.class, c -> true).size());
+        assertEquals(1, buttons(panel, "Full leaderboard >").size());
+        assertEquals(1, find(panel, JLabel.class, l -> String.valueOf(l.getText()).contains(">other-race<")).size());
+        assertTrue(find(panel, JLabel.class, l -> String.valueOf(l.getText()).contains(">kc-id<")).isEmpty());
     }
 
     @Test public void absentLinkedIdDoesNotHideCompetitions() throws Exception {
@@ -113,6 +118,27 @@ public class CompetitionsPanelTest {
         comp.setSideQuests(Collections.singletonList(quest));
         reply(api, 0, comp);
         assertEquals(13, rows(panel).size());
+        assertFalse(labels(panel, "Side Quests").isEmpty());
+    }
+
+    @Test public void bannerArrivalKeepsTheOpenRaceDetail() throws Exception {
+        FakeApi api = new FakeApi();
+        api.race = race("event-id", "kc-id");
+        api.race.setImageUrl("https://example.invalid/banner.png");
+        CompetitionsPanel panel = panel(api);
+        click(panel, "Full KC leaderboard >");
+        assertEquals(1, api.artwork.size());
+        edt(() -> api.artwork.get(0).accept(new BufferedImage(4, 2, BufferedImage.TYPE_INT_RGB)));
+        edt(() -> { });
+        // The banner swaps into the open card: no second side-quest fetch, and the
+        // pending one still lands in the same detail view.
+        assertEquals(Collections.singletonList("kc-id"), api.detailIds);
+        CompetitionsResponse.Competition comp = competition("kc-id", "boss_kills", 12);
+        CompetitionsResponse.SideQuest quest = new CompetitionsResponse.SideQuest();
+        quest.setName("Bonus task");
+        quest.setLeaderboard(Collections.singletonList(comp.getLeaderboard().get(0)));
+        comp.setSideQuests(Collections.singletonList(quest));
+        reply(api, 0, comp);
         assertFalse(labels(panel, "Side Quests").isEmpty());
     }
 
@@ -273,6 +299,7 @@ public class CompetitionsPanelTest {
         List<CompetitionsResponse.Competition> active = Collections.emptyList(), scheduled = Collections.emptyList();
         final List<String> detailIds = new ArrayList<>();
         final List<Consumer<CompetitionDetailsResponse>> pending = new ArrayList<>();
+        final List<Consumer<BufferedImage>> artwork = new ArrayList<>();
 
         FakeApi() { super(null, null); }
 
@@ -286,6 +313,9 @@ public class CompetitionsPanelTest {
         @Override public void fetchVotes(Consumer<VotesResponse> ok, Consumer<Exception> error) { ok.accept(new VotesResponse()); }
         @Override public void fetchActiveCompetitions(Consumer<CompetitionsResponse> ok, Consumer<Exception> error) { ok.accept(response(active)); }
         @Override public void fetchScheduledCompetitions(Consumer<CompetitionsResponse> ok, Consumer<Exception> error) { ok.accept(response(scheduled)); }
+        @Override public void fetchCompetitionArtwork(String imageUrl, Consumer<BufferedImage> ok, Consumer<Exception> error) {
+            artwork.add(ok);
+        }
         @Override public void fetchCompetitionDetails(String id, Consumer<CompetitionDetailsResponse> ok, Consumer<Exception> error) {
             detailIds.add(id);
             pending.add(ok);

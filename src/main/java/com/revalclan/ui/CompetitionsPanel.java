@@ -25,6 +25,7 @@ import java.awt.image.BufferedImage;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -65,6 +66,7 @@ public class CompetitionsPanel extends JPanel {
 	private boolean memberContentAvailable;
 	private String selectedRaceId;
 	private BufferedImage raceArtwork;
+	private RaceEventCard raceDetailCard;
 	private String raceArtworkUrl;
 	private boolean artworkLoading;
 	private final Map<String, BufferedImage> objectiveArtwork = new HashMap<>();
@@ -175,7 +177,7 @@ public class CompetitionsPanel extends JPanel {
 			if (!Objects.equals(requestedUrl, raceArtworkUrl)) return;
 			artworkLoading = false;
 			raceArtwork = image;
-			renderRace();
+			if (!swapRaceDetailArtwork()) renderRace();
 		}), error -> SwingUtilities.invokeLater(() -> {
 			if (Objects.equals(requestedUrl, raceArtworkUrl)) artworkLoading = false;
 		}));
@@ -202,6 +204,25 @@ public class CompetitionsPanel extends JPanel {
 			List<Consumer<BufferedImage>> waiting = objectiveArtworkCallbacks.remove(url);
 			if (waiting != null) waiting.forEach(callback -> callback.accept(image));
 		}), error -> SwingUtilities.invokeLater(() -> objectiveArtworkCallbacks.remove(url)));
+	}
+
+	/**
+	 * With the race detail open, put the banner into its card without rebuilding the detail:
+	 * a rebuild would fetch the side quests again and reset the scroll position.
+	 */
+	private boolean swapRaceDetailArtwork() {
+		if (raceDetailCard == null || featuredRace == null || selectedRaceId == null
+			|| !selectedRaceId.equals(featuredRace.getId())) return false;
+		Container parent = raceDetailCard.getParent();
+		if (parent == null) return false;
+		buildContent();
+		int index = Arrays.asList(parent.getComponents()).indexOf(raceDetailCard);
+		raceDetailCard = new RaceEventCard(featuredRace, raceArtwork, itemManager, this::loadObjectiveArtwork, true, null);
+		parent.remove(index);
+		parent.add(raceDetailCard, index);
+		parent.revalidate();
+		parent.repaint();
+		return true;
 	}
 
 	private void renderRace() {
@@ -334,7 +355,8 @@ public class CompetitionsPanel extends JPanel {
 		selectedRaceId = race.getId();
 		int generation = ++detailGeneration;
 		JPanel body = detailBody(this::refreshRace);
-		body.add(new RaceEventCard(race, raceArtwork, itemManager, this::loadObjectiveArtwork, true, null));
+		raceDetailCard = new RaceEventCard(race, raceArtwork, itemManager, this::loadObjectiveArtwork, true, null);
+		body.add(raceDetailCard);
 		// Side quests are member data, absent from the public race feed. Keep them reachable here.
 		if (memberContentAvailable && race.getKc() != null && race.getKc().getId() != null) {
 			JPanel extras = Labels.column();
@@ -437,11 +459,11 @@ public class CompetitionsPanel extends JPanel {
 			card.add(Labels.wrapped(comp.getDescription(), FontManager.getRunescapeSmallFont(), UIConstants.TEXT_SECONDARY, 165));
 		}
 		card.add(Box.createVerticalStrut(6));
-		String time = "completed".equals(comp.getStatus()) ? "Completed" : "cancelled".equals(comp.getStatus()) ? "Cancelled"
+		String time = "completed".equalsIgnoreCase(comp.getStatus()) ? "Completed" : "cancelled".equalsIgnoreCase(comp.getStatus()) ? "Cancelled"
 			: (active ? "Ends in " : "Starts in ") + formatTimeRemaining(active ? comp.getEndDate() : comp.getStartDate());
 		card.add(Labels.small(time,
 			active ? UIConstants.ACCENT_GREEN : UIConstants.TEXT_PRIMARY));
-		if (comp.getParticipantCount() != null) {
+		if (comp.getParticipantCount() != null && comp.getParticipantCount() > 0) {
 			card.add(Labels.small(comp.getParticipantCount() + " participants", UIConstants.TEXT_MUTED));
 		}
 		if (comp.getRewardConfig() != null && !comp.getRewardConfig().isEmpty()) {
@@ -449,19 +471,23 @@ public class CompetitionsPanel extends JPanel {
 			card.add(Labels.small("PRIZES", UIConstants.TEXT_MUTED));
 			card.add(createRewardsGrid(comp.getRewardConfig()));
 		}
-		String metric = metric(comp.getCompetitionType());
-		card.add(Box.createVerticalStrut(10));
-		card.add(Labels.sectionTitle(rowLimit == 5 ? "Top 5 " + metric : metric + " leaderboard"));
-		card.add(Box.createVerticalStrut(6));
-		card.add(standings(comp.getLeaderboard(), comp.getCompetitionType(), comp.getRewardConfig(), rowLimit));
-		if (rowLimit == 5) {
+		// In the overview, upcoming competitions have no standings yet: no table and no full view
+		boolean hasStandings = rowLimit != 5 || active || (comp.getLeaderboard() != null && !comp.getLeaderboard().isEmpty());
+		if (hasStandings) {
+			String metric = metric(comp.getCompetitionType());
+			card.add(Box.createVerticalStrut(10));
+			card.add(Labels.sectionTitle(rowLimit == 5 ? "Top 5 " + metric : metric + " leaderboard"));
+			card.add(Box.createVerticalStrut(6));
+			card.add(standings(comp.getLeaderboard(), comp.getCompetitionType(), comp.getRewardConfig(), rowLimit));
+		}
+		if (rowLimit != 5) {
+			addSideQuests(card, comp.getSideQuests());
+		} else if (hasStandings) {
 			JButton full = new BlockButton("Full leaderboard >", UIConstants.ACCENT_GOLD, 24);
 			full.setAlignmentX(Component.LEFT_ALIGNMENT);
 			full.addActionListener(e -> showCompetitionDetails(comp, active));
 			card.add(Box.createVerticalStrut(10));
 			card.add(full);
-		} else {
-			addSideQuests(card, comp.getSideQuests());
 		}
 		card.setMaximumSize(new Dimension(Integer.MAX_VALUE, card.getPreferredSize().height));
 		return roundedWrapper(card);
@@ -477,7 +503,7 @@ public class CompetitionsPanel extends JPanel {
 			body.removeAll();
 			CompetitionsResponse.Competition comp = response.getData();
 			if (comp == null) body.add(statusLabel("Competition not found", UIConstants.ERROR_COLOR));
-			else body.add(createCompetitionCard(comp, comp.getStatus() == null ? active : "active".equals(comp.getStatus()), Integer.MAX_VALUE));
+			else body.add(createCompetitionCard(comp, comp.getStatus() == null ? active : "active".equalsIgnoreCase(comp.getStatus()), Integer.MAX_VALUE));
 			body.revalidate();
 			body.repaint();
 		}), error -> SwingUtilities.invokeLater(() -> {

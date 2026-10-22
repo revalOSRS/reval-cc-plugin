@@ -87,7 +87,7 @@ final class CompetitionStandings extends JPanel {
         JLabel reward = Labels.label(points, font, header ? text : UIConstants.ACCENT_GOLD);
         reward.setHorizontalAlignment(SwingConstants.RIGHT);
         reward.setPreferredSize(new Dimension(pointsWidth, 17));
-        reward.setToolTipText(header ? "Projected placement points" : points + " placement points");
+        reward.setToolTipText(header ? "Projected placement points" : "-".equals(points) ? null : points + " placement points");
         result.add(amount, BorderLayout.CENTER);
         result.add(reward, BorderLayout.EAST);
         row.add(result, BorderLayout.EAST);
