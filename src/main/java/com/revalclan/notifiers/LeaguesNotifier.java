@@ -54,7 +54,7 @@ public class LeaguesNotifier extends BaseNotifier {
 	}
 
 	private boolean hasConfig() {
-		LeaguesConfigResponse.LeaguesConfig cfg = getLeaguesConfig();
+		LeaguesConfigResponse.LeaguesConfig cfg = revalApiService.getCachedLeaguesConfig();
 		return cfg != null
 			&& cfg.getLeagueVersion() == client.getVarbitValue(VarbitID.LEAGUE_TYPE);
 	}
@@ -65,7 +65,7 @@ public class LeaguesNotifier extends BaseNotifier {
 	}
 
 	public void onGameTick() {
-		if (getLeaguesConfig() != null || configRetryAttempts >= CONFIG_MAX_RETRIES) return;
+		if (revalApiService.getCachedLeaguesConfig() != null || configRetryAttempts >= CONFIG_MAX_RETRIES) return;
 		if (!Worlds.isSeasonal(client)) return;
 
 		configRetryTicks++;
@@ -204,15 +204,11 @@ public class LeaguesNotifier extends BaseNotifier {
 	private Map<String, Object> createBaseData() {
 		Map<String, Object> data = new HashMap<>();
 		data.put("seasonalWorld", true);
-		LeaguesConfigResponse.LeaguesConfig cfg = getLeaguesConfig();
+		LeaguesConfigResponse.LeaguesConfig cfg = revalApiService.getCachedLeaguesConfig();
 		if (cfg != null) {
 			data.put("leagueName", cfg.getLeagueName());
 		}
 		return data;
-	}
-
-	private LeaguesConfigResponse.LeaguesConfig getLeaguesConfig() {
-		return revalApiService.getCachedLeaguesConfig();
 	}
 
 	private int computeAreasUnlocked() {
