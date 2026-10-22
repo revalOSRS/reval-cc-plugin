@@ -191,7 +191,6 @@ public class EventsPanel extends JPanel {
 		};
 
 		btn.setFont(FontManager.getRunescapeSmallFont());
-		btn.setForeground(currentTab.equals(tabId) ? accentColor : UIConstants.TEXT_SECONDARY);
 		btn.setBackground(null);
 		btn.setBorderPainted(false);
 		btn.setContentAreaFilled(false);
