@@ -10,7 +10,6 @@ package com.revalclan.notifiers;
 import com.revalclan.session.SessionTracker;
 import net.runelite.api.Actor;
 import net.runelite.api.Item;
-import net.runelite.api.ItemComposition;
 import net.runelite.api.ItemContainer;
 import net.runelite.api.NPC;
 import net.runelite.api.NPCComposition;
@@ -200,17 +199,10 @@ public class DeathNotifier extends BaseNotifier {
 			if (item.getId() <= 0 || item.getQuantity() <= 0) continue;
 
 			long gePrice = itemManager.getItemPrice(item.getId());
-			String name;
-			try {
-				ItemComposition comp = itemManager.getItemComposition(item.getId());
-				name = (comp != null) ? comp.getName() : "Unknown";
-			} catch (Exception e) {
-				name = "Unknown";
-			}
 
 			Map<String, Object> itemData = new HashMap<>();
 			itemData.put("id", item.getId());
-			itemData.put("name", name);
+			itemData.put("name", itemName(item.getId(), "Unknown"));
 			itemData.put("quantity", item.getQuantity());
 			itemData.put("gePrice", gePrice);
 			items.add(itemData);

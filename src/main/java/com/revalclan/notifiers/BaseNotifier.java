@@ -166,21 +166,24 @@ public abstract class BaseNotifier {
 			itemData.put("quantity", item.getQuantity());
 			itemData.put("gePrice", itemManager.getItemPrice(item.getId()));
 			itemData.put("slot", i);
-			
-			try {
-				ItemComposition itemComp = itemManager.getItemComposition(item.getId());
-				if (itemComp != null) {
-					itemData.put("name", itemComp.getName());
-				} else {
-					itemData.put("name", "Unknown");
-				}
-			} catch (Exception e) {
-				itemData.put("name", "Unknown");
-			}
-			
+			itemData.put("name", itemName(item.getId(), "Unknown"));
+
 			items.add(itemData);
 		}
-		
+
 		return items;
+	}
+
+	/**
+	 * The item's name, or {@code fallback} when its composition is missing or
+	 * cannot be read.
+	 */
+	protected String itemName(int itemId, String fallback) {
+		try {
+			ItemComposition composition = itemManager.getItemComposition(itemId);
+			return composition != null ? composition.getName() : fallback;
+		} catch (Exception e) {
+			return fallback;
+		}
 	}
 }

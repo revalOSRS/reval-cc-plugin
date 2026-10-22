@@ -6,7 +6,6 @@ import com.revalclan.collectionlog.GreenlogCounterSnapshot;
 import com.revalclan.util.RaidPartyTracker;
 import com.revalclan.util.RaidRewardLedger;
 import net.runelite.api.Item;
-import net.runelite.api.ItemComposition;
 import net.runelite.api.ItemContainer;
 import net.runelite.api.NPC;
 import net.runelite.api.events.ActorDeath;
@@ -397,15 +396,6 @@ public class LootNotifier extends BaseNotifier {
 		return counts;
 	}
 
-	private String itemName(int itemId) {
-		try {
-			ItemComposition composition = itemManager.getItemComposition(itemId);
-			return composition != null ? composition.getName() : null;
-		} catch (Exception e) {
-			return null;
-		}
-	}
-
 	/**
 	 * Report watched items that left the inventory in this change.
 	 *
@@ -426,7 +416,7 @@ public class LootNotifier extends BaseNotifier {
 		for (Map.Entry<Integer, Integer> was : before.entrySet()) {
 			int delta = was.getValue() - after.getOrDefault(was.getKey(), 0);
 			if (delta <= 0) continue;
-			String name = itemName(was.getKey());
+			String name = itemName(was.getKey(), null);
 			if (name != null && watched.contains(name.toLowerCase()) && !isNonConsumption(was.getKey())) {
 				lost.put(was.getKey(), delta);
 			}
@@ -441,7 +431,7 @@ public class LootNotifier extends BaseNotifier {
 
 		if (lost.size() == 1 && !gained.isEmpty()) {
 			int itemId = lost.keySet().iterator().next();
-			String source = itemName(itemId);
+			String source = itemName(itemId, null);
 			// The loot tracker already reported this source; ours would be a duplicate.
 			Integer realTick = recentRealLootSources.get(source.toLowerCase());
 			if (realTick != null && tickCounter - realTick <= REAL_LOOT_GUARD_TICKS) return;
@@ -457,7 +447,7 @@ public class LootNotifier extends BaseNotifier {
 		}
 
 		for (Map.Entry<Integer, Integer> l : lost.entrySet()) {
-			sendItemConsumed(l.getKey(), itemName(l.getKey()), l.getValue());
+			sendItemConsumed(l.getKey(), itemName(l.getKey(), null), l.getValue());
 		}
 	}
 
