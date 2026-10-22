@@ -4,7 +4,6 @@ import com.google.gson.JsonObject;
 import com.revalclan.util.Json;
 import com.revalclan.util.NumberFmt;
 
-import java.util.ArrayList;
 import java.util.List;
 
 /**

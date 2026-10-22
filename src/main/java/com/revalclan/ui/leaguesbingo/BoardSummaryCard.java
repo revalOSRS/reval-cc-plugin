@@ -73,11 +73,10 @@ final class BoardSummaryCard {
 		JLabel banner = new JLabel();
 		banner.setPreferredSize(new Dimension(BANNER_SIZE, BANNER_SIZE));
 		banner.setHorizontalAlignment(JLabel.CENTER);
-		banner.setVerticalAlignment(JLabel.CENTER);
 		int spriteId = stats.isBoardComplete() && meta.getBannerHighlightSprite() >= 0 ? meta.getBannerHighlightSprite() : meta.getBannerSprite();
-		if (spriteManager != null && spriteId >= 0) {
-			boolean dim = stats.isLocked();
-			SpriteIcons.load(spriteManager, spriteId, BANNER_SIZE, icon -> banner.setIcon(dim ? dimmed(icon) : icon));
+		// SpriteIcons.load ignores a null spriteManager.
+		if (spriteId >= 0) {
+			SpriteIcons.load(spriteManager, spriteId, BANNER_SIZE, icon -> banner.setIcon(stats.isLocked() ? dimmed(icon) : icon));
 		}
 
 		wrap.add(banner, BorderLayout.WEST);
