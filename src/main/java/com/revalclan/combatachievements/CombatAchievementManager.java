@@ -29,15 +29,15 @@ public class CombatAchievementManager {
 		TIER_ENUMS.put(3986, "Grandmaster");
 	}
 
-	private static final Map<Integer, String> TYPE_MAP = new LinkedHashMap<>();
-	static {
-		TYPE_MAP.put(1, "Stamina");
-		TYPE_MAP.put(2, "Perfection");
-		TYPE_MAP.put(3, "Kill Count");
-		TYPE_MAP.put(4, "Mechanical");
-		TYPE_MAP.put(5, "Restriction");
-		TYPE_MAP.put(6, "Speed");
-	}
+	// Lookup only (never iterated), so an unordered map is fine
+	private static final Map<Integer, String> TYPE_MAP = Map.of(
+		1, "Stamina",
+		2, "Perfection",
+		3, "Kill Count",
+		4, "Mechanical",
+		5, "Restriction",
+		6, "Speed"
+	);
 
 
 	private static final int FIELD_NAME = 1308;
