@@ -656,24 +656,22 @@ public class CompetitionsPanel extends JPanel {
 		return card;
 	}
 
-	/** Creates a non-opaque JPanel with rounded paintComponent and optional border. */
+	/** Non-opaque panel painting its (live) background rounded, with an optional 2px border. */
 	private JPanel roundedPanel(Color bg, Color borderColor) {
-		JPanel panel = new JPanel() {
+		JPanel panel = new RoundedPanel(4) {
 			@Override
 			protected void paintComponent(Graphics g) {
-				Graphics2D g2d = (Graphics2D) g.create();
-				g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-				g2d.setColor(getBackground());
-				g2d.fillRoundRect(0, 0, getWidth(), getHeight(), 4, 4);
+				super.paintComponent(g);
 				if (borderColor != null) {
+					Graphics2D g2d = (Graphics2D) g.create();
+					g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 					g2d.setColor(borderColor);
 					g2d.setStroke(new BasicStroke(2));
 					g2d.drawRoundRect(1, 1, getWidth() - 3, getHeight() - 3, 4, 4);
+					g2d.dispose();
 				}
-				g2d.dispose();
 			}
 		};
-		panel.setOpaque(false);
 		panel.setBackground(bg);
 		return panel;
 	}
