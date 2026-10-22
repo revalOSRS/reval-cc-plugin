@@ -15,99 +15,34 @@ public class AchievementDiaryManager {
 	@Inject
 	private Client client;
 
+	private static final String[] TIERS = {"easy", "medium", "hard", "elite"};
+
 	private final Map<String, Map<String, Integer>> diaryVarbits = new HashMap<>();
 
+	/**
+	 * Initialize all diary varbit mappings: the easy, medium, hard and elite varbit of each region
+	 */
 	public AchievementDiaryManager() {
-		initializeDiaryVarbits();
+		addRegion("Ardougne", 4458, 4459, 4460, 4461);
+		addRegion("Desert", 4483, 4484, 4485, 4486);
+		addRegion("Falador", 4462, 4463, 4464, 4465);
+		addRegion("Fremennik", 4491, 4492, 4493, 4494);
+		addRegion("Kandarin", 4475, 4476, 4477, 4478);
+		addRegion("Karamja", 3578, 3599, 3611, 4566);
+		addRegion("Kourend", 7925, 7926, 7927, 7928);
+		addRegion("Lumbridge", 4495, 4496, 4497, 4498);
+		addRegion("Morytania", 4487, 4488, 4489, 4490);
+		addRegion("Varrock", 4479, 4480, 4481, 4482);
+		addRegion("Western", 4471, 4472, 4473, 4474);
+		addRegion("Wilderness", 4466, 4467, 4468, 4469);
 	}
 
-	/**
-	 * Initialize all diary varbit mappings
-	 */
-	private void initializeDiaryVarbits() {
-		Map<String, Integer> ardougne = new HashMap<>();
-		ardougne.put("easy", 4458);
-		ardougne.put("medium", 4459);
-		ardougne.put("hard", 4460);
-		ardougne.put("elite", 4461);
-		diaryVarbits.put("Ardougne", ardougne);
-		
-		Map<String, Integer> desert = new HashMap<>();
-		desert.put("easy", 4483);
-		desert.put("medium", 4484);
-		desert.put("hard", 4485);
-		desert.put("elite", 4486);
-		diaryVarbits.put("Desert", desert);
-
-		Map<String, Integer> falador = new HashMap<>();
-		falador.put("easy", 4462);
-		falador.put("medium", 4463);
-		falador.put("hard", 4464);
-		falador.put("elite", 4465);
-		diaryVarbits.put("Falador", falador);
-
-		Map<String, Integer> fremennik = new HashMap<>();
-		fremennik.put("easy", 4491);
-		fremennik.put("medium", 4492);
-		fremennik.put("hard", 4493);
-		fremennik.put("elite", 4494);
-		diaryVarbits.put("Fremennik", fremennik);
-
-		Map<String, Integer> kandarin = new HashMap<>();
-		kandarin.put("easy", 4475);
-		kandarin.put("medium", 4476);
-		kandarin.put("hard", 4477);
-		kandarin.put("elite", 4478);
-		diaryVarbits.put("Kandarin", kandarin);
-
-		Map<String, Integer> karamja = new HashMap<>();
-		karamja.put("easy", 3578);
-		karamja.put("medium", 3599);
-		karamja.put("hard", 3611);
-		karamja.put("elite", 4566);
-		diaryVarbits.put("Karamja", karamja);
-		
-		Map<String, Integer> kourend = new HashMap<>();
-		kourend.put("easy", 7925);
-		kourend.put("medium", 7926);
-		kourend.put("hard", 7927);
-		kourend.put("elite", 7928);
-		diaryVarbits.put("Kourend", kourend);
-		
-		Map<String, Integer> lumbridge = new HashMap<>();
-		lumbridge.put("easy", 4495);
-		lumbridge.put("medium", 4496);
-		lumbridge.put("hard", 4497);
-		lumbridge.put("elite", 4498);
-		diaryVarbits.put("Lumbridge", lumbridge);
-
-		Map<String, Integer> morytania = new HashMap<>();
-		morytania.put("easy", 4487);
-		morytania.put("medium", 4488);
-		morytania.put("hard", 4489);
-		morytania.put("elite", 4490);
-		diaryVarbits.put("Morytania", morytania);
-
-		Map<String, Integer> varrock = new HashMap<>();
-		varrock.put("easy", 4479);
-		varrock.put("medium", 4480);
-		varrock.put("hard", 4481);
-		varrock.put("elite", 4482);
-		diaryVarbits.put("Varrock", varrock);
-		
-		Map<String, Integer> western = new HashMap<>();
-		western.put("easy", 4471);
-		western.put("medium", 4472);
-		western.put("hard", 4473);
-		western.put("elite", 4474);
-		diaryVarbits.put("Western", western);
-		
-		Map<String, Integer> wilderness = new HashMap<>();
-		wilderness.put("easy", 4466);
-		wilderness.put("medium", 4467);
-		wilderness.put("hard", 4468);
-		wilderness.put("elite", 4469);
-		diaryVarbits.put("Wilderness", wilderness);
+	private void addRegion(String region, int... tierVarbits) {
+		Map<String, Integer> tiers = new HashMap<>();
+		for (int i = 0; i < TIERS.length; i++) {
+			tiers.put(TIERS[i], tierVarbits[i]);
+		}
+		diaryVarbits.put(region, tiers);
 	}
 
 	/**
