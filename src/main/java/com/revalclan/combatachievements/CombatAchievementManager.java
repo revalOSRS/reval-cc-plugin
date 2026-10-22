@@ -154,8 +154,6 @@ public class CombatAchievementManager {
 		int varpIndex = taskId / 32;
 		int bitIndex = taskId % 32;
 
-		if (varpIndex >= COMPLETION_VARPS.length) return false;
-		
 		try {
 			int varpValue = client.getVarpValue(COMPLETION_VARPS[varpIndex]);
 			return (varpValue & (1 << bitIndex)) != 0;

@@ -6,7 +6,6 @@ import net.runelite.api.Hitsplat;
 import net.runelite.api.NPC;
 import net.runelite.api.Player;
 import net.runelite.api.events.ActorDeath;
-import net.runelite.api.events.GameTick;
 import net.runelite.api.events.HitsplatApplied;
 import net.runelite.api.events.NpcDespawned;
 import net.runelite.client.game.ItemManager;
@@ -33,7 +32,7 @@ public class KillTracker {
 	private int specTicksRemaining = 0;
 	private String specWeaponName = null;
 
-	public void onGameTick(GameTick event) {
+	public void onGameTick() {
 		int currentSpecEnergy = client.getVarpValue(300);
 
 		if (currentSpecEnergy < previousSpecEnergy) {

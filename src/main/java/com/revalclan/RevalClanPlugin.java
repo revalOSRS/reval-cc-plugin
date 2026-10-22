@@ -416,7 +416,7 @@ public class RevalClanPlugin extends Plugin {
 	public void onGameTick(GameTick gameTick) {
 		// The session and its kill attribution record regardless of clan state — only sending is gated
 		sessionTracker.onGameTick();
-		killTracker.onGameTick(gameTick);
+		killTracker.onGameTick();
 		raidPartyTracker.onGameTick();
 
 		// Re-read the clan sources; flips to member exactly once per login

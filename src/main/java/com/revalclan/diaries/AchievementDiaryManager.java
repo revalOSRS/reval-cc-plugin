@@ -1,6 +1,5 @@
 package com.revalclan.diaries;
 
-import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 
 import javax.inject.Inject;
@@ -11,7 +10,6 @@ import java.util.Map;
 /**
  * Manages achievement diary progress
  */
-@Slf4j
 @Singleton
 public class AchievementDiaryManager {
 	@Inject

@@ -1,6 +1,5 @@
 package com.revalclan.quests;
 
-import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.Quest;
 import net.runelite.api.QuestState;
@@ -14,7 +13,6 @@ import java.util.Set;
 /**
  * Manages quest completion data
  */
-@Slf4j
 @Singleton
 public class QuestManager {
 	@Inject private Client client;
