@@ -6,9 +6,11 @@ import com.revalclan.ui.components.ArrowIcon;
 import com.revalclan.ui.components.BackButton;
 import com.revalclan.ui.components.CheckIcon;
 import com.revalclan.ui.components.Clickable;
+import com.revalclan.ui.components.Labels;
 import com.revalclan.ui.components.LoginPrompt;
 import com.revalclan.ui.components.PanelTitle;
 import com.revalclan.ui.components.RefreshButton;
+import com.revalclan.ui.components.RoundedPanel;
 import com.revalclan.ui.components.TriangleIcon;
 import com.revalclan.ui.components.ScrollWrap;
 import com.revalclan.ui.constants.UIConstants;
@@ -65,9 +67,8 @@ public class DiaryPanel extends JPanel {
 	}
 
 	public void onLoggedOut() { showNotLoggedIn(); }
-	public void refresh() { loadData(); }
 
-	private void loadData() {
+	public void refresh() {
 		if (apiService == null) return;
 		if (refreshButton != null) refreshButton.setLoading(true);
 
@@ -120,15 +121,9 @@ public class DiaryPanel extends JPanel {
 		contentPanel.add(Box.createRigidArea(new Dimension(0, 12)));
 
 		if (allDiaries.isEmpty()) {
-			JLabel empty = new JLabel("No diaries available");
-			empty.setFont(FontManager.getRunescapeSmallFont());
-			empty.setForeground(UIConstants.TEXT_SECONDARY);
-			empty.setAlignmentX(Component.LEFT_ALIGNMENT);
-			contentPanel.add(empty);
+			contentPanel.add(Labels.small("No diaries available", UIConstants.TEXT_SECONDARY));
 		} else {
-			JPanel grid = new JPanel();
-			grid.setLayout(new BoxLayout(grid, BoxLayout.Y_AXIS));
-			grid.setOpaque(false);
+			JPanel grid = Labels.column();
 			grid.setAlignmentX(Component.LEFT_ALIGNMENT);
 
 			for (int i = 0; i < allDiaries.size(); i++) {
@@ -153,46 +148,23 @@ public class DiaryPanel extends JPanel {
 		JPanel card = new JPanel(new BorderLayout(12, 0)) {
 			@Override
 			protected void paintComponent(Graphics g) {
-				Graphics2D g2 = (Graphics2D) g.create();
-				g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-				g2.setColor(isHovered[0] ? UIConstants.CARD_HOVER : UIConstants.CARD_BG);
-				g2.fill(new RoundRectangle2D.Float(0, 0, getWidth(), getHeight(), 8, 8));
-				g2.setColor(getCategoryColor(diary.getCategory()));
-				g2.fillRoundRect(0, 4, 4, getHeight() - 8, 2, 2);
-				g2.dispose();
+				RoundedPanel.fill(g, this, isHovered[0] ? UIConstants.CARD_HOVER : UIConstants.CARD_BG, 8);
+				paintAccentBar(g, this, getCategoryColor(diary.getCategory()));
 			}
 		};
 		card.setOpaque(false);
 		card.setBorder(new EmptyBorder(16, 16, 16, 16));
 		card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 80));
-		card.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
-		JPanel leftPanel = new JPanel();
-		leftPanel.setLayout(new BoxLayout(leftPanel, BoxLayout.Y_AXIS));
-		leftPanel.setOpaque(false);
-
-		JLabel diaryName = new JLabel(diary.getName());
-		diaryName.setFont(FontManager.getRunescapeBoldFont());
-		diaryName.setForeground(UIConstants.TEXT_PRIMARY);
-		diaryName.setAlignmentX(Component.LEFT_ALIGNMENT);
-
-		JLabel categoryLabel = new JLabel(formatCategoryName(diary.getCategory()));
-		categoryLabel.setFont(FontManager.getRunescapeSmallFont());
-		categoryLabel.setForeground(UIConstants.TEXT_SECONDARY);
-		categoryLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-
-		leftPanel.add(diaryName);
+		JPanel leftPanel = Labels.column();
+		leftPanel.add(Labels.bold(diary.getName(), UIConstants.TEXT_PRIMARY));
 		leftPanel.add(Box.createRigidArea(new Dimension(0, 4)));
-		leftPanel.add(categoryLabel);
+		leftPanel.add(Labels.small(formatCategoryName(diary.getCategory()), UIConstants.TEXT_SECONDARY));
 
-		JPanel rightPanel = new JPanel();
-		rightPanel.setLayout(new BoxLayout(rightPanel, BoxLayout.Y_AXIS));
-		rightPanel.setOpaque(false);
+		JPanel rightPanel = Labels.column();
 
 		int[] stats = countTasks(diary);
-		JLabel statsLabel = new JLabel(stats[0] + "/" + stats[1] + " tasks");
-		statsLabel.setFont(FontManager.getRunescapeBoldFont());
-		statsLabel.setForeground(UIConstants.ACCENT_GOLD);
+		JLabel statsLabel = Labels.bold(stats[0] + "/" + stats[1] + " tasks", UIConstants.ACCENT_GOLD);
 		statsLabel.setAlignmentX(Component.RIGHT_ALIGNMENT);
 
 		JLabel arrowLabel = new JLabel(new ArrowIcon(11, UIConstants.TEXT_SECONDARY));
@@ -205,6 +177,7 @@ public class DiaryPanel extends JPanel {
 		card.add(leftPanel, BorderLayout.WEST);
 		card.add(rightPanel, BorderLayout.EAST);
 
+		// onPress also sets the hand cursor
 		Clickable.onPress(card, () -> showDiaryDetail(diary), h -> isHovered[0] = h);
 
 		return card;
@@ -230,7 +203,7 @@ public class DiaryPanel extends JPanel {
 		titleRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 50));
 		titleRow.setAlignmentX(Component.LEFT_ALIGNMENT);
 		titleRow.add(new PanelTitle(diary.getName()), BorderLayout.CENTER);
-		titleRow.add(new RefreshButton(this::loadData), BorderLayout.EAST);
+		titleRow.add(new RefreshButton(this::refresh), BorderLayout.EAST);
 
 		JPanel headerContainer = new JPanel();
 		headerContainer.setLayout(new BoxLayout(headerContainer, BoxLayout.Y_AXIS));
@@ -264,10 +237,7 @@ public class DiaryPanel extends JPanel {
 				if (i < diary.getTiers().size() - 1) detailPanel.add(Box.createRigidArea(new Dimension(0, 8)));
 			}
 		} else {
-			JLabel emptyLabel = new JLabel("No tiers available");
-			emptyLabel.setFont(FontManager.getRunescapeSmallFont());
-			emptyLabel.setForeground(UIConstants.TEXT_MUTED);
-			emptyLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+			JLabel emptyLabel = Labels.small("No tiers available", UIConstants.TEXT_MUTED);
 			emptyLabel.setBorder(new EmptyBorder(20, 0, 20, 0));
 			detailPanel.add(emptyLabel);
 		}
@@ -283,17 +253,14 @@ public class DiaryPanel extends JPanel {
 	// ── Diary Stats Card ──
 
 	private JPanel createDiaryStats(DiariesResponse.Diary diary) {
-		int completedTasks = 0, totalTasks = 0;
+		int[] tasks = countTasks(diary);
+		int completedTasks = tasks[0], totalTasks = tasks[1];
 		int earnedPoints = 0, totalPoints = diary.getFullCompletionBonus();
 
 		if (diary.getTiers() != null) {
 			for (DiariesResponse.Diary.DiaryTier tier : diary.getTiers()) {
 				totalPoints += tier.getCompletionBonus();
-				Integer tc = tier.getTasksCompleted();
-				Integer tt = tier.getTasksTotal();
-				if (tt != null) totalTasks += tt;
-				if (tc != null) completedTasks += tc;
-				if (tier.getIsComplete() != null && tier.getIsComplete()) {
+				if (Boolean.TRUE.equals(tier.getIsComplete())) {
 					earnedPoints += tier.getCompletionBonus();
 				}
 			}
@@ -305,37 +272,19 @@ public class DiaryPanel extends JPanel {
 
 		double progress = totalTasks > 0 ? (double) completedTasks / totalTasks : 0;
 
-		JPanel content = new JPanel();
-		content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
-		content.setOpaque(false);
+		JPanel content = Labels.column();
 		content.setBorder(new EmptyBorder(12, 12, 12, 12));
 		content.setMaximumSize(new Dimension(Integer.MAX_VALUE, 100));
 
 		JPanel headerRow = new JPanel(new BorderLayout());
 		headerRow.setOpaque(false);
-
-		JLabel progressLabel = new JLabel("Progress");
-		progressLabel.setFont(FontManager.getRunescapeBoldFont());
-		progressLabel.setForeground(UIConstants.TEXT_PRIMARY);
-
-		JLabel statsLabel = new JLabel(completedTasks + "/" + totalTasks + " tasks - " + earnedPoints + "/" + totalPoints + " pts");
-		statsLabel.setFont(FontManager.getRunescapeSmallFont());
-		statsLabel.setForeground(UIConstants.TEXT_SECONDARY);
-
-		headerRow.add(progressLabel, BorderLayout.WEST);
-		headerRow.add(statsLabel, BorderLayout.EAST);
-
-		JProgressBar progressBar = new JProgressBar(0, 100);
-		progressBar.setValue((int) (progress * 100));
-		progressBar.setBackground(UIConstants.PROGRESS_BG);
-		progressBar.setForeground(progress >= 1.0 ? UIConstants.SUCCESS_COLOR : UIConstants.TIER_MEDIUM);
-		progressBar.setBorderPainted(false);
-		progressBar.setPreferredSize(new Dimension(0, 8));
-		progressBar.setMaximumSize(new Dimension(Integer.MAX_VALUE, 8));
+		headerRow.add(Labels.sectionTitle("Progress"), BorderLayout.WEST);
+		headerRow.add(Labels.small(completedTasks + "/" + totalTasks + " tasks - " + earnedPoints + "/" + totalPoints + " pts",
+			UIConstants.TEXT_SECONDARY), BorderLayout.EAST);
 
 		content.add(headerRow);
 		content.add(Box.createRigidArea(new Dimension(0, 8)));
-		content.add(progressBar);
+		content.add(progressBar((int) (progress * 100), progress >= 1.0 ? UIConstants.SUCCESS_COLOR : UIConstants.TIER_MEDIUM, 8));
 
 		return roundedWrapper(content);
 	}
@@ -344,27 +293,19 @@ public class DiaryPanel extends JPanel {
 
 	private JPanel createTierSection(DiaryTier tier, DiariesResponse.Diary.DiaryTier apiTier,
 									 java.util.List<DiariesResponse.Diary.DiaryTask> activeTasks, String tierKey) {
-		JPanel tierSection = new JPanel();
-		tierSection.setLayout(new BoxLayout(tierSection, BoxLayout.Y_AXIS));
-		tierSection.setOpaque(false);
+		JPanel tierSection = Labels.column();
 
 		final boolean[] expanded = {expandedTiers.contains(tierKey)};
 		final JPanel[] headerRef = {createTierHeader(tier, apiTier, activeTasks, expanded[0])};
 		headerRef[0].setAlignmentX(Component.LEFT_ALIGNMENT);
-		headerRef[0].setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
-		JPanel tasksContainer = new JPanel();
-		tasksContainer.setLayout(new BoxLayout(tasksContainer, BoxLayout.Y_AXIS));
-		tasksContainer.setOpaque(false);
+		JPanel tasksContainer = Labels.column();
 		tasksContainer.setBorder(new EmptyBorder(8, 0, 0, 0));
 		tasksContainer.setVisible(expanded[0]);
 		tasksContainer.setAlignmentX(Component.LEFT_ALIGNMENT);
 
 		if (activeTasks.isEmpty()) {
-			JLabel empty = new JLabel("No tasks in this tier");
-			empty.setFont(FontManager.getRunescapeSmallFont());
-			empty.setForeground(UIConstants.TEXT_MUTED);
-			empty.setAlignmentX(Component.LEFT_ALIGNMENT);
+			JLabel empty = Labels.small("No tasks in this tier", UIConstants.TEXT_MUTED);
 			empty.setBorder(new EmptyBorder(4, 12, 4, 12));
 			tasksContainer.add(empty);
 		} else {
@@ -394,6 +335,7 @@ public class DiaryPanel extends JPanel {
 			tierSection.revalidate();
 			tierSection.repaint();
 		};
+		// onPress also sets the hand cursor
 		Clickable.onPress(headerRef[0], toggle[0]);
 
 		return tierSection;
@@ -409,31 +351,20 @@ public class DiaryPanel extends JPanel {
 		JPanel header = new JPanel(new BorderLayout(8, 0)) {
 			@Override
 			protected void paintComponent(Graphics g) {
-				Graphics2D g2 = (Graphics2D) g.create();
-				g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-				g2.setColor(tierComplete ? UIConstants.TASK_COMPLETE : UIConstants.CARD_BG);
-				g2.fill(new RoundRectangle2D.Float(0, 0, getWidth(), getHeight(), 6, 6));
-				g2.setColor(tier.color);
-				g2.fillRoundRect(0, 4, 4, getHeight() - 8, 2, 2);
-				g2.dispose();
+				RoundedPanel.fill(g, this, tierComplete ? UIConstants.TASK_COMPLETE : UIConstants.CARD_BG, 6);
+				paintAccentBar(g, this, tier.color);
 			}
 		};
 		header.setOpaque(false);
 		header.setBorder(new EmptyBorder(12, 12, 12, 12));
 		header.setMaximumSize(new Dimension(Integer.MAX_VALUE, 60));
 
-		JPanel leftPanel = new JPanel();
-		leftPanel.setLayout(new BoxLayout(leftPanel, BoxLayout.Y_AXIS));
-		leftPanel.setOpaque(false);
+		JPanel leftPanel = Labels.column();
 
 		JPanel nameRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
 		nameRow.setOpaque(false);
 		nameRow.setAlignmentX(Component.LEFT_ALIGNMENT);
-
-		JLabel tierName = new JLabel(tier.displayName);
-		tierName.setFont(FontManager.getRunescapeBoldFont());
-		tierName.setForeground(tier.color);
-		nameRow.add(tierName);
+		nameRow.add(Labels.bold(tier.displayName, tier.color));
 
 		if (tierComplete) {
 			ImageIcon icon = assetLoader != null ? assetLoader.getIcon("checkmark.png", 16) : null;
@@ -446,14 +377,9 @@ public class DiaryPanel extends JPanel {
 			? apiTier.getCompletionBonus() + " pts earned"
 			: apiTier.getCompletionBonus() + " pts available";
 
-		JLabel progressText = new JLabel(completed + "/" + total + " tasks - " + pointsText);
-		progressText.setFont(FontManager.getRunescapeSmallFont());
-		progressText.setForeground(UIConstants.TEXT_SECONDARY);
-		progressText.setAlignmentX(Component.LEFT_ALIGNMENT);
-
 		leftPanel.add(nameRow);
 		leftPanel.add(Box.createRigidArea(new Dimension(0, 4)));
-		leftPanel.add(progressText);
+		leftPanel.add(Labels.small(completed + "/" + total + " tasks - " + pointsText, UIConstants.TEXT_SECONDARY));
 
 		JLabel expandArrow = new JLabel(new TriangleIcon(!isExpanded, 9, UIConstants.TEXT_SECONDARY));
 
@@ -495,71 +421,35 @@ public class DiaryPanel extends JPanel {
 			}
 		}
 
-		final double finalProgress = progress;
-		final boolean finalComplete = isComplete;
-
 		JPanel card = new JPanel(new BorderLayout(12, 0)) {
 			@Override
 			protected void paintComponent(Graphics g) {
-				Graphics2D g2 = (Graphics2D) g.create();
-				g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-				g2.setColor(finalComplete ? UIConstants.TASK_COMPLETE : UIConstants.CARD_BG);
-				g2.fill(new RoundRectangle2D.Float(0, 0, getWidth(), getHeight(), 6, 6));
-				if (finalComplete) {
+				RoundedPanel.fill(g, this, isComplete ? UIConstants.TASK_COMPLETE : UIConstants.CARD_BG, 6);
+				if (isComplete) {
+					Graphics2D g2 = (Graphics2D) g.create();
+					g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 					g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.3f));
 					g2.setColor(UIConstants.SUCCESS_COLOR);
 					g2.setStroke(new BasicStroke(2));
 					g2.draw(new RoundRectangle2D.Float(1, 1, getWidth() - 2, getHeight() - 2, 6, 6));
+					g2.dispose();
 				}
-				g2.dispose();
 			}
 		};
 		card.setOpaque(false);
 		card.setBorder(new EmptyBorder(12, 12, 12, 12));
 		card.setMaximumSize(new Dimension(Integer.MAX_VALUE, Integer.MAX_VALUE));
 
-		JPanel mainPanel = new JPanel();
-		mainPanel.setLayout(new BoxLayout(mainPanel, BoxLayout.Y_AXIS));
-		mainPanel.setOpaque(false);
-
-		JLabel titleLabel = new JLabel(task.getName());
-		titleLabel.setFont(FontManager.getRunescapeBoldFont());
-		titleLabel.setForeground(isComplete ? UIConstants.SUCCESS_COLOR : UIConstants.TIER_ELITE);
-		titleLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-
-		JTextArea descArea = new JTextArea(task.getDescription() != null ? task.getDescription() : "No description");
-		descArea.setFont(FontManager.getRunescapeSmallFont());
-		descArea.setForeground(UIConstants.TEXT_SECONDARY);
-		descArea.setEditable(false);
-		descArea.setFocusable(false);
-		descArea.setWrapStyleWord(true);
-		descArea.setLineWrap(true);
-		descArea.setOpaque(false);
-		descArea.setBorder(null);
-		descArea.setAlignmentX(Component.LEFT_ALIGNMENT);
-
-		mainPanel.add(titleLabel);
+		JPanel mainPanel = Labels.column();
+		mainPanel.add(Labels.bold(task.getName(), isComplete ? UIConstants.SUCCESS_COLOR : UIConstants.TIER_ELITE));
 		mainPanel.add(Box.createRigidArea(new Dimension(0, 4)));
-		mainPanel.add(descArea);
-
-		JPanel progressPanel = createProgressBar(finalProgress, current, target, progressPercent, isComplete, tierColor);
-		progressPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+		mainPanel.add(textArea(task.getDescription() != null ? task.getDescription() : "No description", UIConstants.TEXT_SECONDARY));
 		mainPanel.add(Box.createRigidArea(new Dimension(0, 6)));
-		mainPanel.add(progressPanel);
+		mainPanel.add(createProgressBar(progress, current, target, progressPercent, isComplete, tierColor));
 
 		if (task.getHint() != null && !task.getHint().isEmpty()) {
-			JTextArea hintArea = new JTextArea("Hint: " + task.getHint());
-			hintArea.setFont(FontManager.getRunescapeSmallFont());
-			hintArea.setForeground(UIConstants.TEXT_MUTED);
-			hintArea.setEditable(false);
-			hintArea.setFocusable(false);
-			hintArea.setWrapStyleWord(true);
-			hintArea.setLineWrap(true);
-			hintArea.setOpaque(false);
-			hintArea.setBorder(null);
-			hintArea.setAlignmentX(Component.LEFT_ALIGNMENT);
 			mainPanel.add(Box.createRigidArea(new Dimension(0, 4)));
-			mainPanel.add(hintArea);
+			mainPanel.add(textArea("Hint: " + task.getHint(), UIConstants.TEXT_MUTED));
 		}
 
 		card.add(mainPanel, BorderLayout.CENTER);
@@ -570,25 +460,24 @@ public class DiaryPanel extends JPanel {
 
 	private JPanel createProgressBar(double progress, int current, int target,
 									 int progressPercent, boolean completed, Color tierColor) {
-		JPanel panel = new JPanel(new BorderLayout(6, 0));
-		panel.setOpaque(false);
+		JPanel panel = Labels.row();
 		panel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 16));
-
-		JProgressBar bar = new JProgressBar(0, 100);
-		bar.setValue((int) (Math.min(1.0, Math.max(0.0, progress)) * 100));
-		bar.setBackground(UIConstants.PROGRESS_BG);
-		bar.setForeground(completed ? UIConstants.SUCCESS_COLOR : tierColor);
-		bar.setBorderPainted(false);
-		bar.setPreferredSize(new Dimension(0, 6));
-		bar.setMaximumSize(new Dimension(Integer.MAX_VALUE, 6));
-
-		JLabel label = new JLabel(formatProgress(current, target, progressPercent, completed));
-		label.setFont(FontManager.getRunescapeSmallFont());
-		label.setForeground(completed ? UIConstants.SUCCESS_COLOR : UIConstants.TEXT_SECONDARY);
-
-		panel.add(bar, BorderLayout.CENTER);
-		panel.add(label, BorderLayout.EAST);
+		panel.add(progressBar((int) (Math.min(1.0, Math.max(0.0, progress)) * 100),
+			completed ? UIConstants.SUCCESS_COLOR : tierColor, 6), BorderLayout.CENTER);
+		panel.add(Labels.small(formatProgress(current, target, progressPercent, completed),
+			completed ? UIConstants.SUCCESS_COLOR : UIConstants.TEXT_SECONDARY), BorderLayout.EAST);
 		return panel;
+	}
+
+	private static JProgressBar progressBar(int value, Color color, int height) {
+		JProgressBar bar = new JProgressBar(0, 100);
+		bar.setValue(value);
+		bar.setBackground(UIConstants.PROGRESS_BG);
+		bar.setForeground(color);
+		bar.setBorderPainted(false);
+		bar.setPreferredSize(new Dimension(0, height));
+		bar.setMaximumSize(new Dimension(Integer.MAX_VALUE, height));
+		return bar;
 	}
 
 	private String formatProgress(int current, int target, int progressPercent, boolean completed) {
@@ -611,16 +500,35 @@ public class DiaryPanel extends JPanel {
 		JPanel wrapper = new JPanel(new BorderLayout()) {
 			@Override
 			protected void paintComponent(Graphics g) {
-				Graphics2D g2 = (Graphics2D) g.create();
-				g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-				g2.setColor(UIConstants.CARD_BG);
-				g2.fill(new RoundRectangle2D.Float(0, 0, getWidth(), getHeight(), 8, 8));
-				g2.dispose();
+				RoundedPanel.fill(g, this, UIConstants.CARD_BG, 8);
 			}
 		};
 		wrapper.setOpaque(false);
 		wrapper.add(content, BorderLayout.CENTER);
 		return wrapper;
+	}
+
+	/** Thin rounded accent bar down a card's left edge. */
+	private static void paintAccentBar(Graphics g, Component c, Color color) {
+		Graphics2D g2 = (Graphics2D) g.create();
+		g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+		g2.setColor(color);
+		g2.fillRoundRect(0, 4, 4, c.getHeight() - 8, 2, 2);
+		g2.dispose();
+	}
+
+	private static JTextArea textArea(String text, Color color) {
+		JTextArea area = new JTextArea(text);
+		area.setFont(FontManager.getRunescapeSmallFont());
+		area.setForeground(color);
+		area.setEditable(false);
+		area.setFocusable(false);
+		area.setWrapStyleWord(true);
+		area.setLineWrap(true);
+		area.setOpaque(false);
+		area.setBorder(null);
+		area.setAlignmentX(Component.LEFT_ALIGNMENT);
+		return area;
 	}
 
 	private java.util.List<DiariesResponse.Diary.DiaryTask> getActiveTasks(DiariesResponse.Diary.DiaryTier tier) {
