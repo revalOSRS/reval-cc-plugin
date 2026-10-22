@@ -9,46 +9,48 @@ import java.awt.Color;
 public class UIConstants {
     
     // ========== Background Colors ==========
+    // The themed colours (non-final) get their values from setHalloweenTheme, run with
+    // false when the class loads; the default and Halloween values are listed there.
     
     /** Main background color used for panels and containers */
-    public static Color BACKGROUND = new Color(15, 17, 17);
+    public static Color BACKGROUND;
     
     /** Card background color for elevated content */
-    public static Color CARD_BG = new Color(28, 31, 33);
+    public static Color CARD_BG;
     
     /** Card hover state background color */
-    public static Color CARD_HOVER = new Color(35, 38, 42);
+    public static Color CARD_HOVER;
     
     /** Border color for cards and containers */
-    public static Color BORDER_COLOR = new Color(50, 54, 58);
+    public static Color BORDER_COLOR;
     
     /** Progress bar background color */
-    public static Color PROGRESS_BG = new Color(40, 43, 47);
+    public static Color PROGRESS_BG;
     
     /** Row/item background color (darker than card) */
-    public static Color ROW_BG = new Color(22, 24, 26);
+    public static Color ROW_BG;
     
     /** Tab active state background */
-    public static Color TAB_ACTIVE = new Color(45, 48, 52);
+    public static Color TAB_ACTIVE;
     
     /** Tab hover state background */
-    public static Color TAB_HOVER = new Color(38, 42, 46);
+    public static Color TAB_HOVER;
     
     // ========== Text Colors ==========
     
     /** Primary text color for main content */
-    public static Color TEXT_PRIMARY = new Color(230, 230, 220);
+    public static Color TEXT_PRIMARY;
     
     /** Secondary text color for less important content */
-    public static Color TEXT_SECONDARY = new Color(150, 150, 140);
+    public static Color TEXT_SECONDARY;
     
     /** Muted text color for disabled or very subtle content */
-    public static Color TEXT_MUTED = new Color(100, 100, 95);
+    public static Color TEXT_MUTED;
     
     // ========== Accent Colors ==========
     
     /** Gold accent color - used for points, highlights, and important elements */
-    public static Color ACCENT_GOLD = new Color(218, 165, 32);
+    public static Color ACCENT_GOLD;
     
     /** Green accent color - used for success states, positive values, and completion */
     public static final Color ACCENT_GREEN = new Color(139, 195, 74);
@@ -146,6 +148,10 @@ public class UIConstants {
     public static final Color PUMPKIN_STEM = new Color(126, 153, 97);
 
     private static boolean halloweenTheme;
+
+    static {
+        setHalloweenTheme(false);
+    }
 
     public static boolean isHalloweenTheme() {
         return halloweenTheme;
