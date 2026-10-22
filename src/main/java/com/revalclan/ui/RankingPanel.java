@@ -171,9 +171,7 @@ public class RankingPanel extends JPanel {
 				if (sources == null || sources.isEmpty() || category.equals("UNTRADEABLE_DROPS")) continue;
 
 				JPanel content = createPointSourcesPanel(sources, category);
-				String displayName = formatCategoryName(category);
-
-				CollapsibleSection section = new CollapsibleSection(displayName, null, content, false);
+				CollapsibleSection section = new CollapsibleSection(formatCategoryName(category), null, content, false);
 				Integer itemId = sources.get(0).getMetadata() != null ? sources.get(0).getMetadata().getItemId() : null;
 				if (itemId != null) {
 					loadSectionIcon(itemId, section);
@@ -241,10 +239,7 @@ public class RankingPanel extends JPanel {
 
 		for (PointsResponse.PointSource source : sources) {
 			// Without an ItemManager the card skips the icon slot
-			PointSourceCard card = new PointSourceCard(source, showIcons ? itemManager : null);
-			card.setAlignmentX(Component.LEFT_ALIGNMENT);
-			panel.add(card);
-			panel.add(Box.createRigidArea(new Dimension(0, 1)));
+			addCard(panel, new PointSourceCard(source, showIcons ? itemManager : null));
 		}
 		return panel;
 	}
@@ -267,14 +262,17 @@ public class RankingPanel extends JPanel {
 
 			// Items
 			for (PointsResponse.PointSource source : items) {
-				PointSourceCard card = PointSourceCard.forUntradeable(source, itemManager);
-				card.setAlignmentX(Component.LEFT_ALIGNMENT);
-				panel.add(card);
-				panel.add(Box.createRigidArea(new Dimension(0, 1)));
+				addCard(panel, PointSourceCard.forUntradeable(source, itemManager));
 			}
 			panel.add(Box.createRigidArea(new Dimension(0, 4)));
 		}
 		return panel;
+	}
+
+	private static void addCard(JPanel panel, JComponent card) {
+		card.setAlignmentX(Component.LEFT_ALIGNMENT);
+		panel.add(card);
+		panel.add(Box.createRigidArea(new Dimension(0, 1)));
 	}
 
 	private String formatCategoryName(String name) {
