@@ -1,5 +1,6 @@
 package com.revalclan.collectionlog;
 
+import com.revalclan.util.Colors;
 import net.runelite.api.Client;
 import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.widgets.Widget;
@@ -101,11 +102,11 @@ public class SyncGuideOverlay extends Overlay {
 		double pulse = (Math.sin(System.currentTimeMillis() / 220.0) + 1) / 2;
 		int alpha = (int) (100 + pulse * 155);
 
-		g.setColor(new Color(GOLD.getRed(), GOLD.getGreen(), GOLD.getBlue(), alpha / 4));
+		g.setColor(Colors.withAlpha(GOLD, alpha / 4));
 		g.fillRoundRect(bounds.x - 3, bounds.y - 3, bounds.width + 6, bounds.height + 6, 8, 8);
 
 		g.setStroke(new BasicStroke(2));
-		g.setColor(new Color(GOLD.getRed(), GOLD.getGreen(), GOLD.getBlue(), alpha));
+		g.setColor(Colors.withAlpha(GOLD, alpha));
 		g.drawRoundRect(bounds.x - 3, bounds.y - 3, bounds.width + 6, bounds.height + 6, 8, 8);
 	}
 
@@ -121,7 +122,7 @@ public class SyncGuideOverlay extends Overlay {
 
 		g.setColor(new Color(0, 0, 0, 180));
 		g.fillRoundRect(x, y, width, height, 10, 10);
-		g.setColor(new Color(GOLD.getRed(), GOLD.getGreen(), GOLD.getBlue(), 140));
+		g.setColor(Colors.withAlpha(GOLD, 140));
 		g.setStroke(new BasicStroke(1));
 		g.drawRoundRect(x, y, width, height, 10, 10);
 
@@ -135,7 +136,7 @@ public class SyncGuideOverlay extends Overlay {
 		g.fillRoundRect(trackX, barY, trackWidth, 3, 3, 3);
 		int fillWidth = (int) Math.round(trackWidth * Math.min(1.0, Math.max(0.0, fraction)));
 		if (fillWidth > 0) {
-			g.setColor(new Color(GOLD.getRed(), GOLD.getGreen(), GOLD.getBlue(), 220));
+			g.setColor(Colors.withAlpha(GOLD, 220));
 			g.fillRoundRect(trackX, barY, fillWidth, 3, 3, 3);
 		}
 	}
