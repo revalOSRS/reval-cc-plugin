@@ -16,6 +16,5 @@ public class MyVoteResponse extends ApiResponse {
     public static class MyVoteData {
         private Boolean hasVoted;
         private String optionId;
-        private String votedAt;
     }
 }

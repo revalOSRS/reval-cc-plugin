@@ -19,9 +19,6 @@ public class ActiveTeamsResponse extends ApiResponse {
 
 	@Data
 	public static class Team {
-		private String eventId;
-		private String eventName;
-		private String name;
 		private String color;   // hex, e.g. "#4DA6FF"; may be null
 		private List<String> members;
 	}

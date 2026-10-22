@@ -25,48 +25,27 @@ public class CompetitionsResponse extends ApiResponse {
         private String name;
         private String description;
         private String competitionType;
-        private Map<String, Object> trackingConfig;
         private String startDate;
         private String endDate;
         private String status;
         private Map<String, Integer> rewardConfig;
-        private String createdAt;
         private Integer participantCount;
         private List<LeaderboardEntry> leaderboard;
         private List<SideQuest> sideQuests;
-        private List<Reward> rewards;
     }
 
     @Data
     public static class LeaderboardEntry {
-        private Integer rank;
-        private Integer osrsAccountId;
         private String osrsNickname;
         private Integer currentValue;
         private Integer finalValue;
-        private String enrolledAt;
-        private String lastUpdatedAt;
     }
 
     @Data
     public static class SideQuest {
-        private String id;
-        private String competitionId;
         private String name;
         private String description;
         private String sideQuestType;
-        private Map<String, Object> trackingConfig;
-        private Map<String, Integer> rewardConfig;
-        private String status;
         private List<LeaderboardEntry> leaderboard;
-    }
-
-    @Data
-    public static class Reward {
-        private Integer osrsAccountId;
-        private String osrsNickname;
-        private String rewardType;
-        private Integer finalRank;
-        private Integer pointsAwarded;
     }
 }

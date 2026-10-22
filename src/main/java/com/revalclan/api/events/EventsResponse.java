@@ -21,7 +21,6 @@ public class EventsResponse extends ApiResponse {
 
     @Data
     public static class EventsData {
-        private int count;
         private List<EventSummary> events;
     }
 

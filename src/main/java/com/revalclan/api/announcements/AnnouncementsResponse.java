@@ -19,7 +19,6 @@ public class AnnouncementsResponse extends ApiResponse {
 
 	@Data
 	public static class AnnouncementsData {
-		private int count;
 		private List<Announcement> announcements;
 	}
 

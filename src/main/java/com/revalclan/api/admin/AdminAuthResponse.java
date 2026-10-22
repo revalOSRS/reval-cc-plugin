@@ -17,8 +17,6 @@ public class AdminAuthResponse extends ApiResponse {
     @Data
     public static class AdminAuthData {
         private boolean authenticated;
-        private int memberId;
-        private String osrsNickname;
         private List<String> permissions;
     }
 }
