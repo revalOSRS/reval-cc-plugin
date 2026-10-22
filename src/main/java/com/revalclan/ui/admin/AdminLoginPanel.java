@@ -4,7 +4,6 @@ import com.revalclan.api.RevalApiService;
 import com.revalclan.api.admin.AdminAuthResponse;
 import com.revalclan.ui.constants.UIConstants;
 import lombok.Getter;
-import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.client.ui.FontManager;
 
@@ -13,7 +12,6 @@ import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.util.function.Consumer;
 
-@Slf4j
 public class AdminLoginPanel extends JPanel {
 	private final RevalApiService apiService;
 	private final Client client;
