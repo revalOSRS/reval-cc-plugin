@@ -7,6 +7,7 @@
 package com.revalclan.collectionlog;
 
 import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.gameval.VarPlayerID;
 import net.runelite.api.Client;
@@ -81,25 +82,18 @@ public class CollectionLogManager {
 	/**
 	 * Helper class to store KC source information
 	 */
+	@RequiredArgsConstructor
 	private static class KCSource {
 		final boolean isVarbit;
 		final int id;
-
-		KCSource(boolean isVarbit, int id) {
-			this.isVarbit = isVarbit;
-			this.id = id;
-		}
 	}
 	
 	/**
 	 * Fluent builder for configuring KC tracking for a subcategory
 	 */
+	@RequiredArgsConstructor
 	private class KCBuilder {
 		private final String subcategory;
-		
-		KCBuilder(String subcategory) {
-			this.subcategory = subcategory;
-		}
 		
 		KCBuilder primaryKC(boolean isVarbit, int id) {
 			categoryKCMap.put(subcategory, new KCSource(isVarbit, id));
@@ -412,9 +406,6 @@ public class CollectionLogManager {
 		// is only real after the player opened the collection log this session
 		data.put("dataSource", obtainedItems.isEmpty() ? "varbit_2943" : "collection_log_opened");
 
-		// Obtained items are already keyed by item id with the latest count
-		Map<Integer, ObtainedCollectionItem> obtainedItemsMap = obtainedItems;
-
 		// Build hierarchical structure: Category > Subcategory > Items
 		Map<String, Map<String, Map<String, Object>>> categoriesData = new LinkedHashMap<>();
 
@@ -426,8 +417,7 @@ public class CollectionLogManager {
 				Set<Integer> categoryItems = categoryItemMap.get(categoryStructIdMap.get(subcategorySlug));
 				if (categoryItems == null) continue;
 
-				Map<String, Object> subcategoryData = buildSubcategoryData(subcategorySlug, categoryItems, obtainedItemsMap);
-				subcategoriesData.put(subcategorySlug, subcategoryData);
+				subcategoriesData.put(subcategorySlug, buildSubcategoryData(subcategorySlug, categoryItems));
 			}
 
 			categoriesData.put(categoryName, subcategoriesData);
@@ -441,13 +431,13 @@ public class CollectionLogManager {
 	 * Build subcategory data including items and KC tracking.
 	 * Only obtained items are included — see sync() javadoc.
 	 */
-	private Map<String, Object> buildSubcategoryData(String subcategorySlug, Set<Integer> categoryItems,
-			Map<Integer, ObtainedCollectionItem> obtainedItemsMap) {
+	private Map<String, Object> buildSubcategoryData(String subcategorySlug, Set<Integer> categoryItems) {
 		Map<String, Object> subcategoryData = new HashMap<>();
 		List<Map<String, Object>> itemsList = new ArrayList<>();
 
+		// Obtained items are already keyed by item id with the latest count
 		for (Integer itemId : categoryItems) {
-			ObtainedCollectionItem obtainedItem = obtainedItemsMap.get(itemId);
+			ObtainedCollectionItem obtainedItem = obtainedItems.get(itemId);
 			if (obtainedItem == null) continue;
 
 			Map<String, Object> itemData = new HashMap<>();
