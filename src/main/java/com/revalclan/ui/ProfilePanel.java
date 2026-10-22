@@ -335,28 +335,21 @@ public class ProfilePanel extends JPanel {
 		header.add(topRow);
 
 		JPanel rankProgress = buildRankProgressBar(account);
-		if (rankProgress != null) {
-			header.add(Box.createRigidArea(new Dimension(0, 8)));
-			rankProgress.setAlignmentX(Component.LEFT_ALIGNMENT);
-			header.add(rankProgress);
-		}
+		if (rankProgress != null) addBelow(header, 8, rankProgress);
 
 		// Leaderboard profiles have no client to refresh from
-		if (client != null) {
-			header.add(Box.createRigidArea(new Dimension(0, 8)));
-			JButton refreshButton = buildRefreshProfileButton();
-			refreshButton.setAlignmentX(Component.LEFT_ALIGNMENT);
-			header.add(refreshButton);
-		}
+		if (client != null) addBelow(header, 8, buildRefreshProfileButton());
 
-		if (onSyncGuide != null) {
-			header.add(Box.createRigidArea(new Dimension(0, 6)));
-			JButton syncButton = buildSyncGuideButton();
-			syncButton.setAlignmentX(Component.LEFT_ALIGNMENT);
-			header.add(syncButton);
-		}
+		if (onSyncGuide != null) addBelow(header, 6, buildSyncGuideButton());
 
 		return wrapInRoundedPanel(header);
+	}
+
+	/** Adds a left-aligned row to the header column, below a gap. */
+	private static void addBelow(JPanel column, int gap, JComponent row) {
+		column.add(Box.createRigidArea(new Dimension(0, gap)));
+		row.setAlignmentX(Component.LEFT_ALIGNMENT);
+		column.add(row);
 	}
 
 	/** Arms the in-game collection log sync guide */
@@ -441,10 +434,6 @@ public class ProfilePanel extends JPanel {
 		progressPanel.setLayout(new BoxLayout(progressPanel, BoxLayout.Y_AXIS));
 		progressPanel.setOpaque(false);
 		progressPanel.setBorder(new EmptyBorder(6, 8, 8, 8));
-		if (onOpenRanks != null) {
-			progressPanel.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-			progressPanel.setToolTipText("View all ranks");
-		}
 
 		JPanel labelRow = new JPanel(new BorderLayout(4, 0));
 		labelRow.setOpaque(false);
@@ -490,6 +479,7 @@ public class ProfilePanel extends JPanel {
 		progressPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, progressPanel.getPreferredSize().height));
 
 		if (onOpenRanks != null) {
+			progressPanel.setToolTipText("View all ranks");
 			Clickable.onPress(progressPanel, onOpenRanks, h -> hovered[0] = h);
 		}
 
