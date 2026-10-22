@@ -32,47 +32,6 @@ public interface RevalClanConfig extends Config {
 		return false;
 	}
 
-	// ── Profile cards ──────────────────────────────────────────────────
-	@ConfigSection(
-		name = "Profile cards",
-		description = "Where the 'View Reval Profile' right-click option appears",
-		position = 2
-	)
-	String profileCardsSection = "profileCardsSection";
-
-	@ConfigItem(
-		keyName = "profileCardsOnPlayers",
-		name = "Players",
-		description = "View Reval Profile when right-clicking a clan member in the world (off by default to keep the menu short)",
-		section = profileCardsSection,
-		position = 0
-	)
-	default boolean profileCardsOnPlayers() {
-		return false;
-	}
-
-	@ConfigItem(
-		keyName = "profileCardsInChat",
-		name = "Chat",
-		description = "View Reval Profile when right-clicking a clan member's name in chat",
-		section = profileCardsSection,
-		position = 1
-	)
-	default boolean profileCardsInChat() {
-		return true;
-	}
-
-	@ConfigItem(
-		keyName = "profileCardsInClanList",
-		name = "Clan list",
-		description = "View Reval Profile when right-clicking a member in the clan member list",
-		section = profileCardsSection,
-		position = 2
-	)
-	default boolean profileCardsInClanList() {
-		return true;
-	}
-
 	// ── Events ─────────────────────────────────────────────────────────
 	@ConfigSection(
 		name = "Events",
