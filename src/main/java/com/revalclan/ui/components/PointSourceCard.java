@@ -13,7 +13,6 @@ import java.awt.*;
 
 public class PointSourceCard extends JPanel {
 	private final JLabel iconLabel = new JLabel();
-	private Color pointsColor = UIConstants.ACCENT_GREEN;
 
 	public PointSourceCard(PointsResponse.PointSource source, ItemManager itemManager) {
 		Integer itemId = source.getMetadata() != null ? source.getMetadata().getItemId() : null;
@@ -79,7 +78,7 @@ public class PointSourceCard extends JPanel {
 
 		JLabel pointsLabel = new JLabel(points);
 		pointsLabel.setFont(FontManager.getRunescapeSmallFont());
-		pointsLabel.setForeground(pointsColor);
+		pointsLabel.setForeground(UIConstants.ACCENT_GREEN);
 		pointsLabel.setVerticalAlignment(SwingConstants.TOP);
 
 		add(leftPanel, BorderLayout.CENTER);

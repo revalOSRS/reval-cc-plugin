@@ -11,7 +11,6 @@ public class CollapsibleSection extends JPanel {
 	private final JPanel contentPanel;
 	private final JLabel arrowLabel;
 	private final JLabel iconLabel;
-	private final JPanel headerPanel;
 	private boolean expanded;
 
 	public CollapsibleSection(String title, String subtitle, JPanel content, boolean startExpanded) {
@@ -23,7 +22,7 @@ public class CollapsibleSection extends JPanel {
 		this.contentPanel = content;
 		contentPanel.setVisible(expanded);
 
-		headerPanel = new JPanel(new BorderLayout(2, 0)) {
+		JPanel headerPanel = new JPanel(new BorderLayout(2, 0)) {
 			@Override
 			protected void paintComponent(Graphics g) {
 				Graphics2D g2d = (Graphics2D) g.create();
@@ -33,9 +32,8 @@ public class CollapsibleSection extends JPanel {
 				g2d.dispose();
 			}
 		};
-		headerPanel.setBackground(UIConstants.HEADER_BG);
+		headerPanel.setBackground(UIConstants.CARD_BG);
 		headerPanel.setBorder(new EmptyBorder(6, 8, 6, 8));
-		headerPanel.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 		headerPanel.setOpaque(false);
 
 		JPanel leftPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
@@ -73,7 +71,8 @@ public class CollapsibleSection extends JPanel {
 		headerPanel.add(leftPanel, BorderLayout.WEST);
 		headerPanel.add(titlePanel, BorderLayout.CENTER);
 
-		Clickable.onPress(headerPanel, () -> setExpanded(!expanded), UIConstants.HEADER_HOVER, UIConstants.HEADER_BG);
+		// Also sets the hand cursor.
+		Clickable.onPress(headerPanel, () -> setExpanded(!expanded), UIConstants.CARD_HOVER, UIConstants.CARD_BG);
 
 		add(headerPanel, BorderLayout.NORTH);
 		add(contentPanel, BorderLayout.CENTER);
@@ -88,9 +87,5 @@ public class CollapsibleSection extends JPanel {
 		arrowLabel.setIcon(new TriangleIcon(expanded, 9, UIConstants.ACCENT_GOLD));
 		contentPanel.setVisible(expanded);
 		revalidate();
-	}
-
-	public boolean isExpanded() {
-		return expanded;
 	}
 }

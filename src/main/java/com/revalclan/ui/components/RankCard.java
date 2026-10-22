@@ -37,7 +37,7 @@ public class RankCard extends JPanel {
 
 		JLabel pointsLabel = new JLabel(pointsText);
 		pointsLabel.setFont(FontManager.getRunescapeBoldFont());
-		pointsLabel.setForeground(UIConstants.POINTS_COLOR);
+		pointsLabel.setForeground(UIConstants.ACCENT_GREEN);
 
 		add(leftPanel, BorderLayout.WEST);
 		add(pointsLabel, BorderLayout.EAST);

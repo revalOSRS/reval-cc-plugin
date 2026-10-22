@@ -28,12 +28,6 @@ public class UIConstants {
     /** Row/item background color (darker than card) */
     public static Color ROW_BG = new Color(22, 24, 26);
     
-    /** Header background color (same as card) */
-    public static Color HEADER_BG = CARD_BG;
-    
-    /** Header hover state background color (same as card hover) */
-    public static Color HEADER_HOVER = CARD_HOVER;
-    
     /** Tab active state background */
     public static Color TAB_ACTIVE = new Color(45, 48, 52);
     
@@ -59,23 +53,11 @@ public class UIConstants {
     /** Green accent color - used for success states, positive values, and completion */
     public static final Color ACCENT_GREEN = new Color(139, 195, 74);
     
-    /** Alternative green (slightly different shade) - used in some components */
-    public static final Color ACCENT_GREEN_ALT = new Color(76, 175, 80);
-    
     /** Blue accent color - used for informational elements */
     public static final Color ACCENT_BLUE = new Color(66, 165, 245);
     
-    /** Alternative blue (slightly different shade) - used in some components */
-    public static final Color ACCENT_BLUE_ALT = new Color(33, 150, 243);
-    
     /** Purple accent color - used for special elements */
     public static final Color ACCENT_PURPLE = new Color(171, 71, 188);
-    
-    /** Orange accent color - used for warnings and medium-priority elements */
-    public static final Color ACCENT_ORANGE = new Color(255, 152, 0);
-    
-    /** Points color (green) - used specifically for displaying points */
-    public static final Color POINTS_COLOR = ACCENT_GREEN;
     
     // ========== State Colors ==========
     
@@ -83,13 +65,10 @@ public class UIConstants {
     public static final Color ERROR_COLOR = new Color(231, 76, 60);
     
     /** Success/green color for completed states */
-    public static final Color SUCCESS_COLOR = ACCENT_GREEN_ALT;
+    public static final Color SUCCESS_COLOR = new Color(76, 175, 80);
     
     /** Task complete background (green with transparency) */
     public static final Color TASK_COMPLETE = new Color(76, 175, 80, 40);
-    
-    /** Complete background (green with transparency) */
-    public static final Color COMPLETE_BG = new Color(76, 175, 80, 25);
     
     // ========== Tier Colors (for diaries, achievements, etc.) ==========
     
@@ -100,7 +79,7 @@ public class UIConstants {
     public static final Color TIER_MEDIUM = new Color(255, 193, 7);
     
     /** Hard tier color */
-    public static final Color TIER_HARD = ACCENT_ORANGE;
+    public static final Color TIER_HARD = new Color(255, 152, 0);
     
     /** Elite tier color */
     public static final Color TIER_ELITE = new Color(239, 83, 80);
@@ -181,8 +160,6 @@ public class UIConstants {
         BORDER_COLOR = enabled ? new Color(71, 50, 34) : new Color(50, 54, 58);
         PROGRESS_BG = enabled ? new Color(57, 42, 29) : new Color(40, 43, 47);
         ROW_BG = enabled ? new Color(24, 22, 18) : new Color(22, 24, 26);
-        HEADER_BG = CARD_BG;
-        HEADER_HOVER = CARD_HOVER;
         TAB_ACTIVE = enabled ? HALLOWEEN_TAB : new Color(45, 48, 52);
         TAB_HOVER = enabled ? CARD_HOVER : new Color(38, 42, 46);
         TEXT_PRIMARY = enabled ? new Color(231, 225, 210) : new Color(230, 230, 220);

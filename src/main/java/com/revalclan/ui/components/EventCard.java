@@ -192,11 +192,9 @@ public class EventCard extends JPanel {
 		footer.setBorder(new EmptyBorder(12, 0, 0, 0));
 		footer.setMaximumSize(new Dimension(Integer.MAX_VALUE, 44));
 
+		// A null status (not registered) falls through to "Register".
 		JButton btn;
-		if (registrationStatus == null) {
-			btn = createButton("Register", UIConstants.ACCENT_BLUE);
-			btn.addActionListener(e -> { if (onRegisterAction != null) onRegisterAction.accept(event.getId(), true); });
-		} else if ("pending".equalsIgnoreCase(registrationStatus)) {
+		if ("pending".equalsIgnoreCase(registrationStatus)) {
 			btn = createButton("Pending", UIConstants.ACCENT_GOLD);
 			btn.setToolTipText("Click to withdraw. Awaiting approval.");
 			btn.addActionListener(e -> { if (onRegisterAction != null) onRegisterAction.accept(event.getId(), false); });
