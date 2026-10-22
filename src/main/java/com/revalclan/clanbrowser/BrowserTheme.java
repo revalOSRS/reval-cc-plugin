@@ -17,6 +17,8 @@ import javax.swing.JComponent;
 import javax.swing.JScrollPane;
 import javax.swing.JTextField;
 import javax.swing.border.Border;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import net.runelite.client.ui.FontManager;
 
 /** A shared RuneScape palette and pixel-font drawing rules for every browser view. */
@@ -93,6 +95,14 @@ final class BrowserTheme {
     /** A one-pixel line in the given colour around symmetric padding. */
     static Border outline(Color color, int vertical, int horizontal) {
         return BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(color), BorderFactory.createEmptyBorder(vertical, horizontal, vertical, horizontal));
+    }
+    /** Runs the action after every edit of the field's text. */
+    static void onChange(JTextField field, Runnable action) {
+        field.getDocument().addDocumentListener(new DocumentListener() {
+            public void insertUpdate(DocumentEvent event) { action.run(); }
+            public void removeUpdate(DocumentEvent event) { action.run(); }
+            public void changedUpdate(DocumentEvent event) { action.run(); }
+        });
     }
     static JScrollPane scroll(JComponent component) {
         JScrollPane pane = new JScrollPane(component);

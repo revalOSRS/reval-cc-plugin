@@ -31,8 +31,6 @@ import javax.swing.JTextField;
 import javax.swing.KeyStroke;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
-import javax.swing.event.DocumentEvent;
-import javax.swing.event.DocumentListener;
 import okhttp3.Call;
 
 /** Independent window: the game can regain focus and stack above it while it stays open. */
@@ -134,11 +132,7 @@ public final class ClanBrowserWindow extends JFrame {
         statistics.setBorder(BorderFactory.createEmptyBorder(9, 0, 0, 0));
         statistics.add(metrics, BorderLayout.NORTH); statistics.add(extra, BorderLayout.CENTER);
         statistics.setVisible(false); controls.add(statistics);
-        search.getDocument().addDocumentListener(new DocumentListener() {
-            public void insertUpdate(DocumentEvent event) { filter(); }
-            public void removeUpdate(DocumentEvent event) { filter(); }
-            public void changedUpdate(DocumentEvent event) { filter(); }
-        });
+        BrowserTheme.onChange(search, this::filter);
         search.addActionListener(event -> { if (clog()) submitSelection(); });
         findMe.addActionListener(event -> {
             search.setText("");

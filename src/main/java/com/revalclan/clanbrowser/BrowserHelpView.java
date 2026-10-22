@@ -23,7 +23,7 @@ final class BrowserHelpView extends JPanel implements Scrollable {
         add(text("<...> = a value you choose     [...] = optional     Do not type the brackets.",18,BrowserTheme.MUTED,1)); gap(12);
 
         JPanel logs=card("Collection logs",BrowserTheme.GREEN);
-        logs.add(text("!reval clog <category> [player]",21,BrowserTheme.GOLD,1)); gap(logs,8);
+        logs.add(code("!reval clog <category> [player]",1)); gap(logs,8);
         logs.add(text("Leave the player out for your own account.\nAdd a name to inspect another clan account.",18,BrowserTheme.TEXT,2)); gap(logs,8);
         logs.add(code("!reval clog forestry\n!reval clog forestry Valgusruum\n!reval clog clues Phosani55555",3));
         logs.add(text("Use quotes for names with spaces: \"Love Yourz\".\nClues shows all tiers; individual tiers are in the sidebar.",17,BrowserTheme.MUTED,2));
@@ -39,7 +39,7 @@ final class BrowserHelpView extends JPanel implements Scrollable {
         add(row(logs,categories)); gap(12);
 
         JPanel boards=card("Clan leaderboards",BrowserTheme.GOLD);
-        boards.add(text("!reval leaderboard <statistic> [filter]",21,BrowserTheme.GOLD,1)); gap(boards,8);
+        boards.add(code("!reval leaderboard <statistic> [filter]",1)); gap(boards,8);
         boards.add(code("!reval leaderboard xp\n!reval leaderboard clues hard\n!reval leaderboard bosses toa",3));
         boards.add(text("Leave the clue tier or boss out for the combined view.\nChoose statistics with the buttons below member search.",18,BrowserTheme.TEXT,2)); gap(boards,6);
         boards.add(text("Statistics: clog, pets, points, greenlogs, xp,\nmonthly-clog, monthly-points, clues, combat, bosses.\nClue tiers: beginner, easy, medium, hard, elite, master.",17,BrowserTheme.MUTED,3));

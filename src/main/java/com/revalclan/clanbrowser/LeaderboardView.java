@@ -35,7 +35,7 @@ final class LeaderboardView extends JPanel {
         super(new BorderLayout(0, 10)); setOpaque(false); this.viewer = viewer;
         dry = "dryboard".equals(view.kind);
         boolean progress = view.rows != null && view.rows.stream().anyMatch(row -> "progress".equals(row.status));
-        valueLabel = view.valueLabel != null ? view.valueLabel : dry ? "Dry KC" : view.metric != null && view.metric.isJsonObject() ? metricLabel(view) + (progress ? " / slots" : "") : "Status" + (progress ? " / slots" : "");
+        valueLabel = view.valueLabel != null ? view.valueLabel : dry ? "Dry KC" : (view.metric != null && view.metric.isJsonObject() ? metricLabel(view) : "Status") + (progress ? " / slots" : "");
         JPanel body = new JPanel(); body.setOpaque(false); body.setLayout(new javax.swing.BoxLayout(body, javax.swing.BoxLayout.Y_AXIS));
         if (view.sections != null && !view.sections.isEmpty()) {
             JTabbedPane tabs = new JTabbedPane(); tabs.setFont(BrowserTheme.font(21, true)); tabs.setForeground(BrowserTheme.TEXT); tabs.setBackground(BrowserTheme.HEADER);
