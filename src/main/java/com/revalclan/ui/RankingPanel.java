@@ -12,8 +12,6 @@ import net.runelite.client.game.SpriteManager;
 import net.runelite.client.util.AsyncBufferedImage;
 import net.runelite.client.util.ImageUtil;
 
-import net.runelite.client.ui.FontManager;
-
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
@@ -50,33 +48,11 @@ public class RankingPanel extends JPanel {
 		gbc.anchor = GridBagConstraints.NORTH;
 		gbc.insets = new Insets(1, 0, 1, 0);
 
-		JPanel wrapper = new JPanel(new BorderLayout()) {
-			@Override
-			public Dimension getPreferredSize() {
-				Dimension size = super.getPreferredSize();
-				if (getParent() != null) {
-					size.width = getParent().getWidth();
-				}
-				return size;
-			}
-		};
-		wrapper.setBackground(UIConstants.BACKGROUND);
-		wrapper.add(contentPanel, BorderLayout.NORTH);
-
-		JScrollPane scrollPane = new JScrollPane(wrapper);
-		scrollPane.setBackground(UIConstants.BACKGROUND);
-		scrollPane.setBorder(null);
-		scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
-		scrollPane.getVerticalScrollBar().setUnitIncrement(16);
-		scrollPane.getViewport().setBackground(UIConstants.BACKGROUND);
-
-		loadingLabel = new JLabel("Loading...");
-		loadingLabel.setFont(FontManager.getRunescapeSmallFont());
-		loadingLabel.setForeground(UIConstants.TEXT_SECONDARY);
+		loadingLabel = Labels.small("Loading...", UIConstants.TEXT_SECONDARY);
 		loadingLabel.setHorizontalAlignment(SwingConstants.CENTER);
 
 		showPlaceholder();
-		add(scrollPane, BorderLayout.CENTER);
+		add(ScrollWrap.of(contentPanel), BorderLayout.CENTER);
 	}
 
 	public void init(RevalApiService apiService, ItemManager itemManager, SpriteManager spriteManager,
@@ -88,14 +64,11 @@ public class RankingPanel extends JPanel {
 	}
 
 	public void load() {
-		loadData();
-	}
-
-	public void refresh() {
-		if (apiService != null) {
-			apiService.clearCache();
-			loadData();
-		}
+		showLoading();
+		apiService.fetchPoints(
+			response -> SwingUtilities.invokeLater(() -> buildContent(response)),
+			error -> SwingUtilities.invokeLater(this::showError)
+		);
 	}
 
 	private void addComponent(JComponent comp) {
@@ -119,19 +92,13 @@ public class RankingPanel extends JPanel {
 		panel.setBackground(UIConstants.BACKGROUND);
 		panel.setBorder(new EmptyBorder(30, 10, 10, 10));
 
-		JLabel title = new JLabel("RANKING");
-		title.setFont(FontManager.getRunescapeBoldFont());
-		title.setForeground(UIConstants.ACCENT_GOLD);
+		JLabel title = new PanelTitle("RANKING");
 		title.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-		JLabel subtitle = new JLabel("Ranks & Points");
-		subtitle.setFont(FontManager.getRunescapeSmallFont());
-		subtitle.setForeground(UIConstants.TEXT_SECONDARY);
+		JLabel subtitle = Labels.small("Ranks & Points", UIConstants.TEXT_SECONDARY);
 		subtitle.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-		JLabel hint = new JLabel("Loading data...");
-		hint.setFont(FontManager.getRunescapeSmallFont());
-		hint.setForeground(UIConstants.TEXT_SECONDARY);
+		JLabel hint = Labels.small("Loading data...", UIConstants.TEXT_SECONDARY);
 		hint.setAlignmentX(Component.CENTER_ALIGNMENT);
 
 		panel.add(title);
@@ -163,23 +130,13 @@ public class RankingPanel extends JPanel {
 		contentPanel.removeAll();
 		gridY = 0;
 
-		JLabel label = new JLabel("Something went wrong");
-		label.setForeground(UIConstants.TEXT_SECONDARY);
-		label.setFont(FontManager.getRunescapeSmallFont());
+		JLabel label = Labels.small("Something went wrong", UIConstants.TEXT_SECONDARY);
 		label.setHorizontalAlignment(SwingConstants.CENTER);
 		label.setBorder(new EmptyBorder(30, 0, 0, 0));
 		addComponent(label);
 
 		contentPanel.revalidate();
 		contentPanel.repaint();
-	}
-
-	private void loadData() {
-		showLoading();
-		apiService.fetchPoints(
-			response -> SwingUtilities.invokeLater(() -> buildContent(response)),
-			error -> SwingUtilities.invokeLater(this::showError)
-		);
 	}
 
 	private void buildContent(PointsResponse response) {
@@ -222,7 +179,7 @@ public class RankingPanel extends JPanel {
 					loadSectionIcon(itemId, section);
 				} else if (category.equalsIgnoreCase("MISC")) {
 					// Misc has no item id — use the stats side-tab sprite (total level icon)
-					loadSpriteIcon(SpriteID.TAB_STATS, section);
+					SpriteIcons.load(spriteManager, SpriteID.TAB_STATS, 24, section::setIcon);
 				}
 				addComponent(section);
 			}
@@ -249,6 +206,7 @@ public class RankingPanel extends JPanel {
 		panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
 		panel.setBackground(UIConstants.BACKGROUND);
 		panel.setAlignmentX(Component.LEFT_ALIGNMENT);
+		panel.setBorder(new EmptyBorder(2, 0, 2, 0));
 		return panel;
 	}
 
@@ -257,26 +215,12 @@ public class RankingPanel extends JPanel {
 		header.setBackground(UIConstants.BACKGROUND);
 		header.setBorder(new EmptyBorder(6, 2, 4, 2));
 
-    JPanel textPanel = new JPanel();
-		textPanel.setLayout(new BoxLayout(textPanel, BoxLayout.Y_AXIS));
-		textPanel.setOpaque(false);
-
-		JLabel titleLabel = new JLabel(title);
-		titleLabel.setFont(FontManager.getRunescapeBoldFont());
-		titleLabel.setForeground(UIConstants.ACCENT_GOLD);
-		textPanel.add(titleLabel);
-
-		JLabel subtitleLabel = new JLabel(subtitle);
-		subtitleLabel.setFont(FontManager.getRunescapeSmallFont());
-		subtitleLabel.setForeground(UIConstants.TEXT_SECONDARY);
-		textPanel.add(subtitleLabel);
+		JPanel textPanel = Labels.column();
+		textPanel.add(new PanelTitle(title));
+		textPanel.add(Labels.small(subtitle, UIConstants.TEXT_SECONDARY));
 
 		header.add(textPanel, BorderLayout.WEST);
 		return header;
-	}
-
-	private void loadSpriteIcon(int spriteId, CollapsibleSection section) {
-		SpriteIcons.load(spriteManager, spriteId, 24, section::setIcon);
 	}
 
 	private void loadSectionIcon(int itemId, CollapsibleSection section) {
@@ -291,7 +235,6 @@ public class RankingPanel extends JPanel {
 
 	private JPanel createPointSourcesPanel(List<PointsResponse.PointSource> sources, String category) {
 		JPanel panel = createVerticalPanel();
-		panel.setBorder(new EmptyBorder(2, 0, 2, 0));
 
 		boolean showIcons = !category.equalsIgnoreCase("VALUABLE_PVM_DROPS")
 			&& !category.equalsIgnoreCase("PETS");
@@ -309,7 +252,6 @@ public class RankingPanel extends JPanel {
 
 	private JPanel createUntradeableDropsPanel(List<PointsResponse.PointSource> sources) {
 		JPanel panel = createVerticalPanel();
-		panel.setBorder(new EmptyBorder(2, 0, 2, 0));
 
 		Map<String, List<PointsResponse.PointSource>> grouped = sources.stream()
 			.filter(s -> s.getMetadata() != null && s.getMetadata().getCategory() != null)
@@ -320,11 +262,8 @@ public class RankingPanel extends JPanel {
 			if (items.isEmpty()) continue;
 
 			// Category header
-			JLabel header = new JLabel(entry.getKey());
-			header.setFont(FontManager.getRunescapeBoldFont());
-			header.setForeground(UIConstants.ACCENT_GOLD);
+			JLabel header = Labels.bold(entry.getKey(), UIConstants.ACCENT_GOLD);
 			header.setBorder(new EmptyBorder(4, 0, 2, 0));
-			header.setAlignmentX(Component.LEFT_ALIGNMENT);
 			panel.add(header);
 
 			// Items
@@ -341,15 +280,9 @@ public class RankingPanel extends JPanel {
 
 	private String formatCategoryName(String name) {
 		if (name == null) return name;
-		String lower = name.toLowerCase();
-		
-		if (lower.equals("valuable_pvm_drops")) return "Valuable Drops";
-		if (lower.equals("pets")) return "Pets";
-		if (lower.equals("milestones")) return "Milestones";
-		if (lower.equals("collection_log")) return "Collection Log";
-		if (lower.equals("combat_achievements")) return "Combat Achievements";
+		if (name.toLowerCase().equals("valuable_pvm_drops")) return "Valuable Drops";
 
-		// Default: capitalize words
+		// Default: capitalize words ("COLLECTION_LOG" -> "Collection Log")
 		StringBuilder result = new StringBuilder();
 		for (String word : name.split("[_\\s]+")) {
 			if (result.length() > 0) result.append(" ");
