@@ -70,7 +70,7 @@ public interface RevalClanConfig extends Config {
 	// ── Notifications ──────────────────────────────────────────────────
 	@ConfigSection(
 		name = "Notifications",
-		description = "What the plugin shows you and what it shares with the clan",
+		description = "What the plugin shows you in chat",
 		position = 4
 	)
 	String eventsSection = "eventsSection";
@@ -83,17 +83,6 @@ public interface RevalClanConfig extends Config {
 		position = 0
 	)
 	default boolean showAnnouncements() {
-		return true;
-	}
-
-	@ConfigItem(
-		keyName = "notifyDeath",
-		name = "Send player deaths to Discord",
-		description = "Post your deaths (and who killed you) to the clan Discord",
-		section = eventsSection,
-		position = 1
-	)
-	default boolean notifyDeath() {
 		return true;
 	}
 

@@ -49,7 +49,7 @@ public class DeathNotifier extends BaseNotifier {
 
 	@Override
 	public boolean isEnabled() {
-		return config.notifyDeath() && filterManager.getFilters().isDeathEnabled();
+		return filterManager.getFilters().isDeathEnabled();
 	}
 
 	@Override
@@ -146,7 +146,7 @@ public class DeathNotifier extends BaseNotifier {
 
 		sessionTracker.addDeath(killedBy, totalLostValue);
 
-		sendNotificationWithScreenshot(deathData);
+		sendNotification(deathData);
 
 		reset();
 	}
