@@ -24,6 +24,7 @@ import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.geom.RoundRectangle2D;
 import java.util.*;
+import java.util.List;
 
 @Slf4j
 public class DiaryPanel extends JPanel {
@@ -36,7 +37,7 @@ public class DiaryPanel extends JPanel {
 	private final CardLayout cardLayout;
 	private final JPanel mainContainer;
 
-	private java.util.List<DiariesResponse.Diary> allDiaries = new ArrayList<>();
+	private List<DiariesResponse.Diary> allDiaries = new ArrayList<>();
 	private DiariesResponse.Diary selectedDiary = null;
 	private final Set<String> expandedTiers = new HashSet<>();
 	private RefreshButton refreshButton;
@@ -49,11 +50,7 @@ public class DiaryPanel extends JPanel {
 		mainContainer = new JPanel(cardLayout);
 		mainContainer.setBackground(UIConstants.BACKGROUND);
 
-		contentPanel = new JPanel();
-		contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
-		contentPanel.setBackground(UIConstants.BACKGROUND);
-		contentPanel.setBorder(new EmptyBorder(8, 8, 8, 8));
-
+		contentPanel = pageBody();
 		mainContainer.add(ScrollWrap.of(contentPanel), "LIST");
 		add(mainContainer, BorderLayout.CENTER);
 		showNotLoggedIn();
@@ -188,10 +185,7 @@ public class DiaryPanel extends JPanel {
 	private void showDiaryDetail(DiariesResponse.Diary diary) {
 		selectedDiary = diary;
 
-		JPanel detailPanel = new JPanel();
-		detailPanel.setLayout(new BoxLayout(detailPanel, BoxLayout.Y_AXIS));
-		detailPanel.setBackground(UIConstants.BACKGROUND);
-		detailPanel.setBorder(new EmptyBorder(8, 8, 8, 8));
+		JPanel detailPanel = pageBody();
 
 		BackButton backButton = new BackButton("< Back", () -> {
 			cardLayout.show(mainContainer, "LIST");
@@ -230,7 +224,7 @@ public class DiaryPanel extends JPanel {
 				DiaryTier tier = parseTier(apiTier.getTier());
 				if (tier == null) continue;
 
-				java.util.List<DiariesResponse.Diary.DiaryTask> activeTasks = getActiveTasks(apiTier);
+				List<DiariesResponse.Diary.DiaryTask> activeTasks = getActiveTasks(apiTier);
 				JPanel tierSection = createTierSection(tier, apiTier, activeTasks, diary.getId() + "_" + i);
 				tierSection.setAlignmentX(Component.LEFT_ALIGNMENT);
 				detailPanel.add(tierSection);
@@ -292,12 +286,11 @@ public class DiaryPanel extends JPanel {
 	// ── Tier Section ──
 
 	private JPanel createTierSection(DiaryTier tier, DiariesResponse.Diary.DiaryTier apiTier,
-									 java.util.List<DiariesResponse.Diary.DiaryTask> activeTasks, String tierKey) {
+									 List<DiariesResponse.Diary.DiaryTask> activeTasks, String tierKey) {
 		JPanel tierSection = Labels.column();
 
 		final boolean[] expanded = {expandedTiers.contains(tierKey)};
 		final JPanel[] headerRef = {createTierHeader(tier, apiTier, activeTasks, expanded[0])};
-		headerRef[0].setAlignmentX(Component.LEFT_ALIGNMENT);
 
 		JPanel tasksContainer = Labels.column();
 		tasksContainer.setBorder(new EmptyBorder(8, 0, 0, 0));
@@ -329,7 +322,6 @@ public class DiaryPanel extends JPanel {
 
 			tierSection.remove(headerRef[0]);
 			headerRef[0] = createTierHeader(tier, apiTier, activeTasks, expanded[0]);
-			headerRef[0].setAlignmentX(Component.LEFT_ALIGNMENT);
 			Clickable.onPress(headerRef[0], toggle[0]);
 			tierSection.add(headerRef[0], 0);
 			tierSection.revalidate();
@@ -342,7 +334,7 @@ public class DiaryPanel extends JPanel {
 	}
 
 	private JPanel createTierHeader(DiaryTier tier, DiariesResponse.Diary.DiaryTier apiTier,
-									java.util.List<DiariesResponse.Diary.DiaryTask> tasks, boolean isExpanded) {
+									List<DiariesResponse.Diary.DiaryTask> tasks, boolean isExpanded) {
 		long completed = tasks.stream()
 			.filter(t -> t.getProgress() != null && t.getProgress().isCompleted()).count();
 		int total = tasks.size();
@@ -358,6 +350,7 @@ public class DiaryPanel extends JPanel {
 		header.setOpaque(false);
 		header.setBorder(new EmptyBorder(12, 12, 12, 12));
 		header.setMaximumSize(new Dimension(Integer.MAX_VALUE, 60));
+		header.setAlignmentX(Component.LEFT_ALIGNMENT);
 
 		JPanel leftPanel = Labels.column();
 
@@ -495,6 +488,14 @@ public class DiaryPanel extends JPanel {
 
 	// ── Helpers ──
 
+	/** Padded vertical body of the list and detail views. */
+	private static JPanel pageBody() {
+		JPanel panel = new JPanel();
+		panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+		panel.setBackground(UIConstants.BACKGROUND);
+		panel.setBorder(new EmptyBorder(8, 8, 8, 8));
+		return panel;
+	}
 
 	private JPanel roundedWrapper(JPanel content) {
 		JPanel wrapper = new JPanel(new BorderLayout()) {
@@ -531,8 +532,8 @@ public class DiaryPanel extends JPanel {
 		return area;
 	}
 
-	private java.util.List<DiariesResponse.Diary.DiaryTask> getActiveTasks(DiariesResponse.Diary.DiaryTier tier) {
-		java.util.List<DiariesResponse.Diary.DiaryTask> active = new ArrayList<>();
+	private List<DiariesResponse.Diary.DiaryTask> getActiveTasks(DiariesResponse.Diary.DiaryTier tier) {
+		List<DiariesResponse.Diary.DiaryTask> active = new ArrayList<>();
 		if (tier.getTasks() != null) {
 			for (DiariesResponse.Diary.DiaryTask task : tier.getTasks()) {
 				if (!task.isHidden() && task.isActive()) active.add(task);
