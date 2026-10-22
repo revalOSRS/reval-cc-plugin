@@ -26,7 +26,6 @@ public final class ApiEndpoints {
     public static final String EVENTS_ACTIVE_TEAMS = "/events/active-teams";
     public static final String PLAYER_PROFILE_CARD = "/players/profile-card";
     public static final String EVENT_REGISTER = "/events/%s/register";
-    public static final String EVENT_REGISTRATION_STATUS = "/events/%s/registration-status";
     public static final String LEAGUES_BINGO_ME = "/events/%s/leagues-bingo/me?accountHash=%s";
     public static final String LEAGUES_BINGO_PICK = "/events/%s/leagues-bingo/pick";
 
@@ -43,21 +42,12 @@ public final class ApiEndpoints {
     public static final String LEAGUES_CONFIG = "/leagues/config";
 
     // Competitions
-    public static final String COMPETITIONS = "/competitions";
     public static final String COMPETITIONS_SCHEDULED = "/competitions/scheduled";
     public static final String COMPETITIONS_ACTIVE = "/competitions/active";
-    public static final String COMPETITIONS_COMPLETED = "/competitions/completed";
     public static final String COMPETITION_BY_ID = "/competitions/%s";
-    public static final String COMPETITION_LEADERBOARD = "/competitions/%s/leaderboard";
-    public static final String COMPETITION_ACTIVITY = "/competitions/%s/activity";
-    public static final String COMPETITION_SIDE_QUESTS = "/competitions/%s/side-quests";
-    public static final String SIDE_QUEST_BY_ID = "/competitions/side-quests/%s";
-    public static final String COMPETITION_MY_PROGRESS = "/competitions/%s/my-progress";
-    public static final String COMPETITIONS_MY_PROGRESS_ALL = "/competitions/my-progress/all";
-    
+
     // Competition Votes
     public static final String COMPETITION_VOTES = "/competitions/votes";
-    public static final String COMPETITION_VOTE_BY_ID = "/competitions/votes/%s";
     public static final String COMPETITION_VOTE_CAST = "/competitions/votes/%s/cast";
     public static final String COMPETITION_VOTE_MY_VOTE = "/competitions/votes/%s/my-vote";
 
@@ -110,13 +100,6 @@ public final class ApiEndpoints {
     }
 
     /**
-     * Build event registration status endpoint for specific event
-     */
-    public static String eventRegistrationStatus(String eventId) {
-        return String.format(EVENT_REGISTRATION_STATUS, eventId);
-    }
-
-    /**
      * Build rank change actualize endpoint for specific rank change ID
      */
     public static String rankChangeActualize(int rankChangeId) {
@@ -135,48 +118,6 @@ public final class ApiEndpoints {
      */
     public static String competitionById(String competitionId) {
         return String.format(COMPETITION_BY_ID, competitionId);
-    }
-
-    /**
-     * Build competition leaderboard endpoint
-     */
-    public static String competitionLeaderboard(String competitionId) {
-        return String.format(COMPETITION_LEADERBOARD, competitionId);
-    }
-
-    /**
-     * Build competition activity endpoint
-     */
-    public static String competitionActivity(String competitionId) {
-        return String.format(COMPETITION_ACTIVITY, competitionId);
-    }
-
-    /**
-     * Build competition side quests endpoint
-     */
-    public static String competitionSideQuests(String competitionId) {
-        return String.format(COMPETITION_SIDE_QUESTS, competitionId);
-    }
-
-    /**
-     * Build side quest by ID endpoint
-     */
-    public static String sideQuestById(String sideQuestId) {
-        return String.format(SIDE_QUEST_BY_ID, sideQuestId);
-    }
-
-    /**
-     * Build competition my progress endpoint
-     */
-    public static String competitionMyProgress(String competitionId) {
-        return String.format(COMPETITION_MY_PROGRESS, competitionId);
-    }
-
-    /**
-     * Build vote by ID endpoint
-     */
-    public static String voteById(String voteId) {
-        return String.format(COMPETITION_VOTE_BY_ID, voteId);
     }
 
     /**

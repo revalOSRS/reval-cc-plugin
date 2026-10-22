@@ -19,8 +19,4 @@ public abstract class ApiResponse implements ApiEnvelope {
     public String getErrorMessage() {
         return message;
     }
-
-    public boolean isError() {
-        return "error".equals(status);
-    }
 }
