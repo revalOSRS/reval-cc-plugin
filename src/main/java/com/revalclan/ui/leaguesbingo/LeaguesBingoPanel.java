@@ -223,25 +223,23 @@ public class LeaguesBingoPanel extends JPanel {
 		Team team = payload != null ? payload.teamById(teamId) : null;
 		if (view != View.TEAMS && team == null) view = View.TEAMS;
 
+		// Board views always have a team, and so a payload: without one the view fell back to TEAMS above.
 		switch (view) {
 			case BOARDS:
 				setHeader("< Teams", team.getName(), teamColor(team));
+				buildBoardsView(team);
 				break;
 			case BOARD:
 				setHeader("< Boards", LeaguesRegions.byId(region).getDisplayName(), LeaguesRegions.byId(region).getAccent());
+				buildBoardView(team);
 				break;
 			default:
 				setHeader("< Events", event != null ? event.getName() : "", UIConstants.ACCENT_GOLD);
-		}
-
-		if (payload == null) {
-			body.add(statusView());
-		} else if (view == View.BOARDS) {
-			buildBoardsView(team);
-		} else if (view == View.BOARD) {
-			buildBoardView(team);
-		} else {
-			buildTeamsView();
+				if (payload == null) {
+					body.add(statusView());
+				} else {
+					buildTeamsView();
+				}
 		}
 
 		body.revalidate();
@@ -258,26 +256,36 @@ public class LeaguesBingoPanel extends JPanel {
 	}
 
 	private JComponent statusView() {
-		if (loading) return Labels.centered(Labels.small("Loading boards...", UIConstants.TEXT_MUTED));
+		if (loading) return hint("Loading boards...");
 		if (loadError != null) {
 			return Labels.centered(Labels.wrapped("Failed to load: " + loadError, FontManager.getRunescapeSmallFont(), UIConstants.ERROR_COLOR, TEXT_WIDTH + 20));
 		}
-		return Labels.centered(Labels.small("No board data", UIConstants.TEXT_MUTED));
+		return hint("No board data");
+	}
+
+	/** A centered muted line: loading, empty and "pick something" states. */
+	private static JComponent hint(String text) {
+		return Labels.centered(Labels.small(text, UIConstants.TEXT_MUTED));
+	}
+
+	/** Vertical space between the stacked body sections. */
+	private void gap(int height) {
+		body.add(Box.createVerticalStrut(height));
 	}
 
 	// ---------- Teams ----------
 
 	private void buildTeamsView() {
 		body.add(TeamCards.eventSummary(payload));
-		body.add(Box.createVerticalStrut(10));
+		gap(10);
 		body.add(Labels.sectionTitle("Standings"));
-		body.add(Box.createVerticalStrut(6));
+		gap(6);
 
 		List<Team> teams = new ArrayList<>(payload.getTeams());
 		teams.sort(Comparator.comparingInt(Team::getScore).reversed()
 			.thenComparing(Comparator.comparingInt(Team::getUniqueCompletedTiles).reversed()));
 		if (teams.isEmpty()) {
-			body.add(Labels.centered(Labels.small("No teams yet", UIConstants.TEXT_MUTED)));
+			body.add(hint("No teams yet"));
 			return;
 		}
 
@@ -285,19 +293,19 @@ public class LeaguesBingoPanel extends JPanel {
 		int rank = 1;
 		for (Team team : teams) {
 			body.add(TeamCards.row(team, rank++, team.hasMember(me), () -> showBoards(team)));
-			body.add(Box.createVerticalStrut(6));
+			gap(6);
 		}
-		body.add(Box.createVerticalStrut(4));
-		body.add(Labels.centered(Labels.small("Pick a team to see its boards", UIConstants.TEXT_MUTED)));
+		gap(4);
+		body.add(hint("Pick a team to see its boards"));
 	}
 
 	// ---------- Boards ----------
 
 	private void buildBoardsView(Team team) {
 		body.add(TeamCards.chip(team, payload, true));
-		body.add(Box.createVerticalStrut(10));
+		gap(10);
 		body.add(Labels.sectionTitle("Boards"));
-		body.add(Box.createVerticalStrut(6));
+		gap(6);
 
 		// Unlocked boards in the order the team unlocked them, locked ones after.
 		List<Board> boards = new ArrayList<>(payload.getBoards());
@@ -309,7 +317,7 @@ public class LeaguesBingoPanel extends JPanel {
 			AccentCard card = boardSummary(team, board, UIConstants.TEXT_PRIMARY, true);
 			Clickable.onPress(card, () -> showBoard(board.getRegion()), card::setHovered);
 			body.add(card);
-			body.add(Box.createVerticalStrut(6));
+			gap(6);
 		}
 	}
 
@@ -332,16 +340,16 @@ public class LeaguesBingoPanel extends JPanel {
 	private void buildBoardView(Team team) {
 		Board board = payload.boardFor(region);
 		if (board == null) {
-			body.add(Labels.centered(Labels.small("Board not found", UIConstants.TEXT_MUTED)));
+			body.add(hint("Board not found"));
 			return;
 		}
 		LeaguesRegions.Region meta = LeaguesRegions.byId(region);
 		BoardStats stats = BoardStats.of(team, board);
 
 		body.add(TeamCards.chip(team, payload, false));
-		body.add(Box.createVerticalStrut(8));
+		gap(8);
 		body.add(boardSummary(team, board, meta.getAccent(), false));
-		body.add(Box.createVerticalStrut(10));
+		gap(10);
 
 		grid = new BoardGridView(payload, team, board, meta, stats, tileIcons, tileId, tile -> {
 			tileId = tile.getBoardTileId().equals(tileId) ? null : tile.getBoardTileId();
@@ -349,7 +357,7 @@ public class LeaguesBingoPanel extends JPanel {
 			renderTileDetail(team, board, stats);
 		});
 		body.add(grid);
-		body.add(Box.createVerticalStrut(10));
+		gap(10);
 
 		tileDetailHolder = Labels.column();
 		tileDetailHolder.setAlignmentX(Component.LEFT_ALIGNMENT);

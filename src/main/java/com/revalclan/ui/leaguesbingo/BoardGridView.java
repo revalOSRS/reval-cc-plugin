@@ -80,10 +80,10 @@ final class BoardGridView extends JPanel {
 				Tile tile = payload.isTilesHidden() ? null : board.tileAt(position);
 
 				TileCell cell;
-				if (payload.isTilesHidden()) {
-					cell = new TileCell(null, TileCell.State.HIDDEN, 0, meta.getAccent(), tileSize);
-				} else if (tile == null) {
-					cell = new TileCell(null, TileCell.State.FILLER, 0, meta.getAccent(), tileSize);
+				if (tile == null) {
+					// A lock while the tiles are hidden, filler for an empty position.
+					cell = new TileCell(null, payload.isTilesHidden() ? TileCell.State.HIDDEN : TileCell.State.FILLER,
+						0, meta.getAccent(), tileSize);
 				} else {
 					int percent = BoardStats.tilePercent(team, tile);
 					TileCell.State state = percent >= 100 ? TileCell.State.COMPLETED
