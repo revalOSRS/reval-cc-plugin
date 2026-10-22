@@ -42,47 +42,47 @@ public class EventFilterManager{
 	@Getter
 	public static class EventFilters {
 		// Loot filter settings
-		@Getter private long lootMinValue = 1_000_000; // 1M default
-		@Getter private Set<Integer> lootWhitelist = new HashSet<>();
-		@Getter private Set<Integer> lootBlacklist = new HashSet<>(Arrays.asList(526, 995)); // Bones, Coins
+		private long lootMinValue = 1_000_000; // 1M default
+		private Set<Integer> lootWhitelist = new HashSet<>();
+		private Set<Integer> lootBlacklist = new HashSet<>(Arrays.asList(526, 995)); // Bones, Coins
 		
 		// Detailed kill filter settings
-		@Getter private Set<Integer> detailedKillNpcIdWhitelist = new HashSet<>();
-		@Getter private Set<Integer> detailedKillNpcIdBlacklist = new HashSet<>();
+		private Set<Integer> detailedKillNpcIdWhitelist = new HashSet<>();
+		private Set<Integer> detailedKillNpcIdBlacklist = new HashSet<>();
 		/** NPC names (lowercase) needed by active server-side requirements; matched by containment */
-		@Getter private Set<String> detailedKillNpcNameWhitelist = new HashSet<>();
+		private Set<String> detailedKillNpcNameWhitelist = new HashSet<>();
 		
 		// Chat filter settings
-		@Getter private List<String> chatPatterns = new ArrayList<>(); // Empty by default = no patterns, all messages pass
+		private List<String> chatPatterns = new ArrayList<>(); // Empty by default = no patterns, all messages pass
 
 		/**
 		 * Item names (lowercase) whose silent consumption is reported. Derived by
 		 * the backend from live tile requirements; nothing is built into the
 		 * plugin, and empty means watch nothing.
 		 */
-		@Getter private Set<String> inventoryWatchItems = new HashSet<>();
+		private Set<String> inventoryWatchItems = new HashSet<>();
 		/** Watched item names as the backend spelled them, keyed lowercased. */
-		@Getter private Map<String, String> inventoryWatchItemNames = new HashMap<>();
+		private Map<String, String> inventoryWatchItemNames = new HashMap<>();
 
 		/** Varbit ids whose value the plugin reports (varbits.watch). Empty by default. */
-		@Getter private Set<Integer> varbitWatch = new HashSet<>();
+		private Set<Integer> varbitWatch = new HashSet<>();
 		
 		// Event toggles
-		@Getter private boolean lootEnabled = true;
-		@Getter private boolean petEnabled = true;
-		@Getter private boolean questEnabled = true;
-		@Getter private boolean levelEnabled = true;
-		@Getter private boolean killCountEnabled = true;
-		@Getter private boolean clueEnabled = true;
-		@Getter private boolean diaryEnabled = true;
-		@Getter private boolean combatAchievementEnabled = true;
-		@Getter private boolean collectionEnabled = true;
-		@Getter private boolean deathEnabled = true;
-		@Getter private boolean detailedKillEnabled = true;
-		@Getter private boolean emoteEnabled = true;
-		@Getter private boolean chatEnabled = true;
-		@Getter private boolean musicEnabled = true;
-		@Getter private boolean leaguesEnabled = false;
+		private boolean lootEnabled = true;
+		private boolean petEnabled = true;
+		private boolean questEnabled = true;
+		private boolean levelEnabled = true;
+		private boolean killCountEnabled = true;
+		private boolean clueEnabled = true;
+		private boolean diaryEnabled = true;
+		private boolean combatAchievementEnabled = true;
+		private boolean collectionEnabled = true;
+		private boolean deathEnabled = true;
+		private boolean detailedKillEnabled = true;
+		private boolean emoteEnabled = true;
+		private boolean chatEnabled = true;
+		private boolean musicEnabled = true;
+		private boolean leaguesEnabled = false;
 	}
 	
 	public EventFilterManager() {
