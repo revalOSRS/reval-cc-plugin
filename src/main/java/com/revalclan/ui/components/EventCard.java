@@ -106,17 +106,12 @@ public class EventCard extends JPanel {
 		header.setAlignmentX(Component.LEFT_ALIGNMENT);
 		header.setMaximumSize(new Dimension(Integer.MAX_VALUE, 50));
 
-		JPanel left = new JPanel();
-		left.setLayout(new BoxLayout(left, BoxLayout.Y_AXIS));
-		left.setOpaque(false);
+		JPanel left = Labels.column();
 
 		JLabel typeBadge = createBadge(event.getEventTypeDisplay(), getAccentColor());
 		typeBadge.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-		JLabel title = new JLabel(event.getName());
-		title.setFont(FontManager.getRunescapeBoldFont());
-		title.setForeground(UIConstants.TEXT_PRIMARY);
-		title.setAlignmentX(Component.LEFT_ALIGNMENT);
+		JLabel title = Labels.bold(event.getName(), UIConstants.TEXT_PRIMARY);
 
 		left.add(typeBadge);
 		left.add(Box.createRigidArea(new Dimension(0, 4)));
@@ -136,35 +131,23 @@ public class EventCard extends JPanel {
 	}
 
 	private JPanel buildContent() {
-		JPanel content = new JPanel();
-		content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
-		content.setOpaque(false);
+		JPanel content = Labels.column();
 		content.setAlignmentX(Component.LEFT_ALIGNMENT);
 		content.setBorder(new EmptyBorder(8, 0, 0, 0));
 
 		if (event.getDescription() != null && !event.getDescription().isEmpty()) {
-			JLabel desc = new JLabel(event.getDescription());
-			desc.setFont(FontManager.getRunescapeSmallFont());
-			desc.setForeground(UIConstants.TEXT_SECONDARY);
-			desc.setAlignmentX(Component.LEFT_ALIGNMENT);
-			content.add(desc);
+			content.add(Labels.small(event.getDescription(), UIConstants.TEXT_SECONDARY));
 			content.add(Box.createRigidArea(new Dimension(0, 8)));
 		}
 
 		// Stats row
 		int participants = event.getActiveRegistrationCount();
-		JLabel stats = new JLabel("Duration: " + event.getDuration() + "  |  " +
-			participants + " participant" + (participants != 1 ? "s" : ""));
-		stats.setFont(FontManager.getRunescapeSmallFont());
-		stats.setForeground(UIConstants.TEXT_SECONDARY);
-		stats.setAlignmentX(Component.LEFT_ALIGNMENT);
+		JLabel stats = Labels.small("Duration: " + event.getDuration() + "  |  " +
+			participants + " participant" + (participants != 1 ? "s" : ""), UIConstants.TEXT_SECONDARY);
 		content.add(stats);
 
 		// Date row
-		JLabel dates = new JLabel(event.getFormattedStartDate() + " - " + event.getFormattedEndDate());
-		dates.setFont(FontManager.getRunescapeSmallFont());
-		dates.setForeground(UIConstants.TEXT_MUTED);
-		dates.setAlignmentX(Component.LEFT_ALIGNMENT);
+		JLabel dates = Labels.small(event.getFormattedStartDate() + " - " + event.getFormattedEndDate(), UIConstants.TEXT_MUTED);
 		dates.setBorder(new EmptyBorder(4, 0, 0, 0));
 		content.add(dates);
 
@@ -178,10 +161,7 @@ public class EventCard extends JPanel {
 		hint.setBorder(new EmptyBorder(8, 0, 0, 0));
 		hint.setMaximumSize(new Dimension(Integer.MAX_VALUE, 24));
 
-		JLabel open = new JLabel("View boards  >");
-		open.setFont(FontManager.getRunescapeSmallFont());
-		open.setForeground(getAccentColor());
-		hint.add(open);
+		hint.add(Labels.small("View boards  >", getAccentColor()));
 		return hint;
 	}
 
@@ -218,11 +198,7 @@ public class EventCard extends JPanel {
 		JLabel badge = new JLabel(text) {
 			@Override
 			protected void paintComponent(Graphics g) {
-				Graphics2D g2d = (Graphics2D) g.create();
-				g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-				g2d.setColor(Colors.withAlpha(color, 30));
-				g2d.fillRoundRect(0, 0, getWidth(), getHeight(), 8, 8);
-				g2d.dispose();
+				RoundedPanel.fill(g, this, Colors.withAlpha(color, 30), 8);
 				super.paintComponent(g);
 			}
 		};

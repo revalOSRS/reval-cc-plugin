@@ -1,7 +1,6 @@
 package com.revalclan.ui.components;
 
 import com.revalclan.ui.constants.UIConstants;
-import net.runelite.client.ui.FontManager;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -22,22 +21,11 @@ public class CollapsibleSection extends JPanel {
 		this.contentPanel = content;
 		contentPanel.setVisible(expanded);
 
-		JPanel headerPanel = new JPanel(new BorderLayout(2, 0)) {
-			@Override
-			protected void paintComponent(Graphics g) {
-				Graphics2D g2d = (Graphics2D) g.create();
-				g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-				g2d.setColor(getBackground());
-				g2d.fillRoundRect(0, 0, getWidth(), getHeight(), 6, 6);
-				g2d.dispose();
-			}
-		};
+		JPanel headerPanel = new RoundedPanel(new BorderLayout(2, 0), 6);
 		headerPanel.setBackground(UIConstants.CARD_BG);
 		headerPanel.setBorder(new EmptyBorder(6, 8, 6, 8));
-		headerPanel.setOpaque(false);
 
-		JPanel leftPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
-		leftPanel.setOpaque(false);
+		JPanel leftPanel = Labels.flow();
 
 		arrowLabel = new JLabel(new TriangleIcon(expanded, 9, UIConstants.ACCENT_GOLD));
 		leftPanel.add(arrowLabel);
@@ -49,20 +37,12 @@ public class CollapsibleSection extends JPanel {
 		JPanel titlePanel = new JPanel();
 		titlePanel.setOpaque(false);
 
-		JLabel titleLabel = new JLabel(title);
-		titleLabel.setFont(FontManager.getRunescapeBoldFont());
-		titleLabel.setForeground(UIConstants.TEXT_PRIMARY);
+		JLabel titleLabel = Labels.sectionTitle(title);
 
 		if (subtitle != null && !subtitle.isEmpty()) {
 			titlePanel.setLayout(new BoxLayout(titlePanel, BoxLayout.Y_AXIS));
-			titleLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
 			titlePanel.add(titleLabel);
-
-			JLabel subtitleLabel = new JLabel(subtitle);
-			subtitleLabel.setFont(FontManager.getRunescapeSmallFont());
-			subtitleLabel.setForeground(UIConstants.TEXT_SECONDARY);
-			subtitleLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-			titlePanel.add(subtitleLabel);
+			titlePanel.add(Labels.small(subtitle, UIConstants.TEXT_SECONDARY));
 		} else {
 			titlePanel.setLayout(new BorderLayout());
 			titlePanel.add(titleLabel, BorderLayout.CENTER);
