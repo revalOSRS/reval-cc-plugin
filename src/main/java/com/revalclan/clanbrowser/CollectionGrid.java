@@ -78,7 +78,7 @@ final class CollectionGrid extends JComponent implements Scrollable, javax.acces
                 heading.y = top; heading.complete = group.complete;
                 if (group.complete) heading.text += " · GREENLOGGED";
                 heading.counter = group.metric == null ? null : BrowserTheme.counter(group.metric);
-                heading.rank = group.rank == null ? null : "Clan luck: #" + group.rank.rank + " / " + group.rank.total + (group.rank.estimated ? " (est.)" : "");
+                heading.rank = group.rank == null ? null : BrowserTheme.luckRank(group.rank);
                 headings.add(heading); top += heading.rank == null ? 42 : 66;
             }
             for (int i = 0; i < group.items.size(); i++) {
@@ -95,7 +95,7 @@ final class CollectionGrid extends JComponent implements Scrollable, javax.acces
     }
     @Override public Dimension getPreferredSize() { layoutCells(); return new Dimension(900, layoutHeight); }
     @Override protected void paintComponent(Graphics graphics) {
-        super.paintComponent(graphics); layoutCells(); Graphics2D g = (Graphics2D) graphics.create(); BrowserTheme.pixel(g);
+        super.paintComponent(graphics); layoutCells(); Graphics2D g = BrowserTheme.pixel(graphics);
         // A bare JComponent has no UI delegate to clear an opaque background.
         // Paint it ourselves so viewport blits cannot retain the previous page.
         g.setColor(getBackground()); g.fillRect(0, 0, getWidth(), getHeight());

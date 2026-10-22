@@ -11,7 +11,6 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.function.Consumer;
 import javax.swing.BorderFactory;
 import javax.swing.JLabel;
@@ -41,7 +40,7 @@ final class LeaderboardView extends JPanel {
         if (view.sections != null && !view.sections.isEmpty()) {
             JTabbedPane tabs = new JTabbedPane(); tabs.setFont(BrowserTheme.font(21, true)); tabs.setForeground(BrowserTheme.TEXT); tabs.setBackground(BrowserTheme.HEADER);
             for (BrowserModels.Section section : view.sections) {
-                String label = section.tier == null || section.tier.equals("all") ? "Total" : section.tier.substring(0, 1).toUpperCase(Locale.ROOT) + section.tier.substring(1);
+                String label = section.tier == null || section.tier.equals("all") ? "Total" : BrowserTheme.capitalize(section.tier);
                 tabs.addTab(label, null, section(section.panels, openLog), section.label);
             }
             body.add(tabs);
@@ -57,7 +56,7 @@ final class LeaderboardView extends JPanel {
 
     static String metricLabel(BrowserModels.View view) {
         String kind = view.metric.getAsJsonObject().has("kind") ? view.metric.getAsJsonObject().get("kind").getAsString() : "kc";
-        return "xp".equals(kind) ? "XP" : "clues".equals(kind) ? "Clues" : "completions".equals(kind) ? "Completions" : "Kills";
+        return BrowserTheme.metricName(kind);
     }
 
     private JPanel section(List<BrowserModels.Panel> panels, Consumer<String> openLog) {
@@ -149,7 +148,7 @@ final class LeaderboardView extends JPanel {
             row = (BrowserModels.Row) value; this.column = column; this.selected = selected; return this;
         }
         @Override protected void paintComponent(Graphics graphics) {
-            Graphics2D g = (Graphics2D) graphics.create(); BrowserTheme.pixel(g);
+            Graphics2D g = BrowserTheme.pixel(graphics);
             if ("section".equals(row.status)) {
                 g.setColor(BrowserTheme.HEADER); g.fillRect(0, 0, getWidth(), getHeight());
                 if (column == 1) BrowserTheme.text(g, row.player, 6, 0, getHeight(), getWidth() - 12, 21, BrowserTheme.GOLD, true, false);

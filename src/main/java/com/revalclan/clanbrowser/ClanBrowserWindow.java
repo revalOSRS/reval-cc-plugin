@@ -193,7 +193,7 @@ public final class ClanBrowserWindow extends JFrame {
         selection.value(lastCategory);
         metricButtons.forEach((metric, button) -> highlight(button, metric.equals(lastMetric)));
         boss.choices(catalogue.bosses); boss.placeholder("All bosses, or search a boss…"); boss.value(command.boss == null ? "all" : command.boss);
-        tiers.setSelectedItem(command.tier == null || command.tier.equals("all") ? "All tiers" : capitalize(command.tier));
+        tiers.setSelectedItem(command.tier == null || command.tier.equals("all") ? "All tiers" : BrowserTheme.capitalize(command.tier));
         if (clog()) search.setText(command.player == null ? "" : command.player);
         search.putClientProperty("JTextField.placeholderText", "Find a clan member…");
         search.setToolTipText(clog() ? "Enter an OSRS name and press Enter to view their collection log" : "Filter the displayed clan standings");
@@ -496,7 +496,6 @@ public final class ClanBrowserWindow extends JFrame {
             default: return "Clan Leaderboards";
         }
     }
-    private static String capitalize(String value) { return value.substring(0, 1).toUpperCase(Locale.ROOT) + value.substring(1); }
     private static JProgressBar progressBar(int width) {
         JProgressBar bar = new JProgressBar(); bar.setIndeterminate(true); bar.setForeground(BrowserTheme.GOLD); bar.setBackground(BrowserTheme.PANEL);
         bar.setPreferredSize(new Dimension(width, 3)); return bar;
@@ -508,7 +507,7 @@ public final class ClanBrowserWindow extends JFrame {
         String text = "Reval · Clan browser";
         Title() { setPreferredSize(new Dimension(100, 66)); }
         @Override protected void paintComponent(Graphics graphics) {
-            Graphics2D g = (Graphics2D) graphics.create(); BrowserTheme.pixel(g); g.setColor(BrowserTheme.HEADER); g.fillRect(0, 0, getWidth(), getHeight());
+            Graphics2D g = BrowserTheme.pixel(graphics); g.setColor(BrowserTheme.HEADER); g.fillRect(0, 0, getWidth(), getHeight());
             g.setColor(BrowserTheme.DARK_BORDER); g.drawRect(0, 0, getWidth() - 1, getHeight() - 1);
             BrowserTheme.centered(g, text == null ? "Clan standings" : text, getWidth() / 2, 0, getHeight(), getWidth() - 20, 36, BrowserTheme.ORANGE, true); g.dispose();
         }
@@ -518,7 +517,7 @@ public final class ClanBrowserWindow extends JFrame {
         Strip(String left, String right) { this.left = left; this.right = right; setPreferredSize(new Dimension(100, 42)); }
         void update(String left, String right) { this.left = left; this.right = right; repaint(); }
         @Override protected void paintComponent(Graphics graphics) {
-            Graphics2D g = (Graphics2D) graphics.create(); BrowserTheme.pixel(g);
+            Graphics2D g = BrowserTheme.pixel(graphics);
             BrowserTheme.text(g, left, 2, 0, getHeight(), getWidth() / 2 - 12, 25, BrowserTheme.TEXT, true, false);
             BrowserTheme.text(g, right, getWidth() - 2, 0, getHeight(), getWidth() / 2 - 12, 20, BrowserTheme.MUTED, false, true); g.dispose();
         }
@@ -527,7 +526,7 @@ public final class ClanBrowserWindow extends JFrame {
         private final BrowserModels.View view;
         LogSummary(BrowserModels.View view) { this.view = view; setPreferredSize(new Dimension(100, view.groups.size() == 1 && view.groups.get(0).rank != null ? 112 : 88)); }
         @Override protected void paintComponent(Graphics graphics) {
-            Graphics2D g = (Graphics2D) graphics.create(); BrowserTheme.pixel(g); int width = getWidth();
+            Graphics2D g = BrowserTheme.pixel(graphics); int width = getWidth();
             boolean complete = !view.groups.isEmpty() && view.groups.stream().allMatch(group -> group.complete);
             String title = view.page.label;
             BrowserTheme.centered(g, title, width / 2, 0, 38, width - (complete ? 340 : 24), 29, complete ? BrowserTheme.GREEN : BrowserTheme.ORANGE, true);
@@ -538,8 +537,7 @@ public final class ClanBrowserWindow extends JFrame {
             BrowserModels.Metric metric = view.groups.size() == 1 ? view.groups.get(0).metric : view.overviewMetric;
             if (metric != null) BrowserTheme.text(g, BrowserTheme.counter(metric), width - 12, 38, 34, width / 2 - 24, 22, BrowserTheme.TEXT, false, true);
             if (view.groups.size() == 1 && view.groups.get(0).rank != null) {
-                BrowserModels.LuckRank rank = view.groups.get(0).rank;
-                BrowserTheme.text(g, "Clan luck: #" + rank.rank + " / " + rank.total + (rank.estimated ? " (est.)" : ""), 12, 72, 30, width - 24, 22, BrowserTheme.GOLD, true, false);
+                BrowserTheme.text(g, BrowserTheme.luckRank(view.groups.get(0).rank), 12, 72, 30, width - 24, 22, BrowserTheme.GOLD, true, false);
             }
             g.dispose();
         }

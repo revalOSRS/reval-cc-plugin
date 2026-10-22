@@ -57,7 +57,7 @@ final class BrowserHelpView extends JPanel implements Scrollable {
     private static void gap(JPanel panel,int size) { panel.add(Box.createVerticalStrut(size)); }
     private static JPanel card(String title,Color accent) {
         JPanel panel=new JPanel(); panel.setLayout(new BoxLayout(panel,BoxLayout.Y_AXIS)); panel.setBackground(BrowserTheme.PANEL); panel.setAlignmentX(LEFT_ALIGNMENT);
-        panel.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(BrowserTheme.BORDER),BorderFactory.createEmptyBorder(12,14,12,14)));
+        panel.setBorder(BrowserTheme.outline(BrowserTheme.BORDER,12,14));
         JLabel heading=new JLabel(title); heading.setForeground(accent); heading.setFont(BrowserTheme.font(25,true));
         heading.setAlignmentX(LEFT_ALIGNMENT); panel.add(heading); gap(panel,8); return panel;
     }
