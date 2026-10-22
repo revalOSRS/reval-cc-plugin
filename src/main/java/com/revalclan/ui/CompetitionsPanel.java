@@ -398,7 +398,6 @@ public class CompetitionsPanel extends JPanel {
 		row.setBorder(new EmptyBorder(8, 10, 8, 10));
 		row.setAlignmentX(Component.LEFT_ALIGNMENT);
 		row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
-		row.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
 		row.add(Labels.small(option.getTemplateName(), isMyVote ? UIConstants.ACCENT_BLUE : UIConstants.TEXT_PRIMARY), BorderLayout.WEST);
 
@@ -430,7 +429,6 @@ public class CompetitionsPanel extends JPanel {
 
 	private JPanel createCompetitionCard(CompetitionsResponse.Competition comp, boolean isActive) {
 		JPanel card = createCard();
-		card.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
 		card.add(Labels.bold(comp.getName(), isActive ? UIConstants.ACCENT_GREEN : UIConstants.TEXT_PRIMARY));
 		if (comp.getDescription() != null && !comp.getDescription().isEmpty()) {
