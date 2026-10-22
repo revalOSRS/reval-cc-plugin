@@ -30,17 +30,17 @@ public class CollectionLogManager {
 	/**
 	 * Maps in-game category struct IDs to the list of items they contain
 	 */
-	@Getter private final Map<Integer, Set<Integer>> categoryItemMap = new HashMap<>();
+	private final Map<Integer, Set<Integer>> categoryItemMap = new HashMap<>();
 
 	/**
 	 * Maps slugified category names to their in-game struct ID
 	 */
-	@Getter private final Map<String, Integer> categoryStructIdMap = new HashMap<>();
+	private final Map<String, Integer> categoryStructIdMap = new HashMap<>();
 
 	/**
 	 * Maps top level tabs to their containing categories
 	 */
-	@Getter private final Map<Integer, Set<String>> categoryTabSlugs = new LinkedHashMap<>();
+	private final Map<Integer, Set<String>> categoryTabSlugs = new LinkedHashMap<>();
 
 	/**
 	 * List of all items in the collection log
@@ -54,7 +54,7 @@ public class CollectionLogManager {
 	 * the log added (id, count=2) NEXT TO the old (id, count=1) — equals() covers
 	 * count — and payload quantities became a coin flip between the two.
 	 */
-	@Getter private final Map<Integer, ObtainedCollectionItem> obtainedItems = new HashMap<>();
+	private final Map<Integer, ObtainedCollectionItem> obtainedItems = new HashMap<>();
 
 	/**
 	 * Maps category slugs to their KC varbit/varp IDs
