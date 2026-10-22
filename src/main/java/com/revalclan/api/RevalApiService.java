@@ -18,7 +18,6 @@ import com.revalclan.api.notifications.NotificationAckResponse;
 import com.revalclan.api.notifications.NotificationsResponse;
 import com.revalclan.api.diaries.DiariesResponse;
 import com.revalclan.api.events.ActiveTeamsResponse;
-import com.revalclan.api.playercards.ProfileCardResponse;
 import com.revalclan.api.events.EventsResponse;
 import com.revalclan.api.events.RegistrationResponse;
 import com.revalclan.api.points.PointsResponse;
@@ -35,7 +34,6 @@ import javax.inject.Singleton;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
-import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
@@ -192,11 +190,6 @@ public class RevalApiService {
         body.put("region", region);
         if (teamId != null) body.put("teamId", teamId);
         post(ApiEndpoints.leaguesBingoPick(eventId), gson.toJson(body), LeaguesBingoPickResponse.class, onSuccess, onError);
-    }
-
-    public void fetchProfileCard(String nickname, Consumer<ProfileCardResponse> onSuccess, Consumer<Exception> onError) {
-        String encoded = URLEncoder.encode(nickname, StandardCharsets.UTF_8);
-        get(ApiEndpoints.PLAYER_PROFILE_CARD + "?nickname=" + encoded, ProfileCardResponse.class, onSuccess, onError);
     }
 
     public void registerForEvent(String eventId, long accountHash,

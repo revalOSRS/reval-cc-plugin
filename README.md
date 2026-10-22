@@ -174,9 +174,6 @@ Leagues task, relic, area and combat mastery tracking is always on; it only runs
 ### Leagues Bingo boards
 Active Leagues Bingo events on the Events tab open in the side panel: pick a team from the standings, pick one of its region boards (completion, points and x2 status per board), then browse the tile grid. Clicking a tile shows the task, its requirements, progress and who contributed.
 
-### Profile cards
-Choose where the "View Reval Profile" right-click option appears: on players in the world, in chat, or in the clan member list.
-
 ### Competition leaderboards
 SOTW, BOTW and other competitions use the same compact standings table as race events.
 The overview shows five players; **Full leaderboard** opens the detail response and its side quests.
