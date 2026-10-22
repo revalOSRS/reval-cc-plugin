@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 import java.util.function.Consumer;
 
 /**
@@ -40,6 +41,12 @@ public abstract class BaseNotifier {
 	@Inject protected ItemManager itemManager;
 
 	@Inject protected ScreenshotService screenshotService;
+
+	/** The game's new collection log slot announcement; group "item" is the item name. */
+	protected static final Pattern COLLECTION_LOG_PATTERN = Pattern.compile(
+		"New item added to your collection log: (?<item>.+)",
+		Pattern.CASE_INSENSITIVE
+	);
 
 	/**
 	 * Check if this notifier should be active

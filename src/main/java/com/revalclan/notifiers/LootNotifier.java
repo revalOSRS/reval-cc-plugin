@@ -27,7 +27,6 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.*;
 import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 @Singleton
 public class LootNotifier extends BaseNotifier {
@@ -41,11 +40,6 @@ public class LootNotifier extends BaseNotifier {
 
 	@Inject
 	private RaidRewardLedger raidRewardLedger;
-
-	private static final Pattern COLLECTION_LOG_PATTERN = Pattern.compile(
-		"New item added to your collection log: (?<item>.+)",
-		Pattern.CASE_INSENSITIVE
-	);
 
 	/** Ticks to hold a loot payload before sending (correlation window). */
 	private static final int LOOT_BUFFER_TICKS = 2;

@@ -30,14 +30,6 @@ public class PetNotifier extends BaseNotifier {
 	);
 
 	/**
-	 * Pattern matching collection log messages (e.g., "New item added to your collection log: Pet zilyana")
-	 */
-	private static final Pattern COLLECTION_LOG_PATTERN = Pattern.compile(
-		"New item added to your collection log: (.+)",
-		Pattern.CASE_INSENSITIVE
-	);
-
-	/**
 	 * Pattern matching clan pet notifications
 	 * Matches formats like:
 	 * - "Username has a funny feeling like she would have been followed: Pet name at 114 completions."
@@ -116,7 +108,7 @@ public class PetNotifier extends BaseNotifier {
 		Matcher untradeableMatcher = UNTRADEABLE_PATTERN.matcher(message);
 		if (untradeableMatcher.find()) offerItemName(untradeableMatcher.group(1));
 		Matcher collectionMatcher = COLLECTION_LOG_PATTERN.matcher(message);
-		if (collectionMatcher.find()) offerItemName(collectionMatcher.group(1));
+		if (collectionMatcher.find()) offerItemName(collectionMatcher.group("item"));
 	}
 
 	/**
