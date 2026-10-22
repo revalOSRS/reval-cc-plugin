@@ -1,6 +1,5 @@
 package com.revalclan.notifiers;
 
-import lombok.extern.slf4j.Slf4j;
 import net.runelite.client.util.Text;
 
 import javax.inject.Singleton;
@@ -12,7 +11,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-@Slf4j
 @Singleton
 public class PetNotifier extends BaseNotifier {
 	/**

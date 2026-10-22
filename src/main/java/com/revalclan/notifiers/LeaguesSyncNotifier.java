@@ -1,7 +1,6 @@
 package com.revalclan.notifiers;
 
 import com.revalclan.util.Worlds;
-import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.events.WidgetLoaded;
 import net.runelite.api.gameval.VarPlayerID;
 import net.runelite.api.gameval.VarbitID;
@@ -19,7 +18,6 @@ import java.util.Map;
  * Payload: leagueType, totalPoints, tasksCompleted, areaSelections (id + name),
  * and selectedRelics (when available from Relics modal).
  */
-@Slf4j
 @Singleton
 public class LeaguesSyncNotifier extends BaseNotifier {
 
