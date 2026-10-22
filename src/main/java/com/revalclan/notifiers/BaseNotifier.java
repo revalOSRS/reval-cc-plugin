@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 import java.util.function.Consumer;
 
 /**
@@ -40,6 +41,12 @@ public abstract class BaseNotifier {
 	@Inject protected ItemManager itemManager;
 
 	@Inject protected ScreenshotService screenshotService;
+
+	/** The game's new collection log slot announcement; group "item" is the item name. */
+	protected static final Pattern COLLECTION_LOG_PATTERN = Pattern.compile(
+		"New item added to your collection log: (?<item>.+)",
+		Pattern.CASE_INSENSITIVE
+	);
 
 	/**
 	 * Check if this notifier should be active
@@ -129,8 +136,8 @@ public abstract class BaseNotifier {
 		}
 		
 		if (includeContainers) {
-			data.put("inventory", getInventoryData());
-			data.put("equipment", getEquippedItems());
+			data.put("inventory", getItemContainerData(93)); // Inventory container
+			data.put("equipment", getItemContainerData(94)); // Equipment container
 		}
 	}
 
@@ -141,21 +148,7 @@ public abstract class BaseNotifier {
 		if (client.getLocalPlayer() != null) return client.getLocalPlayer().getName();
 		return "Unknown";
 	}
-	
-	/**
-	 * Get player's equipped items using the equipment ItemContainer
-	 */
-	protected List<Map<String, Object>> getEquippedItems() {
-		return getItemContainerData(94); // Equipment container
-	}
-	
-	/**
-	 * Get player's inventory data
-	 */
-	protected List<Map<String, Object>> getInventoryData() {
-		return getItemContainerData(93); // Inventory container
-	}
-	
+
 	/**
 	 * Get items from a specific ItemContainer
 	 * @param containerId The container ID (93=inventory, 94=equipment)
@@ -180,21 +173,24 @@ public abstract class BaseNotifier {
 			itemData.put("quantity", item.getQuantity());
 			itemData.put("gePrice", itemManager.getItemPrice(item.getId()));
 			itemData.put("slot", i);
-			
-			try {
-				ItemComposition itemComp = itemManager.getItemComposition(item.getId());
-				if (itemComp != null) {
-					itemData.put("name", itemComp.getName());
-				} else {
-					itemData.put("name", "Unknown");
-				}
-			} catch (Exception e) {
-				itemData.put("name", "Unknown");
-			}
-			
+			itemData.put("name", itemName(item.getId(), "Unknown"));
+
 			items.add(itemData);
 		}
-		
+
 		return items;
+	}
+
+	/**
+	 * The item's name, or {@code fallback} when its composition is missing or
+	 * cannot be read.
+	 */
+	protected String itemName(int itemId, String fallback) {
+		try {
+			ItemComposition composition = itemManager.getItemComposition(itemId);
+			return composition != null ? composition.getName() : fallback;
+		} catch (Exception e) {
+			return fallback;
+		}
 	}
 }

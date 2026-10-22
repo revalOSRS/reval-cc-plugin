@@ -119,7 +119,7 @@ public class ChatNotifier extends BaseNotifier {
 			chatData.put("source", source);
 		}
 		
-		chatData.put("category", categorizeMessage(messageType, message));
+		chatData.put("category", categorizeMessage(messageType));
 		
 		sendNotification(chatData);
 	}
@@ -127,7 +127,7 @@ public class ChatNotifier extends BaseNotifier {
 	/**
 	 * Categorize the message type for easier processing
 	 */
-	private String categorizeMessage(ChatMessageType type, String message) {
+	private String categorizeMessage(ChatMessageType type) {
 		switch (type) {
 			case GAMEMESSAGE:
 			case ENGINE:

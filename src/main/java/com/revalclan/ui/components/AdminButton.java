@@ -41,15 +41,10 @@ public class AdminButton extends JButton {
 		int h = getHeight();
 
 		// Background
-		if (!isAdmin) {
-			g2d.setColor(UIConstants.CARD_BG);
-		} else if (getModel().isPressed()) {
-			g2d.setColor(UIConstants.ACCENT_GOLD.darker());
-		} else if (getModel().isRollover()) {
-			g2d.setColor(UIConstants.ACCENT_GOLD.brighter());
-		} else {
-			g2d.setColor(UIConstants.ACCENT_GOLD);
-		}
+		g2d.setColor(!isAdmin ? UIConstants.CARD_BG
+			: getModel().isPressed() ? UIConstants.ACCENT_GOLD.darker()
+			: getModel().isRollover() ? UIConstants.ACCENT_GOLD.brighter()
+			: UIConstants.ACCENT_GOLD);
 		g2d.fillRoundRect(0, 0, w, h, 6, 6);
 
 		// Lock icon — scale to fit within the button

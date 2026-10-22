@@ -1,7 +1,6 @@
 package com.revalclan.util;
 
 import javax.imageio.ImageIO;
-import javax.inject.Inject;
 import javax.inject.Singleton;
 import javax.swing.*;
 import java.awt.*;
@@ -17,9 +16,6 @@ public class UIAssetLoader {
     
     private final Map<String, ImageIcon> iconCache = new ConcurrentHashMap<>();
     private final Map<String, BufferedImage> imageCache = new ConcurrentHashMap<>();
-    
-    @Inject
-    public UIAssetLoader() {}
     
     /**
      * Load a BufferedImage from assets directory.
@@ -71,33 +67,15 @@ public class UIAssetLoader {
         return null;
       }
       
-      String normalizedFilename = normalizeFilename(filename);
-      String cacheKey = normalizedFilename + "_" + size;
+      String cacheKey = normalizeFilename(filename) + "_" + size;
       
       ImageIcon cached = iconCache.get(cacheKey);
       if (cached != null) {
         return cached;
       }
       
-      BufferedImage image = imageCache.get(normalizedFilename);
-      if (image == null) {
-        String resourcePath = ASSETS_BASE_PATH + normalizedFilename;
-        URL imageUrl = getClass().getResource(resourcePath);
-        
-        if (imageUrl == null) {
-          return null;
-        }
-        
-        try {
-          image = ImageIO.read(imageUrl);
-          if (image != null) {
-            imageCache.put(normalizedFilename, image);
-          }
-        } catch (IOException e) {
-          return null;
-        }
-      }
-      
+      // Shares getImage's cache, so an image loaded at one size is reused for others
+      BufferedImage image = getImage(filename);
       if (image == null) {
         return null;
       }
@@ -109,17 +87,9 @@ public class UIAssetLoader {
       return icon;
     }
     
+    /** Bare file name (anything up to the last '/' dropped), with ".png" added when missing. */
     private String normalizeFilename(String filename) {
-      String normalized = filename;
-      if (normalized.startsWith("/")) {
-        normalized = normalized.substring(1);
-      }
-      if (normalized.contains("/")) {
-        normalized = normalized.substring(normalized.lastIndexOf("/") + 1);
-      }
-      if (!normalized.endsWith(".png")) {
-        normalized = normalized + ".png";
-      }
-      return normalized;
+      String normalized = filename.substring(filename.lastIndexOf('/') + 1);
+      return normalized.endsWith(".png") ? normalized : normalized + ".png";
     }
 }

@@ -26,7 +26,8 @@ import java.awt.geom.RoundRectangle2D;
 public class TileCell extends JComponent {
 	public enum State { COMPLETED, IN_PROGRESS, NOT_STARTED, FILLER, HIDDEN }
 
-	public static final Color COMPLETED = new Color(76, 175, 80);
+	/** The shared success green (76, 175, 80); not themed. */
+	public static final Color COMPLETED = UIConstants.SUCCESS_COLOR;
 	public static final Color IN_PROGRESS = new Color(245, 158, 11);
 
 	private final Tile tile;

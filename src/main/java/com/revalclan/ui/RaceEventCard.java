@@ -2,6 +2,7 @@ package com.revalclan.ui;
 
 import com.revalclan.api.competitions.FeaturedRaceResponse;
 import com.revalclan.ui.components.Clickable;
+import com.revalclan.ui.components.Labels;
 import com.revalclan.ui.constants.UIConstants;
 import com.revalclan.util.SpriteIcons;
 import net.runelite.api.gameval.ItemID;
@@ -21,6 +22,7 @@ import java.util.Collections;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.stream.Collectors;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
@@ -85,15 +87,15 @@ public final class RaceEventCard extends JPanel {
         loadObjectiveIcon(objective, slot);
         row.add(slot, BorderLayout.WEST);
         JPanel copy = column();
-        copy.add(label(objective.getTitle(), FontManager.getRunescapeSmallFont(), UIConstants.TEXT_PRIMARY));
+        copy.add(Labels.small(objective.getTitle(), UIConstants.TEXT_PRIMARY));
         String result = objective.getWinner() == null ? "Unclaimed" : partyObjective && members != null
             ? "Clan party (" + members.size() + ")" : objective.getWinner().getName();
-        JLabel winner = label(result, objective.getWinner() == null ? FontManager.getRunescapeSmallFont().deriveFont(12f) : FontManager.getRunescapeSmallFont(),
+        JLabel winner = Labels.label(result, objective.getWinner() == null ? smallFont(12f) : FontManager.getRunescapeSmallFont(),
             objective.getWinner() == null ? UIConstants.TEXT_SECONDARY : UIConstants.ACCENT_GREEN);
         winner.setToolTipText(objective.getWinner() == null ? result : objective.getWinner().getName());
         copy.add(winner);
         row.add(copy, BorderLayout.CENTER);
-        row.add(label("+" + objective.getPoints() + " pts", FontManager.getRunescapeBoldFont(), UIConstants.ACCENT_GOLD), BorderLayout.EAST);
+        row.add(Labels.bold("+" + objective.getPoints() + " pts", UIConstants.ACCENT_GOLD), BorderLayout.EAST);
         if (partyObjective && members != null && !members.isEmpty()) row.setToolTipText(objective.getWinner().getName());
         return row;
     }
@@ -135,63 +137,20 @@ public final class RaceEventCard extends JPanel {
             JPanel cell = column();
             cell.setOpaque(true); cell.setBackground(UIConstants.ROW_BG);
             cell.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(UIConstants.BORDER_COLOR), new EmptyBorder(5, 7, 5, 7)));
-            cell.add(label(ranks[i], FontManager.getRunescapeSmallFont().deriveFont(12f), UIConstants.TEXT_SECONDARY));
-            cell.add(label(i < points.size() ? "+" + points.get(i) + " pts" : "TBC", FontManager.getRunescapeBoldFont(), UIConstants.ACCENT_GOLD));
+            cell.add(Labels.label(ranks[i], smallFont(12f), UIConstants.TEXT_SECONDARY));
+            cell.add(Labels.bold(i < points.size() ? "+" + points.get(i) + " pts" : "TBC", UIConstants.ACCENT_GOLD));
             grid.add(cell);
         }
         return grid;
     }
 
     private JPanel standings(boolean details) {
-        JPanel table = column();
-        table.setBorder(BorderFactory.createLineBorder(UIConstants.BORDER_COLOR));
-        table.add(standingRow("#", "Player", "KC", "Pts", true, false));
         List<FeaturedRaceResponse.Standing> rows = race.getKc() == null || race.getKc().getLeaderboard() == null
             ? Collections.emptyList() : race.getKc().getLeaderboard();
-        if (rows.isEmpty()) {
-            JLabel empty = label("upcoming".equals(race.getState()) ? "Standings begin at raid release" : "No completions recorded yet",
-                FontManager.getRunescapeSmallFont().deriveFont(12f), UIConstants.TEXT_SECONDARY);
-            empty.setBorder(new EmptyBorder(12, 6, 12, 6));
-            table.add(empty);
-        } else {
-            int count = details ? rows.size() : Math.min(5, rows.size());
-            for (int i = 0; i < count; i++) {
-                FeaturedRaceResponse.Standing player = rows.get(i);
-                table.add(standingRow(String.valueOf(player.getRank()), player.getName(),
-                    String.format(Locale.ENGLISH, "%,d", player.getValue()),
-                    player.getPoints() > 0 ? "+" + player.getPoints() : "-", false, i % 2 == 0));
-            }
-        }
-        table.setMaximumSize(new Dimension(Integer.MAX_VALUE, table.getPreferredSize().height));
-        return table;
-    }
-
-    private JPanel standingRow(String rank, String name, String kc, String points, boolean header, boolean stripe) {
-        JPanel row = new JPanel(new BorderLayout(3, 0));
-        row.setName(header ? "race-kc-header" : "race-kc-row");
-        row.setOpaque(header || stripe);
-        row.setBackground(header ? UIConstants.CARD_HOVER : UIConstants.ROW_BG);
-        row.setBorder(new EmptyBorder(5, 5, 5, 5));
-        row.setAlignmentX(Component.LEFT_ALIGNMENT);
-        Font font = header ? FontManager.getRunescapeSmallFont().deriveFont(12f) : FontManager.getRunescapeSmallFont();
-        Color text = header ? UIConstants.TEXT_SECONDARY : UIConstants.TEXT_PRIMARY;
-        JLabel place = label(rank, font, text);
-        place.setPreferredSize(new Dimension(18, 17));
-        row.add(place, BorderLayout.WEST);
-        JLabel player = label(name, font, text);
-        if (!header) player.setToolTipText(name);
-        row.add(player, BorderLayout.CENTER);
-        JPanel result = new JPanel(new GridLayout(1, 2, 4, 0));
-        result.setOpaque(false);
-        result.setPreferredSize(new Dimension(72, 17));
-        JLabel kills = label(kc, font, text);
-        kills.setHorizontalAlignment(SwingConstants.RIGHT);
-        JLabel reward = label(points, font, header ? text : UIConstants.ACCENT_GOLD);
-        reward.setHorizontalAlignment(SwingConstants.RIGHT);
-        result.add(kills);
-        result.add(reward);
-        row.add(result, BorderLayout.EAST);
-        return row;
+        return new CompetitionStandings("KC", rows.stream().limit(details ? rows.size() : 5)
+            .map(player -> new CompetitionStandings.Entry(player.getRank(), player.getName(), (long) player.getValue(), player.getPoints()))
+            .collect(Collectors.toList()),
+            "upcoming".equals(race.getState()) ? "Standings begin at raid release" : "No completions recorded yet", null);
     }
 
     private final class RaceHeader extends JPanel {
@@ -243,7 +202,7 @@ public final class RaceEventCard extends JPanel {
                 g.drawImage(artwork, (getWidth() - width) / 2, (getHeight() - height) / 2, width, height, null);
                 g.setComposite(AlphaComposite.SrcOver);
             }
-            g.setFont(FontManager.getRunescapeSmallFont().deriveFont(12f));
+            g.setFont(smallFont(12f));
             g.setColor(UIConstants.ACCENT_GOLD);
             String phase = "active".equals(race.getState()) ? "RACE IN PROGRESS" : "completed".equals(race.getState()) ? "RACE RESULTS"
                 : "paused".equals(race.getState()) ? "RACE PAUSED" : "UPCOMING RACE";
@@ -255,7 +214,7 @@ public final class RaceEventCard extends JPanel {
                 g.drawString(line, 12, y);
                 y += 23;
             }
-            g.setFont(FontManager.getRunescapeSmallFont().deriveFont(13f));
+            g.setFont(smallFont(13f));
             g.setColor(UIConstants.TEXT_SECONDARY);
             ZoneId zone = ZoneId.of(race.getTimeZone());
             DateTimeFormatter dateTime = DateTimeFormatter.ofPattern("d MMM HH:mm", Locale.ENGLISH);
@@ -278,18 +237,17 @@ public final class RaceEventCard extends JPanel {
     }
 
     private static JLabel section(String value) {
-        JLabel title = label(value, FontManager.getRunescapeBoldFont(), UIConstants.TEXT_PRIMARY);
+        JLabel title = Labels.sectionTitle(value);
         title.setBorder(new EmptyBorder(3, 1, 7, 0));
         return title;
     }
     private static JPanel column() {
-        JPanel panel = new JPanel(); panel.setOpaque(false);
-        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS)); panel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        JPanel panel = Labels.column();
+        panel.setAlignmentX(Component.LEFT_ALIGNMENT);
         return panel;
     }
-    private static JLabel label(String value, Font font, Color color) {
-        JLabel label = new JLabel(value); label.setFont(font); label.setForeground(color); label.setAlignmentX(Component.LEFT_ALIGNMENT);
-        return label;
+    private static Font smallFont(float size) {
+        return FontManager.getRunescapeSmallFont().deriveFont(size);
     }
     private static JButton button(String title, Runnable action) {
         JButton button = new JButton(title); button.setFont(FontManager.getRunescapeSmallFont());

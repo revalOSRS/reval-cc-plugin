@@ -15,11 +15,8 @@ import javax.swing.JButton;
 import javax.swing.JList;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
-import javax.swing.JScrollPane;
 import javax.swing.JTextField;
 import javax.swing.ListSelectionModel;
-import javax.swing.event.DocumentEvent;
-import javax.swing.event.DocumentListener;
 
 /** Local autocomplete: typing never makes a network request. */
 final class SearchPicker extends JPanel {
@@ -43,14 +40,9 @@ final class SearchPicker extends JPanel {
         list.setSelectionBackground(BrowserTheme.RECEIVED); list.setSelectionForeground(BrowserTheme.GOLD);
         list.setFixedCellHeight(32); list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         list.getAccessibleContext().setAccessibleName(accessibleName + " suggestions");
-        JScrollPane scroll = BrowserTheme.scroll(list);
-        popup.setLayout(new BorderLayout()); popup.add(scroll); popup.setFocusable(false);
+        popup.setLayout(new BorderLayout()); popup.add(BrowserTheme.scroll(list)); popup.setFocusable(false);
         arrow.addActionListener(event -> { if (popup.isVisible()) popup.setVisible(false); else updatePopup(true); });
-        field.getDocument().addDocumentListener(new DocumentListener() {
-            public void insertUpdate(DocumentEvent event) { changed(); }
-            public void removeUpdate(DocumentEvent event) { changed(); }
-            public void changedUpdate(DocumentEvent event) { changed(); }
-        });
+        BrowserTheme.onChange(field, this::changed);
         field.addActionListener(event -> {
             if (popup.isVisible() && list.getSelectedValue() != null) choose(list.getSelectedValue());
             else submit.accept(value());

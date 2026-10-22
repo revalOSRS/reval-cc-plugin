@@ -8,8 +8,6 @@ import com.revalclan.collectionlog.CollectionLogSyncButton;
 import com.revalclan.collectionlog.SyncGuide;
 import com.revalclan.collectionlog.SyncGuideOverlay;
 import com.revalclan.events.RegistrationMarksOverlay;
-import com.revalclan.playercards.PlayerCardManager;
-import com.revalclan.playercards.PlayerCardOverlay;
 import com.revalclan.teams.ClanTeamColors;
 import com.revalclan.ui.leaguesbingo.LeaguesBingoPanel;
 import com.revalclan.notifiers.*;
@@ -32,6 +30,7 @@ import com.google.gson.JsonObject;
 
 import java.awt.image.BufferedImage;
 import java.time.LocalDate;
+import java.time.Month;
 
 import javax.inject.Inject;
 import javax.swing.SwingUtilities;
@@ -82,8 +81,6 @@ public class RevalClanPlugin extends Plugin {
 	@Inject	private SyncGuideOverlay syncGuideOverlay;
 	@Inject	private ClanTeamColors clanTeamColors;
 	@Inject	private RegistrationMarksOverlay registrationMarksOverlay;
-	@Inject	private PlayerCardManager playerCardManager;
-	@Inject	private PlayerCardOverlay playerCardOverlay;
 	@Inject	private OverlayManager overlayManager;
 	@Inject	private ClanRankIconResolver rankIconResolver;
 
@@ -202,29 +199,22 @@ public class RevalClanPlugin extends Plugin {
 		eventBus.register(clanTeamColors);
 		clanTeamColors.startUp();
 		overlayManager.add(registrationMarksOverlay);
-		eventBus.register(playerCardManager);
-		overlayManager.add(playerCardOverlay);
 
 		// Initialize and add the side panel
 		try {
 			if (SwingUtilities.isEventDispatchThread()) {
-				rebuildSidepanel();
+				buildSidepanel();
 			} else {
-				SwingUtilities.invokeAndWait(this::rebuildSidepanel);
+				SwingUtilities.invokeAndWait(this::buildSidepanel);
 			}
 		} catch (Exception e) {
 			log.error("Failed to initialize Reval Clan panel", e);
 		}
 	}
 
-	/** Rebuild the themed Swing tree without restarting game tracking or the plugin. */
-	private void rebuildSidepanel() {
-		boolean replacing = revalPanel != null;
-		String activeTab = replacing ? revalPanel.getActiveTab() : "PROFILE";
-		if (replacing) revalPanel.shutDown();
-		if (navButton != null) clientToolbar.removeNavigation(navButton);
-
-		UIConstants.setHalloweenTheme(config.halloweenTheme().isActive(LocalDate.now()));
+	/** Build the side panel; the Halloween theme is used throughout October. */
+	private void buildSidepanel() {
+		UIConstants.setHalloweenTheme(LocalDate.now().getMonth() == Month.OCTOBER);
 		revalPanel = new RevalPanel();
 		revalPanel.init(revalApiService, client, uiAssetLoader, itemManager, spriteManager, config,
 			rankIconResolver);
@@ -239,7 +229,7 @@ public class RevalClanPlugin extends Plugin {
 				}
 			});
 		});
-		revalPanel.showTab(activeTab);
+		revalPanel.showTab("PROFILE");
 
 		BufferedImage icon = UIConstants.isHalloweenTheme()
 			? HalloweenDecoration.pumpkinImage(30) : uiAssetLoader.getImage("reval.png");
@@ -250,7 +240,6 @@ public class RevalClanPlugin extends Plugin {
 			.panel(revalPanel)
 			.build();
 		clientToolbar.addNavigation(navButton);
-		if (replacing) clientToolbar.openPanel(navButton);
 		if (client.getGameState() == GameState.LOGGED_IN && clanMembership.isMember()) {
 			revalPanel.onLoggedIn();
 		}
@@ -280,9 +269,6 @@ public class RevalClanPlugin extends Plugin {
 		clanTeamColors.shutDown();
 		revalApiService.resetEventsSession();
 		overlayManager.remove(registrationMarksOverlay);
-		eventBus.unregister(playerCardManager);
-		playerCardManager.shutDown();
-		overlayManager.remove(playerCardOverlay);
 
 		// In-memory only — the persisted copy replays at the next startUp/login
 		sessionTracker.reset();
@@ -416,7 +402,7 @@ public class RevalClanPlugin extends Plugin {
 	public void onGameTick(GameTick gameTick) {
 		// The session and its kill attribution record regardless of clan state — only sending is gated
 		sessionTracker.onGameTick();
-		killTracker.onGameTick(gameTick);
+		killTracker.onGameTick();
 		raidPartyTracker.onGameTick();
 
 		// Re-read the clan sources; flips to member exactly once per login
@@ -559,11 +545,6 @@ public class RevalClanPlugin extends Plugin {
 
 		if ("hideCompletedItems".equals(event.getKey()) && revalPanel != null) {
 			revalPanel.getProfilePanel().rebuild();
-		}
-		if ("halloweenTheme".equals(event.getKey()) && revalPanel != null) {
-			SwingUtilities.invokeLater(() -> {
-				if (revalPanel != null) rebuildSidepanel();
-			});
 		}
 	}
 

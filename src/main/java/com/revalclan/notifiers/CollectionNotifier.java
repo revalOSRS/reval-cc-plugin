@@ -15,15 +15,10 @@ import net.runelite.api.gameval.VarPlayerID;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 @Singleton
 public class CollectionNotifier extends BaseNotifier {
 	@Inject private GreenlogCounterSnapshot greenlogCounterSnapshot;
-	private static final Pattern COLLECTION_PATTERN = Pattern.compile(
-		"New item added to your collection log: (?<item>.+)",
-		Pattern.CASE_INSENSITIVE
-	);
 
 	@Override
 	public boolean isEnabled() {
@@ -38,7 +33,7 @@ public class CollectionNotifier extends BaseNotifier {
 	public void onChatMessage(String message) {
 		if (!isEnabled()) return;
 
-		Matcher matcher = COLLECTION_PATTERN.matcher(message);
+		Matcher matcher = COLLECTION_LOG_PATTERN.matcher(message);
 		if (matcher.find()) {
 			String itemName = matcher.group("item");
 			handleCollectionItem(itemName);

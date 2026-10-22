@@ -1,18 +1,15 @@
 package com.revalclan.notifiers;
 
-import lombok.extern.slf4j.Slf4j;
 import net.runelite.client.util.Text;
 
 import javax.inject.Singleton;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-@Slf4j
 @Singleton
 public class PetNotifier extends BaseNotifier {
 	/**
@@ -28,14 +25,6 @@ public class PetNotifier extends BaseNotifier {
 	 */
 	private static final Pattern UNTRADEABLE_PATTERN = Pattern.compile(
 		"Untradeable drop: (.+)",
-		Pattern.CASE_INSENSITIVE
-	);
-
-	/**
-	 * Pattern matching collection log messages (e.g., "New item added to your collection log: Pet zilyana")
-	 */
-	private static final Pattern COLLECTION_LOG_PATTERN = Pattern.compile(
-		"New item added to your collection log: (.+)",
 		Pattern.CASE_INSENSITIVE
 	);
 
@@ -118,7 +107,7 @@ public class PetNotifier extends BaseNotifier {
 		Matcher untradeableMatcher = UNTRADEABLE_PATTERN.matcher(message);
 		if (untradeableMatcher.find()) offerItemName(untradeableMatcher.group(1));
 		Matcher collectionMatcher = COLLECTION_LOG_PATTERN.matcher(message);
-		if (collectionMatcher.find()) offerItemName(collectionMatcher.group(1));
+		if (collectionMatcher.find()) offerItemName(collectionMatcher.group("item"));
 	}
 
 	/**
@@ -237,87 +226,83 @@ public class PetNotifier extends BaseNotifier {
 	/**
 	 * Set of all known pet names (case-insensitive matching)
 	 */
-	private static final Set<String> PET_NAMES = new HashSet<>();
-
-	static {
+	private static final Set<String> PET_NAMES = Set.of(
 		// Boss pets
-		PET_NAMES.add("abyssal orphan");
-		PET_NAMES.add("aggy");
-		PET_NAMES.add("baby mole");
-		PET_NAMES.add("baron");
-		PET_NAMES.add("beef");
-		PET_NAMES.add("bran");
-		PET_NAMES.add("butch");
-		PET_NAMES.add("callisto cub");
-		PET_NAMES.add("dom");
-		PET_NAMES.add("gull");
-		PET_NAMES.add("hellpuppy");
-		PET_NAMES.add("huberte");
-		PET_NAMES.add("ikkle hydra");
-		PET_NAMES.add("jal-nib-rek");
-		PET_NAMES.add("kalphite princess");
-		PET_NAMES.add("lil' zik");
-		PET_NAMES.add("lil'viathan");
-		PET_NAMES.add("little nightmare");
-		PET_NAMES.add("maggot marquess");
-		PET_NAMES.add("moxi");
-		PET_NAMES.add("mr mcgroot");
-		PET_NAMES.add("muphin");
-		PET_NAMES.add("nexling");
-		PET_NAMES.add("nid");
-		PET_NAMES.add("noon");
-		PET_NAMES.add("olmlet");
-		PET_NAMES.add("orion");
-		PET_NAMES.add("pet chaos elemental");
-		PET_NAMES.add("pet dagannoth prime");
-		PET_NAMES.add("pet dagannoth rex");
-		PET_NAMES.add("pet dagannoth supreme");
-		PET_NAMES.add("pet dark core");
-		PET_NAMES.add("pet general graardor");
-		PET_NAMES.add("pet k'ril tsutsaroth");
-		PET_NAMES.add("pet kraken");
-		PET_NAMES.add("pet kree'arra");
-		PET_NAMES.add("pet smoke devil");
-		PET_NAMES.add("pet snakeling");
-		PET_NAMES.add("pet zilyana");
-		PET_NAMES.add("phoenix");
-		PET_NAMES.add("prince black dragon");
-		PET_NAMES.add("scorpia's offspring");
-		PET_NAMES.add("scurry");
-		PET_NAMES.add("skotos");
-		PET_NAMES.add("smolcano");
-		PET_NAMES.add("smol heredit");
-		PET_NAMES.add("sraracha");
-		PET_NAMES.add("tiny tempor");
-		PET_NAMES.add("tumeken's guardian");
-		PET_NAMES.add("tzrek-jad");
-		PET_NAMES.add("venenatis spiderling");
-		PET_NAMES.add("vet'ion jr.");
-		PET_NAMES.add("vorki");
-		PET_NAMES.add("wisp");
-		PET_NAMES.add("yami");
-		PET_NAMES.add("youngllef");
-
+		"abyssal orphan",
+		"aggy",
+		"baby mole",
+		"baron",
+		"beef",
+		"bran",
+		"butch",
+		"callisto cub",
+		"dom",
+		"gull",
+		"hellpuppy",
+		"huberte",
+		"ikkle hydra",
+		"jal-nib-rek",
+		"kalphite princess",
+		"lil' zik",
+		"lil'viathan",
+		"little nightmare",
+		"maggot marquess",
+		"moxi",
+		"mr mcgroot",
+		"muphin",
+		"nexling",
+		"nid",
+		"noon",
+		"olmlet",
+		"orion",
+		"pet chaos elemental",
+		"pet dagannoth prime",
+		"pet dagannoth rex",
+		"pet dagannoth supreme",
+		"pet dark core",
+		"pet general graardor",
+		"pet k'ril tsutsaroth",
+		"pet kraken",
+		"pet kree'arra",
+		"pet smoke devil",
+		"pet snakeling",
+		"pet zilyana",
+		"phoenix",
+		"prince black dragon",
+		"scorpia's offspring",
+		"scurry",
+		"skotos",
+		"smolcano",
+		"smol heredit",
+		"sraracha",
+		"tiny tempor",
+		"tumeken's guardian",
+		"tzrek-jad",
+		"venenatis spiderling",
+		"vet'ion jr.",
+		"vorki",
+		"wisp",
+		"yami",
+		"youngllef",
 		// Skill pets
-		PET_NAMES.add("baby chinchompa");
-		PET_NAMES.add("beaver");
-		PET_NAMES.add("giant squirrel");
-		PET_NAMES.add("heron");
-		PET_NAMES.add("rift guardian");
-		PET_NAMES.add("rock golem");
-		PET_NAMES.add("rocky");
-		PET_NAMES.add("soup");
-		PET_NAMES.add("tangleroot");
-
+		"baby chinchompa",
+		"beaver",
+		"giant squirrel",
+		"heron",
+		"rift guardian",
+		"rock golem",
+		"rocky",
+		"soup",
+		"tangleroot",
 		// Other pets
-		PET_NAMES.add("abyssal protector");
-		PET_NAMES.add("bloodhound");
-		PET_NAMES.add("chompy chick");
-		PET_NAMES.add("herbi");
-		PET_NAMES.add("lil' creator");
-		PET_NAMES.add("pet penance queen");
-		PET_NAMES.add("quetzin");
-	}
+		"abyssal protector",
+		"bloodhound",
+		"chompy chick",
+		"herbi",
+		"lil' creator",
+		"pet penance queen",
+		"quetzin"
+	);
 
 	/**
 	 * Check if an item name is a known pet
@@ -328,18 +313,9 @@ public class PetNotifier extends BaseNotifier {
 		// Normalize the item name (lowercase, trim)
 		String normalized = itemName.toLowerCase().trim();
 
-		// Direct match
-		if (PET_NAMES.contains(normalized)) {
-			return true;
-		}
-
-		// Check if it starts with "pet " and the rest matches
-		if (normalized.startsWith("pet ")) {
-			String withoutPrefix = normalized.substring(4).trim();
-			return PET_NAMES.contains(withoutPrefix) || PET_NAMES.contains(normalized);
-		}
-
-		return false;
+		// Direct match, or "pet " followed by a known name
+		return PET_NAMES.contains(normalized)
+			|| (normalized.startsWith("pet ") && PET_NAMES.contains(normalized.substring(4).trim()));
 	}
 
 	private boolean isLocalPlayer(String name) {

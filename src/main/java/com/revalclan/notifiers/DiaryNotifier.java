@@ -76,10 +76,7 @@ public class DiaryNotifier extends BaseNotifier {
 		if (diaryInfo == null) return;
 		if (!isEnabled()) return;
 
-		if (diaryCompletionById.isEmpty()) {
-			if (client.getGameState() == GameState.LOGGED_IN && isComplete(id, event.getValue())) return;
-			else return;
-		}
+		if (diaryCompletionById.isEmpty()) return;
 
 		int value = event.getValue();
 		Integer previous = diaryCompletionById.get(id);
@@ -115,13 +112,12 @@ public class DiaryNotifier extends BaseNotifier {
 
 		int totalDiariesCompleted = getTotalCompleted();
 
+		// Every DIARY_VARBITS value is "Area_Tier"
 		String[] parts = diaryInfo.split("_");
-		String area = parts.length > 0 ? parts[0] : "Unknown";
-		String difficulty = parts.length > 1 ? parts[1] : "Unknown";
 
 		Map<String, Object> diaryData = new HashMap<>();
-		diaryData.put("area", area);
-		diaryData.put("difficulty", difficulty);
+		diaryData.put("area", parts[0]);
+		diaryData.put("difficulty", parts[1]);
 		diaryData.put("varbitId", varbitId);
 		diaryData.put("completedTasks", completedTasks);
 		diaryData.put("totalTasks", totalTasks);
@@ -165,67 +161,26 @@ public class DiaryNotifier extends BaseNotifier {
 
 	private static Map<Integer, String> createDiaryMap() {
 		Map<Integer, String> map = new HashMap<>();
-		
-		map.put(3577, "Ardougne_Easy");
-		map.put(3598, "Ardougne_Medium");
-		map.put(3608, "Ardougne_Hard");
-		map.put(3630, "Ardougne_Elite");
-		
-		map.put(3579, "Desert_Easy");
-		map.put(3597, "Desert_Medium");
-		map.put(3610, "Desert_Hard");
-		map.put(3628, "Desert_Elite");
-		
-		map.put(3580, "Falador_Easy");
-		map.put(3596, "Falador_Medium");
-		map.put(3612, "Falador_Hard");
-		map.put(3632, "Falador_Elite");
-		
-		map.put(3582, "Fremennik_Easy");
-		map.put(3594, "Fremennik_Medium");
-		map.put(3615, "Fremennik_Hard");
-		map.put(3636, "Fremennik_Elite");
-		
-		map.put(3583, "Kandarin_Easy");
-		map.put(3593, "Kandarin_Medium");
-		map.put(3617, "Kandarin_Hard");
-		map.put(3638, "Kandarin_Elite");
-		
-		map.put(3578, "Karamja_Easy");
-		map.put(3599, "Karamja_Medium");
-		map.put(3611, "Karamja_Hard");
-		map.put(3631, "Karamja_Elite");
-		
-		map.put(3581, "Lumbridge_Easy");
-		map.put(3595, "Lumbridge_Medium");
-		map.put(3614, "Lumbridge_Hard");
-		map.put(3635, "Lumbridge_Elite");
-		
-		map.put(3584, "Morytania_Easy");
-		map.put(3592, "Morytania_Medium");
-		map.put(3618, "Morytania_Hard");
-		map.put(3639, "Morytania_Elite");
-		
-		map.put(3576, "Varrock_Easy");
-		map.put(3601, "Varrock_Medium");
-		map.put(3606, "Varrock_Hard");
-		map.put(3627, "Varrock_Elite");
-		
-		map.put(3585, "Western_Easy");
-		map.put(3591, "Western_Medium");
-		map.put(3620, "Western_Hard");
-		map.put(3641, "Western_Elite");
-		
-		map.put(3586, "Wilderness_Easy");
-		map.put(3600, "Wilderness_Medium");
-		map.put(3621, "Wilderness_Hard");
-		map.put(3642, "Wilderness_Elite");
-		
-		map.put(7925, "Kourend_Easy");
-		map.put(7926, "Kourend_Medium");
-		map.put(7927, "Kourend_Hard");
-		map.put(7928, "Kourend_Elite");
-		
+		addDiary(map, "Ardougne", 3577, 3598, 3608, 3630);
+		addDiary(map, "Desert", 3579, 3597, 3610, 3628);
+		addDiary(map, "Falador", 3580, 3596, 3612, 3632);
+		addDiary(map, "Fremennik", 3582, 3594, 3615, 3636);
+		addDiary(map, "Kandarin", 3583, 3593, 3617, 3638);
+		addDiary(map, "Karamja", 3578, 3599, 3611, 3631);
+		addDiary(map, "Lumbridge", 3581, 3595, 3614, 3635);
+		addDiary(map, "Morytania", 3584, 3592, 3618, 3639);
+		addDiary(map, "Varrock", 3576, 3601, 3606, 3627);
+		addDiary(map, "Western", 3585, 3591, 3620, 3641);
+		addDiary(map, "Wilderness", 3586, 3600, 3621, 3642);
+		addDiary(map, "Kourend", 7925, 7926, 7927, 7928);
 		return map;
+	}
+
+	/** Maps one area's diary varbits, listed Easy to Elite, to "Area_Tier" names. */
+	private static void addDiary(Map<Integer, String> map, String area, int... varbits) {
+		String[] tiers = {"Easy", "Medium", "Hard", "Elite"};
+		for (int i = 0; i < varbits.length; i++) {
+			map.put(varbits[i], area + "_" + tiers[i]);
+		}
 	}
 }

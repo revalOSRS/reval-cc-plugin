@@ -31,27 +31,23 @@ public class FeaturedRaceResponse extends PublicApiResponse {
     }
     @Data
     public static class Objective {
-        private String id;
         private String kind;
         private String title;
         private Integer iconItemId;
         private String imageUrl;
         private int points;
-        private boolean trackingReady;
         private boolean clanPartyOnly;
         private Winner winner;
     }
     @Data
     public static class Winner {
         private String name;
-        private String completedAt;
         private List<String> members;
     }
 
     @Data
     public static class Kc {
         private String id;
-        private String state;
         private List<Integer> rewards;
         private List<Standing> leaderboard;
     }

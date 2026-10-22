@@ -19,7 +19,6 @@ public class AnnouncementsResponse extends ApiResponse {
 
 	@Data
 	public static class AnnouncementsData {
-		private int count;
 		private List<Announcement> announcements;
 	}
 
@@ -45,13 +44,8 @@ public class AnnouncementsResponse extends ApiResponse {
 		 * Get the intervalMinutes from config, defaulting to 30 if absent.
 		 */
 		public int getIntervalMinutes() {
-			if (config != null && config.containsKey("intervalMinutes")) {
-				Object val = config.get("intervalMinutes");
-				if (val instanceof Number) {
-					return ((Number) val).intValue();
-				}
-			}
-			return 30;
+			Object val = config != null ? config.get("intervalMinutes") : null;
+			return val instanceof Number ? ((Number) val).intValue() : 30;
 		}
 	}
 }

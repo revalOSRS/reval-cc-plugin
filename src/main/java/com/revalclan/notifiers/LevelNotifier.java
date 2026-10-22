@@ -33,22 +33,12 @@ public class LevelNotifier extends BaseNotifier {
 		int newLevel = event.getLevel();
 		int newXp = event.getXp();
 
-		// Initialize if first time seeing this skill
-		if (!previousLevels.containsKey(skill)) {
-			previousLevels.put(skill, newLevel);
-			previousXp.put(skill, newXp);
-			return;
-		}
-
-		int oldLevel = previousLevels.get(skill);
-		int oldXp = previousXp.get(skill);
-
-		// Update tracking
-		previousLevels.put(skill, newLevel);
-		previousXp.put(skill, newXp);
+		// Update tracking; the first sighting of a skill only initializes it
+		Integer oldLevel = previousLevels.put(skill, newLevel);
+		Integer oldXp = previousXp.put(skill, newXp);
 
 		// Check for level up
-		if (newLevel > oldLevel && newXp > oldXp) {
+		if (oldLevel != null && newLevel > oldLevel && newXp > oldXp) {
 			handleLevelUp(skill, newLevel, newXp);
 		}
 	}

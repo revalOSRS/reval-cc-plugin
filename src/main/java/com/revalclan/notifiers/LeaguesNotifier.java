@@ -48,13 +48,12 @@ public class LeaguesNotifier extends BaseNotifier {
 
 	@Override
 	public boolean isEnabled() {
-		return config.notifyLeagues()
-			&& filterManager.getFilters().isLeaguesEnabled()
+		return filterManager.getFilters().isLeaguesEnabled()
 			&& Worlds.isSeasonal(client);
 	}
 
 	private boolean hasConfig() {
-		LeaguesConfigResponse.LeaguesConfig cfg = getLeaguesConfig();
+		LeaguesConfigResponse.LeaguesConfig cfg = revalApiService.getCachedLeaguesConfig();
 		return cfg != null
 			&& cfg.getLeagueVersion() == client.getVarbitValue(VarbitID.LEAGUE_TYPE);
 	}
@@ -65,7 +64,7 @@ public class LeaguesNotifier extends BaseNotifier {
 	}
 
 	public void onGameTick() {
-		if (getLeaguesConfig() != null || configRetryAttempts >= CONFIG_MAX_RETRIES) return;
+		if (revalApiService.getCachedLeaguesConfig() != null || configRetryAttempts >= CONFIG_MAX_RETRIES) return;
 		if (!Worlds.isSeasonal(client)) return;
 
 		configRetryTicks++;
@@ -137,12 +136,10 @@ public class LeaguesNotifier extends BaseNotifier {
 				}
 			}
 
-			Integer nextTrophyThreshold = pointsToTrophy.ceilingKey(totalPoints + 1);
-			Integer nextRelicThreshold = pointsToRelicTier.ceilingKey(totalPoints + 1);
 			data.put("taskPoints", taskPoints);
 			data.put("tasksUntilNextArea", computeTasksUntilNextArea(tasksCompleted));
-			data.put("pointsUntilNextRelic", nextRelicThreshold != null ? nextRelicThreshold - totalPoints : null);
-			data.put("pointsUntilNextTrophy", nextTrophyThreshold != null ? nextTrophyThreshold - totalPoints : null);
+			data.put("pointsUntilNextRelic", pointsUntilNext(pointsToRelicTier, totalPoints));
+			data.put("pointsUntilNextTrophy", pointsUntilNext(pointsToTrophy, totalPoints));
 			data.put("trophyEarned", trophyEarned);
 		}
 
@@ -167,10 +164,9 @@ public class LeaguesNotifier extends BaseNotifier {
 				}
 			}
 
-			Integer nextTierThreshold = pointsToRelicTier.ceilingKey(currentPoints + 1);
 			data.put("relicTier", relicTier);
 			data.put("requiredPoints", requiredPoints);
-			data.put("pointsUntilNextTier", nextTierThreshold != null ? nextTierThreshold - currentPoints : null);
+			data.put("pointsUntilNextTier", pointsUntilNext(pointsToRelicTier, currentPoints));
 		}
 
 		sendNotification(data);
@@ -207,15 +203,11 @@ public class LeaguesNotifier extends BaseNotifier {
 	private Map<String, Object> createBaseData() {
 		Map<String, Object> data = new HashMap<>();
 		data.put("seasonalWorld", true);
-		LeaguesConfigResponse.LeaguesConfig cfg = getLeaguesConfig();
+		LeaguesConfigResponse.LeaguesConfig cfg = revalApiService.getCachedLeaguesConfig();
 		if (cfg != null) {
 			data.put("leagueName", cfg.getLeagueName());
 		}
 		return data;
-	}
-
-	private LeaguesConfigResponse.LeaguesConfig getLeaguesConfig() {
-		return revalApiService.getCachedLeaguesConfig();
 	}
 
 	private int computeAreasUnlocked() {
@@ -238,6 +230,12 @@ public class LeaguesNotifier extends BaseNotifier {
 		}
 
 		return 0;
+	}
+
+	/** Points from {@code points} to the next threshold above it, or null when none is left. */
+	private static Integer pointsUntilNext(TreeMap<Integer, ?> thresholds, int points) {
+		Integer next = thresholds.ceilingKey(points + 1);
+		return next != null ? next - points : null;
 	}
 
 	private Integer computeTasksUntilNextArea(int tasksCompleted) {
