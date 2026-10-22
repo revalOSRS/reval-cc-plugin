@@ -6,6 +6,7 @@ import com.revalclan.api.playercards.ProfileCardResponse;
 import com.revalclan.util.ClanRankIconResolver;
 import com.revalclan.util.ClanSidepanel;
 import com.revalclan.util.RankColors;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.MenuAction;
@@ -141,16 +142,11 @@ public class PlayerCardManager {
 		"Add friend", "Remove friend", "Add ignore", "Message");
 
 	/** A pending menu insertion: index keeps the entry inside its player's group. */
+	@RequiredArgsConstructor
 	private static class Pending {
 		final int index;
 		final String name;
 		final String target;
-
-		Pending(int index, String name, String target) {
-			this.index = index;
-			this.name = name;
-			this.target = target;
-		}
 	}
 
 	@Subscribe
@@ -292,10 +288,9 @@ public class PlayerCardManager {
 		overlay.show(data, RankColors.forSlug(profile.getClanRank()));
 		rankIconResolver.resolve(data.getRankName(), spriteId ->
 			spriteManager.getSpriteAsync(spriteId, 0, overlay::setRankSprite));
-		if (data.getNextRankName() != null) {
-			rankIconResolver.resolve(data.getNextRankName(), spriteId ->
-				spriteManager.getSpriteAsync(spriteId, 0, overlay::setNextRankSprite));
-		}
+		// resolve() ignores a null rank, which is the next rank at max rank
+		rankIconResolver.resolve(data.getNextRankName(), spriteId ->
+			spriteManager.getSpriteAsync(spriteId, 0, overlay::setNextRankSprite));
 	}
 
 	private void unregisterListeners() {
