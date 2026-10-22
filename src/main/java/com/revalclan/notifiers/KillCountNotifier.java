@@ -164,8 +164,7 @@ public class KillCountNotifier extends BaseNotifier {
 			if (duration != null) {
 				pendingTime = duration;
 				pendingTimeRaid = scope;
-				pendingIsPb = msg.toLowerCase().contains("(new personal best)") || 
-				              msg.toLowerCase().contains("new personal best");
+				pendingIsPb = msg.toLowerCase().contains("new personal best");
 				badTicks = 0;
 			} else {
 				log.debug("Failed to parse time string: {}", timeStr);
@@ -177,8 +176,6 @@ public class KillCountNotifier extends BaseNotifier {
 	 * Normalize boss names based on message type
 	 */
 	private String normalizeBossName(String boss, String type) {
-		if (boss == null) return null;
-		
 		switch (type.toLowerCase()) {
 			case "chest":
 				if ("Barrows".equalsIgnoreCase(boss)) return "Barrows";
@@ -208,8 +205,6 @@ public class KillCountNotifier extends BaseNotifier {
 	 * Normalize raid names
 	 */
 	private String normalizeRaidName(String raid) {
-		if (raid == null) return null;
-		
 		if ("Wintertodt".equalsIgnoreCase(raid)) return "Wintertodt";
 		String resolved = RaidPartyTracker.raidOf(raid);
 		if (RaidPartyTracker.FRACTURED_ARCHIVE.equals(resolved)) return resolved;
@@ -232,8 +227,6 @@ public class KillCountNotifier extends BaseNotifier {
 	 * Parse time string like "1:23" or "1:23.45" into Duration
 	 */
 	private Duration parseTimeString(String timeStr) {
-		if (timeStr == null) return null;
-		
 		try {
 			String[] parts = timeStr.split(":");
 			if (parts.length == 2) {

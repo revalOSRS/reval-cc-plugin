@@ -76,10 +76,7 @@ public class DiaryNotifier extends BaseNotifier {
 		if (diaryInfo == null) return;
 		if (!isEnabled()) return;
 
-		if (diaryCompletionById.isEmpty()) {
-			if (client.getGameState() == GameState.LOGGED_IN && isComplete(id, event.getValue())) return;
-			else return;
-		}
+		if (diaryCompletionById.isEmpty()) return;
 
 		int value = event.getValue();
 		Integer previous = diaryCompletionById.get(id);
@@ -115,13 +112,12 @@ public class DiaryNotifier extends BaseNotifier {
 
 		int totalDiariesCompleted = getTotalCompleted();
 
+		// Every DIARY_VARBITS value is "Area_Tier"
 		String[] parts = diaryInfo.split("_");
-		String area = parts.length > 0 ? parts[0] : "Unknown";
-		String difficulty = parts.length > 1 ? parts[1] : "Unknown";
 
 		Map<String, Object> diaryData = new HashMap<>();
-		diaryData.put("area", area);
-		diaryData.put("difficulty", difficulty);
+		diaryData.put("area", parts[0]);
+		diaryData.put("difficulty", parts[1]);
 		diaryData.put("varbitId", varbitId);
 		diaryData.put("completedTasks", completedTasks);
 		diaryData.put("totalTasks", totalTasks);

@@ -313,18 +313,9 @@ public class PetNotifier extends BaseNotifier {
 		// Normalize the item name (lowercase, trim)
 		String normalized = itemName.toLowerCase().trim();
 
-		// Direct match
-		if (PET_NAMES.contains(normalized)) {
-			return true;
-		}
-
-		// Check if it starts with "pet " and the rest matches
-		if (normalized.startsWith("pet ")) {
-			String withoutPrefix = normalized.substring(4).trim();
-			return PET_NAMES.contains(withoutPrefix) || PET_NAMES.contains(normalized);
-		}
-
-		return false;
+		// Direct match, or "pet " followed by a known name
+		return PET_NAMES.contains(normalized)
+			|| (normalized.startsWith("pet ") && PET_NAMES.contains(normalized.substring(4).trim()));
 	}
 
 	private boolean isLocalPlayer(String name) {
