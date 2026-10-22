@@ -28,6 +28,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 public class CompetitionsPanel extends JPanel {
@@ -220,63 +221,42 @@ public class CompetitionsPanel extends JPanel {
 		memberLoading = true;
 		updateLoading();
 
+		// Each request stores its result on the EDT unless a newer load started; the content rebuilds once all three are in
 		final boolean[] loaded = {false, false, false};
-		Runnable checkComplete = () -> {
+		BiConsumer<Integer, Runnable> onResult = (slot, store) -> SwingUtilities.invokeLater(() -> {
+			if (generation != loadGeneration) return;
+			store.run();
+			loaded[slot] = true;
 			if (loaded[0] && loaded[1] && loaded[2]) {
 				memberLoading = false;
 				updateLoading();
 				buildContent();
 			}
-		};
+		});
 
 		apiService.fetchVotes(
-			response -> SwingUtilities.invokeLater(() -> {
-				if (generation != loadGeneration) return;
+			response -> onResult.accept(0, () -> {
 				activeVotes = response.getData() != null && response.getData().getVotes() != null
 					? response.getData().getVotes() : new ArrayList<>();
 				fetchMyVotes(activeVotes, generation);
-				loaded[0] = true;
-				checkComplete.run();
 			}),
-			error -> SwingUtilities.invokeLater(() -> {
-				if (generation != loadGeneration) return;
-				activeVotes = new ArrayList<>();
-				loaded[0] = true;
-				checkComplete.run();
-			})
+			error -> onResult.accept(0, () -> activeVotes = new ArrayList<>())
 		);
 
 		apiService.fetchActiveCompetitions(
-			response -> SwingUtilities.invokeLater(() -> {
-				if (generation != loadGeneration) return;
-				activeCompetitions = response.getData() != null && response.getData().getCompetitions() != null
-					? response.getData().getCompetitions() : new ArrayList<>();
-				loaded[1] = true;
-				checkComplete.run();
-			}),
-			error -> SwingUtilities.invokeLater(() -> {
-				if (generation != loadGeneration) return;
-				activeCompetitions = new ArrayList<>();
-				loaded[1] = true;
-				checkComplete.run();
-			})
+			response -> onResult.accept(1, () -> activeCompetitions = competitionList(response)),
+			error -> onResult.accept(1, () -> activeCompetitions = new ArrayList<>())
 		);
 
 		apiService.fetchScheduledCompetitions(
-			response -> SwingUtilities.invokeLater(() -> {
-				if (generation != loadGeneration) return;
-				scheduledCompetitions = response.getData() != null && response.getData().getCompetitions() != null
-					? response.getData().getCompetitions() : new ArrayList<>();
-				loaded[2] = true;
-				checkComplete.run();
-			}),
-			error -> SwingUtilities.invokeLater(() -> {
-				if (generation != loadGeneration) return;
-				scheduledCompetitions = new ArrayList<>();
-				loaded[2] = true;
-				checkComplete.run();
-			})
+			response -> onResult.accept(2, () -> scheduledCompetitions = competitionList(response)),
+			error -> onResult.accept(2, () -> scheduledCompetitions = new ArrayList<>())
 		);
+	}
+
+	private static List<CompetitionsResponse.Competition> competitionList(CompetitionsResponse response) {
+		return response.getData() != null && response.getData().getCompetitions() != null
+			? response.getData().getCompetitions() : new ArrayList<>();
 	}
 
 	private void fetchMyVotes(List<VotesResponse.Vote> votes, int generation) {
