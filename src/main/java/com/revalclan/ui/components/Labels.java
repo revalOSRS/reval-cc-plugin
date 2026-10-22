@@ -3,6 +3,7 @@ package com.revalclan.ui.components;
 import com.revalclan.ui.constants.UIConstants;
 import net.runelite.client.ui.FontManager;
 
+import javax.swing.BoxLayout;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
@@ -64,6 +65,14 @@ public final class Labels {
 		int end = text.length();
 		while (end > 1 && fm.stringWidth(text.substring(0, end).trim() + "...") > maxWidth) end--;
 		return text.substring(0, end).trim() + "...";
+	}
+
+	/** Transparent panel stacking its children vertically. */
+	public static JPanel column() {
+		JPanel p = new JPanel();
+		p.setLayout(new BoxLayout(p, BoxLayout.Y_AXIS));
+		p.setOpaque(false);
+		return p;
 	}
 
 	/** Left/right pair on one line. */
