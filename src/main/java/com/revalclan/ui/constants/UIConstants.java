@@ -157,7 +157,7 @@ public class UIConstants {
         return halloweenTheme;
     }
 
-    /** Apply before constructing the panel tree. Theme changes rebuild that tree on the EDT. */
+    /** Apply before constructing the panel tree; the plugin sets it once when it starts. */
     public static void setHalloweenTheme(boolean enabled) {
         halloweenTheme = enabled;
         BACKGROUND = enabled ? new Color(18, 18, 15) : new Color(15, 17, 17);

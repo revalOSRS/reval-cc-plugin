@@ -311,10 +311,6 @@ public class RevalPanel extends PluginPanel {
 		return label;
 	}
 
-	public String getActiveTab() {
-		return selectedTab;
-	}
-
 	// ==================== Admin Navigation ====================
 
 	private void navigateToAdmin(String section) {
