@@ -12,6 +12,7 @@ import com.revalclan.api.leaguesbingo.LeaguesBingoResponse.TileProgress;
 import com.revalclan.ui.components.AccentCard;
 import com.revalclan.ui.components.Badge;
 import com.revalclan.ui.components.DotIcon;
+import com.revalclan.ui.components.Labels;
 import com.revalclan.ui.components.ProgressBar;
 import com.revalclan.ui.constants.UIConstants;
 import com.revalclan.util.DateTimeUtil;

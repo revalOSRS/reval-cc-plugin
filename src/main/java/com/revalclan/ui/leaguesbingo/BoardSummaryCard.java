@@ -3,6 +3,7 @@ package com.revalclan.ui.leaguesbingo;
 import com.revalclan.api.leaguesbingo.LeaguesBingoResponse.Board;
 import com.revalclan.ui.components.AccentCard;
 import com.revalclan.ui.components.Badge;
+import com.revalclan.ui.components.Labels;
 import com.revalclan.ui.constants.UIConstants;
 import com.revalclan.util.SpriteIcons;
 import net.runelite.client.game.SpriteManager;

@@ -5,6 +5,7 @@ import com.revalclan.api.leaguesbingo.LeaguesBingoResponse.Payload;
 import com.revalclan.api.leaguesbingo.LeaguesBingoResponse.Team;
 import com.revalclan.api.leaguesbingo.LeaguesBingoResponse.Tile;
 import com.revalclan.ui.components.Clickable;
+import com.revalclan.ui.components.Labels;
 import com.revalclan.ui.constants.UIConstants;
 import com.revalclan.util.Colors;
 import net.runelite.client.ui.FontManager;

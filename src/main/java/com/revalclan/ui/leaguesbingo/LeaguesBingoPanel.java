@@ -12,6 +12,7 @@ import com.revalclan.ui.components.AccentButton;
 import com.revalclan.ui.components.AccentCard;
 import com.revalclan.ui.components.BackButton;
 import com.revalclan.ui.components.Clickable;
+import com.revalclan.ui.components.Labels;
 import com.revalclan.ui.components.ProgressBar;
 import com.revalclan.ui.components.RefreshButton;
 import com.revalclan.ui.components.ScrollWrap;
