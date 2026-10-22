@@ -9,7 +9,6 @@ import com.revalclan.util.SpriteIcons;
 import net.runelite.client.game.SpriteManager;
 
 import javax.swing.Box;
-import javax.swing.BoxLayout;
 import javax.swing.ImageIcon;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
@@ -48,9 +47,7 @@ final class BoardSummaryCard {
 			top.add(Labels.small(stats.percent() + "%", stats.allDone() ? TileCell.COMPLETED : UIConstants.TEXT_SECONDARY), BorderLayout.EAST);
 		}
 
-		JPanel lines = new JPanel();
-		lines.setLayout(new BoxLayout(lines, BoxLayout.Y_AXIS));
-		lines.setOpaque(false);
+		JPanel lines = Labels.column();
 		lines.add(top);
 		lines.add(Box.createVerticalStrut(4));
 		lines.add(Labels.small(stats.line(board), UIConstants.TEXT_SECONDARY));

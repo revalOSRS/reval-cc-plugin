@@ -22,7 +22,6 @@ import com.revalclan.util.TextWrap;
 import net.runelite.client.ui.FontManager;
 
 import javax.swing.Box;
-import javax.swing.BoxLayout;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
@@ -117,9 +116,7 @@ final class TileDetailView {
 	 * the contributors, all hanging under the text.
 	 */
 	private static JComponent requirementRow(JsonObject requirement, RequirementProgress rp, boolean done) {
-		JPanel text = new JPanel();
-		text.setLayout(new BoxLayout(text, BoxLayout.Y_AXIS));
-		text.setOpaque(false);
+		JPanel text = Labels.column();
 		text.setAlignmentX(Component.LEFT_ALIGNMENT);
 
 		Font font = FontManager.getRunescapeSmallFont();

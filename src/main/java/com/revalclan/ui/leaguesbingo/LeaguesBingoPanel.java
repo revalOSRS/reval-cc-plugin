@@ -13,6 +13,7 @@ import com.revalclan.ui.components.AccentCard;
 import com.revalclan.ui.components.BackButton;
 import com.revalclan.ui.components.Clickable;
 import com.revalclan.ui.components.Labels;
+import com.revalclan.ui.components.PanelTitle;
 import com.revalclan.ui.components.ProgressBar;
 import com.revalclan.ui.components.RefreshButton;
 import com.revalclan.ui.components.ScrollWrap;
@@ -26,7 +27,6 @@ import net.runelite.client.ui.FontManager;
 import javax.inject.Inject;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
-import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
@@ -95,10 +95,7 @@ public class LeaguesBingoPanel extends JPanel {
 		header.setBackground(UIConstants.CARD_BG);
 		header.setBorder(new EmptyBorder(6, 6, 6, 6));
 		backButton = new BackButton("< Back", this::back);
-		titleLabel = new JLabel("");
-		titleLabel.setFont(FontManager.getRunescapeBoldFont());
-		titleLabel.setForeground(UIConstants.ACCENT_GOLD);
-		titleLabel.setHorizontalAlignment(JLabel.CENTER);
+		titleLabel = new PanelTitle("", JLabel.CENTER);
 		refreshButton = new RefreshButton(this::refresh);
 		header.add(backButton, BorderLayout.WEST);
 		header.add(titleLabel, BorderLayout.CENTER);
@@ -354,9 +351,7 @@ public class LeaguesBingoPanel extends JPanel {
 		body.add(grid);
 		body.add(Box.createVerticalStrut(10));
 
-		tileDetailHolder = new JPanel();
-		tileDetailHolder.setLayout(new BoxLayout(tileDetailHolder, BoxLayout.Y_AXIS));
-		tileDetailHolder.setOpaque(false);
+		tileDetailHolder = Labels.column();
 		tileDetailHolder.setAlignmentX(Component.LEFT_ALIGNMENT);
 		body.add(tileDetailHolder);
 		renderTileDetail(team, board, stats);
@@ -392,7 +387,7 @@ public class LeaguesBingoPanel extends JPanel {
 	}
 
 	private JComponent unlockButton(Team team, Board board) {
-		JButton button = new AccentButton("Unlock board", UIConstants.ACCENT_GOLD);
+		AccentButton button = new AccentButton("Unlock board", UIConstants.ACCENT_GOLD);
 		button.setForeground(UIConstants.BACKGROUND);
 		button.setPreferredSize(new Dimension(100, 22));
 		button.setMaximumSize(new Dimension(Integer.MAX_VALUE, 22));
