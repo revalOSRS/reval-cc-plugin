@@ -65,7 +65,6 @@ public final class ClanBrowserWindow extends JFrame {
     private BrowserCommand request;
     private ViewRequest activeRead;
     private BrowserModels.View data;
-    private CollectionGrid grid;
     private LeaderboardView standings;
     private Call dataCall, catalogueCall;
     private long accountHash;
@@ -87,7 +86,7 @@ public final class ClanBrowserWindow extends JFrame {
         // Retain component buffering without the separate native window's stale swap buffer.
         getRootPane().setDoubleBuffered(false);
         this.api = api; this.icons = icons;
-        setDefaultCloseOperation(DISPOSE_ON_CLOSE); setMinimumSize(new Dimension(960, 620)); setSize(1180, 820);
+        setDefaultCloseOperation(DISPOSE_ON_CLOSE); setSize(1180, 820);
         setLocationRelativeTo(anchor);
         java.awt.GraphicsConfiguration screen = anchor != null ? anchor.getGraphicsConfiguration() : java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDefaultConfiguration();
         java.awt.Rectangle available = new java.awt.Rectangle(screen.getBounds());
@@ -159,7 +158,7 @@ public final class ClanBrowserWindow extends JFrame {
         this.accountHash = accountHash; this.viewer = viewer;
         findMe.setEnabled(viewer != null); if (standings != null) standings.viewer(viewer);
         if (changed && activeRead != null && activeRead.usesViewer()) {
-            generation++; cancel(); activeRead = null; data = null; grid = null; standings = null;
+            generation++; cancel(); activeRead = null; data = null; standings = null;
             if (!closed) perform();
         }
     }
@@ -203,7 +202,6 @@ public final class ClanBrowserWindow extends JFrame {
         boss.choices(catalogue.bosses); boss.placeholder("All bosses, or search a boss…"); boss.value(command.boss == null ? "all" : command.boss);
         tiers.setSelectedItem(command.tier == null || command.tier.equals("all") ? "All tiers" : capitalize(command.tier));
         if (kind.equals("clog")) search.setText(command.player == null ? "" : command.player);
-        findMe.setVisible(true);
         search.putClientProperty("JTextField.placeholderText", "Find a clan member…");
         search.setToolTipText(kind.equals("clog") ? "Enter an OSRS name and press Enter to view their collection log" : "Filter the displayed clan standings");
         configureExtra(); adjusting = false;
@@ -271,7 +269,7 @@ public final class ClanBrowserWindow extends JFrame {
         });
         // Cache hits have already rendered in this EDT event. Never clear them for a loading frame.
         if (dataCall != null) {
-            data = null; grid = null; standings = null;
+            data = null; standings = null;
             if (categoryBrowser()) { busy(false); loadingDetails(); }
             else {
                 busy(true); title.text = titleFor(request); title.repaint();
@@ -285,7 +283,7 @@ public final class ClanBrowserWindow extends JFrame {
     }
 
     private void render() {
-        grid = null; standings = null;
+        standings = null;
         boolean clog = "clog".equals(data.kind);
         if (clog && data.account != null) {
             title.text = "Collection Log  (" + BrowserTheme.number(data.account.obtained) + " / " + BrowserTheme.number(data.account.total) + ")";
@@ -295,7 +293,7 @@ public final class ClanBrowserWindow extends JFrame {
             logAccount = logAccountKey();
             logStrip.update(data.account.name, "Last synced: " + BrowserTheme.timestamp(data.account.lastSyncedAt));
             logDetail.removeAll(); logDetail.add(new LogSummary(data), BorderLayout.NORTH);
-            grid = new CollectionGrid(data.groups, icons); logDetail.add(BrowserTheme.scroll(grid), BorderLayout.CENTER);
+            logDetail.add(BrowserTheme.scroll(new CollectionGrid(data.groups, icons)), BorderLayout.CENTER);
             setTitle("Reval · " + data.account.name + " · " + data.page.label);
         } else {
             JPanel destination = body;
@@ -419,7 +417,7 @@ public final class ClanBrowserWindow extends JFrame {
     }
 
     private void collectionMessage(String text, Runnable retry) {
-        collectionLayout(); grid = null; standings = null;
+        collectionLayout(); standings = null;
         java.awt.Component previous = ((BorderLayout) logDetail.getLayout()).getLayoutComponent(BorderLayout.CENTER);
         if (previous != null) logDetail.remove(previous);
         logDetail.add(messagePanel(text, retry), BorderLayout.CENTER); body.revalidate(); body.repaint();
@@ -465,7 +463,7 @@ public final class ClanBrowserWindow extends JFrame {
     private void filter() { if (!kind.equals("clog") && standings != null) standings.filter(search.getText()); }
     private void busy(boolean value) { loading.setVisible(value); }
     private void message(String text, Runnable retry) {
-        grid = null; standings = null; body.removeAll();
+        standings = null; body.removeAll();
         body.add(messagePanel(text, retry), BorderLayout.CENTER); body.revalidate(); body.repaint();
     }
     private JPanel messagePanel(String text, Runnable retry) {
@@ -477,7 +475,7 @@ public final class ClanBrowserWindow extends JFrame {
     }
     private void showHelp() {
         cancel(); generation++; activeRead = null; request = BrowserCommand.parse("reval help"); kind = "help";
-        data = null; busy(false); grid = null; standings = null;
+        data = null; busy(false); standings = null;
         title.text = "Reval · Command guide"; title.repaint(); setTitle("Reval · Command guide"); body.removeAll();
         tools.setVisible(false); choices.setVisible(false); statistics.setVisible(false);
         modeButtons.values().forEach(button -> highlight(button, false));
