@@ -250,20 +250,18 @@ public class LootNotifier extends BaseNotifier {
 		if (!isEnabled()) return;
 
 		// Most NPCs are handled by NpcLootReceived or LootReceived to avoid duplicates
-		int npcId = event.getComposition().getId();
-		var name = event.getComposition().getName();
+		var comp = event.getComposition();
+		int npcId = comp.getId();
 
 		// Only handle Yama, Hespori, Mad Angel, sailing sea creatures, and Hallowed Sepulchre
 		if (npcId != NpcID.YAMA && npcId != NpcID.HESPORI && !MAD_ANGEL_IDS.contains(npcId)
-			&& !SAILING_NPC_IDS.contains(npcId) && !name.startsWith("Hallowed Sepulchre")) {
+			&& !SAILING_NPC_IDS.contains(npcId) && !comp.getName().startsWith("Hallowed Sepulchre")) {
 			return;
 		}
 
-		var comp = event.getComposition();
-		handleLootDrop(event.getItems(), comp.getName(), "NPC", comp.getId());
+		handleLootDrop(event.getItems(), comp.getName(), "NPC", npcId);
 	}
 
-	/** Note that the game reported loot for this source, for the diff's duplicate guard. */
 	/**
 	 * The backend's name for a watched item this loot source refers to, or null.
 	 * The tracker names some containers with a suffix ("Ore Pack (Volcanic
@@ -280,6 +278,7 @@ public class LootNotifier extends BaseNotifier {
 		return null;
 	}
 
+	/** Note that the game reported loot for this source, for the diff's duplicate guard. */
 	private void recordRealLootSource(String source) {
 		if (source != null && !source.isEmpty()) {
 			recentRealLootSources.put(source.toLowerCase(), tickCounter);
@@ -297,8 +296,7 @@ public class LootNotifier extends BaseNotifier {
 		// Skip NPCs that fire LootReceived or ServerNpcLoot instead (to avoid duplicates)
 		if (SPECIAL_LOOT_NPC_IDS.contains(npcId) || MAD_ANGEL_IDS.contains(npcId) || SAILING_NPC_IDS.contains(npcId)) return;
 
-		Collection<ItemStack> items = event.getItems();
-		handleLootDrop(items, npc.getName(), "NPC", npcId);
+		handleLootDrop(event.getItems(), npc.getName(), "NPC", npcId);
 	}
 
 	@Subscribe
@@ -306,10 +304,9 @@ public class LootNotifier extends BaseNotifier {
 		if (!isEnabled()) return;
 
 		String playerName = event.getPlayer().getName();
-		Collection<ItemStack> items = event.getItems();
 		recordRealLootSource(playerName);
 
-		handleLootDrop(items, playerName, "PLAYER", null);
+		handleLootDrop(event.getItems(), playerName, "PLAYER", null);
 	}
 
 	@Subscribe
@@ -339,16 +336,13 @@ public class LootNotifier extends BaseNotifier {
 			if (!raidRewardLedger.record(source, event.getItems())) return;
 			// For raid chests (CoX / ToB / ToA) attach the party: read live inside the raid,
 			// or as saved at the final boss when the reward is claimed from the outside chest
-			handleLootDrop(event.getItems(), source, "EVENT", null, raidPartyTracker.partyFor(source));
+			handleLootDrop(event.getItems(), source, "EVENT", null, raidPartyTracker.partyFor(source), false);
 		}
 		// Handle special NPCs that fire LootReceived instead of NpcLootReceived
 		else if (event.getType() == LootRecordType.NPC && SPECIAL_LOOT_NPC_NAMES.contains(event.getName())) {
 			String source = event.getName();
-			if ("The Gauntlet".equals(source) || "Corrupted Gauntlet".equals(source)) {
-				handleLootDrop(event.getItems(), source, "EVENT", null);
-			} else {
-				handleLootDrop(event.getItems(), source, "NPC", null);
-			}
+			boolean gauntlet = "The Gauntlet".equals(source) || "Corrupted Gauntlet".equals(source);
+			handleLootDrop(event.getItems(), source, gauntlet ? "EVENT" : "NPC", null);
 		}
 	}
 
@@ -377,12 +371,10 @@ public class LootNotifier extends BaseNotifier {
 		recordInflow(recentSelfDrops, itemId, quantity, tickCounter, SELF_DROP_SUSPECT_TICKS);
 	}
 
-	/** Current inventory as id → total quantity. Empty when there is no inventory. */
-	private Map<Integer, Integer> snapshotInventory() {
+	/** A container's contents as id → total quantity. */
+	private static Map<Integer, Integer> countItems(ItemContainer container) {
 		Map<Integer, Integer> counts = new HashMap<>();
-		ItemContainer inventory = client.getItemContainer(InventoryID.INV);
-		if (inventory == null) return counts;
-		for (Item item : inventory.getItems()) {
+		for (Item item : container.getItems()) {
 			if (item.getId() > 0 && item.getQuantity() > 0) {
 				counts.merge(item.getId(), item.getQuantity(), Integer::sum);
 			}
@@ -496,7 +488,9 @@ public class LootNotifier extends BaseNotifier {
 	@Subscribe
 	public void onItemContainerChanged(ItemContainerChanged event) {
 		if (event.getContainerId() == InventoryID.INV) {
-			Map<Integer, Integer> after = snapshotInventory();
+			// A missing inventory counts as empty
+			ItemContainer inventory = client.getItemContainer(InventoryID.INV);
+			Map<Integer, Integer> after = inventory == null ? new HashMap<>() : countItems(inventory);
 			if (lastInventoryKnown) {
 				reportWatchedConsumption(lastInventory, after);
 			}
@@ -508,13 +502,7 @@ public class LootNotifier extends BaseNotifier {
 
 		if (event.getContainerId() != InventoryID.WORN) return;
 
-		Map<Integer, Integer> worn = new HashMap<>();
-		for (Item item : event.getItemContainer().getItems()) {
-			if (item.getId() > 0 && item.getQuantity() > 0) {
-				worn.merge(item.getId(), item.getQuantity(), Integer::sum);
-			}
-		}
-
+		Map<Integer, Integer> worn = countItems(event.getItemContainer());
 		for (Map.Entry<Integer, Integer> was : equipmentSnapshot.entrySet()) {
 			int removed = was.getValue() - worn.getOrDefault(was.getKey(), 0);
 			if (removed > 0) {
@@ -688,10 +676,6 @@ public class LootNotifier extends BaseNotifier {
 		handleLootDrop(items, source, sourceType, sourceId, null, false);
 	}
 
-	private void handleLootDrop(Collection<ItemStack> items, String source, String sourceType, Integer sourceId, RaidPartyTracker.Party party) {
-		handleLootDrop(items, source, sourceType, sourceId, party, false);
-	}
-
 	/**
 	 * @param party   the raid party behind a raid chest, or null
 	 * @param keepAll send every item regardless of value: the backend asked to watch
@@ -717,7 +701,6 @@ public class LootNotifier extends BaseNotifier {
 			int haValue = itemManager.getItemComposition(itemId).getPrice();
 			boolean isTradeable = itemManager.getItemComposition(itemId).isTradeable();
 			String itemName = itemManager.getItemComposition(itemId).getName();
-			long stackValue = gePrice * item.getQuantity();
 
 			String suspectReason = suspectReason(itemId, item.getQuantity(), tickCounter);
 
@@ -744,7 +727,7 @@ public class LootNotifier extends BaseNotifier {
 			// Split out of items[] at flush, so they must not count toward totals
 			if (suspectReason != null) continue;
 
-			totalGEValue += stackValue;
+			totalGEValue += gePrice * item.getQuantity();
 			totalHAValue += (long) haValue * item.getQuantity();
 		}
 
