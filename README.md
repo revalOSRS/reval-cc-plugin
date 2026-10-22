@@ -10,7 +10,6 @@ Raid loot and completion events include known per-member death counts in
 `party.members[].deaths`. ToB and ToA use the game's named death messages, including
 logout penalties, without assigning the team-wide total to an individual. CoX/CM
 records the local player's deaths; teammates outside the loaded scene remain unknown.
-Tracking runs independently of the **Send player deaths to Discord** setting.
 
 An explicit raid start establishes coverage. Enabling the plugin mid-raid, missing
 death messages, reconnecting, hopping, or restarting leaves affected counts unknown,
@@ -165,9 +164,8 @@ Configure the plugin in the RuneLite settings panel:
 - **Save Local JSON**: Save collected data to local JSON files on logout
 
 ### Notifications
-Which game events are tracked is decided by the Reval backend, not per player, so the plugin stays in sync with what the clan systems expect. The per-player switches are:
+Which game events are tracked is decided by the Reval backend, not per player, so the plugin stays in sync with what the clan systems expect. The per-player switch is:
 - **Show clan notifications**: Reval announcements and notifications in chat
-- **Send player deaths to Discord**: post your deaths (and who killed you) to the clan Discord
 
 Leagues task, relic, area and combat mastery tracking is always on; it only runs on Leagues worlds while the backend has Leagues tracking enabled.
 
