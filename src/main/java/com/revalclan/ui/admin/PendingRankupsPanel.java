@@ -5,12 +5,13 @@ import com.revalclan.api.admin.PendingRankChangesResponse;
 import com.revalclan.ui.components.ArrowIcon;
 import com.revalclan.ui.components.CheckIcon;
 import com.revalclan.ui.components.BackButton;
+import com.revalclan.ui.components.Labels;
 import com.revalclan.ui.components.PanelTitle;
+import com.revalclan.ui.components.RoundedPanel;
 import com.revalclan.ui.constants.UIConstants;
 import com.revalclan.util.ClanRankIconResolver;
 import com.revalclan.util.RankNames;
 import com.revalclan.util.UIAssetLoader;
-import net.runelite.client.ui.FontManager;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -123,11 +124,7 @@ public class PendingRankupsPanel extends JPanel {
 		JPanel card = new JPanel(new BorderLayout(8, 0)) {
 			@Override
 			protected void paintComponent(Graphics g) {
-				Graphics2D g2d = (Graphics2D) g.create();
-				g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-				g2d.setColor(UIConstants.CARD_BG);
-				g2d.fillRoundRect(0, 0, getWidth(), getHeight(), 6, 6);
-				g2d.dispose();
+				RoundedPanel.fill(g, this, UIConstants.CARD_BG, 6);
 			}
 		};
 		card.setOpaque(false);
@@ -139,35 +136,16 @@ public class PendingRankupsPanel extends JPanel {
 		card.setToolTipText(name + " - " + formatTimestamp(change.getChangedAt()));
 
 		// Left: name + rank transition
-		JPanel left = new JPanel();
-		left.setLayout(new BoxLayout(left, BoxLayout.Y_AXIS));
-		left.setOpaque(false);
+		JPanel left = Labels.column();
 
-		JLabel nameLabel = new JLabel(name);
-		nameLabel.setFont(FontManager.getRunescapeSmallFont());
-		nameLabel.setForeground(UIConstants.TEXT_PRIMARY);
-		nameLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-
-		JPanel rankLine = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
-		rankLine.setOpaque(false);
-
-		JLabel prevIcon = new JLabel();
-		prevIcon.setPreferredSize(new Dimension(18, 18));
-		rankIconResolver.apply(change.getPreviousRank(), prevIcon, 18);
-
-		JLabel arrow = new JLabel(new ArrowIcon(12, UIConstants.ACCENT_GOLD));
-
-		JLabel newIcon = new JLabel();
-		newIcon.setPreferredSize(new Dimension(18, 18));
-		rankIconResolver.apply(change.getNewRank(), newIcon, 18);
-
-		rankLine.add(prevIcon);
-		rankLine.add(arrow);
-		rankLine.add(newIcon);
+		JPanel rankLine = Labels.flow();
+		rankLine.add(rankIcon(change.getPreviousRank()));
+		rankLine.add(new JLabel(new ArrowIcon(12, UIConstants.ACCENT_GOLD)));
+		rankLine.add(rankIcon(change.getNewRank()));
 		rankLine.setToolTipText(RankNames.display(change.getPreviousRank()) + " -> " + RankNames.display(change.getNewRank()));
 		rankLine.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-		left.add(nameLabel);
+		left.add(Labels.small(name, UIConstants.TEXT_PRIMARY));
 		left.add(Box.createRigidArea(new Dimension(0, 2)));
 		left.add(rankLine);
 
@@ -178,11 +156,7 @@ public class PendingRankupsPanel extends JPanel {
 		JButton actualizeBtn = new JButton() {
 			@Override
 			protected void paintComponent(Graphics g) {
-				Graphics2D g2d = (Graphics2D) g.create();
-				g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-				g2d.setColor(getBackground());
-				g2d.fillRoundRect(0, 0, getWidth(), getHeight(), 6, 6);
-				g2d.dispose();
+				RoundedPanel.fill(g, this, getBackground(), 6);
 				super.paintComponent(g);
 			}
 		};
@@ -210,6 +184,13 @@ public class PendingRankupsPanel extends JPanel {
 		return card;
 	}
 
+	private JLabel rankIcon(String rank) {
+		JLabel icon = new JLabel();
+		icon.setPreferredSize(new Dimension(18, 18));
+		rankIconResolver.apply(rank, icon, 18);
+		return icon;
+	}
+
 	private void actualizeRankChange(int id, JButton button) {
 		button.setEnabled(false);
 
@@ -233,9 +214,7 @@ public class PendingRankupsPanel extends JPanel {
 
 	private void showMessage(String text, Color color) {
 		contentPanel.removeAll();
-		JLabel lbl = new JLabel(text);
-		lbl.setFont(FontManager.getRunescapeSmallFont());
-		lbl.setForeground(color);
+		JLabel lbl = Labels.small(text, color);
 		lbl.setAlignmentX(Component.CENTER_ALIGNMENT);
 		contentPanel.add(lbl);
 		contentPanel.revalidate();
