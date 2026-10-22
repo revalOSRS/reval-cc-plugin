@@ -4,7 +4,9 @@ import com.revalclan.api.RevalApiService;
 import com.revalclan.api.leaderboard.LeaderboardResponse;
 import com.revalclan.ui.components.BackButton;
 import com.revalclan.ui.components.Clickable;
+import com.revalclan.ui.components.Labels;
 import com.revalclan.ui.components.RefreshButton;
+import com.revalclan.ui.components.RoundedPanel;
 import com.revalclan.ui.constants.UIConstants;
 import com.revalclan.util.ClanRankIconResolver;
 import com.revalclan.util.RankNames;
@@ -130,12 +132,8 @@ public class LeaderboardPanel extends JPanel {
 
 		BackButton backButton = new BackButton("< Back", this::showListView);
 
-		JLabel nameLabel = new JLabel(playerName);
-		nameLabel.setFont(FontManager.getRunescapeBoldFont());
-		nameLabel.setForeground(UIConstants.ACCENT_GOLD);
-
 		header.add(backButton, BorderLayout.WEST);
-		header.add(nameLabel, BorderLayout.EAST);
+		header.add(Labels.bold(playerName, UIConstants.ACCENT_GOLD), BorderLayout.EAST);
 
 		return header;
 	}
@@ -146,10 +144,6 @@ public class LeaderboardPanel extends JPanel {
 		this.apiService = apiService;
 		this.assetLoader = assetLoader;
 		this.itemManager = itemManager;
-	}
-
-	public void refresh() {
-		loadLeaderboard();
 	}
 
 	public void showListView() {
@@ -171,11 +165,11 @@ public class LeaderboardPanel extends JPanel {
 		cardLayout.show(cardContainer, "PROFILE");
 	}
 
-	private void loadLeaderboard() {
+	public void refresh() {
 		if (apiService == null) return;
 
 		refreshButton.setLoading(true);
-		showLoading();
+		showMessage("Loading...");
 		apiService.fetchLeaderboard(
 			response -> {
 				if (response.getData() != null && response.getData().getLeaderboard() != null) {
@@ -199,24 +193,10 @@ public class LeaderboardPanel extends JPanel {
 		buildLeaderboard();
 	}
 
-	private void showLoading() {
-		contentPanel.removeAll();
-		contentPanel.add(Box.createVerticalStrut(20));
-		JLabel label = new JLabel("Loading...");
-		label.setFont(FontManager.getRunescapeSmallFont());
-		label.setForeground(UIConstants.TEXT_SECONDARY);
-		label.setAlignmentX(Component.CENTER_ALIGNMENT);
-		contentPanel.add(label);
-		contentPanel.revalidate();
-		contentPanel.repaint();
-	}
-
 	private void showMessage(String message) {
 		contentPanel.removeAll();
 		contentPanel.add(Box.createVerticalStrut(20));
-		JLabel label = new JLabel(message);
-		label.setFont(FontManager.getRunescapeSmallFont());
-		label.setForeground(UIConstants.TEXT_SECONDARY);
+		JLabel label = Labels.small(message, UIConstants.TEXT_SECONDARY);
 		label.setAlignmentX(Component.CENTER_ALIGNMENT);
 		contentPanel.add(label);
 		contentPanel.revalidate();
@@ -235,14 +215,10 @@ public class LeaderboardPanel extends JPanel {
 			? allEntries.size() + " players"
 			: filteredEntries.size() + " of " + allEntries.size() + " players";
 
-		JLabel countLabel = new JLabel(countText);
-		countLabel.setFont(FontManager.getRunescapeSmallFont());
-		countLabel.setForeground(UIConstants.TEXT_MUTED);
-
 		JPanel countRow = new JPanel(new BorderLayout());
 		countRow.setOpaque(false);
 		countRow.setAlignmentX(Component.LEFT_ALIGNMENT);
-		countRow.add(countLabel, BorderLayout.WEST);
+		countRow.add(Labels.small(countText, UIConstants.TEXT_MUTED), BorderLayout.WEST);
 		countRow.add(refreshButton, BorderLayout.EAST);
 
 		contentPanel.add(countRow);
@@ -258,18 +234,7 @@ public class LeaderboardPanel extends JPanel {
 	}
 
 	private JPanel createPlayerRow(LeaderboardResponse.LeaderboardEntry entry) {
-		JPanel row = new JPanel(new BorderLayout(8, 0)) {
-			@Override
-			protected void paintComponent(Graphics g) {
-				Graphics2D g2d = (Graphics2D) g.create();
-				g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-				g2d.setColor(getBackground());
-				g2d.fillRoundRect(0, 0, getWidth(), getHeight(), 6, 6);
-				g2d.dispose();
-			}
-		};
-
-		row.setOpaque(false);
+		JPanel row = new RoundedPanel(new BorderLayout(8, 0), 6);
 		row.setBackground(UIConstants.CARD_BG);
 		row.setBorder(new EmptyBorder(8, 10, 8, 12));
 		row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 44));
@@ -283,32 +248,20 @@ public class LeaderboardPanel extends JPanel {
 		leftPanel.setLayout(new BoxLayout(leftPanel, BoxLayout.X_AXIS));
 		leftPanel.setOpaque(false);
 
-		JLabel rankLabel = new JLabel("#" + entry.getRank());
-		rankLabel.setFont(FontManager.getRunescapeBoldFont());
-		rankLabel.setForeground(getRankColor(entry.getRank()));
+		JLabel rankLabel = Labels.bold("#" + entry.getRank(), getRankColor(entry.getRank()));
 		rankLabel.setPreferredSize(new Dimension(42, 20));
-
-		JLabel nameLabel = new JLabel(entry.getOsrsNickname());
-		nameLabel.setFont(FontManager.getRunescapeSmallFont());
-		nameLabel.setForeground(UIConstants.TEXT_PRIMARY);
 
 		leftPanel.add(rankLabel);
 		leftPanel.add(Box.createRigidArea(new Dimension(6, 0)));
-		leftPanel.add(nameLabel);
+		leftPanel.add(Labels.small(entry.getOsrsNickname(), UIConstants.TEXT_PRIMARY));
 
 		// Right: Points + Rank
-		JPanel rightPanel = new JPanel();
-		rightPanel.setLayout(new BoxLayout(rightPanel, BoxLayout.Y_AXIS));
-		rightPanel.setOpaque(false);
+		JPanel rightPanel = Labels.column();
 
-		JLabel pointsLabel = new JLabel(formatPoints(entry.getActivityPoints()) + " pts");
-		pointsLabel.setFont(FontManager.getRunescapeBoldFont());
-		pointsLabel.setForeground(UIConstants.ACCENT_GOLD);
+		JLabel pointsLabel = Labels.bold(formatPoints(entry.getActivityPoints()) + " pts", UIConstants.ACCENT_GOLD);
 		pointsLabel.setAlignmentX(Component.RIGHT_ALIGNMENT);
 
-		JLabel clanRankLabel = new JLabel(RankNames.display(entry.getClanRank()));
-		clanRankLabel.setFont(FontManager.getRunescapeSmallFont());
-		clanRankLabel.setForeground(UIConstants.TEXT_MUTED);
+		JLabel clanRankLabel = Labels.small(RankNames.display(entry.getClanRank()), UIConstants.TEXT_MUTED);
 		clanRankLabel.setAlignmentX(Component.RIGHT_ALIGNMENT);
 
 		rightPanel.add(pointsLabel);
