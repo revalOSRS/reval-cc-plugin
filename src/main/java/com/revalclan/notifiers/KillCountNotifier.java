@@ -228,16 +228,12 @@ public class KillCountNotifier extends BaseNotifier {
 	 */
 	private Duration parseTimeString(String timeStr) {
 		try {
+			// [hours:]minutes:seconds
 			String[] parts = timeStr.split(":");
-			if (parts.length == 2) {
-				int minutes = Integer.parseInt(parts[0]);
-				double seconds = Double.parseDouble(parts[1]);
-				long totalMillis = (minutes * 60 * 1000L) + (long)(seconds * 1000);
-				return Duration.ofMillis(totalMillis);
-			} else if (parts.length == 3) {
-				int hours = Integer.parseInt(parts[0]);
-				int minutes = Integer.parseInt(parts[1]);
-				double seconds = Double.parseDouble(parts[2]);
+			if (parts.length == 2 || parts.length == 3) {
+				int hours = parts.length == 3 ? Integer.parseInt(parts[0]) : 0;
+				int minutes = Integer.parseInt(parts[parts.length - 2]);
+				double seconds = Double.parseDouble(parts[parts.length - 1]);
 				long totalMillis = (hours * 3600 * 1000L) + (minutes * 60 * 1000L) + (long)(seconds * 1000);
 				return Duration.ofMillis(totalMillis);
 			}
