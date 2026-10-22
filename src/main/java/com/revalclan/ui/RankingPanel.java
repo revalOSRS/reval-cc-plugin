@@ -240,9 +240,8 @@ public class RankingPanel extends JPanel {
 			&& !category.equalsIgnoreCase("PETS");
 
 		for (PointsResponse.PointSource source : sources) {
-			PointSourceCard card = showIcons 
-				? new PointSourceCard(source, itemManager)
-				: new PointSourceCard(source.getName(), source.getDescription(), source.getPointsDisplay(), null);
+			// Without an ItemManager the card skips the icon slot
+			PointSourceCard card = new PointSourceCard(source, showIcons ? itemManager : null);
 			card.setAlignmentX(Component.LEFT_ALIGNMENT);
 			panel.add(card);
 			panel.add(Box.createRigidArea(new Dimension(0, 1)));
