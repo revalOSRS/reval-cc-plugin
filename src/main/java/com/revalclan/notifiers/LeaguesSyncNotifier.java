@@ -26,12 +26,11 @@ public class LeaguesSyncNotifier extends BaseNotifier {
 	private static final int RELIC_SELECTED_COLOR = 0xF47113;
 	private static final int RELIC_UNSELECTED_COLOR = 0xAAAAAA;
 
-	private static final Map<Integer, String> AREA_NAMES = new HashMap<>();
-	static {
-		AREA_NAMES.put(2, "Karamja");
-		AREA_NAMES.put(7, "Tirannwn");
-		AREA_NAMES.put(21, "Varlamore");
-	}
+	private static final Map<Integer, String> AREA_NAMES = Map.of(
+		2, "Karamja",
+		7, "Tirannwn",
+		21, "Varlamore"
+	);
 
 	private List<String> cachedSelectedRelics = null;
 	private int pendingRelicRead = -1;
@@ -102,8 +101,7 @@ public class LeaguesSyncNotifier extends BaseNotifier {
 			if (areaId != 0) {
 				Map<String, Object> area = new HashMap<>();
 				area.put("id", areaId);
-				String name = AREA_NAMES.get(areaId);
-				area.put("name", name != null ? name : "Unknown");
+				area.put("name", AREA_NAMES.getOrDefault(areaId, "Unknown"));
 				areas.add(area);
 			}
 		}
