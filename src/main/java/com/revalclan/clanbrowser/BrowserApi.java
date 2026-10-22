@@ -41,10 +41,6 @@ public class BrowserApi {
         }, failure);
     }
 
-    public Call view(BrowserCommand command, long accountHash, Consumer<BrowserModels.View> success, Consumer<String> failure) {
-        return view(command, accountHash, false, success, failure);
-    }
-
     public Call view(BrowserCommand command, long accountHash, boolean refresh, Consumer<BrowserModels.View> success, Consumer<String> failure) {
         command = command.resolve(cached);
         Map<String, String> parameters = command.parameters(accountHash);
