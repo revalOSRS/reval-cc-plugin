@@ -230,11 +230,6 @@ public class ProfilePanel extends JPanel {
 		}
 	}
 
-	public String getClanRank() {
-		return (currentAccount != null && currentAccount.getOsrsAccount() != null) 
-			? currentAccount.getOsrsAccount().getClanRank() : null;
-	}
-
 	public boolean isAccountLoaded() {
 		return currentAccount != null && currentAccount.getOsrsAccount() != null;
 	}
@@ -817,7 +812,7 @@ public class ProfilePanel extends JPanel {
 	}
 
 	private JPanel createStatCard(String value, String label, Color accentColor, String sourceType) {
-		Color valueColor = accentColor != null ? accentColor : UIConstants.TEXT_PRIMARY;
+		Color valueColor = accentColor;
 		if (UIConstants.isHalloweenTheme() && !UIConstants.TEXT_SECONDARY.equals(accentColor)) {
 			valueColor = sourceType != null ? UIConstants.HALLOWEEN_ACCENT : UIConstants.HALLOWEEN_STAT_GREEN;
 		}
@@ -829,7 +824,7 @@ public class ProfilePanel extends JPanel {
 				setBorder(new EmptyBorder(8, 8, 8, 8));
 
 				if (sourceType != null) {
-					Clickable.onPress(this, () -> showPointsBreakdown(sourceType, label), h -> hovered = h);
+					Clickable.onPress(this, () -> showPointsBreakdown(sourceType), h -> hovered = h);
 				}
 			}
 			@Override
@@ -916,7 +911,7 @@ public class ProfilePanel extends JPanel {
 		return rankName;
 	}
 
-	private void showPointsBreakdown(String sourceType, String title) {
+	private void showPointsBreakdown(String sourceType) {
 		if (pointsLog == null || pointsLog.isEmpty()) {
 			JOptionPane.showMessageDialog(this, "No points log data available.", "Points Log", JOptionPane.INFORMATION_MESSAGE);
 			return;
