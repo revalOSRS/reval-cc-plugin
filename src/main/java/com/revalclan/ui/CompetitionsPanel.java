@@ -3,6 +3,7 @@ package com.revalclan.ui;
 import com.revalclan.api.RevalApiService;
 import com.revalclan.api.competitions.*;
 import com.revalclan.ui.components.BackButton;
+import com.revalclan.ui.components.BlockButton;
 import com.revalclan.ui.components.Clickable;
 import com.revalclan.ui.components.Labels;
 import com.revalclan.ui.components.PanelTitle;
@@ -27,11 +28,15 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
 import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 public class CompetitionsPanel extends JPanel {
+	private static final Pattern TOP_RANGE = Pattern.compile("^top(\\d+)$");
 	private static final Color MEDAL_GOLD = new Color(255, 215, 0);
 	private static final Color MEDAL_SILVER = new Color(198, 198, 198);
 	private static final Color MEDAL_BRONZE = new Color(205, 127, 80);
@@ -53,6 +58,7 @@ public class CompetitionsPanel extends JPanel {
 
 	private int loadGeneration;
 	private int raceGeneration;
+	private int detailGeneration;
 	private FeaturedRaceResponse.Race featuredRace;
 	private boolean raceLoading;
 	private boolean memberLoading;
@@ -125,7 +131,7 @@ public class CompetitionsPanel extends JPanel {
 
 	public void refresh() {
 		refreshRace();
-		loadData(false);
+		loadData();
 	}
 
 	private void updateLoading() {
@@ -209,7 +215,7 @@ public class CompetitionsPanel extends JPanel {
 		}
 	}
 
-	private void loadData(boolean showLoadingState) {
+	private void loadData() {
 		if (apiService == null) return;
 		if (client == null || client.getAccountHash() == -1) {
 			onLoggedOut();
@@ -217,7 +223,6 @@ public class CompetitionsPanel extends JPanel {
 		}
 		final int generation = ++loadGeneration;
 		memberContentAvailable = true;
-		if (showLoadingState) showLoading();
 		memberLoading = true;
 		updateLoading();
 
@@ -276,14 +281,6 @@ public class CompetitionsPanel extends JPanel {
 		}
 	}
 
-	private void showLoading() {
-		contentPanel.removeAll();
-		contentPanel.add(Box.createVerticalStrut(30));
-		contentPanel.add(statusLabel("Loading competitions...", UIConstants.TEXT_SECONDARY));
-		contentPanel.revalidate();
-		contentPanel.repaint();
-	}
-
 	private void buildContent() {
 		contentPanel.removeAll();
 		boolean hasContent = false;
@@ -304,24 +301,8 @@ public class CompetitionsPanel extends JPanel {
 			contentPanel.add(Box.createVerticalStrut(12));
 		}
 
-		if (!activeCompetitions.isEmpty()) {
-			hasContent = true;
-			addSection("Active Competitions");
-			for (CompetitionsResponse.Competition comp : activeCompetitions) {
-				contentPanel.add(createCompetitionCard(comp, true));
-				contentPanel.add(Box.createVerticalStrut(8));
-			}
-			contentPanel.add(Box.createVerticalStrut(12));
-		}
-
-		if (!scheduledCompetitions.isEmpty()) {
-			hasContent = true;
-			addSection("Upcoming Competitions");
-			for (CompetitionsResponse.Competition comp : scheduledCompetitions) {
-				contentPanel.add(createCompetitionCard(comp, false));
-				contentPanel.add(Box.createVerticalStrut(8));
-			}
-		}
+		hasContent |= addCompetitions("Active Competitions", activeCompetitions, true);
+		hasContent |= addCompetitions("Upcoming Competitions", scheduledCompetitions, false);
 
 		if (!memberContentAvailable && featuredRace == null) {
 			contentPanel.add(new LoginPrompt("Competitions"));
@@ -332,31 +313,49 @@ public class CompetitionsPanel extends JPanel {
 
 		contentPanel.revalidate();
 		contentPanel.repaint();
+	}
 
-
+	/** The public race already renders its linked KC competition, including all standings. */
+	private boolean addCompetitions(String title, List<CompetitionsResponse.Competition> competitions, boolean active) {
+		String featuredId = featuredRace != null && featuredRace.getKc() != null ? featuredRace.getKc().getId() : null;
+		boolean added = false;
+		for (CompetitionsResponse.Competition comp : competitions) {
+			if (featuredId != null && featuredId.equals(comp.getId())) continue;
+			if (!added) addSection(title);
+			contentPanel.add(createCompetitionCard(comp, active, 5));
+			contentPanel.add(Box.createVerticalStrut(8));
+			added = true;
+		}
+		if (added) contentPanel.add(Box.createVerticalStrut(12));
+		return added;
 	}
 
 	private void showRaceDetails(FeaturedRaceResponse.Race race) {
 		selectedRaceId = race.getId();
-		detailViewPanel.removeAll();
-		JPanel top = new JPanel(new BorderLayout());
-		top.setBackground(UIConstants.CARD_BG);
-		top.setBorder(new EmptyBorder(8, 8, 8, 8));
-		top.add(new BackButton("< Competitions", () -> {
-			selectedRaceId = null;
-			showListView();
-		}), BorderLayout.WEST);
-		top.add(new RefreshButton(this::refreshRace), BorderLayout.EAST);
-		detailViewPanel.add(top, BorderLayout.NORTH);
-		JPanel body = new JPanel();
-		body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
-		body.setBackground(UIConstants.BACKGROUND);
-		body.setBorder(new EmptyBorder(8, 8, 8, 8));
+		int generation = ++detailGeneration;
+		JPanel body = detailBody(this::refreshRace);
 		body.add(new RaceEventCard(race, raceArtwork, itemManager, this::loadObjectiveArtwork, true, null));
-		detailViewPanel.add(ScrollWrap.of(body), BorderLayout.CENTER);
-		cardLayout.show(cardContainer, "DETAIL");
-		detailViewPanel.revalidate();
-		detailViewPanel.repaint();
+		// Side quests are member data, absent from the public race feed. Keep them reachable here.
+		if (memberContentAvailable && race.getKc() != null && race.getKc().getId() != null) {
+			JPanel extras = Labels.column();
+			body.add(extras);
+			Runnable unavailable = () -> {
+				if (generation != detailGeneration) return;
+				extras.add(Labels.small("Side quests unavailable", UIConstants.TEXT_MUTED));
+				JButton retry = new RefreshButton(() -> showRaceDetails(race));
+				retry.setText("Retry side quests");
+				extras.add(retry);
+				extras.revalidate();
+				extras.repaint();
+			};
+			apiService.fetchCompetitionDetails(race.getKc().getId(), response -> SwingUtilities.invokeLater(() -> {
+				if (generation != detailGeneration) return;
+				if (response.getData() == null) unavailable.run();
+				else addSideQuests(extras, response.getData().getSideQuests());
+				extras.revalidate();
+				extras.repaint();
+			}), error -> SwingUtilities.invokeLater(unavailable));
+		}
 	}
 
 	private void addSection(String text) {
@@ -427,210 +426,145 @@ public class CompetitionsPanel extends JPanel {
 		);
 	}
 
-	private JPanel createCompetitionCard(CompetitionsResponse.Competition comp, boolean isActive) {
+	/** The overview and full view use the same card and table; only the row limit changes. */
+	private JPanel createCompetitionCard(CompetitionsResponse.Competition comp, boolean active, int rowLimit) {
 		JPanel card = createCard();
-
-		card.add(Labels.bold(comp.getName(), isActive ? UIConstants.ACCENT_GREEN : UIConstants.TEXT_PRIMARY));
+		card.setBorder(new EmptyBorder(10, 8, 10, 8));
+		card.add(Labels.wrapped(comp.getName(), FontManager.getRunescapeBoldFont(),
+			active ? UIConstants.ACCENT_GREEN : UIConstants.TEXT_PRIMARY, 165));
 		if (comp.getDescription() != null && !comp.getDescription().isEmpty()) {
 			card.add(Box.createVerticalStrut(4));
-			card.add(Labels.small(comp.getDescription(), UIConstants.TEXT_SECONDARY));
+			card.add(Labels.wrapped(comp.getDescription(), FontManager.getRunescapeSmallFont(), UIConstants.TEXT_SECONDARY, 165));
 		}
-
 		card.add(Box.createVerticalStrut(6));
-		String timeText = isActive ? "Ends in " + formatTimeRemaining(comp.getEndDate())
-			: "Starts in " + formatTimeRemaining(comp.getStartDate());
-		card.add(Labels.label(timeText, FontManager.getRunescapeFont(), isActive ? UIConstants.ACCENT_GREEN : UIConstants.TEXT_PRIMARY));
-
-		if (comp.getParticipantCount() != null && comp.getParticipantCount() > 0) {
+		String time = "completed".equals(comp.getStatus()) ? "Completed" : "cancelled".equals(comp.getStatus()) ? "Cancelled"
+			: (active ? "Ends in " : "Starts in ") + formatTimeRemaining(active ? comp.getEndDate() : comp.getStartDate());
+		card.add(Labels.small(time,
+			active ? UIConstants.ACCENT_GREEN : UIConstants.TEXT_PRIMARY));
+		if (comp.getParticipantCount() != null) {
 			card.add(Labels.small(comp.getParticipantCount() + " participants", UIConstants.TEXT_MUTED));
 		}
-
-		if (isActive && comp.getLeaderboard() != null && !comp.getLeaderboard().isEmpty()) {
-			card.add(Box.createVerticalStrut(8));
-			card.add(createLeaderboardPreview(comp.getLeaderboard(), comp.getCompetitionType()));
-		}
-
 		if (comp.getRewardConfig() != null && !comp.getRewardConfig().isEmpty()) {
 			card.add(Box.createVerticalStrut(8));
-			JSeparator divider = new JSeparator(SwingConstants.HORIZONTAL);
-			divider.setForeground(UIConstants.BACKGROUND);
-			divider.setMaximumSize(new Dimension(Integer.MAX_VALUE, 1));
-			divider.setAlignmentX(Component.LEFT_ALIGNMENT);
-			card.add(divider);
-			card.add(Box.createVerticalStrut(8));
 			card.add(Labels.small("PRIZES", UIConstants.TEXT_MUTED));
-			card.add(Box.createVerticalStrut(4));
 			card.add(createRewardsGrid(comp.getRewardConfig()));
 		}
-
-		Clickable.onPress(card, () -> showCompetitionDetails(comp), UIConstants.CARD_HOVER, UIConstants.CARD_BG);
-
+		String metric = metric(comp.getCompetitionType());
+		card.add(Box.createVerticalStrut(10));
+		card.add(Labels.sectionTitle(rowLimit == 5 ? "Top 5 " + metric : metric + " leaderboard"));
+		card.add(Box.createVerticalStrut(6));
+		card.add(standings(comp.getLeaderboard(), comp.getCompetitionType(), comp.getRewardConfig(), rowLimit));
+		if (rowLimit == 5) {
+			JButton full = new BlockButton("Full leaderboard >", UIConstants.ACCENT_GOLD, 24);
+			full.setAlignmentX(Component.LEFT_ALIGNMENT);
+			full.addActionListener(e -> showCompetitionDetails(comp, active));
+			card.add(Box.createVerticalStrut(10));
+			card.add(full);
+		} else {
+			addSideQuests(card, comp.getSideQuests());
+		}
+		card.setMaximumSize(new Dimension(Integer.MAX_VALUE, card.getPreferredSize().height));
 		return roundedWrapper(card);
 	}
 
-	private JPanel createLeaderboardPreview(List<CompetitionsResponse.LeaderboardEntry> leaderboard, String type) {
-		JPanel preview = Labels.column();
-		preview.setAlignmentX(Component.LEFT_ALIGNMENT);
-
-		String suffix = getValueSuffix(type);
-		for (int i = 0; i < Math.min(3, leaderboard.size()); i++) {
-			CompetitionsResponse.LeaderboardEntry entry = leaderboard.get(i);
-			Integer value = entry.getCurrentValue() != null ? entry.getCurrentValue() : entry.getFinalValue();
-
-			JPanel row = new JPanel(new BorderLayout());
-			row.setOpaque(false);
-			row.setAlignmentX(Component.LEFT_ALIGNMENT);
-			row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 18));
-
-			JPanel nameCell = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
-			nameCell.setOpaque(false);
-			Color placeColor = i == 0 ? MEDAL_GOLD : i == 1 ? MEDAL_SILVER : MEDAL_BRONZE;
-			nameCell.add(Labels.small((i + 1) + ". ", placeColor));
-			nameCell.add(Labels.small(entry.getOsrsNickname(), UIConstants.TEXT_PRIMARY));
-			row.add(nameCell, BorderLayout.WEST);
-			row.add(Labels.bold(value != null ? formatValue(value) + suffix : "-", UIConstants.ACCENT_BLUE), BorderLayout.EAST);
-			preview.add(row);
-		}
-
-		return preview;
+	private void showCompetitionDetails(CompetitionsResponse.Competition summary, boolean active) {
+		selectedRaceId = null;
+		int generation = ++detailGeneration;
+		JPanel body = detailBody(() -> showCompetitionDetails(summary, active));
+		body.add(statusLabel("Loading leaderboard...", UIConstants.TEXT_SECONDARY));
+		apiService.fetchCompetitionDetails(summary.getId(), response -> SwingUtilities.invokeLater(() -> {
+			if (generation != detailGeneration) return;
+			body.removeAll();
+			CompetitionsResponse.Competition comp = response.getData();
+			if (comp == null) body.add(statusLabel("Competition not found", UIConstants.ERROR_COLOR));
+			else body.add(createCompetitionCard(comp, comp.getStatus() == null ? active : "active".equals(comp.getStatus()), Integer.MAX_VALUE));
+			body.revalidate();
+			body.repaint();
+		}), error -> SwingUtilities.invokeLater(() -> {
+			if (generation != detailGeneration) return;
+			body.removeAll();
+			body.add(statusLabel("Failed to load: " + error.getMessage(), UIConstants.ERROR_COLOR));
+			body.revalidate();
+			body.repaint();
+		}));
 	}
 
-	private void showCompetitionDetails(CompetitionsResponse.Competition comp) {
+	/** Back/refresh stay separate from the wrapped title, even for long competition names. */
+	private JPanel detailBody(Runnable refresh) {
 		detailViewPanel.removeAll();
-
 		JPanel header = new JPanel(new BorderLayout());
 		header.setBackground(UIConstants.CARD_BG);
-		header.setBorder(new EmptyBorder(8, 10, 8, 10));
-		header.add(new BackButton("< Back", this::showListView), BorderLayout.WEST);
-		header.add(Labels.bold(comp.getName(), UIConstants.ACCENT_GOLD), BorderLayout.EAST);
+		header.setBorder(new EmptyBorder(8, 8, 8, 8));
+		header.add(new BackButton("< Competitions", this::showListView), BorderLayout.WEST);
+		header.add(new RefreshButton(refresh), BorderLayout.EAST);
 		detailViewPanel.add(header, BorderLayout.NORTH);
-
-		JPanel content = new JPanel();
-		content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
-		content.setBackground(UIConstants.BACKGROUND);
-		content.setBorder(new EmptyBorder(12, 12, 12, 12));
-		content.add(Box.createVerticalStrut(20));
-		content.add(statusLabel("Loading leaderboard...", UIConstants.TEXT_SECONDARY));
-
-		detailViewPanel.add(ScrollWrap.of(content), BorderLayout.CENTER);
+		JPanel body = Labels.column();
+		body.setBorder(new EmptyBorder(8, 8, 8, 8));
+		detailViewPanel.add(ScrollWrap.of(body), BorderLayout.CENTER);
+		cardLayout.show(cardContainer, "DETAIL");
 		detailViewPanel.revalidate();
 		detailViewPanel.repaint();
-		cardLayout.show(cardContainer, "DETAIL");
-
-		apiService.fetchCompetitionDetails(comp.getId(),
-			response -> SwingUtilities.invokeLater(() -> buildDetailsContent(content, response.getData())),
-			error -> SwingUtilities.invokeLater(() -> {
-				content.removeAll();
-				content.add(Box.createVerticalStrut(20));
-				content.add(statusLabel("Failed to load: " + error.getMessage(), UIConstants.ERROR_COLOR));
-				content.revalidate();
-				content.repaint();
-			})
-		);
+		return body;
 	}
 
-	private void buildDetailsContent(JPanel content, CompetitionsResponse.Competition comp) {
-		content.removeAll();
-
-		if (comp == null) {
-			content.add(statusLabel("Competition not found", UIConstants.ERROR_COLOR));
-			content.revalidate();
-			content.repaint();
-			return;
-		}
-
-		if (comp.getDescription() != null) {
-			content.add(Labels.small(comp.getDescription(), UIConstants.TEXT_SECONDARY));
-			content.add(Box.createVerticalStrut(8));
-		}
-
-		boolean isActive = "active".equalsIgnoreCase(comp.getStatus());
-		String timeText = isActive ? "Ends in " + formatTimeRemaining(comp.getEndDate())
-			: "Starts in " + formatTimeRemaining(comp.getStartDate());
-		content.add(Labels.label(timeText, FontManager.getRunescapeFont(), UIConstants.TEXT_PRIMARY));
-
-		if (comp.getParticipantCount() != null) {
-			content.add(Labels.small(comp.getParticipantCount() + " participants", UIConstants.TEXT_MUTED));
-		}
-
-		content.add(Box.createVerticalStrut(12));
-		content.add(Labels.sectionTitle("Leaderboard"));
-		content.add(Box.createVerticalStrut(6));
-
-		if (comp.getLeaderboard() != null && !comp.getLeaderboard().isEmpty()) {
-			for (int i = 0; i < comp.getLeaderboard().size(); i++) {
-				content.add(createLeaderboardRow(comp.getLeaderboard().get(i), i + 1, comp.getCompetitionType()));
-				content.add(Box.createVerticalStrut(2));
+	private void addSideQuests(JPanel parent, List<CompetitionsResponse.SideQuest> quests) {
+		if (quests == null || quests.isEmpty()) return;
+		parent.add(Box.createVerticalStrut(12));
+		parent.add(Labels.sectionTitle("Side Quests"));
+		for (CompetitionsResponse.SideQuest quest : quests) {
+			parent.add(Box.createVerticalStrut(8));
+			parent.add(Labels.wrapped(quest.getName(), FontManager.getRunescapeBoldFont(), UIConstants.ACCENT_PURPLE, 165));
+			if (quest.getDescription() != null) {
+				parent.add(Labels.wrapped(quest.getDescription(), FontManager.getRunescapeSmallFont(), UIConstants.TEXT_SECONDARY, 165));
 			}
-		} else {
-			content.add(Labels.small("No participants yet", UIConstants.TEXT_MUTED));
+			parent.add(standings(quest.getLeaderboard(), quest.getSideQuestType(), quest.getRewardConfig(), Integer.MAX_VALUE));
 		}
-
-		if (comp.getSideQuests() != null && !comp.getSideQuests().isEmpty()) {
-			content.add(Box.createVerticalStrut(16));
-			content.add(Labels.sectionTitle("Side Quests"));
-			content.add(Box.createVerticalStrut(6));
-			for (CompetitionsResponse.SideQuest sq : comp.getSideQuests()) {
-				content.add(createSideQuestCard(sq));
-				content.add(Box.createVerticalStrut(8));
-			}
-		}
-
-		content.revalidate();
-		content.repaint();
 	}
 
-	private JPanel createLeaderboardRow(CompetitionsResponse.LeaderboardEntry entry, int rank, String type) {
-		String playerName = client != null && client.getLocalPlayer() != null ? client.getLocalPlayer().getName() : null;
-		boolean isCurrentPlayer = playerName != null && entry.getOsrsNickname() != null
-			&& entry.getOsrsNickname().equalsIgnoreCase(playerName);
-
-		JPanel row = roundedPanel(UIConstants.CARD_BG, isCurrentPlayer ? UIConstants.ACCENT_BLUE : null);
-		row.setLayout(new BorderLayout(4, 0));
-		row.setBorder(new EmptyBorder(6, 10, 6, 10));
-		row.setAlignmentX(Component.LEFT_ALIGNMENT);
-		row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 32));
-
-		Color rankColor = rank == 1 ? MEDAL_GOLD
-			: rank == 2 ? MEDAL_SILVER
-			: rank == 3 ? MEDAL_BRONZE
-			: UIConstants.TEXT_SECONDARY;
-
-		JLabel rankLabel = Labels.bold("#" + rank, rankColor);
-		rankLabel.setPreferredSize(new Dimension(42, 20));
-
-		Integer value = entry.getCurrentValue() != null ? entry.getCurrentValue() : entry.getFinalValue();
-
-		row.add(rankLabel, BorderLayout.WEST);
-		row.add(Labels.small(entry.getOsrsNickname(), isCurrentPlayer ? UIConstants.ACCENT_BLUE : UIConstants.TEXT_PRIMARY), BorderLayout.CENTER);
-		row.add(Labels.bold(value != null ? formatValue(value) + getValueSuffix(type) : "-", UIConstants.ACCENT_GOLD), BorderLayout.EAST);
-
-		return row;
+	private CompetitionStandings standings(List<CompetitionsResponse.LeaderboardEntry> leaderboard,
+			String type, Map<String, Integer> rewards, int limit) {
+		List<CompetitionStandings.Entry> entries = new ArrayList<>();
+		if (leaderboard != null) for (int i = 0; i < Math.min(limit, leaderboard.size()); i++) {
+			CompetitionsResponse.LeaderboardEntry player = leaderboard.get(i);
+			int rank = player.getRank() != null && player.getRank() > 0 ? player.getRank() : i + 1;
+			Long value = player.getCurrentValue() != null ? player.getCurrentValue() : player.getFinalValue();
+			entries.add(new CompetitionStandings.Entry(rank, player.getOsrsNickname(), value,
+				value != null && value > 0 ? placementPoints(rank, rewards) : 0));
+		}
+		String viewer = client != null && client.getLocalPlayer() != null ? client.getLocalPlayer().getName() : null;
+		return new CompetitionStandings(metric(type), entries, "No participants yet", viewer);
 	}
 
-	private JPanel createSideQuestCard(CompetitionsResponse.SideQuest sq) {
-		JPanel card = createCard();
-		card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 120));
-
-		card.add(Labels.bold(sq.getName(), UIConstants.ACCENT_PURPLE));
-		if (sq.getDescription() != null) {
-			card.add(Labels.small(sq.getDescription(), UIConstants.TEXT_SECONDARY));
+	static String metric(String type) {
+		switch (type == null ? "" : type.toLowerCase(Locale.ROOT)) {
+			case "skill_xp": return "XP";
+			case "boss_kills": case "npc_kills": return "KC";
+			case "loot_value": return "GP";
+			case "collection_log": return "Slots";
+			case "minigame_rounds": return "Rounds";
+			case "clue_scrolls": return "Clues";
+			default: return "Value";
 		}
+	}
 
-		if (sq.getLeaderboard() != null && !sq.getLeaderboard().isEmpty()) {
-			card.add(Box.createVerticalStrut(6));
-			String suffix = getValueSuffix(sq.getSideQuestType());
-			for (int i = 0; i < Math.min(3, sq.getLeaderboard().size()); i++) {
-				CompetitionsResponse.LeaderboardEntry entry = sq.getLeaderboard().get(i);
-				card.add(Labels.small((i + 1) + ". " + entry.getOsrsNickname() + " - " + formatValue(entry.getCurrentValue()) + suffix,
-					UIConstants.TEXT_PRIMARY));
+	/** Mirrors the backend: nonzero exact rank first, then the first matching top-N range. */
+	static int placementPoints(int rank, Map<String, Integer> rewards) {
+		if (rewards == null) return 0;
+		Integer exact = rewards.get(String.valueOf(rank));
+		if (exact != null && exact != 0) return Math.max(0, exact);
+		for (Map.Entry<String, Integer> reward : rewards.entrySet()) {
+			Matcher range = TOP_RANGE.matcher(reward.getKey());
+			if (range.matches() && rank <= Double.parseDouble(range.group(1))) {
+				return reward.getValue() == null ? 0 : Math.max(0, reward.getValue());
 			}
 		}
-
-		return roundedWrapper(card);
+		return 0;
 	}
 
 	private void showListView() {
+		selectedRaceId = null;
+		detailGeneration++;
+		detailViewPanel.removeAll();
 		cardLayout.show(cardContainer, "LIST");
 	}
 
@@ -712,37 +646,20 @@ public class CompetitionsPanel extends JPanel {
 		grid.setOpaque(false);
 		grid.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-		addRewardCell(grid, "1st", rewards.get("1"), MEDAL_GOLD);
-		addRewardCell(grid, "2nd", rewards.get("2"), MEDAL_SILVER);
-		addRewardCell(grid, "3rd", rewards.get("3"), MEDAL_BRONZE);
-		addRewardCell(grid, "4-10th", rewards.get("top10"), UIConstants.TEXT_SECONDARY);
+		rewards.forEach((rank, points) -> {
+			if (points == null) return;
+			String place = "1".equals(rank) ? "1st" : "2".equals(rank) ? "2nd" : "3".equals(rank) ? "3rd"
+				: rank.startsWith("top") ? "Top " + rank.substring(3) : "#" + rank;
+			Color color = "1".equals(rank) ? MEDAL_GOLD : "2".equals(rank) ? MEDAL_SILVER
+				: "3".equals(rank) ? MEDAL_BRONZE : UIConstants.TEXT_SECONDARY;
+			JPanel cell = Labels.row();
+			cell.add(Labels.small(place, color), BorderLayout.WEST);
+			cell.add(Labels.small(points + " pts", UIConstants.ACCENT_GOLD), BorderLayout.EAST);
+			grid.add(cell);
+		});
 
 		grid.setMaximumSize(new Dimension(Integer.MAX_VALUE, grid.getPreferredSize().height));
 		return grid;
 	}
 
-	private void addRewardCell(JPanel grid, String place, Integer points, Color placeColor) {
-		if (points == null) return;
-
-		JPanel cell = new JPanel(new BorderLayout());
-		cell.setOpaque(false);
-		cell.add(Labels.small(place, placeColor), BorderLayout.WEST);
-		cell.add(Labels.small(points + " pts", UIConstants.ACCENT_GOLD), BorderLayout.EAST);
-		grid.add(cell);
-	}
-
-	private String formatValue(Integer value) {
-		if (value == null) return "-";
-		if (value >= 1_000_000) return String.format("%.1fM", value / 1_000_000.0);
-		if (value >= 1_000) return String.format("%.1fK", value / 1_000.0);
-		return String.valueOf(value);
-	}
-
-	private String getValueSuffix(String type) {
-		if (type == null) return "";
-		String t = type.toLowerCase();
-		if (t.contains("xp") || t.contains("experience") || t.contains("skill")) return " XP";
-		if (t.contains("kc") || t.contains("kill") || t.contains("boss") || t.contains("npc")) return " KC";
-		return "";
-	}
 }

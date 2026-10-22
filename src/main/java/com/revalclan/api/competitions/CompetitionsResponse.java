@@ -36,9 +36,10 @@ public class CompetitionsResponse extends ApiResponse {
 
     @Data
     public static class LeaderboardEntry {
+        private Integer rank;
         private String osrsNickname;
-        private Integer currentValue;
-        private Integer finalValue;
+        private Long currentValue;
+        private Long finalValue;
     }
 
     @Data
@@ -46,6 +47,7 @@ public class CompetitionsResponse extends ApiResponse {
         private String name;
         private String description;
         private String sideQuestType;
+        private Map<String, Integer> rewardConfig;
         private List<LeaderboardEntry> leaderboard;
     }
 }

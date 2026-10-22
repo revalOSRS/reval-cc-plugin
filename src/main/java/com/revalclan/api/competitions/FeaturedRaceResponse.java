@@ -47,6 +47,7 @@ public class FeaturedRaceResponse extends PublicApiResponse {
 
     @Data
     public static class Kc {
+        private String id;
         private List<Integer> rewards;
         private List<Standing> leaderboard;
     }

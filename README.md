@@ -177,6 +177,12 @@ Active Leagues Bingo events on the Events tab open in the side panel: pick a tea
 ### Profile cards
 Choose where the "View Reval Profile" right-click option appears: on players in the world, in chat, or in the clan member list.
 
+### Competition leaderboards
+SOTW, BOTW and other competitions use the same compact standings table as race events.
+The overview shows five players; **Full leaderboard** opens the detail response and its side quests.
+The featured race appears once, with its linked KC competition included in the race card.
+Points show projected placement rewards; hover a compact score to see its exact value.
+
 ## Usage
 
 ### Collection Log Sync
