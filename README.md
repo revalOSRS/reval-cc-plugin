@@ -168,7 +168,8 @@ Configure the plugin in the RuneLite settings panel:
 Which game events are tracked is decided by the Reval backend, not per player, so the plugin stays in sync with what the clan systems expect. The per-player switches are:
 - **Show clan notifications**: Reval announcements and notifications in chat
 - **Send player deaths to Discord**: post your deaths (and who killed you) to the clan Discord
-- **Leagues Events**: Leagues task, relic, area and combat mastery tracking
+
+Leagues task, relic, area and combat mastery tracking is always on; it only runs on Leagues worlds while the backend has Leagues tracking enabled.
 
 ### Leagues Bingo boards
 Active Leagues Bingo events on the Events tab open in the side panel: pick a team from the standings, pick one of its region boards (completion, points and x2 status per board), then browse the tile grid. Clicking a tile shows the task, its requirements, progress and who contributed.

@@ -48,8 +48,7 @@ public class LeaguesNotifier extends BaseNotifier {
 
 	@Override
 	public boolean isEnabled() {
-		return config.notifyLeagues()
-			&& filterManager.getFilters().isLeaguesEnabled()
+		return filterManager.getFilters().isLeaguesEnabled()
 			&& Worlds.isSeasonal(client);
 	}
 

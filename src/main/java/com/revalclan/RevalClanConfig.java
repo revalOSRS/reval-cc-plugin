@@ -159,17 +159,6 @@ public interface RevalClanConfig extends Config {
 		return true;
 	}
 
-	@ConfigItem(
-		keyName = "notifyLeagues",
-		name = "Leagues Events",
-		description = "Track Leagues events (tasks, relics, areas, combat masteries)",
-		section = eventsSection,
-		position = 2
-	)
-	default boolean notifyLeagues() {
-		return true;
-	}
-
 	@ConfigSection(
 		name = "Clan browser",
 		description = "Collection logs and shared clan leaderboards",
