@@ -444,7 +444,7 @@ public class RevalPanel extends PluginPanel {
 		publicLoads.put("COMPETITIONS", competitionsPanel::refreshRace);
 		memberLoads.put("ACHIEVEMENTS", achievementsPanel::refresh);
 		memberLoads.put("COMPETITIONS", competitionsPanel::refresh);
-		memberClickLoads.put("EVENTS", eventsPanel::load);
+		memberClickLoads.put("EVENTS", eventsPanel::refresh);
 		memberLoads.put("DIARY", diaryPanel::refresh);
 
 		adminManager = new AdminManager();
