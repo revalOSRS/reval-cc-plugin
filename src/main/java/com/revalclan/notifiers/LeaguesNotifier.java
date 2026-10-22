@@ -137,12 +137,10 @@ public class LeaguesNotifier extends BaseNotifier {
 				}
 			}
 
-			Integer nextTrophyThreshold = pointsToTrophy.ceilingKey(totalPoints + 1);
-			Integer nextRelicThreshold = pointsToRelicTier.ceilingKey(totalPoints + 1);
 			data.put("taskPoints", taskPoints);
 			data.put("tasksUntilNextArea", computeTasksUntilNextArea(tasksCompleted));
-			data.put("pointsUntilNextRelic", nextRelicThreshold != null ? nextRelicThreshold - totalPoints : null);
-			data.put("pointsUntilNextTrophy", nextTrophyThreshold != null ? nextTrophyThreshold - totalPoints : null);
+			data.put("pointsUntilNextRelic", pointsUntilNext(pointsToRelicTier, totalPoints));
+			data.put("pointsUntilNextTrophy", pointsUntilNext(pointsToTrophy, totalPoints));
 			data.put("trophyEarned", trophyEarned);
 		}
 
@@ -167,10 +165,9 @@ public class LeaguesNotifier extends BaseNotifier {
 				}
 			}
 
-			Integer nextTierThreshold = pointsToRelicTier.ceilingKey(currentPoints + 1);
 			data.put("relicTier", relicTier);
 			data.put("requiredPoints", requiredPoints);
-			data.put("pointsUntilNextTier", nextTierThreshold != null ? nextTierThreshold - currentPoints : null);
+			data.put("pointsUntilNextTier", pointsUntilNext(pointsToRelicTier, currentPoints));
 		}
 
 		sendNotification(data);
@@ -238,6 +235,12 @@ public class LeaguesNotifier extends BaseNotifier {
 		}
 
 		return 0;
+	}
+
+	/** Points from {@code points} to the next threshold above it, or null when none is left. */
+	private static Integer pointsUntilNext(TreeMap<Integer, ?> thresholds, int points) {
+		Integer next = thresholds.ceilingKey(points + 1);
+		return next != null ? next - points : null;
 	}
 
 	private Integer computeTasksUntilNextArea(int tasksCompleted) {
