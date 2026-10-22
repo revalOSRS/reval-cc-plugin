@@ -129,8 +129,8 @@ public abstract class BaseNotifier {
 		}
 		
 		if (includeContainers) {
-			data.put("inventory", getInventoryData());
-			data.put("equipment", getEquippedItems());
+			data.put("inventory", getItemContainerData(93)); // Inventory container
+			data.put("equipment", getItemContainerData(94)); // Equipment container
 		}
 	}
 
@@ -141,21 +141,7 @@ public abstract class BaseNotifier {
 		if (client.getLocalPlayer() != null) return client.getLocalPlayer().getName();
 		return "Unknown";
 	}
-	
-	/**
-	 * Get player's equipped items using the equipment ItemContainer
-	 */
-	protected List<Map<String, Object>> getEquippedItems() {
-		return getItemContainerData(94); // Equipment container
-	}
-	
-	/**
-	 * Get player's inventory data
-	 */
-	protected List<Map<String, Object>> getInventoryData() {
-		return getItemContainerData(93); // Inventory container
-	}
-	
+
 	/**
 	 * Get items from a specific ItemContainer
 	 * @param containerId The container ID (93=inventory, 94=equipment)
