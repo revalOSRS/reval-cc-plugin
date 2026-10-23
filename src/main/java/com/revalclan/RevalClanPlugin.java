@@ -19,6 +19,7 @@ import com.revalclan.ui.RevalPanel;
 import com.revalclan.ui.components.HalloweenDecoration;
 import com.revalclan.ui.constants.UIConstants;
 import com.revalclan.util.AnnouncementService;
+import com.revalclan.util.ArchiveLootBroadcasts;
 import com.revalclan.util.ClanRankIconResolver;
 import com.revalclan.util.EventFilterManager;
 import com.revalclan.util.RaidPartyTracker;
@@ -52,6 +53,7 @@ import net.runelite.api.events.StatChanged;
 import net.runelite.api.events.VarbitChanged;
 import net.runelite.api.events.WidgetLoaded;
 import net.runelite.api.events.ScriptPreFired;
+import net.runelite.api.events.ScriptCallbackEvent;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.events.ConfigChanged;
@@ -478,6 +480,11 @@ public class RevalClanPlugin extends Plugin {
 		} else if (type == ChatMessageType.CLAN_MESSAGE) {
 			petNotifier.onClanNotification(cleanMessage);
 		}
+	}
+
+	@Subscribe
+	public void onScriptCallbackEvent(ScriptCallbackEvent event) {
+		ArchiveLootBroadcasts.filter(client, event);
 	}
 
 	@Subscribe
