@@ -173,4 +173,27 @@ public class WebhookServiceTest {
 		service.shutDown();
 		drain();
 	}
+	@Test public void ordinaryBurstsLeaveSixteenSlotsForSessionAndSyncEvents() {
+		for (int i = 0; i < 48; i++) assertFalse(service.sendDataAsync(Map.of("eventType", "CHAT")).isDone());
+		for (int i = 0; i < 1000; i++) assertTrue(service.sendDataAsync(Map.of("eventType", "CHAT")).isCompletedExceptionally());
+		for (int i = 0; i < 16; i++) assertFalse(service.sendDataAsync(Map.of("eventType", "LOGIN")).isDone());
+		assertTrue(service.sendDataAsync(Map.of("eventType", "SYNC")).isCompletedExceptionally());
+		assertEquals(64, tasks.size());
+		drain();
+		verify(http, times(64)).newCall(any(Request.class));
+		service.shutDown();
+	}
+
+	@Test public void failedRequestsReleaseCapacityForTheNextBurst() {
+		for (int i = 0; i < 48; i++) service.sendDataAsync(Map.of("eventType", "CHAT"));
+		drain();
+		ArgumentCaptor<Callback> callbacks = ArgumentCaptor.forClass(Callback.class);
+		verify(call, times(48)).enqueue(callbacks.capture());
+		for (Callback callback : callbacks.getAllValues()) callback.onFailure(call, new IOException("offline"));
+		for (int i = 0; i < 48; i++) assertFalse(service.sendDataAsync(Map.of("eventType", "CHAT")).isDone());
+		assertEquals(48, tasks.size());
+		service.shutDown();
+		drain();
+	}
+
 }
