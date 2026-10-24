@@ -14,6 +14,8 @@ import com.revalclan.notifiers.*;
 import com.revalclan.pbs.ClogPersonalBestCapture;
 import com.revalclan.pbs.CombatAchievementPersonalBestCapture;
 import com.revalclan.session.SessionTracker;
+import com.revalclan.session.SessionState;
+import net.runelite.client.events.ClientShutdown;
 import com.revalclan.util.ClanMembership;
 import com.revalclan.ui.RevalPanel;
 import com.revalclan.ui.components.HalloweenDecoration;
@@ -26,8 +28,14 @@ import com.revalclan.util.RaidPartyTracker;
 import com.revalclan.util.SyncStateManager;
 import com.revalclan.util.UIAssetLoader;
 import com.revalclan.util.Worlds;
+import com.revalclan.util.WebhookService;
+import com.revalclan.util.RequestScope;
 import com.google.inject.Provides;
 import com.google.gson.JsonObject;
+import okhttp3.OkHttpClient;
+import javax.inject.Named;
+import javax.inject.Singleton;
+import java.util.concurrent.TimeUnit;
 
 import java.awt.image.BufferedImage;
 import java.time.LocalDate;
@@ -131,6 +139,7 @@ public class RevalClanPlugin extends Plugin {
 	@Inject	private SyncNotifier syncNotifier;
 
 	@Inject	private SessionTracker sessionTracker;
+	@Inject private SessionState sessionState;
 	@Inject	private ClanMembership clanMembership;
 
 	@Inject	private SyncStateManager syncStateManager;
@@ -155,15 +164,22 @@ public class RevalClanPlugin extends Plugin {
 	@Inject	private UIAssetLoader uiAssetLoader;
 
 	@Inject	private RevalClanConfig config;
+	@Inject private WebhookService webhookService;
 
 	private RevalPanel revalPanel;
 	private NavigationButton navButton;
 
 	private boolean wasLoggedIn = false;
 	private boolean pendingLoginNotification = false;
+	private RequestScope lifecycle = new RequestScope();
 
 	@Override
 	protected void startUp() throws Exception {
+		lifecycle.cancel();
+		RequestScope owner = lifecycle = new RequestScope();
+		revalApiService.startUp();
+		webhookService.startUp();
+		sessionTracker.startUp();
 		log.info("Reval Clan plugin started!");
 		wasLoggedIn = false;
 		pendingLoginNotification = false;
@@ -171,6 +187,7 @@ public class RevalClanPlugin extends Plugin {
 		sessionTracker.setOnHeartbeatResponse(this::onChanges);
 
 		clientThread.invoke(() -> {
+			if (!owner.isActive()) return true;
 			if (client.getIndexConfig() == null || client.getGameState().ordinal() < GameState.LOGIN_SCREEN.ordinal()) {
 				return false;
 			}
@@ -249,12 +266,21 @@ public class RevalClanPlugin extends Plugin {
 
 	@Override
 	protected void shutDown() throws Exception {
+		lifecycle.cancel();
+		pendingLoginNotification = false;
+		webhookService.shutDown();
+		sessionTracker.shutDown();
+		sessionTracker.setOnHeartbeatResponse(null);
 		eventFilterManager.resetSession();
 		log.info("Reval Clan plugin stopped!");
 		clanMembership.reset();
 		wasLoggedIn = false;
 
-		collectionLogManager.clearObtainedItems();
+		clientThread.invoke(() -> {
+			collectionLogManager.clearObtainedItems();
+			sessionState.reset();
+			sessionTracker.reset();
+		});
 		syncButton.shutDown();
 		overlayManager.remove(syncGuideOverlay);
 		if (revalPanel != null) {
@@ -270,25 +296,21 @@ public class RevalClanPlugin extends Plugin {
 		eventBus.unregister(clanTeamColors);
 		clanTeamColors.shutDown();
 		revalApiService.resetEventsSession();
+		revalApiService.shutDown();
 		overlayManager.remove(registrationMarksOverlay);
 
-		// In-memory only — the persisted copy replays at the next startUp/login
-		sessionTracker.reset();
-
 		announcementService.reset();
-		levelNotifier.reset();
-		clueNotifier.reset();
-		killCountNotifier.reset();
-		killTracker.reset();
-		raidPartyTracker.reset();
-		leaguesNotifier.reset();
-		leaguesSyncNotifier.reset();
 
 		// Remove the side panel
 		if (navButton != null) {
 			clientToolbar.removeNavigation(navButton);
 			navButton = null;
 		}
+	}
+
+	@Subscribe
+	public void onClientShutdown(ClientShutdown event) {
+		event.waitFor(sessionTracker.flush());
 	}
 
 	@Subscribe
@@ -318,11 +340,7 @@ public class RevalClanPlugin extends Plugin {
 				clanMembership.reset();
 				pendingLoginNotification = false;
 				announcementService.reset();
-				leaguesNotifier.reset();
-				leaguesSyncNotifier.reset();
-				lootNotifier.reset();
-				varbitNotifier.reset();
-				raidPartyTracker.reset();
+				sessionState.reset();
 
 				if (wasLoggedIn) {
 					if (wasInClan) {
@@ -553,6 +571,12 @@ public class RevalClanPlugin extends Plugin {
 		if ("hideCompletedItems".equals(event.getKey()) && revalPanel != null) {
 			revalPanel.getProfilePanel().rebuild();
 		}
+	}
+
+	/** Shares RuneLite's dispatcher/pool while keeping Reval's timeout policy in one binding. */
+	@Provides @Singleton @Named("reval-http")
+	OkHttpClient provideHttpClient(OkHttpClient shared) {
+		return shared.newBuilder().callTimeout(30, TimeUnit.SECONDS).build();
 	}
 
 	@Provides

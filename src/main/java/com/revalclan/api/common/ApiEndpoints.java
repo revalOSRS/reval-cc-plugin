@@ -30,9 +30,6 @@ public final class ApiEndpoints {
     // Diaries
     public static final String DIARIES = "/diaries";
 
-    // Challenges
-    public static final String CHALLENGES = "/challenges";
-
     // Leagues
     public static final String LEAGUES_CONFIG = "/leagues/config";
 

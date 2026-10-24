@@ -1,5 +1,8 @@
 package com.revalclan.util;
 
+import com.revalclan.session.SessionScoped;
+import com.revalclan.session.SessionState;
+
 import net.runelite.api.Actor;
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
@@ -37,7 +40,8 @@ import java.util.regex.Pattern;
  * Call on the client thread.
  */
 @Singleton
-public class RaidPartyTracker {
+public class RaidPartyTracker implements SessionScoped {
+	@Inject void registerSessionState(SessionState state) { state.register(this); }
 	static final String CHAMBERS_OF_XERIC = "Chambers of Xeric";
 	static final String THEATRE_OF_BLOOD = "Theatre of Blood";
 	static final String TOMBS_OF_AMASCUT = "Tombs of Amascut";
