@@ -14,8 +14,6 @@ public class CastVoteResponse extends ApiResponse {
 
     @Data
     public static class CastVoteData {
-        private String message;
         private String previousOptionId;
-        private String newOptionId;
     }
 }

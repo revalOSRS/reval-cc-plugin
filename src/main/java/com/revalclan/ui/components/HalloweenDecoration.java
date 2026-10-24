@@ -1,6 +1,7 @@
 package com.revalclan.ui.components;
 
 import com.revalclan.ui.constants.UIConstants;
+import com.revalclan.util.Colors;
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Graphics;
@@ -63,8 +64,7 @@ public final class HalloweenDecoration {
     public static void paintHeader(Graphics graphics, int width, int height) {
         Graphics2D g = (Graphics2D) graphics.create();
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        Color glow = new Color(UIConstants.HALLOWEEN_ACCENT.getRed(),
-            UIConstants.HALLOWEEN_ACCENT.getGreen(), UIConstants.HALLOWEEN_ACCENT.getBlue(), 18);
+        Color glow = Colors.withAlpha(UIConstants.HALLOWEEN_ACCENT, 18);
         g.setPaint(new RadialGradientPaint(width, height, Math.max(width, height),
             new float[] {0, 1}, new Color[] {glow, new Color(0, 0, 0, 0)}));
         g.fillRect(0, 0, width, height);

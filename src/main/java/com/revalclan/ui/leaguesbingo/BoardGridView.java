@@ -5,9 +5,9 @@ import com.revalclan.api.leaguesbingo.LeaguesBingoResponse.Payload;
 import com.revalclan.api.leaguesbingo.LeaguesBingoResponse.Team;
 import com.revalclan.api.leaguesbingo.LeaguesBingoResponse.Tile;
 import com.revalclan.ui.components.Clickable;
+import com.revalclan.ui.components.Labels;
 import com.revalclan.ui.constants.UIConstants;
 import com.revalclan.util.Colors;
-import net.runelite.client.ui.FontManager;
 
 import javax.swing.JLabel;
 import javax.swing.JPanel;
@@ -16,7 +16,6 @@ import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
-import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.GridBagConstraints;
@@ -63,18 +62,17 @@ final class BoardGridView extends JPanel {
 		GridBagConstraints c = new GridBagConstraints();
 		c.insets = new Insets(GAP / 2, GAP / 2, GAP / 2, GAP / 2);
 
-		Font small = FontManager.getRunescapeSmallFont();
 		for (int col = 0; col < cols; col++) {
 			c.gridx = col + 1;
 			c.gridy = 0;
-			grid.add(gutterLabel(String.valueOf((char) ('A' + col)), small, tileSize, GUTTER - GAP), c);
+			grid.add(gutterLabel(String.valueOf((char) ('A' + col)), tileSize, GUTTER - GAP), c);
 		}
 
-		Color accent = team != null ? LeaguesBingoPanel.teamColor(team) : meta.getAccent();
+		Color accent = LeaguesBingoPanel.teamColor(team);
 		for (int r = 0; r < rows; r++) {
 			c.gridx = 0;
 			c.gridy = r + 1;
-			grid.add(gutterLabel(String.valueOf(r + 1), small, GUTTER - GAP, tileSize), c);
+			grid.add(gutterLabel(String.valueOf(r + 1), GUTTER - GAP, tileSize), c);
 
 			for (int col = 0; col < cols; col++) {
 				c.gridx = col + 1;
@@ -82,10 +80,10 @@ final class BoardGridView extends JPanel {
 				Tile tile = payload.isTilesHidden() ? null : board.tileAt(position);
 
 				TileCell cell;
-				if (payload.isTilesHidden()) {
-					cell = new TileCell(null, TileCell.State.HIDDEN, 0, meta.getAccent(), tileSize);
-				} else if (tile == null) {
-					cell = new TileCell(null, TileCell.State.FILLER, 0, meta.getAccent(), tileSize);
+				if (tile == null) {
+					// A lock while the tiles are hidden, filler for an empty position.
+					cell = new TileCell(null, payload.isTilesHidden() ? TileCell.State.HIDDEN : TileCell.State.FILLER,
+						0, meta.getAccent(), tileSize);
 				} else {
 					int percent = BoardStats.tilePercent(team, tile);
 					TileCell.State state = percent >= 100 ? TileCell.State.COMPLETED
@@ -109,8 +107,8 @@ final class BoardGridView extends JPanel {
 		}
 	}
 
-	private static JLabel gutterLabel(String text, Font font, int width, int height) {
-		JLabel l = Labels.label(text, font, UIConstants.TEXT_MUTED);
+	private static JLabel gutterLabel(String text, int width, int height) {
+		JLabel l = Labels.small(text, UIConstants.TEXT_MUTED);
 		l.setHorizontalAlignment(JLabel.CENTER);
 		l.setPreferredSize(new Dimension(width, height));
 		return l;

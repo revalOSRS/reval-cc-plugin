@@ -22,9 +22,7 @@ public class LeaguesBingoMeResponse extends ApiResponse {
 
 		/** May this viewer spend a token for the given team? */
 		public boolean canPickFor(String targetTeamId) {
-			if (!canPick) return false;
-			if (superadmin) return true;
-			return teamId != null && teamId.equals(targetTeamId);
+			return canPick && (superadmin || isOwnTeam(targetTeamId));
 		}
 
 		public boolean isOwnTeam(String targetTeamId) {

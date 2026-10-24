@@ -3,8 +3,11 @@ package com.revalclan.ui;
 import com.revalclan.api.RevalApiService;
 import com.revalclan.api.achievements.AchievementsResponse;
 import com.revalclan.ui.components.Badge;
+import com.revalclan.ui.components.Labels;
 import com.revalclan.ui.components.LoginPrompt;
+import com.revalclan.ui.components.PanelTitle;
 import com.revalclan.ui.components.RefreshButton;
+import com.revalclan.ui.components.ScrollWrap;
 import com.revalclan.ui.constants.UIConstants;
 import net.runelite.api.Client;
 import net.runelite.client.ui.FontManager;
@@ -32,25 +35,7 @@ public class AchievementsPanel extends JPanel {
 		contentPanel.setBackground(UIConstants.BACKGROUND);
 		contentPanel.setBorder(new EmptyBorder(8, 8, 8, 8));
 
-		JPanel wrapper = new JPanel(new BorderLayout()) {
-			@Override
-			public Dimension getPreferredSize() {
-				Dimension size = super.getPreferredSize();
-				if (getParent() != null) size.width = getParent().getWidth();
-				return size;
-			}
-		};
-		wrapper.setBackground(UIConstants.BACKGROUND);
-		wrapper.add(contentPanel, BorderLayout.NORTH);
-
-		JScrollPane scrollPane = new JScrollPane(wrapper);
-		scrollPane.setBackground(UIConstants.BACKGROUND);
-		scrollPane.setBorder(null);
-		scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
-		scrollPane.getVerticalScrollBar().setUnitIncrement(16);
-		scrollPane.getViewport().setBackground(UIConstants.BACKGROUND);
-
-		add(scrollPane, BorderLayout.CENTER);
+		add(ScrollWrap.of(contentPanel), BorderLayout.CENTER);
 		showNotLoggedIn();
 	}
 
@@ -64,10 +49,6 @@ public class AchievementsPanel extends JPanel {
 	}
 
 	public void refresh() {
-		loadData();
-	}
-
-	private void loadData() {
 		if (client == null || client.getAccountHash() == -1 || apiService == null) {
 			showNotLoggedIn();
 			return;
@@ -105,21 +86,15 @@ public class AchievementsPanel extends JPanel {
 		header.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
 		header.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-		JLabel title = new JLabel("ACHIEVEMENTS");
-		title.setFont(FontManager.getRunescapeBoldFont());
-		title.setForeground(UIConstants.ACCENT_GOLD);
-
 		refreshBtn = new RefreshButton(this::refresh);
-		header.add(title, BorderLayout.WEST);
+		header.add(new PanelTitle("ACHIEVEMENTS"), BorderLayout.WEST);
 		header.add(refreshBtn, BorderLayout.EAST);
 
 		contentPanel.add(header);
 		contentPanel.add(Box.createRigidArea(new Dimension(0, 12)));
 
 		if (achievements.isEmpty()) {
-			JLabel empty = new JLabel("No achievements available");
-			empty.setFont(FontManager.getRunescapeSmallFont());
-			empty.setForeground(UIConstants.TEXT_SECONDARY);
+			JLabel empty = Labels.small("No achievements available", UIConstants.TEXT_SECONDARY);
 			empty.setAlignmentX(Component.CENTER_ALIGNMENT);
 			contentPanel.add(empty);
 		} else {
@@ -165,37 +140,29 @@ public class AchievementsPanel extends JPanel {
 		Badge badge = completed ? Badge.rarity(achievement.getRarity()) : new Badge(capitalize(achievement.getRarity()), UIConstants.TEXT_MUTED);
 		badge.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-		JTextArea name = new JTextArea(achievement.getName() != null ? achievement.getName() : "Unknown");
-		name.setFont(FontManager.getRunescapeSmallFont());
-		name.setForeground(completed ? rarityColor : UIConstants.TEXT_SECONDARY);
-		name.setEditable(false);
-		name.setFocusable(false);
-		name.setLineWrap(true);
-		name.setWrapStyleWord(true);
-		name.setOpaque(false);
-		name.setBorder(null);
-		name.setMargin(new Insets(0, 0, 0, 0));
-		name.setAlignmentX(Component.LEFT_ALIGNMENT);
-
-		JTextArea desc = new JTextArea(achievement.getDescription() != null ? achievement.getDescription() : "");
-		desc.setFont(FontManager.getRunescapeSmallFont());
-		desc.setForeground(UIConstants.TEXT_MUTED);
-		desc.setEditable(false);
-		desc.setFocusable(false);
-		desc.setLineWrap(true);
-		desc.setWrapStyleWord(true);
-		desc.setOpaque(false);
-		desc.setBorder(null);
-		desc.setMargin(new Insets(0, 0, 0, 0));
-		desc.setAlignmentX(Component.LEFT_ALIGNMENT);
-
 		card.add(badge);
 		card.add(Box.createRigidArea(new Dimension(0, 3)));
-		card.add(name);
+		card.add(textArea(achievement.getName() != null ? achievement.getName() : "Unknown",
+			completed ? rarityColor : UIConstants.TEXT_SECONDARY));
 		card.add(Box.createRigidArea(new Dimension(0, 3)));
-		card.add(desc);
+		card.add(textArea(achievement.getDescription() != null ? achievement.getDescription() : "", UIConstants.TEXT_MUTED));
 
 		return card;
+	}
+
+	private static JTextArea textArea(String text, Color color) {
+		JTextArea area = new JTextArea(text);
+		area.setFont(FontManager.getRunescapeSmallFont());
+		area.setForeground(color);
+		area.setEditable(false);
+		area.setFocusable(false);
+		area.setLineWrap(true);
+		area.setWrapStyleWord(true);
+		area.setOpaque(false);
+		area.setBorder(null);
+		area.setMargin(new Insets(0, 0, 0, 0));
+		area.setAlignmentX(Component.LEFT_ALIGNMENT);
+		return area;
 	}
 
 	private Color getRarityColor(String rarity) {

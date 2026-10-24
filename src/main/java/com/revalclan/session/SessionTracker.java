@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.revalclan.session.SessionStore.PersistedSession;
 import com.revalclan.util.ClanMembership;
+import com.revalclan.util.Json;
 import com.revalclan.util.WebhookService;
 import com.revalclan.util.RequestScope;
 import com.revalclan.util.Worlds;
@@ -262,7 +263,7 @@ public class SessionTracker {
 	 */
 	public void confirmDelivered(String deliveredSessionId, JsonObject response) {
 		if (deliveredSessionId == null) return;
-		String outcome = storedOutcome(response);
+		String outcome = Json.str(response, "sessionStored", null);
 		clientThread.invokeLater(() -> {
 			inFlight.remove(deliveredSessionId);
 			if ("stored".equals(outcome) || "duplicate".equals(outcome) || "rejected".equals(outcome)) {
@@ -316,15 +317,6 @@ public class SessionTracker {
 				if (changeHandler != null) changeHandler.accept(response);
 			});
 		});
-	}
-
-	private static String storedOutcome(JsonObject response) {
-		try {
-			if (response != null && response.has("sessionStored") && !response.get("sessionStored").isJsonNull()) {
-				return response.get("sessionStored").getAsString();
-			}
-		} catch (Exception ignored) {}
-		return null;
 	}
 
 	private Map<String, Object> envelope(String eventType, String name, long hash, int w, List<String> flags) {

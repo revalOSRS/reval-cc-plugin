@@ -11,6 +11,7 @@ import com.revalclan.ui.components.Clickable;
 import com.revalclan.ui.components.GradientSeparator;
 import com.revalclan.ui.components.HalloweenDecoration;
 import com.revalclan.ui.components.HalloweenTabButton;
+import com.revalclan.ui.components.Labels;
 import com.revalclan.ui.components.PanelTitle;
 import com.revalclan.ui.constants.UIConstants;
 import com.revalclan.util.ClanRankIconResolver;
@@ -42,24 +43,20 @@ public class RevalPanel extends PluginPanel {
 	private final JPanel contentPanel;
 
 	@Getter private final ProfilePanel profilePanel;
-	@Getter private final RankingPanel rankingPanel;
+	private final RankingPanel rankingPanel;
 	@Getter private final LeaderboardPanel leaderboardPanel;
-	@Getter private final AchievementsPanel achievementsPanel;
-	@Getter private final CompetitionsPanel competitionsPanel;
+	private final AchievementsPanel achievementsPanel;
+	private final CompetitionsPanel competitionsPanel;
 	@Getter private final EventsPanel eventsPanel;
-	@Getter private final DiaryPanel diaryPanel;
+	private final DiaryPanel diaryPanel;
 
 	private JLabel infoButton;
 	private JLabel discordIcon;
 	private JLabel websiteIcon;
-	@Getter private AdminButton adminButton;
+	private AdminButton adminButton;
 
-	private JButton profileTab;
-	private JButton eventsTab;
 	private JButton leaderboardTab;
-	private JButton achievementsTab;
-	private JButton competitionsTab;
-	private JButton diaryTab;
+	private final Map<String, JButton> navTabs = new HashMap<>();
 	private String selectedTab = "PROFILE";
 	// Accessed only on the EDT. Public data survives validated login changes.
 	private final Map<String, Runnable> publicLoads = new HashMap<>();
@@ -120,7 +117,7 @@ public class RevalPanel extends PluginPanel {
 		add(topSection, BorderLayout.NORTH);
 		add(contentPanel, BorderLayout.CENTER);
 
-		selectTab("PROFILE");
+		showTab("PROFILE");
 	}
 
 	private JPanel createNavBar() {
@@ -134,14 +131,8 @@ public class RevalPanel extends PluginPanel {
 		row1.setOpaque(false);
 		row1.setMaximumSize(new Dimension(Integer.MAX_VALUE, 28));
 
-		profileTab = createTabButton("Profile");
-		profileTab.addActionListener(e -> selectTab("PROFILE"));
-
-		achievementsTab = createTabButton("Achievements");
-		achievementsTab.addActionListener(e -> selectTab("ACHIEVEMENTS"));
-
-		row1.add(profileTab);
-		row1.add(achievementsTab);
+		row1.add(createTabButton("Profile", "PROFILE"));
+		row1.add(createTabButton("Achievements", "ACHIEVEMENTS"));
 
 		// Second row: Events, trophy (small), Competitions
 		JPanel row2 = new JPanel();
@@ -149,22 +140,19 @@ public class RevalPanel extends PluginPanel {
 		row2.setOpaque(false);
 		row2.setMaximumSize(new Dimension(Integer.MAX_VALUE, 28));
 
-		eventsTab = createTabButton("Events");
+		JButton eventsTab = createTabButton("Events", "EVENTS");
 		eventsTab.setMaximumSize(new Dimension(Integer.MAX_VALUE, 28));
-		eventsTab.addActionListener(e -> selectTab("EVENTS"));
 
 		// Text is a fallback until init() swaps in the trophy sprite — the 🏆
 		// emoji has no glyph in the RuneScape font (missing-glyph box on macOS)
-		leaderboardTab = createTabButton("LB");
+		leaderboardTab = createTabButton("LB", "LEADERBOARD");
 		leaderboardTab.setPreferredSize(new Dimension(36, 28));
 		leaderboardTab.setMinimumSize(new Dimension(36, 28));
 		leaderboardTab.setMaximumSize(new Dimension(36, 28));
 		leaderboardTab.setToolTipText("Leaderboard");
-		leaderboardTab.addActionListener(e -> selectTab("LEADERBOARD"));
 
-		competitionsTab = createTabButton("Competitions");
+		JButton competitionsTab = createTabButton("Competitions", "COMPETITIONS");
 		competitionsTab.setMaximumSize(new Dimension(Integer.MAX_VALUE, 28));
-		competitionsTab.addActionListener(e -> selectTab("COMPETITIONS"));
 
 		row2.add(eventsTab);
 		row2.add(Box.createRigidArea(new Dimension(4, 0)));
@@ -177,10 +165,7 @@ public class RevalPanel extends PluginPanel {
 		row3.setOpaque(false);
 		row3.setMaximumSize(new Dimension(Integer.MAX_VALUE, 28));
 
-		diaryTab = createTabButton("Diary");
-		diaryTab.addActionListener(e -> selectTab("DIARY"));
-
-		row3.add(diaryTab);
+		row3.add(createTabButton("Diary", "DIARY"));
 
 		navBar.add(row1);
 		navBar.add(Box.createRigidArea(new Dimension(0, 4)));
@@ -191,13 +176,16 @@ public class RevalPanel extends PluginPanel {
 		return navBar;
 	}
 
-	private JButton createTabButton(String text) {
+	/** Nav button that opens the given content card; registered for selection styling. */
+	private JButton createTabButton(String text, String tabName) {
 		JButton btn = new HalloweenTabButton(text);
 		btn.setFont(FontManager.getRunescapeSmallFont());
 		btn.setFocusPainted(false);
 		btn.setBorderPainted(false);
 		btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 		btn.setPreferredSize(new Dimension(0, 28));
+		btn.addActionListener(e -> showTab(tabName));
+		navTabs.put(tabName, btn);
 		return btn;
 	}
 
@@ -218,7 +206,7 @@ public class RevalPanel extends PluginPanel {
 		// Info button (left)
 		infoButton = new JLabel();
 		infoButton.setToolTipText("Ranks & Points");
-		Clickable.onPress(infoButton, () -> selectTab("RANKING"));
+		Clickable.onPress(infoButton, () -> showTab("RANKING"));
 
 		JPanel leftPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
 		leftPanel.setOpaque(false);
@@ -271,14 +259,10 @@ public class RevalPanel extends PluginPanel {
 			titleLabel.setIconTextGap(5);
 		}
 
-		JPanel titlePanel = new JPanel();
-		titlePanel.setLayout(new BoxLayout(titlePanel, BoxLayout.Y_AXIS));
-		titlePanel.setOpaque(false);
+		JPanel titlePanel = Labels.column();
 		titlePanel.add(titleLabel);
 		if (UIConstants.isHalloweenTheme()) {
-			JLabel seasonalLabel = new JLabel("HALLOWEEN AT REVAL");
-			seasonalLabel.setFont(FontManager.getRunescapeSmallFont());
-			seasonalLabel.setForeground(UIConstants.TEXT_SECONDARY);
+			JLabel seasonalLabel = Labels.small("HALLOWEEN AT REVAL", UIConstants.TEXT_SECONDARY);
 			seasonalLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
 			titlePanel.add(Box.createVerticalStrut(4));
 			titlePanel.add(seasonalLabel);
@@ -292,7 +276,7 @@ public class RevalPanel extends PluginPanel {
 		return header;
 	}
 
-	private void selectTab(String tabName) {
+	public void showTab(String tabName) {
 		selectedTab = tabName;
 		updateNavStyles();
 		cardLayout.show(contentPanel, tabName);
@@ -309,16 +293,10 @@ public class RevalPanel extends PluginPanel {
 	}
 
 	private void updateNavStyles() {
-		styleTab(profileTab, "PROFILE".equals(selectedTab));
-		styleTab(eventsTab, "EVENTS".equals(selectedTab));
-		styleTab(leaderboardTab, "LEADERBOARD".equals(selectedTab));
-		styleTab(achievementsTab, "ACHIEVEMENTS".equals(selectedTab));
-		styleTab(competitionsTab, "COMPETITIONS".equals(selectedTab));
-		styleTab(diaryTab, "DIARY".equals(selectedTab));
+		navTabs.forEach((tabName, tab) -> styleTab(tab, tabName.equals(selectedTab)));
 	}
 
 	private void styleTab(JButton tab, boolean active) {
-		if (tab == null) return;
 		tab.setSelected(active);
 		tab.setBackground(active
 			? (UIConstants.isHalloweenTheme() ? UIConstants.HALLOWEEN_TAB : UIConstants.ACCENT_BLUE)
@@ -333,14 +311,6 @@ public class RevalPanel extends PluginPanel {
 		label.setToolTipText(tooltip);
 		Clickable.onPress(label, () -> LinkBrowser.browse(url));
 		return label;
-	}
-
-	public void showTab(String tabName) {
-		selectTab(tabName);
-	}
-
-	public String getActiveTab() {
-		return selectedTab;
 	}
 
 	// ==================== Admin Navigation ====================
@@ -360,7 +330,7 @@ public class RevalPanel extends PluginPanel {
 							adminManager.setSession(adminLoginPanel.getEnteredCode(), authData);
 							navigateToAdmin("DASHBOARD");
 						},
-						() -> selectTab("PROFILE")
+						() -> showTab("PROFILE")
 					);
 					contentPanel.add(adminLoginPanel, "ADMIN_LOGIN");
 				}
@@ -435,17 +405,18 @@ public class RevalPanel extends PluginPanel {
 
 		rankingPanel.init(apiService, itemManager, spriteManager, rankIconResolver);
 		profilePanel.init(apiService, client, assetLoader, config, itemManager, rankIconResolver);
-		profilePanel.setOnOpenRanks(() -> selectTab("RANKING"));
+		profilePanel.setOnOpenRanks(() -> showTab("RANKING"));
 		leaderboardPanel.init(apiService, assetLoader, itemManager, rankIconResolver);
 		achievementsPanel.init(apiService, client);
-		competitionsPanel.init(apiService, client);
+		competitionsPanel.init(apiService, client, itemManager);
 		eventsPanel.init(apiService, client);
 		diaryPanel.init(apiService, client, assetLoader);
 		publicLoads.put("RANKING", rankingPanel::load);
 		publicLoads.put("LEADERBOARD", leaderboardPanel::refresh);
+		publicLoads.put("COMPETITIONS", competitionsPanel::refreshRace);
 		memberLoads.put("ACHIEVEMENTS", achievementsPanel::refresh);
 		memberLoads.put("COMPETITIONS", competitionsPanel::refresh);
-		memberClickLoads.put("EVENTS", eventsPanel::load);
+		memberClickLoads.put("EVENTS", eventsPanel::refresh);
 		memberLoads.put("DIARY", diaryPanel::refresh);
 
 		adminManager = new AdminManager();
@@ -473,13 +444,10 @@ public class RevalPanel extends PluginPanel {
 		}
 
 		if (ClanRanks.isDeputyOwnerPlus(client)) {
-			setAdminEnabled(true);
+			adminButton.setAdmin(true);
 		}
 	}
 
-	/**
-	 * Set admin status — call after verifying admin eligibility (e.g. from account data).
-	 */
 	/** Forwarded so the plugin never reaches into child panels. */
 	public void setOnSyncGuide(Runnable onSyncGuide) {
 		profilePanel.setOnSyncGuide(onSyncGuide);
@@ -491,13 +459,8 @@ public class RevalPanel extends PluginPanel {
 		clanValidated = false;
 		if (adminRetry != null) { adminRetry.stop(); adminRetry = null; }
 		profilePanel.shutDown();
+		competitionsPanel.shutDown();
 		eventsPanel.onLoggedOut();
-	}
-
-	public void setAdminEnabled(boolean enabled) {
-		if (adminButton != null) {
-			adminButton.setAdmin(enabled);
-		}
 	}
 
 	// ==================== Lifecycle ====================

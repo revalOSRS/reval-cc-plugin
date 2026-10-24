@@ -20,7 +20,6 @@ public class NotificationsResponse extends ApiResponse {
 	@Data
 	public static class NotificationsData {
 		private String version;
-		private int count;
 		private List<Notification> notifications;
 	}
 
@@ -31,6 +30,5 @@ public class NotificationsResponse extends ApiResponse {
 		private String title;
 		private String message;
 		private Map<String, Object> metadata;
-		private String createdAt;
 	}
 }

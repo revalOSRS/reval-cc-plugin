@@ -9,7 +9,6 @@ import com.revalclan.player.PlayerManager;
 import com.revalclan.quests.QuestManager;
 import com.revalclan.util.SyncStateManager;
 import com.revalclan.util.Worlds;
-import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.gameval.VarClientID;
 
@@ -21,7 +20,6 @@ import java.util.Map;
 /**
  * Collects ALL player data by coordinating various managers
  */
-@Slf4j
 @Singleton
 public class PlayerDataCollector {
 	@Inject

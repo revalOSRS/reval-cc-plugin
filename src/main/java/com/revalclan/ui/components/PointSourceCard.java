@@ -13,7 +13,6 @@ import java.awt.*;
 
 public class PointSourceCard extends JPanel {
 	private final JLabel iconLabel = new JLabel();
-	private Color pointsColor = UIConstants.ACCENT_GREEN;
 
 	public PointSourceCard(PointsResponse.PointSource source, ItemManager itemManager) {
 		Integer itemId = source.getMetadata() != null ? source.getMetadata().getItemId() : null;
@@ -51,15 +50,8 @@ public class PointSourceCard extends JPanel {
 			loadIcon(itemId, itemManager);
 		}
 
-		JPanel textPanel = new JPanel();
-		textPanel.setLayout(new BoxLayout(textPanel, BoxLayout.Y_AXIS));
-		textPanel.setOpaque(false);
-
-		JLabel nameLabel = new JLabel(name);
-		nameLabel.setFont(FontManager.getRunescapeBoldFont());
-		nameLabel.setForeground(UIConstants.TEXT_PRIMARY);
-		nameLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-		textPanel.add(nameLabel);
+		JPanel textPanel = Labels.column();
+		textPanel.add(Labels.bold(name, UIConstants.TEXT_PRIMARY));
 
 		if (description != null && !description.isEmpty()) {
 			JTextArea descArea = new JTextArea(description);
@@ -77,9 +69,7 @@ public class PointSourceCard extends JPanel {
 
 		leftPanel.add(textPanel, BorderLayout.CENTER);
 
-		JLabel pointsLabel = new JLabel(points);
-		pointsLabel.setFont(FontManager.getRunescapeSmallFont());
-		pointsLabel.setForeground(pointsColor);
+		JLabel pointsLabel = Labels.small(points, UIConstants.ACCENT_GREEN);
 		pointsLabel.setVerticalAlignment(SwingConstants.TOP);
 
 		add(leftPanel, BorderLayout.CENTER);
@@ -97,10 +87,6 @@ public class PointSourceCard extends JPanel {
 
 	@Override
 	protected void paintComponent(Graphics g) {
-		Graphics2D g2d = (Graphics2D) g.create();
-		g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-		g2d.setColor(getBackground());
-		g2d.fillRoundRect(0, 0, getWidth(), getHeight(), 4, 4);
-		g2d.dispose();
+		RoundedPanel.fill(g, this, getBackground(), 4);
 	}
 }
