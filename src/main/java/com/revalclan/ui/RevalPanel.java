@@ -459,6 +459,7 @@ public class RevalPanel extends PluginPanel {
 		clanValidated = false;
 		if (adminRetry != null) { adminRetry.stop(); adminRetry = null; }
 		profilePanel.shutDown();
+		competitionsPanel.shutDown();
 		eventsPanel.onLoggedOut();
 	}
 

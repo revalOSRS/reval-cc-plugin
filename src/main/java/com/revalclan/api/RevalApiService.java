@@ -8,7 +8,6 @@ import com.revalclan.api.admin.ActualizeRankChangeResponse;
 import com.revalclan.api.admin.AdminAuthResponse;
 import com.revalclan.api.admin.AdminLoginRequest;
 import com.revalclan.api.admin.PendingRankChangesResponse;
-import com.revalclan.api.challenges.ChallengesResponse;
 import com.revalclan.api.leagues.LeaguesConfigResponse;
 import com.revalclan.api.competitions.*;
 import com.revalclan.api.announcements.AnnouncementsResponse;
@@ -35,7 +34,6 @@ import okhttp3.*;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
-import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -66,9 +64,7 @@ public class RevalApiService {
     private final CachedFetch<PointsResponse> points = new CachedFetch<>(CACHE_DURATION_MS);
     private final CachedFetch<AccountResponse> account = new CachedFetch<>(ACCOUNT_CACHE_DURATION_MS);
     private final CachedFetch<ActiveTeamsResponse> teams = new CachedFetch<>(CACHE_DURATION_MS);
-    private final CachedFetch<AchievementsResponse> achievements = new CachedFetch<>(CACHE_DURATION_MS);
     private final CachedFetch<DiariesResponse> diaries = new CachedFetch<>(CACHE_DURATION_MS);
-    private final CachedFetch<ChallengesResponse> challenges = new CachedFetch<>(CACHE_DURATION_MS);
     private final CachedFetch<LeaguesConfigResponse> leagues = new CachedFetch<>(0);
 
     @Inject
@@ -172,16 +168,8 @@ public class RevalApiService {
 
     // ==================== ACHIEVEMENTS API ====================
 
-    public void fetchAchievementDefinitions(Long accountHash, Consumer<AchievementsResponse> onSuccess, Consumer<Exception> onError) {
-        if (accountHash == null) {
-            observe(achievements.get(null, () -> getFuture(ApiEndpoints.ACHIEVEMENTS, AchievementsResponse.class)), onSuccess, onError);
-        } else {
-            get(ApiEndpoints.ACHIEVEMENTS + "?accountHash=" + accountHash, AchievementsResponse.class, onSuccess, onError);
-        }
-    }
-
-    public void fetchAchievementDefinitions(Consumer<AchievementsResponse> onSuccess, Consumer<Exception> onError) {
-        fetchAchievementDefinitions(null, onSuccess, onError);
+    public void fetchAchievementDefinitions(long accountHash, Consumer<AchievementsResponse> onSuccess, Consumer<Exception> onError) {
+        get(ApiEndpoints.ACHIEVEMENTS + "?accountHash=" + accountHash, AchievementsResponse.class, onSuccess, onError);
     }
 
     // ==================== DIARIES API ====================
@@ -192,24 +180,6 @@ public class RevalApiService {
         } else {
             get(ApiEndpoints.DIARIES + "?accountHash=" + accountHash, DiariesResponse.class, onSuccess, onError);
         }
-    }
-
-    public void fetchDiaries(Consumer<DiariesResponse> onSuccess, Consumer<Exception> onError) {
-        fetchDiaries(null, onSuccess, onError);
-    }
-
-    // ==================== CHALLENGES API ====================
-
-    public void fetchChallenges(Long accountHash, Consumer<ChallengesResponse> onSuccess, Consumer<Exception> onError) {
-        if (accountHash == null) {
-            observe(challenges.get(null, () -> getFuture(ApiEndpoints.CHALLENGES, ChallengesResponse.class)), onSuccess, onError);
-        } else {
-            get(ApiEndpoints.CHALLENGES + "?accountHash=" + accountHash, ChallengesResponse.class, onSuccess, onError);
-        }
-    }
-    
-    public void fetchChallenges(Consumer<ChallengesResponse> onSuccess, Consumer<Exception> onError) {
-        fetchChallenges(null, onSuccess, onError);
     }
 
     // ==================== LEAGUES API ====================
@@ -240,17 +210,10 @@ public class RevalApiService {
             onError.accept(new IOException("Invalid event image URL"));
             return;
         }
-        httpClient.newCall(new Request.Builder().url(url).build()).enqueue(new Callback() {
-            @Override public void onFailure(Call call, IOException error) { onError.accept(error); }
-            @Override public void onResponse(Call call, Response response) {
-                try (Response result = response) {
-                    if (!result.isSuccessful() || result.body() == null) throw new IOException("Event image unavailable");
-                    BufferedImage image = ImageIO.read(result.body().byteStream());
-                    if (image == null) throw new IOException("Unsupported event image format");
-                    onSuccess.accept(image);
-                } catch (IOException error) { onError.accept(error); }
-            }
-        });
+        observe(requests.request(httpClient, new Request.Builder().url(url).build(), response -> {
+            if (!response.isSuccessful() || response.body() == null) throw new IOException("Event image unavailable");
+            return CompetitionArtwork.read(response.body());
+        }), onSuccess, onError);
     }
 
     public void fetchScheduledCompetitions(Consumer<CompetitionsResponse> onSuccess, Consumer<Exception> onError) {
@@ -332,11 +295,10 @@ public class RevalApiService {
     // ==================== CACHE MANAGEMENT ====================
 
     public void clearCache() {
-        points.clear(); account.clear(); teams.clear(); achievements.clear();
-        diaries.clear(); challenges.clear(); leagues.clear();
+        points.clear(); account.clear(); teams.clear(); diaries.clear(); leagues.clear();
     }
 
-    public void clearAccountCache() { account.clear(); achievements.clear(); }
+    public void clearAccountCache() { account.clear(); }
 
     // ==================== HTTP HELPERS ====================
 
