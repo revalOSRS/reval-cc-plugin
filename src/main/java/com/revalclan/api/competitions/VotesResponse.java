@@ -23,10 +23,7 @@ public class VotesResponse extends ApiResponse {
         private String id;
         private String title;
         private String description;
-        private String voteStartDate;
         private String voteEndDate;
-        private String competitionStartDate;
-        private String competitionEndDate;
         private Integer totalVotes;
         private List<VoteOption> options;
     }
@@ -34,11 +31,7 @@ public class VotesResponse extends ApiResponse {
     @Data
     public static class VoteOption {
         private String id;
-        private String templateId;
         private String templateName;
-        private String templateDescription;
-        private String competitionType;
         private Integer voteCount;
-        private Integer displayOrder;
     }
 }

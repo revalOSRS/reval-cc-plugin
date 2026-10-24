@@ -34,11 +34,7 @@ public class Badge extends JLabel {
 
 	@Override
 	protected void paintComponent(Graphics g) {
-		Graphics2D g2d = (Graphics2D) g.create();
-		g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-		g2d.setColor(Colors.withAlpha(badgeColor, 40));
-		g2d.fillRoundRect(0, 0, getWidth(), getHeight(), 6, 6);
-		g2d.dispose();
+		RoundedPanel.fill(g, this, Colors.withAlpha(badgeColor, 40), 6);
 		super.paintComponent(g);
 	}
 

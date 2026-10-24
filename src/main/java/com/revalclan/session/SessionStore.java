@@ -176,11 +176,10 @@ public class SessionStore {
 		Files.deleteIfExists(fileFor(sessionId).toPath());
 	}
 
-	/** Reads on the shared single worker after preceding writes and tombstones. */
+	/** Reads after preceding writes were attempted; one failed write must not hide other saved sessions. */
 	public CompletableFuture<List<PersistedSession>> readAll() {
 		CompletableFuture<List<PersistedSession>> result = new CompletableFuture<>();
 		flush().whenComplete((ignored, failure) -> {
-			if (failure != null) { result.completeExceptionally(failure); return; }
 			try {
 				executor.execute(() -> {
 					if (result.isDone()) return;

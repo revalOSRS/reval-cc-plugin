@@ -17,11 +17,8 @@ public class AccountResponse extends ApiResponse {
     public static class AccountData {
         private OsrsAccount osrsAccount;
         private PointsBreakdown pointsBreakdown;
-        private Integer questPoints;
-        private Integer diariesTotalCompleted;
         private Integer combatAchievementPoints;
         private Integer collectionLogUniqueObtained;
-        private Integer totalKills;
         private List<Milestone> milestones;
         private List<PointsLogEntry> pointsLog;
     }
@@ -31,17 +28,11 @@ public class AccountResponse extends ApiResponse {
      */
     @Data
     public static class OsrsAccount {
-        private Integer id;
         private String osrsNickname;
-        private Integer womPlayerId;
-        private String womRank;
         private Double ehp;
         private Double ehb;
         private Integer activityPoints;
-        private Integer maintenancePoints;
         private String clanRank;
-        private String lastSyncedAt;
-        private String rankUpdatedAt;
     }
 
     /**
@@ -74,13 +65,8 @@ public class AccountResponse extends ApiResponse {
      */
     @Data
     public static class PointsLogEntry {
-        private Integer id;
-        private Integer osrsAccountId;
-        private String pointType; // 'activity' | 'maintenance'
         private Integer pointsChange;
-        private Integer pointsAfter;
         private String sourceType; // 'drop' | 'pet' | 'milestone' | 'manual' | 'event' | 'decay' | 'misc'
-        private Integer sourceId;
         private Integer itemId;
         private String sourceDescription;
         private String createdAt;

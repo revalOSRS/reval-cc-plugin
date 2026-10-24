@@ -7,6 +7,7 @@ import com.revalclan.ui.components.AccentCard;
 import com.revalclan.ui.components.Badge;
 import com.revalclan.ui.components.Clickable;
 import com.revalclan.ui.components.ColorDot;
+import com.revalclan.ui.components.Labels;
 import com.revalclan.ui.constants.UIConstants;
 import com.revalclan.util.DateTimeUtil;
 import net.runelite.client.ui.FontManager;

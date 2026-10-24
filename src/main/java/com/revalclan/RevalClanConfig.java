@@ -1,6 +1,5 @@
 package com.revalclan;
 
-import com.revalclan.ui.HalloweenAppearance;
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
@@ -31,67 +30,6 @@ public interface RevalClanConfig extends Config {
 	)
 	default boolean hideCompletedItems() {
 		return false;
-	}
-
-	// ── Themes ─────────────────────────────────────────────────────────
-	@ConfigSection(
-		name = "Themes",
-		description = "Seasonal themes for the Reval side panel",
-		position = 1,
-		closedByDefault = true
-	)
-	String themesSection = "themesSection";
-
-	@ConfigItem(
-		keyName = "halloweenTheme",
-		name = "Halloween theme",
-		description = "Pumpkin-orange tabs, candlelit cards and cobwebs. Automatic enables it in October; Off restores the normal theme. Changes reload the side panel.",
-		section = themesSection,
-		position = 0
-	)
-	default HalloweenAppearance halloweenTheme() {
-		return HalloweenAppearance.AUTOMATIC;
-	}
-
-	// ── Profile cards ──────────────────────────────────────────────────
-	@ConfigSection(
-		name = "Profile cards",
-		description = "Where the 'View Reval Profile' right-click option appears",
-		position = 2
-	)
-	String profileCardsSection = "profileCardsSection";
-
-	@ConfigItem(
-		keyName = "profileCardsOnPlayers",
-		name = "Players",
-		description = "View Reval Profile when right-clicking a clan member in the world (off by default to keep the menu short)",
-		section = profileCardsSection,
-		position = 0
-	)
-	default boolean profileCardsOnPlayers() {
-		return false;
-	}
-
-	@ConfigItem(
-		keyName = "profileCardsInChat",
-		name = "Chat",
-		description = "View Reval Profile when right-clicking a clan member's name in chat",
-		section = profileCardsSection,
-		position = 1
-	)
-	default boolean profileCardsInChat() {
-		return true;
-	}
-
-	@ConfigItem(
-		keyName = "profileCardsInClanList",
-		name = "Clan list",
-		description = "View Reval Profile when right-clicking a member in the clan member list",
-		section = profileCardsSection,
-		position = 2
-	)
-	default boolean profileCardsInClanList() {
-		return true;
 	}
 
 	// ── Events ─────────────────────────────────────────────────────────
@@ -132,7 +70,7 @@ public interface RevalClanConfig extends Config {
 	// ── Notifications ──────────────────────────────────────────────────
 	@ConfigSection(
 		name = "Notifications",
-		description = "What the plugin shows you and what it shares with the clan",
+		description = "What the plugin shows you in chat",
 		position = 4
 	)
 	String eventsSection = "eventsSection";
@@ -145,28 +83,6 @@ public interface RevalClanConfig extends Config {
 		position = 0
 	)
 	default boolean showAnnouncements() {
-		return true;
-	}
-
-	@ConfigItem(
-		keyName = "notifyDeath",
-		name = "Send player deaths to Discord",
-		description = "Post your deaths (and who killed you) to the clan Discord",
-		section = eventsSection,
-		position = 1
-	)
-	default boolean notifyDeath() {
-		return true;
-	}
-
-	@ConfigItem(
-		keyName = "notifyLeagues",
-		name = "Leagues Events",
-		description = "Track Leagues events (tasks, relics, areas, combat masteries)",
-		section = eventsSection,
-		position = 2
-	)
-	default boolean notifyLeagues() {
 		return true;
 	}
 

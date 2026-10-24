@@ -2,7 +2,6 @@ package com.revalclan.ui.components;
 
 import com.revalclan.ui.constants.UIConstants;
 import com.revalclan.util.UIAssetLoader;
-import net.runelite.client.ui.FontManager;
 
 import javax.swing.*;
 import java.awt.*;
@@ -35,9 +34,7 @@ public class ChecklistItem extends JPanel {
 		statusBox.setPreferredSize(new Dimension(14, 14));
 		statusBox.setOpaque(false);
 
-		JLabel descLabel = new JLabel(description);
-		descLabel.setFont(FontManager.getRunescapeSmallFont());
-		descLabel.setForeground(completed ? UIConstants.TEXT_PRIMARY : UIConstants.TEXT_SECONDARY);
+		JLabel descLabel = Labels.small(description, completed ? UIConstants.TEXT_PRIMARY : UIConstants.TEXT_SECONDARY);
 		descLabel.setToolTipText(description);
 
 		JPanel leftPanel = new JPanel(new BorderLayout(8, 0));
@@ -47,9 +44,7 @@ public class ChecklistItem extends JPanel {
 		add(leftPanel, BorderLayout.CENTER);
 
 		if (points != null && points > 0) {
-			JLabel pointsLabel = new JLabel("+" + points + " pts");
-			pointsLabel.setFont(FontManager.getRunescapeSmallFont());
-			pointsLabel.setForeground(UIConstants.ACCENT_GOLD);
+			JLabel pointsLabel = Labels.small("+" + points + " pts", UIConstants.ACCENT_GOLD);
 			pointsLabel.setVerticalAlignment(SwingConstants.TOP);
 			add(pointsLabel, BorderLayout.EAST);
 		}

@@ -8,8 +8,6 @@ import com.revalclan.collectionlog.CollectionLogSyncButton;
 import com.revalclan.collectionlog.SyncGuide;
 import com.revalclan.collectionlog.SyncGuideOverlay;
 import com.revalclan.events.RegistrationMarksOverlay;
-import com.revalclan.playercards.PlayerCardManager;
-import com.revalclan.playercards.PlayerCardOverlay;
 import com.revalclan.teams.ClanTeamColors;
 import com.revalclan.ui.leaguesbingo.LeaguesBingoPanel;
 import com.revalclan.notifiers.*;
@@ -23,6 +21,7 @@ import com.revalclan.ui.RevalPanel;
 import com.revalclan.ui.components.HalloweenDecoration;
 import com.revalclan.ui.constants.UIConstants;
 import com.revalclan.util.AnnouncementService;
+import com.revalclan.util.ArchiveLootBroadcasts;
 import com.revalclan.util.ClanRankIconResolver;
 import com.revalclan.util.EventFilterManager;
 import com.revalclan.util.RaidPartyTracker;
@@ -40,7 +39,7 @@ import java.util.concurrent.TimeUnit;
 
 import java.awt.image.BufferedImage;
 import java.time.LocalDate;
-import java.util.regex.Pattern;
+import java.time.Month;
 
 import javax.inject.Inject;
 import javax.swing.SwingUtilities;
@@ -62,6 +61,7 @@ import net.runelite.api.events.StatChanged;
 import net.runelite.api.events.VarbitChanged;
 import net.runelite.api.events.WidgetLoaded;
 import net.runelite.api.events.ScriptPreFired;
+import net.runelite.api.events.ScriptCallbackEvent;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.events.ConfigChanged;
@@ -74,6 +74,7 @@ import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.ClientToolbar;
 import net.runelite.client.ui.NavigationButton;
 import net.runelite.client.ui.overlay.OverlayManager;
+import net.runelite.client.util.Text;
 
 @Slf4j
 @PluginDescriptor(
@@ -90,8 +91,6 @@ public class RevalClanPlugin extends Plugin {
 	@Inject	private SyncGuideOverlay syncGuideOverlay;
 	@Inject	private ClanTeamColors clanTeamColors;
 	@Inject	private RegistrationMarksOverlay registrationMarksOverlay;
-	@Inject	private PlayerCardManager playerCardManager;
-	@Inject	private PlayerCardOverlay playerCardOverlay;
 	@Inject	private OverlayManager overlayManager;
 	@Inject	private ClanRankIconResolver rankIconResolver;
 
@@ -174,9 +173,6 @@ public class RevalClanPlugin extends Plugin {
 	private boolean pendingLoginNotification = false;
 	private RequestScope lifecycle = new RequestScope();
 
-	private static final Pattern COL_OPEN = Pattern.compile("<col=[0-9a-fA-F]+>");
-	private static final Pattern COL_CLOSE = Pattern.compile("</col>");
-
 	@Override
 	protected void startUp() throws Exception {
 		lifecycle.cancel();
@@ -222,29 +218,22 @@ public class RevalClanPlugin extends Plugin {
 		eventBus.register(clanTeamColors);
 		clanTeamColors.startUp();
 		overlayManager.add(registrationMarksOverlay);
-		eventBus.register(playerCardManager);
-		overlayManager.add(playerCardOverlay);
 
 		// Initialize and add the side panel
 		try {
 			if (SwingUtilities.isEventDispatchThread()) {
-				rebuildSidepanel();
+				buildSidepanel();
 			} else {
-				SwingUtilities.invokeAndWait(this::rebuildSidepanel);
+				SwingUtilities.invokeAndWait(this::buildSidepanel);
 			}
 		} catch (Exception e) {
 			log.error("Failed to initialize Reval Clan panel", e);
 		}
 	}
 
-	/** Rebuild the themed Swing tree without restarting game tracking or the plugin. */
-	private void rebuildSidepanel() {
-		boolean replacing = revalPanel != null;
-		String activeTab = replacing ? revalPanel.getActiveTab() : "PROFILE";
-		if (replacing) revalPanel.shutDown();
-		if (navButton != null) clientToolbar.removeNavigation(navButton);
-
-		UIConstants.setHalloweenTheme(config.halloweenTheme().isActive(LocalDate.now()));
+	/** Build the side panel; the Halloween theme is used throughout October. */
+	private void buildSidepanel() {
+		UIConstants.setHalloweenTheme(LocalDate.now().getMonth() == Month.OCTOBER);
 		revalPanel = new RevalPanel();
 		revalPanel.init(revalApiService, client, uiAssetLoader, itemManager, spriteManager, config,
 			rankIconResolver);
@@ -259,7 +248,7 @@ public class RevalClanPlugin extends Plugin {
 				}
 			});
 		});
-		revalPanel.showTab(activeTab);
+		revalPanel.showTab("PROFILE");
 
 		BufferedImage icon = UIConstants.isHalloweenTheme()
 			? HalloweenDecoration.pumpkinImage(30) : uiAssetLoader.getImage("reval.png");
@@ -270,7 +259,6 @@ public class RevalClanPlugin extends Plugin {
 			.panel(revalPanel)
 			.build();
 		clientToolbar.addNavigation(navButton);
-		if (replacing) clientToolbar.openPanel(navButton);
 		if (client.getGameState() == GameState.LOGGED_IN && clanMembership.isMember()) {
 			revalPanel.onLoggedIn();
 		}
@@ -310,9 +298,6 @@ public class RevalClanPlugin extends Plugin {
 		revalApiService.resetEventsSession();
 		revalApiService.shutDown();
 		overlayManager.remove(registrationMarksOverlay);
-		eventBus.unregister(playerCardManager);
-		playerCardManager.shutDown();
-		overlayManager.remove(playerCardOverlay);
 
 		announcementService.reset();
 
@@ -437,7 +422,7 @@ public class RevalClanPlugin extends Plugin {
 	public void onGameTick(GameTick gameTick) {
 		// The session and its kill attribution record regardless of clan state — only sending is gated
 		sessionTracker.onGameTick();
-		killTracker.onGameTick(gameTick);
+		killTracker.onGameTick();
 		raidPartyTracker.onGameTick();
 
 		// Re-read the clan sources; flips to member exactly once per login
@@ -493,8 +478,8 @@ public class RevalClanPlugin extends Plugin {
 		raidPartyTracker.onChatMessage(event.getType(), event.getMessage());
 		if (!clanMembership.isMember()) return;
 
-		String message = event.getMessage();
-		String cleanMessage = COL_CLOSE.matcher(COL_OPEN.matcher(message).replaceAll("")).replaceAll("");
+		String cleanMessage = Text.removeTags(event.getMessage().replace("<br>", " "))
+			.replace('\u00A0', ' ').trim();
 
 		ChatMessageType type = event.getType();
 
@@ -510,11 +495,14 @@ public class RevalClanPlugin extends Plugin {
 			combatAchievementNotifier.onChatMessage(cleanMessage);
 			collectionNotifier.onChatMessage(cleanMessage);
 			leaguesNotifier.onChatMessage(cleanMessage);
-		} else if (type == ChatMessageType.CLAN_MESSAGE ||
-			type == ChatMessageType.CLAN_CHAT ||
-			type == ChatMessageType.CLAN_GUEST_CHAT) {
+		} else if (type == ChatMessageType.CLAN_MESSAGE) {
 			petNotifier.onClanNotification(cleanMessage);
 		}
+	}
+
+	@Subscribe
+	public void onScriptCallbackEvent(ScriptCallbackEvent event) {
+		ArchiveLootBroadcasts.filter(client, event);
 	}
 
 	@Subscribe
@@ -582,11 +570,6 @@ public class RevalClanPlugin extends Plugin {
 
 		if ("hideCompletedItems".equals(event.getKey()) && revalPanel != null) {
 			revalPanel.getProfilePanel().rebuild();
-		}
-		if ("halloweenTheme".equals(event.getKey()) && revalPanel != null) {
-			SwingUtilities.invokeLater(() -> {
-				if (revalPanel != null) rebuildSidepanel();
-			});
 		}
 	}
 

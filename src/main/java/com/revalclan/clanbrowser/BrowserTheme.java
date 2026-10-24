@@ -3,6 +3,7 @@ package com.revalclan.clanbrowser;
 import java.awt.Color;
 import java.awt.Font;
 import java.awt.FontMetrics;
+import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.text.NumberFormat;
@@ -15,6 +16,9 @@ import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.JScrollPane;
 import javax.swing.JTextField;
+import javax.swing.border.Border;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import net.runelite.client.ui.FontManager;
 
 /** A shared RuneScape palette and pixel-font drawing rules for every browser view. */
@@ -41,12 +45,21 @@ final class BrowserTheme {
     static String counter(BrowserModels.Metric metric) {
         String key = metric.key == null ? "" : metric.key;
         String skill = key.startsWith("xp:") ? key.substring(3).replace('_', ' ') : "";
-        if (!skill.isEmpty()) skill = skill.substring(0, 1).toUpperCase(Locale.ROOT) + skill.substring(1);
-        String label = "xp".equals(metric.kind) ? skill + " XP" : "clues".equals(metric.kind) ? "Clues" : "completions".equals(metric.kind) ? "Completions" : "Kills";
+        if (!skill.isEmpty()) skill = capitalize(skill);
+        String label = "xp".equals(metric.kind) ? skill + " XP" : metricName(metric.kind);
         String value = label + ": " + (metric.current == null ? "Unknown" : number(metric.current));
         return metric.completion == null ? value : value + " (" + (metric.completion.estimated ? "~" : "") + number(metric.completion.value) + ")";
     }
-    static void pixel(Graphics2D g) { g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_OFF); g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR); }
+    /** Counter names shared by collection log headings and leaderboard columns. */
+    static String metricName(String kind) { return "xp".equals(kind) ? "XP" : "clues".equals(kind) ? "Clues" : "completions".equals(kind) ? "Completions" : "Kills"; }
+    static String luckRank(BrowserModels.LuckRank rank) { return "Clan luck: #" + rank.rank + " / " + rank.total + (rank.estimated ? " (est.)" : ""); }
+    static String capitalize(String value) { return value.substring(0, 1).toUpperCase(Locale.ROOT) + value.substring(1); }
+    /** A copy of the graphics with the pixel font's rendering hints; the caller disposes it. */
+    static Graphics2D pixel(Graphics graphics) {
+        Graphics2D g = (Graphics2D) graphics.create();
+        g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_OFF); g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+        return g;
+    }
     static void text(Graphics2D g, String text, int x, int top, int height, int maxWidth, int size, Color color, boolean bold, boolean right) {
         if (text == null) return;
         Font selected = font(size, bold);
@@ -67,18 +80,29 @@ final class BrowserTheme {
     static JButton button(String text) {
         JButton button = new JButton(text);
         button.setFont(font(20, true)); button.setForeground(TEXT); button.setBackground(HEADER);
-        button.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(BORDER), BorderFactory.createEmptyBorder(5, 12, 5, 12)));
+        button.setBorder(outline(BORDER, 5, 12));
         button.setFocusPainted(false); return button;
     }
     static void collectionCategory(JButton button, boolean selected, boolean complete) {
         button.setForeground(complete ? GREEN : selected ? GOLD : TEXT);
         button.setBackground(complete ? selected ? new Color(0x4e6039) : RECEIVED : selected ? new Color(0x6b5a3d) : HEADER);
-        Color border = complete ? selected ? GREEN : GREEN_BORDER : BORDER;
-        button.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(border), BorderFactory.createEmptyBorder(5, 12, 5, 12)));
+        button.setBorder(outline(complete ? selected ? GREEN : GREEN_BORDER : BORDER, 5, 12));
     }
     static void field(JTextField field) {
         field.setBackground(HEADER); field.setForeground(TEXT); field.setCaretColor(GOLD); field.setFont(font(20, false));
-        field.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(BORDER), BorderFactory.createEmptyBorder(5, 8, 5, 8)));
+        field.setBorder(outline(BORDER, 5, 8));
+    }
+    /** A one-pixel line in the given colour around symmetric padding. */
+    static Border outline(Color color, int vertical, int horizontal) {
+        return BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(color), BorderFactory.createEmptyBorder(vertical, horizontal, vertical, horizontal));
+    }
+    /** Runs the action after every edit of the field's text. */
+    static void onChange(JTextField field, Runnable action) {
+        field.getDocument().addDocumentListener(new DocumentListener() {
+            public void insertUpdate(DocumentEvent event) { action.run(); }
+            public void removeUpdate(DocumentEvent event) { action.run(); }
+            public void changedUpdate(DocumentEvent event) { action.run(); }
+        });
     }
     static JScrollPane scroll(JComponent component) {
         JScrollPane pane = new JScrollPane(component);

@@ -21,7 +21,6 @@ public class EventsResponse extends ApiResponse {
 
     @Data
     public static class EventsData {
-        private int count;
         private List<EventSummary> events;
     }
 
@@ -36,11 +35,7 @@ public class EventsResponse extends ApiResponse {
         private String startDate;  // ISO 8601
         private String endDate;    // ISO 8601
         private List<EventRegistration> registrations;
-        
-        public boolean isCompleted() {
-            return "completed".equals(status);
-        }
-        
+
         public boolean isCurrentlyActive() {
             return "active".equals(status) || "planning".equals(status);
         }

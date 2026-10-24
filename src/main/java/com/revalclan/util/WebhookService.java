@@ -32,8 +32,6 @@ import java.util.zip.GZIPOutputStream;
 @Singleton
 public class WebhookService {
 	private static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
-	private static final MediaType GZIP = MediaType.parse("application/gzip");
-	private static final MediaType JPEG = MediaType.parse("image/jpeg");
 	private static final String WEBHOOK_URL = "https://api.revalosrs.ee/reval-webhook";
 	private final OkHttpClient httpClient;
 	private final Gson gson;
@@ -52,12 +50,8 @@ public class WebhookService {
 	public void startUp() { scope.cancel(); scope = new RequestScope(); }
 	public void shutDown() { scope.cancel(); }
 
-	public CompletableFuture<JsonObject> sendDataAsync(Map<String, Object> data) {
-		return sendDataAsync(data, (byte[]) null);
-	}
-
 	/** Callers transfer ownership of data and must not mutate it after sending. */
-	public CompletableFuture<JsonObject> sendDataAsync(Map<String, Object> data, byte[] screenshot) {
+	public CompletableFuture<JsonObject> sendDataAsync(Map<String, Object> data) {
 		RequestScope owner = scope;
 		CompletableFuture<JsonObject> result = owner.track(new CompletableFuture<>());
 		if (result.isDone()) return result;
@@ -81,7 +75,7 @@ public class WebhookService {
 			executor.execute(() -> {
 				try {
 					if (result.isDone()) return;
-					Request request = prepare(data, screenshot);
+					Request request = prepare(data);
 					if (result.isDone()) return;
 					CompletableFuture<JsonObject> delivery = owner.request(httpClient, request, response -> {
 						if (!response.isSuccessful()) throw new IOException("HTTP " + response.code());
@@ -104,17 +98,10 @@ public class WebhookService {
 		return result;
 	}
 
-	private Request prepare(Map<String, Object> data, byte[] screenshot) throws IOException {
+	private Request prepare(Map<String, Object> data) throws IOException {
 		byte[] payload = gzip(gson.toJson(data).getBytes(StandardCharsets.UTF_8));
-		Request.Builder request = new Request.Builder().url(WEBHOOK_URL).header("User-Agent", PluginVersion.userAgent());
-		if (screenshot == null) {
-			request.post(RequestBody.create(JSON, payload)).header("Content-Encoding", "gzip");
-		} else {
-			request.post(new MultipartBody.Builder().setType(MultipartBody.FORM)
-				.addFormDataPart("payload", "payload.json.gz", RequestBody.create(GZIP, payload))
-				.addFormDataPart("screenshot", "screenshot.jpg", RequestBody.create(JPEG, screenshot)).build());
-		}
-		return request.build();
+		return new Request.Builder().url(WEBHOOK_URL).header("User-Agent", PluginVersion.userAgent())
+			.header("Content-Encoding", "gzip").post(RequestBody.create(JSON, payload)).build();
 	}
 
 	private static byte[] gzip(byte[] bytes) throws IOException {

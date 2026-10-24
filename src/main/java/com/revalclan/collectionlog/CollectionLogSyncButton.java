@@ -89,7 +89,7 @@ public class CollectionLogSyncButton implements SessionScoped {
 		int menuId = (int) args[3];
 
 		try {
-			addButton(menuId, this::onButtonClick);
+			addButton(menuId);
 		} catch (Exception e) {
 			log.debug("Failed to add Reval button to menu: {}", e.getMessage());
 		}
@@ -101,15 +101,14 @@ public class CollectionLogSyncButton implements SessionScoped {
 		// Rate limit: 30 seconds between syncs
 		if (lastAttemptedSync != -1 && lastAttemptedSync + 50 > client.getTickCount()) {
 			int secondsRemaining = (int) Math.round((lastAttemptedSync + 50 - client.getTickCount()) * 0.6);
-			client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", 
-				"Reval: Please wait " + secondsRemaining + " seconds before syncing again.", "");
+			chat("Reval: Please wait " + secondsRemaining + " seconds before syncing again.");
 			return;
 		}
 		lastAttemptedSync = client.getTickCount();
 
 		// Validate clan membership
 		if (!clanMembership.isMember()) {
-			client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "Reval: You must be in the Reval clan to sync.", "");
+			chat("Reval: You must be in the Reval clan to sync.");
 			return;
 		}
 
@@ -120,13 +119,9 @@ public class CollectionLogSyncButton implements SessionScoped {
 		client.menuAction(-1, 40697932, MenuAction.CC_OP, 1, -1, "Search", null);
 		client.runScript(2240);
 
-		client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "Reval: Scanning collection log...", "");
+		chat("Reval: Scanning collection log...");
 
 		// Schedule the sync after a short delay to allow the search to populate items
-		scheduleSync();
-	}
-
-	private void scheduleSync() {
 		pendingSyncTick = client.getTickCount() + SYNC_DELAY_TICKS;
 	}
 
@@ -141,17 +136,20 @@ public class CollectionLogSyncButton implements SessionScoped {
 	private void performSync() {
 		try {
 			syncNotifier.triggerSync();
-			client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", 
-				"Reval: Synced account data successfully!", "");
+			chat("Reval: Synced account data successfully!");
 		} catch (Exception e) {
-			client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "Reval: Failed to sync. Please try again.", "");
+			chat("Reval: Failed to sync. Please try again.");
 		}
 	}
 
-	private void addButton(int menuId, Runnable onClick) throws NullPointerException, NoSuchElementException {
+	private void chat(String message) {
+		client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", message, "");
+	}
+
+	/** Throws NullPointerException / NoSuchElementException when the menu is not as expected. */
+	private void addButton(int menuId) {
 		// Don't add button if viewing from POH adventure log (viewing someone else's log)
-		boolean isOpenedFromAdventureLog = client.getVarbitValue(VarbitID.COLLECTION_POH_HOST_BOOK_OPEN) == 1;
-		if (isOpenedFromAdventureLog) return;
+		if (client.getVarbitValue(VarbitID.COLLECTION_POH_HOST_BOOK_OPEN) == 1) return;
 
 		Widget menu = Objects.requireNonNull(client.getWidget(menuId));
 		Widget[] menuChildren = Objects.requireNonNull(menu.getChildren());
@@ -179,7 +177,7 @@ public class CollectionLogSyncButton implements SessionScoped {
 
 		// Check if button already exists
 		final Widget existing = Arrays.stream(menuChildren)
-			.filter(w -> w.getText() != null && w.getText().equals(BUTTON_TEXT))
+			.filter(w -> BUTTON_TEXT.equals(w.getText()))
 			.findFirst()
 			.orElse(null);
 		if (existing != null) {
@@ -212,7 +210,7 @@ public class CollectionLogSyncButton implements SessionScoped {
 			text.setOnMouseOverListener((JavaScriptCallback) ev -> text.setTextColor(FONT_COLOR_ACTIVE));
 			text.setOnMouseLeaveListener((JavaScriptCallback) ev -> text.setTextColor(FONT_COLOR));
 			text.setAction(0, "Sync collection log to Reval");
-			text.setOnOpListener((JavaScriptCallback) ev -> onClick.run());
+			text.setOnOpListener((JavaScriptCallback) ev -> onButtonClick());
 			text.revalidate();
 			syncGuide.setSyncButtonWidget(text);
 		}

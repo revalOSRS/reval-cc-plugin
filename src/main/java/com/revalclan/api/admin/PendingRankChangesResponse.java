@@ -23,17 +23,9 @@ public class PendingRankChangesResponse extends ApiResponse {
     @Data
     public static class RankChange {
         private int id;
-        private int osrsAccountId;
         private String osrsNickname;
         private String previousRank;
         private String newRank;
-        private String changeReason;
-        private String changeDetails;
-        private int activityPointsAtChange;
-        private int maintenancePointsAtChange;
         private String changedAt;
-        private boolean actualized;
-        private String actualizedAt;
-        private Integer actualizedBy;
     }
 }

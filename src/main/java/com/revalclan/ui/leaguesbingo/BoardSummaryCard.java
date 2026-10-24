@@ -3,12 +3,12 @@ package com.revalclan.ui.leaguesbingo;
 import com.revalclan.api.leaguesbingo.LeaguesBingoResponse.Board;
 import com.revalclan.ui.components.AccentCard;
 import com.revalclan.ui.components.Badge;
+import com.revalclan.ui.components.Labels;
 import com.revalclan.ui.constants.UIConstants;
 import com.revalclan.util.SpriteIcons;
 import net.runelite.client.game.SpriteManager;
 
 import javax.swing.Box;
-import javax.swing.BoxLayout;
 import javax.swing.ImageIcon;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
@@ -47,9 +47,7 @@ final class BoardSummaryCard {
 			top.add(Labels.small(stats.percent() + "%", stats.allDone() ? TileCell.COMPLETED : UIConstants.TEXT_SECONDARY), BorderLayout.EAST);
 		}
 
-		JPanel lines = new JPanel();
-		lines.setLayout(new BoxLayout(lines, BoxLayout.Y_AXIS));
-		lines.setOpaque(false);
+		JPanel lines = Labels.column();
 		lines.add(top);
 		lines.add(Box.createVerticalStrut(4));
 		lines.add(Labels.small(stats.line(board), UIConstants.TEXT_SECONDARY));
@@ -72,11 +70,10 @@ final class BoardSummaryCard {
 		JLabel banner = new JLabel();
 		banner.setPreferredSize(new Dimension(BANNER_SIZE, BANNER_SIZE));
 		banner.setHorizontalAlignment(JLabel.CENTER);
-		banner.setVerticalAlignment(JLabel.CENTER);
 		int spriteId = stats.isBoardComplete() && meta.getBannerHighlightSprite() >= 0 ? meta.getBannerHighlightSprite() : meta.getBannerSprite();
-		if (spriteManager != null && spriteId >= 0) {
-			boolean dim = stats.isLocked();
-			SpriteIcons.load(spriteManager, spriteId, BANNER_SIZE, icon -> banner.setIcon(dim ? dimmed(icon) : icon));
+		// SpriteIcons.load ignores a null spriteManager.
+		if (spriteId >= 0) {
+			SpriteIcons.load(spriteManager, spriteId, BANNER_SIZE, icon -> banner.setIcon(stats.isLocked() ? dimmed(icon) : icon));
 		}
 
 		wrap.add(banner, BorderLayout.WEST);

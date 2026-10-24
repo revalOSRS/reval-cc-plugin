@@ -27,7 +27,7 @@ public final class ClanValidator {
 	public static final String REQUIRED_CLAN_NAME = "Reval";
 
 	/** Minimum clan rank required (-1 to 127, higher = more permissions). 0 = any member. */
-	public static final ClanRank MINIMUM_CLAN_RANK = new ClanRank(0);
+	public static final int MINIMUM_CLAN_RANK = 0;
 
 	private ClanValidator() {}
 
@@ -61,6 +61,6 @@ public final class ClanValidator {
 	}
 
 	private static boolean rankOk(ClanRank rank) {
-		return MINIMUM_CLAN_RANK == null || rank == null || rank.getRank() >= MINIMUM_CLAN_RANK.getRank();
+		return rank == null || rank.getRank() >= MINIMUM_CLAN_RANK;
 	}
 }

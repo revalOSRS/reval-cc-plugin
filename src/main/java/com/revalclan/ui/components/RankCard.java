@@ -3,7 +3,6 @@ package com.revalclan.ui.components;
 import com.revalclan.api.points.PointsResponse;
 import com.revalclan.ui.constants.UIConstants;
 import com.revalclan.util.ClanRankIconResolver;
-import net.runelite.client.ui.FontManager;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -21,12 +20,9 @@ public class RankCard extends JPanel {
 
 		iconLabel.setPreferredSize(new Dimension(18, 18));
 
-		JLabel nameLabel = new JLabel(displayName);
-		nameLabel.setFont(FontManager.getRunescapeBoldFont());
-		nameLabel.setForeground(UIConstants.ACCENT_GOLD);
+		JLabel nameLabel = Labels.bold(displayName, UIConstants.ACCENT_GOLD);
 
-		JPanel leftPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
-		leftPanel.setOpaque(false);
+		JPanel leftPanel = Labels.flow();
 		leftPanel.add(iconLabel);
 		leftPanel.add(nameLabel);
 
@@ -35,9 +31,7 @@ public class RankCard extends JPanel {
 			pointsText += " (" + rank.getMaintenancePerMonth() + "/mo)";
 		}
 
-		JLabel pointsLabel = new JLabel(pointsText);
-		pointsLabel.setFont(FontManager.getRunescapeBoldFont());
-		pointsLabel.setForeground(UIConstants.POINTS_COLOR);
+		JLabel pointsLabel = Labels.bold(pointsText, UIConstants.ACCENT_GREEN);
 
 		add(leftPanel, BorderLayout.WEST);
 		add(pointsLabel, BorderLayout.EAST);
@@ -65,10 +59,6 @@ public class RankCard extends JPanel {
 
 	@Override
 	protected void paintComponent(Graphics g) {
-		Graphics2D g2d = (Graphics2D) g.create();
-		g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-		g2d.setColor(getBackground());
-		g2d.fillRoundRect(0, 0, getWidth(), getHeight(), 6, 6);
-		g2d.dispose();
+		RoundedPanel.fill(g, this, getBackground(), 6);
 	}
 }

@@ -2,9 +2,10 @@ package com.revalclan.ui.admin;
 
 import com.revalclan.api.RevalApiService;
 import com.revalclan.api.admin.AdminAuthResponse;
+import com.revalclan.ui.components.Labels;
+import com.revalclan.ui.components.PanelTitle;
 import com.revalclan.ui.constants.UIConstants;
 import lombok.Getter;
-import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.client.ui.FontManager;
 
@@ -13,7 +14,6 @@ import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.util.function.Consumer;
 
-@Slf4j
 public class AdminLoginPanel extends JPanel {
 	private final RevalApiService apiService;
 	private final Client client;
@@ -48,14 +48,10 @@ public class AdminLoginPanel extends JPanel {
 		icon.setFont(icon.getFont().deriveFont(28f));
 		icon.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-		JLabel title = new JLabel("ADMIN LOGIN");
-		title.setFont(FontManager.getRunescapeBoldFont());
-		title.setForeground(UIConstants.ACCENT_GOLD);
+		JLabel title = new PanelTitle("ADMIN LOGIN");
 		title.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-		JLabel hint = new JLabel("Enter your admin code");
-		hint.setFont(FontManager.getRunescapeSmallFont());
-		hint.setForeground(UIConstants.TEXT_SECONDARY);
+		JLabel hint = Labels.small("Enter your admin code", UIConstants.TEXT_SECONDARY);
 		hint.setAlignmentX(Component.CENTER_ALIGNMENT);
 
 		// Input
@@ -72,9 +68,7 @@ public class AdminLoginPanel extends JPanel {
 		codeField.addActionListener(e -> performLogin());
 
 		// Error
-		errorLabel = new JLabel(" ");
-		errorLabel.setFont(FontManager.getRunescapeSmallFont());
-		errorLabel.setForeground(UIConstants.ERROR_COLOR);
+		errorLabel = Labels.small(" ", UIConstants.ERROR_COLOR);
 		errorLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
 		errorLabel.setVisible(false);
 
