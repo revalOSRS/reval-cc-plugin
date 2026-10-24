@@ -1,7 +1,9 @@
 package com.revalclan.ui;
 
 import com.revalclan.api.account.AccountResponse;
+import com.revalclan.ui.components.Labels;
 import com.revalclan.ui.constants.UIConstants;
+import com.revalclan.util.Colors;
 import com.revalclan.util.TextWrap;
 import com.revalclan.util.NumberFmt;
 import net.runelite.client.game.ItemManager;
@@ -99,8 +101,8 @@ public class PointsAlbumWindow extends JFrame {
 	private final JComboBox<String> sortCombo;
 	private final JTextField searchField;
 	private final JCheckBox groupToggle;
-	private final JLabel summaryLabel = new JLabel();
-	private final JLabel pageLabel = new JLabel();
+	private final JLabel summaryLabel = Labels.small("", UIConstants.ACCENT_GOLD);
+	private final JLabel pageLabel = Labels.small("", UIConstants.TEXT_SECONDARY);
 	private final JButton prevButton;
 	private final JButton nextButton;
 	private final JPanel gridPanel;
@@ -129,10 +131,8 @@ public class PointsAlbumWindow extends JFrame {
 		filterRow.setOpaque(false);
 
 		filterRow.add(mutedLabel("Source:"));
-		SourceKind[] kinds = SourceKind.values();
-		String[] sourceLabels = new String[kinds.length];
-		for (int i = 0; i < kinds.length; i++) sourceLabels[i] = kinds[i].label;
-		sourceCombo = styledCombo(new JComboBox<>(sourceLabels));
+		sourceCombo = styledCombo(new JComboBox<>(
+			Arrays.stream(SourceKind.values()).map(kind -> kind.label).toArray(String[]::new)));
 		filterRow.add(sourceCombo);
 
 		filterRow.add(mutedLabel("Sort:"));
@@ -161,13 +161,8 @@ public class PointsAlbumWindow extends JFrame {
 		JPanel pagingRow = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 0));
 		pagingRow.setOpaque(false);
 
-		summaryLabel.setFont(FontManager.getRunescapeSmallFont());
-		summaryLabel.setForeground(UIConstants.ACCENT_GOLD);
-
 		prevButton = pagingButton("< Prev");
 		nextButton = pagingButton("Next >");
-		pageLabel.setFont(FontManager.getRunescapeSmallFont());
-		pageLabel.setForeground(UIConstants.TEXT_SECONDARY);
 
 		pagingRow.add(summaryLabel);
 		pagingRow.add(Box.createHorizontalStrut(16));
@@ -198,13 +193,13 @@ public class PointsAlbumWindow extends JFrame {
 		add(scroll, BorderLayout.CENTER);
 
 		// ==================== Wiring ====================
-		sourceCombo.addActionListener(e -> { page = 0; rebuild(); });
-		sortCombo.addActionListener(e -> { page = 0; rebuild(); });
-		groupToggle.addActionListener(e -> { page = 0; rebuild(); });
+		sourceCombo.addActionListener(e -> showFirstPage());
+		sortCombo.addActionListener(e -> showFirstPage());
+		groupToggle.addActionListener(e -> showFirstPage());
 		searchField.getDocument().addDocumentListener(new DocumentListener() {
-			public void insertUpdate(DocumentEvent e) { page = 0; rebuild(); }
-			public void removeUpdate(DocumentEvent e) { page = 0; rebuild(); }
-			public void changedUpdate(DocumentEvent e) { page = 0; rebuild(); }
+			public void insertUpdate(DocumentEvent e) { showFirstPage(); }
+			public void removeUpdate(DocumentEvent e) { showFirstPage(); }
+			public void changedUpdate(DocumentEvent e) { showFirstPage(); }
 		});
 		prevButton.addActionListener(e -> { if (page > 0) { page--; rebuild(); } });
 		nextButton.addActionListener(e -> { if ((page + 1) * PAGE_SIZE < filtered.size()) { page++; rebuild(); } });
@@ -225,10 +220,17 @@ public class PointsAlbumWindow extends JFrame {
 
 	// ==================== Pipeline ====================
 
+	/** A filter, sort or grouping change: rebuild from the first page. */
+	private void showFirstPage() {
+		page = 0;
+		rebuild();
+	}
+
 	private void rebuild() {
 		SourceKind source = SourceKind.values()[sourceCombo.getSelectedIndex()];
 		String query = searchField.getText() != null ? searchField.getText().trim().toLowerCase() : "";
 
+		boolean group = groupToggle.isSelected();
 		List<CardData> cards = new ArrayList<>();
 		long totalPts = 0;
 		int totalEntries = 0;
@@ -247,36 +249,26 @@ public class PointsAlbumWindow extends JFrame {
 			totalPts += entry.getPointsChange();
 			totalEntries++;
 
-			if (groupToggle.isSelected()) {
-				String groupKey = parts[0].toLowerCase() + "|" + type;
-				CardData card = grouped.get(groupKey);
-				if (card == null) {
-					card = new CardData();
-					card.title = parts[0];
-					card.origin = stripKc(parts[1]);
-					card.itemId = entry.getItemId();
-					card.sourceType = entry.getSourceType();
-					grouped.put(groupKey, card);
-					cards.add(card);
-				} else if (!card.origin.equals(stripKc(parts[1]))) {
-					card.origin = "Various";
-				}
-				if (card.itemId == null) card.itemId = entry.getItemId();
-				card.points += entry.getPointsChange();
-				card.count++;
-				String date = entry.getCreatedAt() != null ? entry.getCreatedAt() : "";
-				if (date.compareTo(card.latestDate) > 0) card.latestDate = date;
-			} else {
-				CardData card = new CardData();
+			// Grouping merges entries with the same title and source type into one card;
+			// otherwise every entry starts a fresh card
+			String groupKey = parts[0].toLowerCase() + "|" + type;
+			CardData card = group ? grouped.get(groupKey) : null;
+			if (card == null) {
+				card = new CardData();
 				card.title = parts[0];
-				card.origin = parts[1];
+				card.origin = group ? stripKc(parts[1]) : parts[1];
 				card.itemId = entry.getItemId();
 				card.sourceType = entry.getSourceType();
-				card.points = entry.getPointsChange();
-				card.count = 1;
-				card.latestDate = entry.getCreatedAt() != null ? entry.getCreatedAt() : "";
+				if (group) grouped.put(groupKey, card);
 				cards.add(card);
+			} else if (!card.origin.equals(stripKc(parts[1]))) {
+				card.origin = "Various";
 			}
+			if (card.itemId == null) card.itemId = entry.getItemId();
+			card.points += entry.getPointsChange();
+			card.count++;
+			String date = entry.getCreatedAt() != null ? entry.getCreatedAt() : "";
+			if (date.compareTo(card.latestDate) > 0) card.latestDate = date;
 		}
 
 		Comparator<CardData> byDate = Comparator.comparing(c -> c.latestDate);
@@ -294,7 +286,7 @@ public class PointsAlbumWindow extends JFrame {
 		int from = page * PAGE_SIZE;
 		int to = Math.min(from + PAGE_SIZE, filtered.size());
 
-		String entryWord = groupToggle.isSelected()
+		String entryWord = group
 			? filtered.size() + " sources (" + totalEntries + " entries)"
 			: totalEntries + " entries";
 		summaryLabel.setText(entryWord + " - " + NumberFmt.group(totalPts) + " pts");
@@ -323,7 +315,7 @@ public class PointsAlbumWindow extends JFrame {
 				g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 				g2d.setColor(UIConstants.CARD_BG);
 				g2d.fillRoundRect(0, 0, getWidth(), getHeight(), 10, 10);
-				g2d.setColor(new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), 90));
+				g2d.setColor(Colors.withAlpha(accent, 90));
 				g2d.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 10, 10);
 				g2d.dispose();
 			}
@@ -338,9 +330,7 @@ public class PointsAlbumWindow extends JFrame {
 		panel.add(title, BorderLayout.NORTH);
 
 		// Center: icon + origin line
-		JPanel center = new JPanel();
-		center.setLayout(new BoxLayout(center, BoxLayout.Y_AXIS));
-		center.setOpaque(false);
+		JPanel center = Labels.column();
 
 		center.add(Box.createVerticalGlue());
 		JLabel icon = new JLabel();
@@ -367,27 +357,15 @@ public class PointsAlbumWindow extends JFrame {
 		JPanel footer = new JPanel(new BorderLayout());
 		footer.setOpaque(false);
 
-		JPanel pointsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
-		pointsPanel.setOpaque(false);
-
-		JLabel points = new JLabel((card.points >= 0 ? "+" : "") + NumberFmt.group(card.points) + " pts");
-		points.setFont(FontManager.getRunescapeBoldFont());
-		points.setForeground(card.points >= 0 ? UIConstants.ACCENT_GOLD : UIConstants.ERROR_COLOR);
-		pointsPanel.add(points);
-
+		JPanel pointsPanel = Labels.flow();
+		pointsPanel.add(Labels.bold((card.points >= 0 ? "+" : "") + NumberFmt.group(card.points) + " pts",
+			card.points >= 0 ? UIConstants.ACCENT_GOLD : UIConstants.ERROR_COLOR));
 		if (card.count > 1) {
-			JLabel count = new JLabel("x" + card.count);
-			count.setFont(FontManager.getRunescapeSmallFont());
-			count.setForeground(UIConstants.TEXT_SECONDARY);
-			pointsPanel.add(count);
+			pointsPanel.add(mutedLabel("x" + card.count));
 		}
 
-		JLabel date = new JLabel(formatDate(card.latestDate));
-		date.setFont(FontManager.getRunescapeSmallFont());
-		date.setForeground(UIConstants.TEXT_MUTED);
-
 		footer.add(pointsPanel, BorderLayout.WEST);
-		footer.add(date, BorderLayout.EAST);
+		footer.add(Labels.small(formatDate(card.latestDate), UIConstants.TEXT_MUTED), BorderLayout.EAST);
 		panel.add(footer, BorderLayout.SOUTH);
 
 		return panel;
@@ -448,10 +426,7 @@ public class PointsAlbumWindow extends JFrame {
 	// ==================== Small UI helpers ====================
 
 	private JLabel mutedLabel(String text) {
-		JLabel label = new JLabel(text);
-		label.setFont(FontManager.getRunescapeSmallFont());
-		label.setForeground(UIConstants.TEXT_SECONDARY);
-		return label;
+		return Labels.small(text, UIConstants.TEXT_SECONDARY);
 	}
 
 	private JComboBox<String> styledCombo(JComboBox<String> combo) {
@@ -490,10 +465,7 @@ public class PointsAlbumWindow extends JFrame {
 			setForeground(color);
 			FontMetrics fm = getFontMetrics(font);
 			this.lineHeight = fm.getHeight();
-			wrap(text != null ? text.trim() : "", fm);
-		}
-
-		private void wrap(String text, FontMetrics fm) {
+			// TextWrap trims and returns no lines for null/blank text
 			lines.addAll(TextWrap.wrap(text, fm, wrapWidth));
 			if (lines.isEmpty()) lines.add(" ");
 		}
@@ -549,7 +521,7 @@ public class PointsAlbumWindow extends JFrame {
 		public void paintIcon(Component c, Graphics g, int x, int y) {
 			Graphics2D g2d = (Graphics2D) g.create();
 			g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-			g2d.setColor(new Color(color.getRed(), color.getGreen(), color.getBlue(), 45));
+			g2d.setColor(Colors.withAlpha(color, 45));
 			g2d.fillOval(x, y, SIZE, SIZE);
 			g2d.setColor(color);
 			g2d.drawOval(x, y, SIZE - 1, SIZE - 1);

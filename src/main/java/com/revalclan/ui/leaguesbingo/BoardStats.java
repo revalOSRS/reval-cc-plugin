@@ -5,10 +5,13 @@ import com.revalclan.api.leaguesbingo.LeaguesBingoResponse.Team;
 import com.revalclan.api.leaguesbingo.LeaguesBingoResponse.Tile;
 import com.revalclan.api.leaguesbingo.LeaguesBingoResponse.TileProgress;
 import com.revalclan.api.leaguesbingo.LeaguesBingoResponse.UnlockedRegion;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 /** One team's standing on one region board, derived from the public payload. */
 @Getter
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
 public final class BoardStats {
 	/** A started-but-tiny progress still gets a visible sliver on tiles and bars. */
 	public static final int MIN_VISIBLE_PERCENT = 8;
@@ -19,15 +22,6 @@ public final class BoardStats {
 	private final int bonus;
 	private final boolean locked;
 	private final boolean boardComplete;
-
-	private BoardStats(int total, int completed, int earned, int bonus, boolean locked, boolean boardComplete) {
-		this.total = total;
-		this.completed = completed;
-		this.earned = earned;
-		this.bonus = bonus;
-		this.locked = locked;
-		this.boardComplete = boardComplete;
-	}
 
 	public static BoardStats of(Team team, Board board) {
 		UnlockedRegion unlock = team.unlockFor(board.getRegion());

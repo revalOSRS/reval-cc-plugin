@@ -1,6 +1,5 @@
 package com.revalclan.notifiers;
 
-import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.events.WidgetLoaded;
 import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.gameval.VarPlayerID;
@@ -11,7 +10,6 @@ import javax.inject.Singleton;
 import java.util.HashMap;
 import java.util.Map;
 
-@Slf4j
 @Singleton
 public class QuestNotifier extends BaseNotifier {
 	@Override

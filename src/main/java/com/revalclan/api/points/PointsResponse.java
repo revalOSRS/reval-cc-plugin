@@ -33,7 +33,6 @@ public class PointsResponse extends ApiResponse {
         @Data
         public static class AdditionalRequirement {
             private String description;
-            private List<String> anyOf;
         }
     }
 
@@ -43,10 +42,8 @@ public class PointsResponse extends ApiResponse {
         private String name;
         private String pointsDescription; // Human-readable points description (e.g., "30 points", "1 point per 1M GP value")
         private String description;
-        private boolean repeatable;
         private Integer points; // Numeric points value (null/undefined for dynamic sources, actual value for constant sources)
         private Integer threshold; // For collection log and combat achievements (moved from metadata)
-        private String icon; // Icon identifier string for point sources (for display purposes, not included for dynamic sources)
         private PointSourceMetadata metadata; // Optional metadata
 
         public String getPointsDisplay() {

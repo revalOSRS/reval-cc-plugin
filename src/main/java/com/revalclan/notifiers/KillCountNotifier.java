@@ -8,6 +8,7 @@ import javax.inject.Singleton;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -35,6 +36,8 @@ public class KillCountNotifier extends BaseNotifier {
 		"(?:Duration|time|Subdued in):?\\s*(?<time>[\\d:]+(?:\\.\\d+)?)\\.?(?:\\s*\\(new personal best\\))?(?:\\s*Personal best:\\s*(?<pbtime>[\\d:]+(?:\\.\\d+)?))?",
 		Pattern.CASE_INSENSITIVE
 	);
+	private static final Pattern RAID_TOTAL_TIME = Pattern.compile(
+		"^(.+?): Total completion time:", Pattern.CASE_INSENSITIVE);
 
 	@Inject
 	private RaidPartyTracker raidPartyTracker;
@@ -43,6 +46,7 @@ public class KillCountNotifier extends BaseNotifier {
 	private Integer pendingCount = null;
 	private Duration pendingTime = null;
 	private boolean pendingIsPb = false;
+	private String pendingTimeRaid = null;
 	private RaidPartyTracker.Party pendingParty = null;
 	private int badTicks = 0;
 	private static final int MAX_BAD_TICKS = 10;
@@ -132,7 +136,7 @@ public class KillCountNotifier extends BaseNotifier {
 			}
 		}
 	}
-	
+
 	private void parseTime(String message) {
 		// TOB special case: skip wave duration, get challenge time
 		String msg = message;
@@ -147,6 +151,10 @@ public class KillCountNotifier extends BaseNotifier {
 			}
 		}
 		
+		Matcher total = RAID_TOTAL_TIME.matcher(msg);
+		String scope = total.find() ? RaidPartyTracker.raidOf(total.group(1)) : null;
+		// A room split cannot replace a known raid total.
+		if (scope == null && pendingTimeRaid != null) return;
 		Matcher matcher = TIME_REGEX.matcher(msg);
 		if (matcher.find()) {
 			String timeStr = matcher.group("time");
@@ -155,8 +163,8 @@ public class KillCountNotifier extends BaseNotifier {
 			
 			if (duration != null) {
 				pendingTime = duration;
-				pendingIsPb = msg.toLowerCase().contains("(new personal best)") || 
-				              msg.toLowerCase().contains("new personal best");
+				pendingTimeRaid = scope;
+				pendingIsPb = msg.toLowerCase().contains("new personal best");
 				badTicks = 0;
 			} else {
 				log.debug("Failed to parse time string: {}", timeStr);
@@ -168,8 +176,6 @@ public class KillCountNotifier extends BaseNotifier {
 	 * Normalize boss names based on message type
 	 */
 	private String normalizeBossName(String boss, String type) {
-		if (boss == null) return null;
-		
 		switch (type.toLowerCase()) {
 			case "chest":
 				if ("Barrows".equalsIgnoreCase(boss)) return "Barrows";
@@ -199,9 +205,9 @@ public class KillCountNotifier extends BaseNotifier {
 	 * Normalize raid names
 	 */
 	private String normalizeRaidName(String raid) {
-		if (raid == null) return null;
-		
 		if ("Wintertodt".equalsIgnoreCase(raid)) return "Wintertodt";
+		String resolved = RaidPartyTracker.raidOf(raid);
+		if (RaidPartyTracker.FRACTURED_ARCHIVE.equals(resolved)) return resolved;
 		
 		// Handle raid modes (e.g., "Theatre of Blood: Entry Mode")
 		int modeSeparator = raid.lastIndexOf(':');
@@ -221,19 +227,13 @@ public class KillCountNotifier extends BaseNotifier {
 	 * Parse time string like "1:23" or "1:23.45" into Duration
 	 */
 	private Duration parseTimeString(String timeStr) {
-		if (timeStr == null) return null;
-		
 		try {
+			// [hours:]minutes:seconds
 			String[] parts = timeStr.split(":");
-			if (parts.length == 2) {
-				int minutes = Integer.parseInt(parts[0]);
-				double seconds = Double.parseDouble(parts[1]);
-				long totalMillis = (minutes * 60 * 1000L) + (long)(seconds * 1000);
-				return Duration.ofMillis(totalMillis);
-			} else if (parts.length == 3) {
-				int hours = Integer.parseInt(parts[0]);
-				int minutes = Integer.parseInt(parts[1]);
-				double seconds = Double.parseDouble(parts[2]);
+			if (parts.length == 2 || parts.length == 3) {
+				int hours = parts.length == 3 ? Integer.parseInt(parts[0]) : 0;
+				int minutes = Integer.parseInt(parts[parts.length - 2]);
+				double seconds = Double.parseDouble(parts[parts.length - 1]);
 				long totalMillis = (hours * 3600 * 1000L) + (minutes * 60 * 1000L) + (long)(seconds * 1000);
 				return Duration.ofMillis(totalMillis);
 			}
@@ -249,12 +249,15 @@ public class KillCountNotifier extends BaseNotifier {
 		kcData.put("boss", pendingBoss);
 		kcData.put("killCount", pendingCount);
 		
-		if (pendingTime != null) {
+		String raid = RaidPartyTracker.raidOf(pendingBoss);
+		boolean timeApplies = Objects.equals(pendingTimeRaid,
+			RaidPartyTracker.FRACTURED_ARCHIVE.equals(raid) ? raid : null);
+		if (pendingTime != null && timeApplies) {
 			kcData.put("time", formatDuration(pendingTime));
 			kcData.put("timeSeconds", pendingTime.getSeconds() + (pendingTime.getNano() / 1_000_000_000.0));
 		}
 		
-		if (pendingIsPb) {
+		if (pendingIsPb && timeApplies) {
 			kcData.put("personalBest", true);
 		}
 
@@ -287,6 +290,7 @@ public class KillCountNotifier extends BaseNotifier {
 		pendingCount = null;
 		pendingTime = null;
 		pendingIsPb = false;
+		pendingTimeRaid = null;
 		pendingParty = null;
 		badTicks = 0;
 	}

@@ -103,8 +103,7 @@ public class ClueNotifier extends BaseNotifier {
 
 		sendNotification(clueData);
 
-		clueCount = -1;
-		clueTier = "";
+		reset();
 	}
 
 	public void reset() {

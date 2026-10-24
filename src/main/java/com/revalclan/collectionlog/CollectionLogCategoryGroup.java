@@ -6,7 +6,6 @@
  */
 package com.revalclan.collectionlog;
 
-import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
 /**
@@ -20,7 +19,7 @@ public enum CollectionLogCategoryGroup {
 	MINIGAMES(474),
 	OTHER(475);
 
-	@Getter private final int structId;
+	private final int structId;
 	
 	/**
 	 * Get the category name (capitalized) from struct ID

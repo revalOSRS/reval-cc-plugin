@@ -142,7 +142,7 @@ public class AnnouncementService {
 			.forEach(a -> {
 				chatMessageManager.queue(QueuedMessage.builder()
 					.type(ChatMessageType.BROADCAST)
-					.runeLiteFormattedMessage(formatBroadcastMessage(a))
+					.runeLiteFormattedMessage(formatMessage(a.getTitle(), a.getMessage()))
 					.build());
 				shownBroadcastIds.add(a.getId());
 			});
@@ -191,18 +191,16 @@ public class AnnouncementService {
 		}
 	}
 
-	private String formatBroadcastMessage(Announcement announcement) {
-		if (announcement.getTitle() != null && !announcement.getTitle().isEmpty()) {
-			return "<col=FFD700>[Reval] " + announcement.getTitle() + ":</col> " + announcement.getMessage();
-		}
-		return "<col=FFD700>[Reval]</col> " + announcement.getMessage();
+	private String formatNotificationMessage(Notification notification) {
+		return formatMessage(notification.getTitle(), notification.getMessage());
 	}
 
-	private String formatNotificationMessage(Notification notification) {
-		if (notification.getTitle() != null && !notification.getTitle().isEmpty()) {
-			return "<col=FFD700>[Reval] " + notification.getTitle() + ":</col> " + notification.getMessage();
+	/** Broadcasts and notifications share one look: gold "[Reval] Title:" (or "[Reval]") then the message. */
+	private static String formatMessage(String title, String message) {
+		if (title != null && !title.isEmpty()) {
+			return "<col=FFD700>[Reval] " + title + ":</col> " + message;
 		}
-		return "<col=FFD700>[Reval]</col> " + notification.getMessage();
+		return "<col=FFD700>[Reval]</col> " + message;
 	}
 
 	public synchronized void reset() {

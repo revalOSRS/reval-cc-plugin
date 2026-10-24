@@ -1,7 +1,6 @@
 package com.revalclan.notifiers;
 
 import com.revalclan.util.Worlds;
-import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.events.WidgetLoaded;
 import net.runelite.api.gameval.VarPlayerID;
 import net.runelite.api.gameval.VarbitID;
@@ -19,7 +18,6 @@ import java.util.Map;
  * Payload: leagueType, totalPoints, tasksCompleted, areaSelections (id + name),
  * and selectedRelics (when available from Relics modal).
  */
-@Slf4j
 @Singleton
 public class LeaguesSyncNotifier extends BaseNotifier {
 
@@ -28,15 +26,14 @@ public class LeaguesSyncNotifier extends BaseNotifier {
 	private static final int RELIC_SELECTED_COLOR = 0xF47113;
 	private static final int RELIC_UNSELECTED_COLOR = 0xAAAAAA;
 
-	private static final Map<Integer, String> AREA_NAMES = new HashMap<>();
-	static {
-		AREA_NAMES.put(2, "Karamja");
-		AREA_NAMES.put(7, "Tirannwn");
-		AREA_NAMES.put(21, "Varlamore");
-	}
+	private static final Map<Integer, String> AREA_NAMES = Map.of(
+		2, "Karamja",
+		7, "Tirannwn",
+		21, "Varlamore"
+	);
 
 	private List<String> cachedSelectedRelics = null;
-	private int pendingRelicRead = -1;
+	/** Ticks until the opened Relics modal is read; 0 when no read is pending. */
 	private int pendingRelicTicks = 0;
 
 	@Override
@@ -59,18 +56,14 @@ public class LeaguesSyncNotifier extends BaseNotifier {
 
 	public void onWidgetLoaded(WidgetLoaded event) {
 		if (!isEnabled() || event.getGroupId() != LEAGUES_RELICS_GROUP) return;
-		pendingRelicRead = LEAGUES_RELICS_GROUP;
 		pendingRelicTicks = RELIC_READ_DELAY_TICKS;
 	}
 
 	public void onGameTick() {
-		if (pendingRelicRead == -1) return;
+		if (pendingRelicTicks == 0) return;
 		if (--pendingRelicTicks > 0) return;
 
-		int groupId = pendingRelicRead;
-		pendingRelicRead = -1;
-
-		List<String> relics = extractRelics(groupId);
+		List<String> relics = extractRelics();
 		if (!relics.isEmpty()) {
 			cachedSelectedRelics = relics;
 			sendSync();
@@ -78,7 +71,6 @@ public class LeaguesSyncNotifier extends BaseNotifier {
 	}
 
 	public void reset() {
-		pendingRelicRead = -1;
 		pendingRelicTicks = 0;
 		cachedSelectedRelics = null;
 	}
@@ -104,8 +96,7 @@ public class LeaguesSyncNotifier extends BaseNotifier {
 			if (areaId != 0) {
 				Map<String, Object> area = new HashMap<>();
 				area.put("id", areaId);
-				String name = AREA_NAMES.get(areaId);
-				area.put("name", name != null ? name : "Unknown");
+				area.put("name", AREA_NAMES.getOrDefault(areaId, "Unknown"));
 				areas.add(area);
 			}
 		}
@@ -120,10 +111,10 @@ public class LeaguesSyncNotifier extends BaseNotifier {
 
 	// ========== Relics ==========
 
-	private List<String> extractRelics(int groupId) {
+	private List<String> extractRelics() {
 		List<String> selected = new ArrayList<>();
 		for (int childId = 0; childId < 20; childId++) {
-			Widget child = client.getWidget(groupId, childId);
+			Widget child = client.getWidget(LEAGUES_RELICS_GROUP, childId);
 			if (child == null) continue;
 			if (collectSelectedRelics(child, selected, 0)) break;
 		}
@@ -143,15 +134,12 @@ public class LeaguesSyncNotifier extends BaseNotifier {
 			}
 
 			if (hasOrange && hasGrey) {
-				int[][] tierGroups = {
-					{0, 1, 2}, {3, 4, 5}, {6, 7, 8}, {9, 10, 11},
-					{12, 13, 14}, {15, 16, 17}, {18, 19, 20}, {21, 22}
-				};
-				for (int[] group : tierGroups) {
+				// Relics are listed three per tier (the last tier has two)
+				for (int tierStart = 0; tierStart < dc.length; tierStart += 3) {
 					String orangeRelic = null;
 					boolean hasGreyInTier = false;
-					for (int idx : group) {
-						if (idx >= dc.length || dc[idx] == null) continue;
+					for (int idx = tierStart; idx < Math.min(tierStart + 3, dc.length); idx++) {
+						if (dc[idx] == null) continue;
 						if (dc[idx].getTextColor() == RELIC_SELECTED_COLOR) {
 							orangeRelic = dc[idx].getText();
 						} else if (dc[idx].getTextColor() == RELIC_UNSELECTED_COLOR) {

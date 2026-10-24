@@ -1,7 +1,6 @@
 package com.revalclan.ui.components;
 
 import com.revalclan.ui.constants.UIConstants;
-import net.runelite.client.ui.FontManager;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -13,14 +12,10 @@ public class LoginPrompt extends JPanel {
 		setBackground(UIConstants.BACKGROUND);
 		setBorder(new EmptyBorder(30, 20, 20, 20));
 
-		JLabel title = new JLabel(featureName.toUpperCase());
-		title.setFont(FontManager.getRunescapeBoldFont());
-		title.setForeground(UIConstants.ACCENT_GOLD);
+		JLabel title = Labels.bold(featureName.toUpperCase(), UIConstants.ACCENT_GOLD);
 		title.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-		JLabel hint = new JLabel("Log in to view " + featureName.toLowerCase());
-		hint.setFont(FontManager.getRunescapeSmallFont());
-		hint.setForeground(UIConstants.TEXT_SECONDARY);
+		JLabel hint = Labels.small("Log in to view " + featureName.toLowerCase(), UIConstants.TEXT_SECONDARY);
 		hint.setAlignmentX(Component.CENTER_ALIGNMENT);
 
 		add(title);

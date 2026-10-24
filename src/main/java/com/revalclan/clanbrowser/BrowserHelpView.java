@@ -18,12 +18,12 @@ final class BrowserHelpView extends JPanel implements Scrollable {
         setLayout(new BoxLayout(this,BoxLayout.Y_AXIS)); setBackground(BrowserTheme.BACKGROUND);
         setBorder(BorderFactory.createEmptyBorder(14,14,14,14));
         JPanel intro=card("Start here",BrowserTheme.GOLD);
-        intro.add(text("Send !reval in public or clan chat, then click its link.\nUse the browser buttons to change views without sending more messages.",20,BrowserTheme.TEXT,2));
+        intro.add(text("Send !reval in public, clan or private chat.\nClick its link, then choose Open Reval board.\nUse browser buttons to browse without sending more messages.",20,BrowserTheme.TEXT,3));
         add(intro); gap(10);
         add(text("<...> = a value you choose     [...] = optional     Do not type the brackets.",18,BrowserTheme.MUTED,1)); gap(12);
 
         JPanel logs=card("Collection logs",BrowserTheme.GREEN);
-        logs.add(text("!reval clog <category> [player]",21,BrowserTheme.GOLD,1)); gap(logs,8);
+        logs.add(code("!reval clog <category> [player]",1)); gap(logs,8);
         logs.add(text("Leave the player out for your own account.\nAdd a name to inspect another clan account.",18,BrowserTheme.TEXT,2)); gap(logs,8);
         logs.add(code("!reval clog forestry\n!reval clog forestry Valgusruum\n!reval clog clues Phosani55555",3));
         logs.add(text("Use quotes for names with spaces: \"Love Yourz\".\nClues shows all tiers; individual tiers are in the sidebar.",17,BrowserTheme.MUTED,2));
@@ -39,25 +39,25 @@ final class BrowserHelpView extends JPanel implements Scrollable {
         add(row(logs,categories)); gap(12);
 
         JPanel boards=card("Clan leaderboards",BrowserTheme.GOLD);
-        boards.add(text("!reval leaderboard <statistic> [filter]",21,BrowserTheme.GOLD,1)); gap(boards,8);
+        boards.add(code("!reval leaderboard <statistic> [filter]",1)); gap(boards,8);
         boards.add(code("!reval leaderboard xp\n!reval leaderboard clues hard\n!reval leaderboard bosses toa",3));
         boards.add(text("Leave the clue tier or boss out for the combined view.\nChoose statistics with the buttons below member search.",18,BrowserTheme.TEXT,2)); gap(boards,6);
         boards.add(text("Statistics: clog, pets, points, greenlogs, xp,\nmonthly-clog, monthly-points, clues, combat, bosses.\nClue tiers: beginner, easy, medium, hard, elite, master.",17,BrowserTheme.MUTED,3));
 
         JPanel sharing=card("Share a board in chat",BrowserTheme.GREEN);
-        sharing.add(text("Send a command, then click its chat link.",18,BrowserTheme.TEXT,1)); gap(sharing,8);
+        sharing.add(text("Send a command in public, clan or private chat.",18,BrowserTheme.TEXT,2)); gap(sharing,8);
         sharing.add(code("!reval luck araxxor\n!reval clog forestry\n!reval leaderboard clues hard",3));
-        sharing.add(text("Other updated Reval clients can click the message\nto open the same board. A shared clog uses your account\nunless you add a different player's name.",18,BrowserTheme.TEXT,3)); gap(sharing,6);
+        sharing.add(text("Click or right-click the message and choose\nOpen Reval board. A shared clog uses your account\nunless you add a different player's name.",18,BrowserTheme.TEXT,3)); gap(sharing,6);
         sharing.add(text("Use buttons to browse without sending more messages.\nPlayers need the updated Reval plugin to open shares.",17,BrowserTheme.MUTED,2));
         add(row(boards,sharing)); gap(12);
-        add(text("Useful aliases: cox, tob, toa, bandos. Category suggestions accept names too.\nViews are cached. Refresh reloads the current view. Monthly boards use the clan's Tallinn calendar month.",18,BrowserTheme.MUTED,2));
+        add(text("Collection Log shortcuts work here too: amox, cox, tob, toa, bandos, wt, gotr.\nViews are cached. Refresh reloads the current view. Monthly boards use the clan's Tallinn calendar month.",18,BrowserTheme.MUTED,2));
     }
 
     private void gap(int size) { gap(this,size); }
     private static void gap(JPanel panel,int size) { panel.add(Box.createVerticalStrut(size)); }
     private static JPanel card(String title,Color accent) {
         JPanel panel=new JPanel(); panel.setLayout(new BoxLayout(panel,BoxLayout.Y_AXIS)); panel.setBackground(BrowserTheme.PANEL); panel.setAlignmentX(LEFT_ALIGNMENT);
-        panel.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(BrowserTheme.BORDER),BorderFactory.createEmptyBorder(12,14,12,14)));
+        panel.setBorder(BrowserTheme.outline(BrowserTheme.BORDER,12,14));
         JLabel heading=new JLabel(title); heading.setForeground(accent); heading.setFont(BrowserTheme.font(25,true));
         heading.setAlignmentX(LEFT_ALIGNMENT); panel.add(heading); gap(panel,8); return panel;
     }

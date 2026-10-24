@@ -42,18 +42,11 @@ public class SyncStateManager {
 			Map<String, Object> quests = (Map<String, Object>) data.get("quests");
 			canonical.append("quests|");
 			if (quests != null) {
-				Object questStates = quests.get("questStates");
-				if (questStates instanceof Map) {
-					for (Map.Entry<String, Object> e : new TreeMap<>((Map<String, Object>) questStates).entrySet()) {
-						canonical.append(e.getKey()).append('=').append(e.getValue()).append(';');
-					}
-				}
+				appendSorted(canonical, quests.get("questStates"));
 				Object miniquestStates = quests.get("miniquestStates");
 				if (miniquestStates instanceof Map) {
 					canonical.append("mini|");
-					for (Map.Entry<String, Object> e : new TreeMap<>((Map<String, Object>) miniquestStates).entrySet()) {
-						canonical.append(e.getKey()).append('=').append(e.getValue()).append(';');
-					}
+					appendSorted(canonical, miniquestStates);
 				}
 				canonical.append("qp=").append(quests.get("questPoints"));
 			}
@@ -109,18 +102,17 @@ public class SyncStateManager {
 		}
 	}
 
+	/** {@code key=value;} per entry in key order; nothing when {@code states} is not a map. */
+	@SuppressWarnings("unchecked")
+	private static void appendSorted(StringBuilder canonical, Object states) {
+		if (!(states instanceof Map)) return;
+		for (Map.Entry<String, Object> e : new TreeMap<>((Map<String, Object>) states).entrySet()) {
+			canonical.append(e.getKey()).append('=').append(e.getValue()).append(';');
+		}
+	}
+
 	public String getAckedFingerprint(long accountHash) {
 		return configManager.getConfiguration(CONFIG_GROUP, CONFIG_KEY_PREFIX + accountHash);
-	}
-
-	public void storeAckedFingerprint(long accountHash, String fingerprint) {
-		configManager.setConfiguration(CONFIG_GROUP, CONFIG_KEY_PREFIX + accountHash, fingerprint);
-	}
-
-	public void clearAckedFingerprint(long accountHash) {
-		try {
-			configManager.unsetConfiguration(CONFIG_GROUP, CONFIG_KEY_PREFIX + accountHash);
-		} catch (Exception ignored) {}
 	}
 
 	/** Response consumer recording the server's fingerprint ack for this account. */
@@ -136,14 +128,16 @@ public class SyncStateManager {
 
 			boolean stale = sync.has("stale") && !sync.get("stale").isJsonNull() && sync.get("stale").getAsBoolean();
 			if (stale) {
-				clearAckedFingerprint(accountHash);
+				try {
+					configManager.unsetConfiguration(CONFIG_GROUP, CONFIG_KEY_PREFIX + accountHash);
+				} catch (Exception ignored) {}
 				fullSyncRequested.set(true);
 				log.info("Sync fingerprint stale — full sync requested");
 				return;
 			}
 
 			if (sync.has("fingerprint") && !sync.get("fingerprint").isJsonNull()) {
-				storeAckedFingerprint(accountHash, sync.get("fingerprint").getAsString());
+				configManager.setConfiguration(CONFIG_GROUP, CONFIG_KEY_PREFIX + accountHash, sync.get("fingerprint").getAsString());
 			}
 		} catch (Exception e) {
 			log.warn("Failed to handle sync ack: {}", e.getMessage());

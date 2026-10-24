@@ -3,6 +3,7 @@ package com.revalclan.ui;
 import com.revalclan.api.RevalApiService;
 import com.revalclan.api.events.EventsResponse;
 import com.revalclan.ui.components.EventCard;
+import com.revalclan.ui.components.Labels;
 import com.revalclan.ui.components.LoginPrompt;
 import com.revalclan.ui.components.PanelTitle;
 import com.revalclan.ui.components.RefreshButton;
@@ -98,10 +99,6 @@ public class EventsPanel extends JPanel {
 		eventsListPanel.repaint();
 	}
 
-	public void load() {
-		loadAuthorized();
-	}
-
 	public void onLoggedOut() {
 		memberSession = false;
 		loadGeneration++;
@@ -112,10 +109,6 @@ public class EventsPanel extends JPanel {
 	}
 
 	public void refresh() {
-		loadAuthorized();
-	}
-
-	private void loadAuthorized() {
 		if (!memberSession || client == null || client.getAccountHash() == -1) {
 			showNotLoggedIn();
 			return;
@@ -198,7 +191,6 @@ public class EventsPanel extends JPanel {
 		};
 
 		btn.setFont(FontManager.getRunescapeSmallFont());
-		btn.setForeground(currentTab.equals(tabId) ? accentColor : UIConstants.TEXT_SECONDARY);
 		btn.setBackground(null);
 		btn.setBorderPainted(false);
 		btn.setContentAreaFilled(false);
@@ -330,17 +322,7 @@ public class EventsPanel extends JPanel {
 
 	private void showLoading() {
 		eventsListPanel.removeAll();
-
-		JPanel wrapper = new JPanel(new GridBagLayout());
-		wrapper.setOpaque(false);
-		wrapper.setMaximumSize(new Dimension(Integer.MAX_VALUE, 150));
-
-		JLabel label = new JLabel("Loading events...");
-		label.setFont(FontManager.getRunescapeSmallFont());
-		label.setForeground(UIConstants.TEXT_MUTED);
-
-		wrapper.add(label);
-		eventsListPanel.add(wrapper);
+		eventsListPanel.add(messageArea(Labels.small("Loading events...", UIConstants.TEXT_MUTED), 150));
 		eventsListPanel.revalidate();
 		eventsListPanel.repaint();
 	}
@@ -355,34 +337,16 @@ public class EventsPanel extends JPanel {
 	private void showEmptyState() {
 		String message = currentTab.equals("upcoming") ? "No upcoming events"
 			: "No active events right now";
-
-		JPanel wrapper = new JPanel(new GridBagLayout());
-		wrapper.setOpaque(false);
-		wrapper.setMaximumSize(new Dimension(Integer.MAX_VALUE, 200));
-
-		JLabel label = new JLabel(message);
-		label.setFont(FontManager.getRunescapeSmallFont());
-		label.setForeground(UIConstants.TEXT_MUTED);
-
-		wrapper.add(label);
-		eventsListPanel.add(wrapper);
+		eventsListPanel.add(messageArea(Labels.small(message, UIConstants.TEXT_MUTED), 200));
 	}
 
 	private void showError(String message) {
 		eventsListPanel.removeAll();
 
-		JPanel wrapper = new JPanel(new GridBagLayout());
-		wrapper.setOpaque(false);
-		wrapper.setMaximumSize(new Dimension(Integer.MAX_VALUE, 200));
-
-		JPanel errorPanel = new JPanel();
-		errorPanel.setLayout(new BoxLayout(errorPanel, BoxLayout.Y_AXIS));
-		errorPanel.setOpaque(false);
+		JPanel errorPanel = Labels.column();
 		errorPanel.setBorder(new EmptyBorder(40, 0, 40, 0));
 
-		JLabel text = new JLabel(message);
-		text.setFont(FontManager.getRunescapeSmallFont());
-		text.setForeground(UIConstants.TEXT_MUTED);
+		JLabel text = Labels.small(message, UIConstants.TEXT_MUTED);
 		text.setAlignmentX(Component.CENTER_ALIGNMENT);
 
 		JButton retryBtn = new JButton("Retry");
@@ -394,9 +358,17 @@ public class EventsPanel extends JPanel {
 		errorPanel.add(Box.createRigidArea(new Dimension(0, 12)));
 		errorPanel.add(retryBtn);
 
-		wrapper.add(errorPanel);
-		eventsListPanel.add(wrapper);
+		eventsListPanel.add(messageArea(errorPanel, 200));
 		eventsListPanel.revalidate();
 		eventsListPanel.repaint();
+	}
+
+	/** Centres content in a transparent area of the list that grows to at most maxHeight. */
+	private static JPanel messageArea(JComponent content, int maxHeight) {
+		JPanel wrapper = new JPanel(new GridBagLayout());
+		wrapper.setOpaque(false);
+		wrapper.setMaximumSize(new Dimension(Integer.MAX_VALUE, maxHeight));
+		wrapper.add(content);
+		return wrapper;
 	}
 }

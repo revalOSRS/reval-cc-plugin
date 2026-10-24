@@ -10,7 +10,6 @@ import java.util.regex.Pattern;
 
 @Singleton
 public class MusicNotifier extends BaseNotifier {
-	private static final int MUSIC_INTERFACE = InterfaceID.MUSIC;
 	private static final Pattern HTML_TAGS = Pattern.compile("<[^>]+>");
 
 	@Override
@@ -31,7 +30,7 @@ public class MusicNotifier extends BaseNotifier {
 		int widgetId = event.getParam1();
 		int widgetGroup = widgetId >> 16;
 		
-		if ("Play".equals(menuOption) && widgetGroup == MUSIC_INTERFACE) {
+		if ("Play".equals(menuOption) && widgetGroup == InterfaceID.MUSIC) {
 			String trackName = HTML_TAGS.matcher(menuTarget).replaceAll("").trim();
 			
 			if (!trackName.isEmpty()) {

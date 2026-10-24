@@ -12,6 +12,7 @@ import com.revalclan.api.leaguesbingo.LeaguesBingoResponse.TileProgress;
 import com.revalclan.ui.components.AccentCard;
 import com.revalclan.ui.components.Badge;
 import com.revalclan.ui.components.DotIcon;
+import com.revalclan.ui.components.Labels;
 import com.revalclan.ui.components.ProgressBar;
 import com.revalclan.ui.constants.UIConstants;
 import com.revalclan.util.DateTimeUtil;
@@ -21,7 +22,6 @@ import com.revalclan.util.TextWrap;
 import net.runelite.client.ui.FontManager;
 
 import javax.swing.Box;
-import javax.swing.BoxLayout;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
@@ -34,6 +34,7 @@ import java.awt.Font;
 import java.awt.FontMetrics;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -116,9 +117,7 @@ final class TileDetailView {
 	 * the contributors, all hanging under the text.
 	 */
 	private static JComponent requirementRow(JsonObject requirement, RequirementProgress rp, boolean done) {
-		JPanel text = new JPanel();
-		text.setLayout(new BoxLayout(text, BoxLayout.Y_AXIS));
-		text.setOpaque(false);
+		JPanel text = Labels.column();
 		text.setAlignmentX(Component.LEFT_ALIGNMENT);
 
 		Font font = FontManager.getRunescapeSmallFont();
@@ -178,11 +177,7 @@ final class TileDetailView {
 			if (i > 0) html.append(", ");
 			String name = ordered.get(i);
 			String escaped = Labels.escapeHtml(name);
-			if (obtained.contains(name.toLowerCase())) {
-				html.append("<span style='color:#4caf50'>").append(escaped).append("</span>");
-			} else {
-				html.append(escaped);
-			}
+			html.append(obtained.contains(name.toLowerCase()) ? "<span style='color:#4caf50'>" + escaped + "</span>" : escaped);
 		}
 		if (ordered.size() > shown) html.append(" +").append(ordered.size() - shown).append(" more");
 		return Labels.wrappedHtml(html.toString(), font, UIConstants.TEXT_MUTED, TEXT_WIDTH - REQ_INDENT);
@@ -221,10 +216,8 @@ final class TileDetailView {
 	}
 
 	private static String contributors(JsonObject meta) {
-		List<String> names = new ArrayList<>();
-		for (String n : Json.strings(Json.array(meta, "playerContributions"), "osrsNickname")) {
-			if (!names.contains(n)) names.add(n);
-		}
+		// Each nickname once, in order of first contribution.
+		List<String> names = new ArrayList<>(new LinkedHashSet<>(Json.strings(Json.array(meta, "playerContributions"), "osrsNickname")));
 		if (names.size() > MAX_CONTRIBUTORS) {
 			return String.join(", ", names.subList(0, MAX_CONTRIBUTORS)) + " +" + (names.size() - MAX_CONTRIBUTORS);
 		}

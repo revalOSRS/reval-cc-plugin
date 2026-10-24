@@ -2,6 +2,7 @@ package com.revalclan.ui.leaguesbingo;
 
 import lombok.Value;
 import net.runelite.api.gameval.SpriteID;
+import net.runelite.api.gameval.SpriteID.League6MapShields02;
 
 import java.awt.Color;
 import java.util.Arrays;
@@ -36,18 +37,18 @@ public final class LeaguesRegions {
 	 * Sailing uses the skill icon.
 	 */
 	public static final List<Region> ALL = Arrays.asList(
-		new Region("varlamore", "Varlamore", new Color(0xe8c258), SpriteID.League6MapShields02._10, SpriteID.League6MapShields02._22),
-		new Region("karamja", "Karamja", new Color(0x57a64a), SpriteID.League6MapShields02._1, SpriteID.League6MapShields02._13),
-		new Region("asgarnia", "Asgarnia", new Color(0x4f7ee3), SpriteID.League6MapShields02._2, SpriteID.League6MapShields02._14),
-		new Region("desert", "Desert", new Color(0xd1913f), SpriteID.League6MapShields02._3, SpriteID.League6MapShields02._15),
-		new Region("fremennik", "Fremennik", new Color(0x9ec7dd), SpriteID.League6MapShields02._7, SpriteID.League6MapShields02._19),
-		new Region("kandarin", "Kandarin", new Color(0xd9534f), SpriteID.League6MapShields02._6, SpriteID.League6MapShields02._18),
-		new Region("morytania", "Morytania", new Color(0x9b59b6), SpriteID.League6MapShields02._4, SpriteID.League6MapShields02._16),
-		new Region("tirannwn", "Tirannwn", new Color(0x45c48f), SpriteID.League6MapShields02._8, SpriteID.League6MapShields02._20),
-		new Region("wilderness", "Wilderness", new Color(0x8b8b8b), SpriteID.League6MapShields02._5, SpriteID.League6MapShields02._17),
-		new Region("kourend", "Kourend", new Color(0x3aa6a6), SpriteID.League6MapShields02._9, SpriteID.League6MapShields02._21),
-		new Region("misthalin", "Misthalin", new Color(0x6faedb), SpriteID.League6MapShields02._0, SpriteID.League6MapShields02._12),
-		new Region("global", "Global", new Color(0xe3b341), SpriteID.League6MapShields02._11, SpriteID.League6MapShields02._23),
+		new Region("varlamore", "Varlamore", new Color(0xe8c258), League6MapShields02._10, League6MapShields02._22),
+		new Region("karamja", "Karamja", new Color(0x57a64a), League6MapShields02._1, League6MapShields02._13),
+		new Region("asgarnia", "Asgarnia", new Color(0x4f7ee3), League6MapShields02._2, League6MapShields02._14),
+		new Region("desert", "Desert", new Color(0xd1913f), League6MapShields02._3, League6MapShields02._15),
+		new Region("fremennik", "Fremennik", new Color(0x9ec7dd), League6MapShields02._7, League6MapShields02._19),
+		new Region("kandarin", "Kandarin", new Color(0xd9534f), League6MapShields02._6, League6MapShields02._18),
+		new Region("morytania", "Morytania", new Color(0x9b59b6), League6MapShields02._4, League6MapShields02._16),
+		new Region("tirannwn", "Tirannwn", new Color(0x45c48f), League6MapShields02._8, League6MapShields02._20),
+		new Region("wilderness", "Wilderness", new Color(0x8b8b8b), League6MapShields02._5, League6MapShields02._17),
+		new Region("kourend", "Kourend", new Color(0x3aa6a6), League6MapShields02._9, League6MapShields02._21),
+		new Region("misthalin", "Misthalin", new Color(0x6faedb), League6MapShields02._0, League6MapShields02._12),
+		new Region("global", "Global", new Color(0xe3b341), League6MapShields02._11, League6MapShields02._23),
 		new Region("sailing", "Sailing", new Color(0x3b9ec9), SpriteID.Staticons2.SAILING, SpriteID.Staticons2.SAILING)
 	);
 

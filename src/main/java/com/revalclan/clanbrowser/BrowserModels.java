@@ -23,9 +23,7 @@ public final class BrowserModels {
 
     public static class Catalogue {
         public List<Page> pages = new ArrayList<>();
-        public List<Choice> metrics = new ArrayList<>();
         public List<Choice> bosses = new ArrayList<>();
-        public List<String> clueTiers = new ArrayList<>();
     }
 
     public static class View {
@@ -33,10 +31,8 @@ public final class BrowserModels {
         public String title;
         public String subtitle;
         public String valueLabel;
-        public String emptyLabel;
         public String generatedAt;
         public Integer completedTotal;
-        public boolean partial;
         public Page page;
         public Account account;
         public JsonElement metric;
@@ -49,7 +45,6 @@ public final class BrowserModels {
     }
 
     public static class Account {
-        public int id;
         @SerializedName(value = "osrs_nickname", alternate = {"osrsNickname"}) public String name;
         @SerializedName(value = "last_synced_at", alternate = {"lastSyncedAt"}) public String lastSyncedAt;
         public Long obtained;
@@ -58,7 +53,6 @@ public final class BrowserModels {
 
     public static class Item {
         public Integer id;
-        public Integer canonicalId;
         public String name;
         public Long quantity;
     }
@@ -76,7 +70,6 @@ public final class BrowserModels {
         public int rank;
         public int total;
         public boolean estimated;
-        public boolean valueEstimated;
     }
 
     public static class Group {
@@ -89,7 +82,6 @@ public final class BrowserModels {
     }
 
     public static class Row {
-        public int accountId;
         public String player;
         public Integer rank;
         public Long value;
@@ -107,7 +99,6 @@ public final class BrowserModels {
     }
 
     public static class Panel {
-        public String key;
         public String label;
         public String color;
         public int total;

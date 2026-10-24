@@ -18,10 +18,8 @@ import com.revalclan.api.notifications.NotificationAckResponse;
 import com.revalclan.api.notifications.NotificationsResponse;
 import com.revalclan.api.diaries.DiariesResponse;
 import com.revalclan.api.events.ActiveTeamsResponse;
-import com.revalclan.api.playercards.ProfileCardResponse;
 import com.revalclan.api.events.EventsResponse;
 import com.revalclan.api.events.RegistrationResponse;
-import com.revalclan.api.events.RegistrationStatusResponse;
 import com.revalclan.api.points.PointsResponse;
 import com.revalclan.api.common.ApiEnvelope;
 import com.revalclan.api.common.PublicApiResponse;
@@ -37,8 +35,9 @@ import okhttp3.*;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
 import java.io.IOException;
-import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
@@ -89,11 +88,6 @@ public class RevalApiService {
     public void fetchAccount(long accountHash, Consumer<AccountResponse> onSuccess, Consumer<Exception> onError) {
         observe(account.get(accountHash, () -> getFuture(ApiEndpoints.ACCOUNT + "?accountHash=" + accountHash,
             AccountResponse.class)), onSuccess, onError);
-    }
-
-    public void refreshAccount(long accountHash, Consumer<AccountResponse> onSuccess, Consumer<Exception> onError) {
-        clearAccountCache();
-        fetchAccount(accountHash, onSuccess, onError);
     }
 
     public void fetchAccountById(int osrsAccountId, Consumer<AccountResponse> onSuccess, Consumer<Exception> onError) {
@@ -164,11 +158,6 @@ public class RevalApiService {
         post(ApiEndpoints.leaguesBingoPick(eventId), gson.toJson(body), LeaguesBingoPickResponse.class, onSuccess, onError);
     }
 
-    public void fetchProfileCard(String nickname, Consumer<ProfileCardResponse> onSuccess, Consumer<Exception> onError) {
-        String encoded = URLEncoder.encode(nickname, StandardCharsets.UTF_8);
-        get(ApiEndpoints.PLAYER_PROFILE_CARD + "?nickname=" + encoded, ProfileCardResponse.class, onSuccess, onError);
-    }
-
     public void registerForEvent(String eventId, long accountHash,
                                  Consumer<RegistrationResponse> onSuccess, Consumer<Exception> onError) {
         post(ApiEndpoints.eventRegister(eventId), "{\"accountHash\":\"" + accountHash + "\"}", 
@@ -179,12 +168,6 @@ public class RevalApiService {
                                         Consumer<RegistrationResponse> onSuccess, Consumer<Exception> onError) {
         delete(ApiEndpoints.eventRegister(eventId), "{\"accountHash\":\"" + accountHash + "\"}",
             RegistrationResponse.class, onSuccess, onError);
-    }
-
-    public void checkRegistrationStatus(String eventId, long accountHash,
-                                        Consumer<RegistrationStatusResponse> onSuccess, Consumer<Exception> onError) {
-        get(ApiEndpoints.eventRegistrationStatus(eventId) + "?accountHash=" + accountHash,
-            RegistrationStatusResponse.class, onSuccess, onError);
     }
 
     // ==================== ACHIEVEMENTS API ====================
@@ -245,15 +228,29 @@ public class RevalApiService {
 
     // ==================== COMPETITIONS API ====================
 
-    public void fetchCompetitions(String status, Consumer<CompetitionsResponse> onSuccess, Consumer<Exception> onError) {
-        String endpoint = status != null 
-            ? ApiEndpoints.COMPETITIONS + "?status=" + status
-            : ApiEndpoints.COMPETITIONS;
-        get(endpoint, CompetitionsResponse.class, onSuccess, onError);
+    public void fetchFeaturedRace(Consumer<FeaturedRaceResponse> onSuccess, Consumer<Exception> onError) {
+        getPublic(ApiEndpoints.publicUrl(ApiEndpoints.PUBLIC_FEATURED_RACE), FeaturedRaceResponse.class, onSuccess, onError);
     }
 
-    public void fetchCompetitions(Consumer<CompetitionsResponse> onSuccess, Consumer<Exception> onError) {
-        fetchCompetitions(null, onSuccess, onError);
+    /** Banner and task artwork is optional; decoding and network IO stay off the Swing thread. */
+    public void fetchCompetitionArtwork(String imageUrl, Consumer<BufferedImage> onSuccess, Consumer<Exception> onError) {
+        String source = imageUrl.trim();
+        HttpUrl url = HttpUrl.parse(source.startsWith("/") ? "https://www.revalosrs.ee" + source : source);
+        if (url == null || !"https".equals(url.scheme())) {
+            onError.accept(new IOException("Invalid event image URL"));
+            return;
+        }
+        httpClient.newCall(new Request.Builder().url(url).build()).enqueue(new Callback() {
+            @Override public void onFailure(Call call, IOException error) { onError.accept(error); }
+            @Override public void onResponse(Call call, Response response) {
+                try (Response result = response) {
+                    if (!result.isSuccessful() || result.body() == null) throw new IOException("Event image unavailable");
+                    BufferedImage image = ImageIO.read(result.body().byteStream());
+                    if (image == null) throw new IOException("Unsupported event image format");
+                    onSuccess.accept(image);
+                } catch (IOException error) { onError.accept(error); }
+            }
+        });
     }
 
     public void fetchScheduledCompetitions(Consumer<CompetitionsResponse> onSuccess, Consumer<Exception> onError) {
@@ -264,42 +261,14 @@ public class RevalApiService {
         get(ApiEndpoints.COMPETITIONS_ACTIVE, CompetitionsResponse.class, onSuccess, onError);
     }
 
-    public void fetchCompletedCompetitions(Consumer<CompetitionsResponse> onSuccess, Consumer<Exception> onError) {
-        get(ApiEndpoints.COMPETITIONS_COMPLETED, CompetitionsResponse.class, onSuccess, onError);
-    }
-
     public void fetchCompetitionDetails(String competitionId, Consumer<CompetitionDetailsResponse> onSuccess, Consumer<Exception> onError) {
         get(ApiEndpoints.competitionById(competitionId), CompetitionDetailsResponse.class, onSuccess, onError);
-    }
-
-    public void fetchCompetitionLeaderboard(String competitionId, Consumer<CompetitionLeaderboardResponse> onSuccess, Consumer<Exception> onError) {
-        get(ApiEndpoints.competitionLeaderboard(competitionId), CompetitionLeaderboardResponse.class, onSuccess, onError);
-    }
-
-    public void fetchCompetitionActivity(String competitionId, Consumer<CompetitionActivityResponse> onSuccess, Consumer<Exception> onError) {
-        get(ApiEndpoints.competitionActivity(competitionId), CompetitionActivityResponse.class, onSuccess, onError);
-    }
-
-    public void fetchMyCompetitionProgress(String competitionId, long accountHash, 
-                                           Consumer<MyProgressResponse> onSuccess, Consumer<Exception> onError) {
-        get(ApiEndpoints.competitionMyProgress(competitionId) + "?accountHash=" + accountHash,
-            MyProgressResponse.class, onSuccess, onError);
-    }
-
-    public void fetchMyAllCompetitionsProgress(long accountHash, 
-                                               Consumer<MyProgressAllResponse> onSuccess, Consumer<Exception> onError) {
-        get(ApiEndpoints.COMPETITIONS_MY_PROGRESS_ALL + "?accountHash=" + accountHash,
-            MyProgressAllResponse.class, onSuccess, onError);
     }
 
     // ==================== COMPETITION VOTES API ====================
 
     public void fetchVotes(Consumer<VotesResponse> onSuccess, Consumer<Exception> onError) {
         get(ApiEndpoints.COMPETITION_VOTES, VotesResponse.class, onSuccess, onError);
-    }
-
-    public void fetchVoteDetails(String voteId, Consumer<VoteDetailsResponse> onSuccess, Consumer<Exception> onError) {
-        get(ApiEndpoints.voteById(voteId), VoteDetailsResponse.class, onSuccess, onError);
     }
 
     public void castVote(String voteId, String optionId, long accountHash,
@@ -326,15 +295,10 @@ public class RevalApiService {
             AdminAuthResponse.class, onSuccess, onError);
     }
 
-    public void fetchPendingRankChanges(String memberCode, int limit,
-                                        Consumer<PendingRankChangesResponse> onSuccess, Consumer<Exception> onError) {
-        getAdmin(ApiEndpoints.ADMIN_RANK_CHANGES_PENDING + "?limit=" + limit, memberCode,
-            PendingRankChangesResponse.class, onSuccess, onError);
-    }
-
     public void fetchPendingRankChanges(String memberCode,
                                         Consumer<PendingRankChangesResponse> onSuccess, Consumer<Exception> onError) {
-        fetchPendingRankChanges(memberCode, 100, onSuccess, onError);
+        getAdmin(ApiEndpoints.ADMIN_RANK_CHANGES_PENDING + "?limit=100", memberCode,
+            PendingRankChangesResponse.class, onSuccess, onError);
     }
 
     public void actualizeRankChange(String memberCode, int rankChangeId,
