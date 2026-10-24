@@ -85,6 +85,19 @@ public class SessionStoreTest {
 		assertEquals(1, store.readAll().join().size());
 	}
 
+	@Test public void aFailedSnapshotDoesNotHideOtherRecoverableFiles() throws Exception {
+		File directory = temporary.newFolder();
+		SessionStore store = new SessionStore(new Gson(), Runnable::run, directory);
+		store.write(session("saved"));
+		File blockedTemp = new File(directory, "broken.tmp");
+		assertTrue(blockedTemp.mkdir());
+		assertTrue(new File(blockedTemp, "block-write").createNewFile());
+		store.write(session("broken"));
+		List<SessionStore.PersistedSession> recovered = store.readAll().join();
+		assertEquals(1, recovered.size());
+		assertEquals("saved", recovered.get(0).sessionId());
+	}
+
 	static SessionStore.PersistedSession session(String id) {
 		SessionStore.PersistedSession session = new SessionStore.PersistedSession();
 		session.summary = new JsonObject();
