@@ -31,7 +31,6 @@ public class SessionStateTest {
 				bind(EventFilterManager.class).toInstance(new EventFilterManager(mock(okhttp3.OkHttpClient.class), new Gson()));
 				bind(ClanMembership.class).toInstance(mock(ClanMembership.class));
 				bind(ItemManager.class).toInstance(mock(ItemManager.class));
-				bind(ScreenshotService.class).toProvider(() -> mock(ScreenshotService.class));
 			}
 		});
 		NewBufferedNotifier notifier = injector.getInstance(NewBufferedNotifier.class);

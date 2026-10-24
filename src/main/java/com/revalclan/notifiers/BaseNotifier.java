@@ -7,7 +7,6 @@ import com.google.gson.JsonObject;
 import com.revalclan.RevalClanConfig;
 import com.revalclan.util.ClanMembership;
 import com.revalclan.util.EventFilterManager;
-import com.revalclan.util.ScreenshotService;
 import com.revalclan.util.WebhookService;
 import com.revalclan.util.Worlds;
 import lombok.extern.slf4j.Slf4j;
@@ -47,8 +46,6 @@ public abstract class BaseNotifier implements SessionScoped {
 	@Inject protected ClanMembership clanMembership;
 	
 	@Inject protected ItemManager itemManager;
-
-	@Inject protected ScreenshotService screenshotService;
 
 	/** The game's new collection log slot announcement; group "item" is the item name. */
 	protected static final Pattern COLLECTION_LOG_PATTERN = Pattern.compile(
@@ -108,20 +105,6 @@ public abstract class BaseNotifier implements SessionScoped {
 		if (!passesClanCheck()) return;
 		addEventMetadata(eventType, data, false);
 		webhookService.sendDataAsync(data);
-	}
-
-	/**
-	 * Captures a screenshot of the current game frame, then sends the
-	 * notification with the image as its own request part (plain JSON when the
-	 * capture failed).
-	 * @param data The notification data
-	 */
-	protected void sendNotificationWithScreenshot(Map<String, Object> data) {
-		if (!passesClanCheck()) return;
-		addEventMetadata(getEventType(), data, true);
-
-		screenshotService.captureScreenshot()
-			.thenAccept(screenshot -> webhookService.sendDataAsync(data, screenshot));
 	}
 
 	/**
