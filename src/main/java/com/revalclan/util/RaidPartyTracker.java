@@ -38,9 +38,9 @@ import java.util.regex.Pattern;
  */
 @Singleton
 public class RaidPartyTracker {
-	static final String CHAMBERS_OF_XERIC = "Chambers of Xeric";
-	static final String THEATRE_OF_BLOOD = "Theatre of Blood";
-	static final String TOMBS_OF_AMASCUT = "Tombs of Amascut";
+	public static final String CHAMBERS_OF_XERIC = "Chambers of Xeric";
+	public static final String THEATRE_OF_BLOOD = "Theatre of Blood";
+	public static final String TOMBS_OF_AMASCUT = "Tombs of Amascut";
 	public static final String FRACTURED_ARCHIVE = "The Fractured Archive";
 
 	/** First VarClientStr holding a ToB party member name (5 consecutive slots). */
@@ -308,7 +308,7 @@ public class RaidPartyTracker {
 	}
 
 	/** RuneScape treats space, underscore and hyphen in a name as the same character. */
-	static String nameKey(String name) {
+	public static String nameKey(String name) {
 		return sanitize(name).toLowerCase(Locale.ROOT).replace('_', ' ').replace('-', ' ');
 	}
 

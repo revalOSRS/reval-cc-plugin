@@ -117,6 +117,7 @@ public class RevalClanPlugin extends Plugin {
 	@Inject	private EmoteNotifier emoteNotifier;
 
 	@Inject	private ChatNotifier chatNotifier;
+	@Inject	private RaidPartyDropNotifier raidPartyDropNotifier;
 
 	@Inject	private MusicNotifier musicNotifier;
 
@@ -466,6 +467,7 @@ public class RevalClanPlugin extends Plugin {
 		ChatMessageType type = event.getType();
 
 		chatNotifier.onChatMessage(type, event.getName(), cleanMessage);
+		raidPartyDropNotifier.onChatMessage(type, cleanMessage);
 
 		if (type == ChatMessageType.GAMEMESSAGE ||
 			type == ChatMessageType.SPAM ||
