@@ -83,6 +83,12 @@ public class PetNotifier extends BaseNotifier {
 	 */
 	private final AtomicInteger ticksWaited = new AtomicInteger(0);
 
+	/**
+	 * Event data started on the first tick after the personal message, with the
+	 * game counters read then (e.g. Rifts closed), not when the name arrives
+	 */
+	private volatile Map<String, Object> pendingData = null;
+
 	@Override
 	public boolean isEnabled() {
 		return filterManager.getFilters().isPetEnabled();
@@ -174,6 +180,12 @@ public class PetNotifier extends BaseNotifier {
 			return;
 		}
 
+		// First tick after the game message: the drop tick's varp and XP updates are applied
+		if (this.pendingData == null) {
+			this.pendingData = new HashMap<>();
+			greenlogCounterSnapshot.attachTo(this.pendingData, null);
+		}
+
 		// We have the game message - check if we have complete info or should wait
 		if (this.petName != null) {
 			handleNotify();
@@ -199,7 +211,7 @@ public class PetNotifier extends BaseNotifier {
 		// Determine if pet was obtained or duplicate based on game message
 		boolean obtained = this.gameMessage != null && !this.gameMessage.contains("would have been");
 
-		Map<String, Object> petData = new HashMap<>();
+		Map<String, Object> petData = this.pendingData != null ? this.pendingData : new HashMap<>();
 		petData.put("message", this.gameMessage);
 		petData.put("obtained", obtained);
 
@@ -211,12 +223,6 @@ public class PetNotifier extends BaseNotifier {
 		// Add kill count if available
 		if (this.killCount != null && !this.killCount.isEmpty()) {
 			petData.put("killCount", this.killCount);
-		}
-		// Minigame pet broadcasts carry no count (e.g. Rifts closed), so the server reads it from these.
-		try {
-			petData.put("greenlogCounters", greenlogCounterSnapshot.capture(null));
-		} catch (RuntimeException ignored) {
-			// Optional counters must never prevent the pet event.
 		}
 
 		sendNotification(petData);
@@ -230,6 +236,7 @@ public class PetNotifier extends BaseNotifier {
 		this.gameMessage = null;
 		this.petName = null;
 		this.killCount = null;
+		this.pendingData = null;
 		this.ticksWaited.set(0);
 	}
 
