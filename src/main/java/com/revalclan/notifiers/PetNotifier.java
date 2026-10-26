@@ -211,7 +211,8 @@ public class PetNotifier extends BaseNotifier {
 		// Determine if pet was obtained or duplicate based on game message
 		boolean obtained = this.gameMessage != null && !this.gameMessage.contains("would have been");
 
-		Map<String, Object> petData = this.pendingData != null ? this.pendingData : new HashMap<>();
+		// Started by onGameTick on the first tick after the game message
+		Map<String, Object> petData = this.pendingData;
 		petData.put("message", this.gameMessage);
 		petData.put("obtained", obtained);
 
