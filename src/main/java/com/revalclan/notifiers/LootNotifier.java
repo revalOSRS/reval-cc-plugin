@@ -586,6 +586,7 @@ public class LootNotifier extends BaseNotifier {
 						boolean newlySuspect = false;
 						List<Map<String, Object>> cleanItems = new ArrayList<>();
 						List<Map<String, Object>> suspectedItems = new ArrayList<>();
+						Set<Integer> clogIds = new HashSet<>();
 
 						for (Map<String, Object> item : pending.items) {
 							// Re-check at flush — the worn-container event can land
@@ -609,6 +610,8 @@ public class LootNotifier extends BaseNotifier {
 								suspectedItems.add(item);
 							} else {
 								cleanItems.add(item);
+								Integer id = (Integer) item.get("id");
+								if (collectionLogManager.getAllCollectionLogItems().contains(id)) clogIds.add(id);
 							}
 						}
 
@@ -622,16 +625,7 @@ public class LootNotifier extends BaseNotifier {
 							}
 						}
 
-						try {
-							Set<Integer> clogIds = new HashSet<>();
-							for (Map<String, Object> item : cleanItems) {
-								int id = ((Number) item.get("id")).intValue();
-								if (collectionLogManager.getAllCollectionLogItems().contains(id)) clogIds.add(id);
-							}
-							if (!clogIds.isEmpty()) pending.lootData.put("greenlogCounters", greenlogCounterSnapshot.capture(clogIds));
-						} catch (RuntimeException ignored) {
-							// Optional counters must never prevent the loot event.
-						}
+						if (!clogIds.isEmpty()) greenlogCounterSnapshot.attachTo(pending.lootData, clogIds);
 						if (pending.party != null) pending.party.addTo(pending.lootData);
 						sendNotification(pending.lootData);
 					} catch (Exception ignored) {

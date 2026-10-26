@@ -43,11 +43,7 @@ public class CollectionNotifier extends BaseNotifier {
 	private void handleCollectionItem(String itemName) {
 		Map<String, Object> collectionData = new HashMap<>();
 		collectionData.put("item", itemName);
-		try {
-			collectionData.put("greenlogCounters", greenlogCounterSnapshot.capture(null));
-		} catch (RuntimeException ignored) {
-			// Optional counters must never prevent the collection event.
-		}
+		greenlogCounterSnapshot.attachTo(collectionData, null);
 		// Total slot count, so the server derives the Gilded rung from live data
 		// when judging this drop for a rank milestone
 		int totalSlots = client.getVarpValue(VarPlayerID.COLLECTION_COUNT_MAX);
