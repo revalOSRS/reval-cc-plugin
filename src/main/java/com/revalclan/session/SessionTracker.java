@@ -284,6 +284,9 @@ public class SessionTracker {
 	}
 
 	private void sendHeartbeat() {
+		// A rename can land mid-session: send the name the player has now, not the starting one
+		String name = playerName();
+		if (name != null) username = name;
 		Map<String, Object> payload = envelope("SESSION_HEARTBEAT", username, accountHash, world, worldFlags);
 		payload.put("sessionSummary", buildSummary(null, touch()));
 		String id = sessionId;
