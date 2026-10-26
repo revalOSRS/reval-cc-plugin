@@ -1,7 +1,9 @@
 package com.revalclan.notifiers;
 
+import com.revalclan.collectionlog.GreenlogCounterSnapshot;
 import net.runelite.client.util.Text;
 
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.HashMap;
 import java.util.Map;
@@ -12,6 +14,8 @@ import java.util.regex.Pattern;
 
 @Singleton
 public class PetNotifier extends BaseNotifier {
+	@Inject private GreenlogCounterSnapshot greenlogCounterSnapshot;
+
 	/**
 	 * Pattern matching the initial pet drop message
 	 */
@@ -207,6 +211,12 @@ public class PetNotifier extends BaseNotifier {
 		// Add kill count if available
 		if (this.killCount != null && !this.killCount.isEmpty()) {
 			petData.put("killCount", this.killCount);
+		}
+		// Minigame pet broadcasts carry no count (e.g. Rifts closed), so the server reads it from these.
+		try {
+			petData.put("greenlogCounters", greenlogCounterSnapshot.capture(null));
+		} catch (RuntimeException ignored) {
+			// Optional counters must never prevent the pet event.
 		}
 
 		sendNotification(petData);
