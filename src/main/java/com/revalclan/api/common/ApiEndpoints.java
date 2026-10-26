@@ -43,6 +43,9 @@ public final class ApiEndpoints {
     // Competition Votes
     public static final String COMPETITION_VOTES = "/competitions/votes";
 
+    // Account linking: exchanges a one-use Link code for a plugin credential (no bearer yet)
+    public static final String AUTH_PAIR = "/auth/pair";
+
     // Admin - Authentication
     public static final String ADMIN_AUTH_LOGIN = "/admin/auth/login";
 

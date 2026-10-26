@@ -301,7 +301,7 @@ public class CompetitionsPanelTest {
         final List<Consumer<CompetitionDetailsResponse>> pending = new ArrayList<>();
         final List<Consumer<BufferedImage>> artwork = new ArrayList<>();
 
-        FakeApi() { super(null, null); }
+        FakeApi() { super(null, null, null); }
 
         @Override public void fetchFeaturedRace(Consumer<FeaturedRaceResponse> ok, Consumer<Exception> error) {
             FeaturedRaceResponse response = new FeaturedRaceResponse();

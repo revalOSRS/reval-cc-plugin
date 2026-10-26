@@ -24,7 +24,7 @@ public class PendingRankupsPanel extends JPanel {
 	private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("MMM dd, yyyy HH:mm");
 
 	private final RevalApiService apiService;
-	private final String memberCode;
+	private final AdminManager.Session session;
 	private final Runnable onBack;
 	private final UIAssetLoader assetLoader;
 	private final ClanRankIconResolver rankIconResolver;
@@ -32,11 +32,11 @@ public class PendingRankupsPanel extends JPanel {
 	private JPanel contentPanel;
 	private boolean isLoading = false;
 
-	public PendingRankupsPanel(RevalApiService apiService, String memberCode,
+	public PendingRankupsPanel(RevalApiService apiService, AdminManager.Session session,
 	                           Runnable onBack, UIAssetLoader assetLoader,
 	                           ClanRankIconResolver rankIconResolver) {
 		this.apiService = apiService;
-		this.memberCode = memberCode;
+		this.session = session;
 		this.onBack = onBack;
 		this.assetLoader = assetLoader;
 		this.rankIconResolver = rankIconResolver;
@@ -86,12 +86,13 @@ public class PendingRankupsPanel extends JPanel {
 	}
 
 	public void loadData() {
-		if (isLoading) return;
+		if (isLoading || !session.isCurrent()) return;
 		isLoading = true;
 		showMessage("Loading...", UIConstants.TEXT_SECONDARY);
 
-		apiService.fetchPendingRankChanges(memberCode,
+		apiService.fetchPendingRankChanges(
 			response -> SwingUtilities.invokeLater(() -> {
+				if (!session.isCurrent()) return;
 				isLoading = false;
 				if (response.getData() != null && response.getData().getPendingRankChanges() != null) {
 					displayRankChanges(response.getData().getPendingRankChanges());
@@ -100,6 +101,7 @@ public class PendingRankupsPanel extends JPanel {
 				}
 			}),
 			error -> SwingUtilities.invokeLater(() -> {
+				if (!session.isCurrent()) return;
 				isLoading = false;
 				showMessage("Failed to load: " + error.getMessage(), UIConstants.ERROR_COLOR);
 			})
@@ -192,10 +194,12 @@ public class PendingRankupsPanel extends JPanel {
 	}
 
 	private void actualizeRankChange(int id, JButton button) {
+		if (!session.isCurrent()) return;
 		button.setEnabled(false);
 
-		apiService.actualizeRankChange(memberCode, id,
+		apiService.actualizeRankChange(id,
 			response -> SwingUtilities.invokeLater(() -> {
+				if (!session.isCurrent()) return;
 				if (response.isSuccess()) {
 					loadData();
 				} else {
@@ -205,6 +209,7 @@ public class PendingRankupsPanel extends JPanel {
 				}
 			}),
 			error -> SwingUtilities.invokeLater(() -> {
+				if (!session.isCurrent()) return;
 				button.setEnabled(true);
 				JOptionPane.showMessageDialog(this,
 					"Error: " + error.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);

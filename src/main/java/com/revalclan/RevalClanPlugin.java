@@ -1,6 +1,7 @@
 package com.revalclan;
 
 import com.revalclan.api.RevalApiService;
+import com.revalclan.auth.LinkTokenManager;
 import com.revalclan.combat.KillTracker;
 import com.revalclan.clanbrowser.ClanBrowserManager;
 import com.revalclan.collectionlog.CollectionLogManager;
@@ -150,7 +151,7 @@ public class RevalClanPlugin extends Plugin {
 	@Inject	private ClientToolbar clientToolbar;
 
 	@Inject	private RevalApiService revalApiService;
-
+	@Inject	private LinkTokenManager linkTokens;
 
 	@Inject	private UIAssetLoader uiAssetLoader;
 
@@ -168,6 +169,7 @@ public class RevalClanPlugin extends Plugin {
 		wasLoggedIn = false;
 		pendingLoginNotification = false;
 		clanMembership.reset();
+		linkTokens.start(this::showLinkMessage, this::onAccountLinked);
 		sessionTracker.setOnHeartbeatResponse(this::onChanges);
 
 		clientThread.invoke(() -> {
@@ -253,6 +255,8 @@ public class RevalClanPlugin extends Plugin {
 		log.info("Reval Clan plugin stopped!");
 		clanMembership.reset();
 		wasLoggedIn = false;
+		// Before the panel goes: nothing may act as the previous account from here on
+		linkTokens.shutDown();
 
 		collectionLogManager.clearObtainedItems();
 		syncButton.shutDown();
@@ -298,6 +302,7 @@ public class RevalClanPlugin extends Plugin {
 
 		switch (gameStateChanged.getGameState()) {
 			case LOGGED_IN:
+				linkTokens.onAccount(client.getAccountHash());
 				// LOGGED_IN also follows every region load and reconnect: only a fresh
 				// login runs the login hooks, and startSession is a no-op while a
 				// session is active — so this opens exactly the post-login and
@@ -312,6 +317,8 @@ public class RevalClanPlugin extends Plugin {
 				break;
 
 			case LOGIN_SCREEN: {
+				// First: late responses and callbacks for this account stop counting right here
+				linkTokens.onLoggedOut();
 				eventFilterManager.resetSession();
 				revalApiService.resetEventsSession();
 				boolean wasInClan = clanMembership.isMember();
@@ -378,6 +385,10 @@ public class RevalClanPlugin extends Plugin {
 		// This account is a member: its sessions recorded before we knew can go out now
 		sessionTracker.recoverPersistedSessions(client.getAccountHash());
 
+		if (!linkTokens.isLinked(client.getAccountHash())) {
+			linkTokens.noticeLinkRequired(client.getAccountHash());
+		}
+
 		if (revalPanel != null) {
 			revalPanel.onLoggedIn();
 		}
@@ -402,6 +413,9 @@ public class RevalClanPlugin extends Plugin {
 
 	@Subscribe
 	public void onGameTick(GameTick gameTick) {
+		// Safety net for a login whose account hash was not ready at LOGGED_IN
+		linkTokens.onAccount(client.getAccountHash());
+
 		// The session and its kill attribution record regardless of clan state — only sending is gated
 		sessionTracker.onGameTick();
 		killTracker.onGameTick();
@@ -550,9 +564,33 @@ public class RevalClanPlugin extends Plugin {
 	public void onConfigChanged(ConfigChanged event) {
 		if (!"revalclan".equals(event.getGroup())) return;
 
+		if ("linkCode".equals(event.getKey())) {
+			linkTokens.submitLinkCode(event.getNewValue(), true);
+			return;
+		}
+
 		if ("hideCompletedItems".equals(event.getKey()) && revalPanel != null) {
 			revalPanel.getProfilePanel().rebuild();
 		}
+	}
+
+	/** Plain-language line from the account link, shown as a game message (any thread). */
+	private void showLinkMessage(String message) {
+		clientThread.invokeLater(() -> {
+			if (client.getGameState() == GameState.LOGGED_IN) {
+				client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "Reval: " + message, "");
+			}
+		});
+	}
+
+	/** The logged-in account was just linked: whatever waited for a credential can go now. */
+	private void onAccountLinked(long accountHash) {
+		clientThread.invokeLater(() -> {
+			if (client.getAccountHash() != accountHash || !clanMembership.isMember()) return;
+			sessionTracker.recoverPersistedSessions(accountHash);
+			announcementService.onServerVersion(null);
+			if (revalPanel != null) revalPanel.onLoggedIn();
+		});
 	}
 
 	@Provides
