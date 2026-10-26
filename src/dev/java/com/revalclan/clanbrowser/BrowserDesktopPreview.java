@@ -2,6 +2,8 @@ package com.revalclan.clanbrowser;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
+import com.revalclan.auth.CredentialStore;
+import com.revalclan.auth.LinkTokenManager;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.nio.file.Files;
@@ -27,7 +29,9 @@ public class BrowserDesktopPreview {
             });
         }
         BrowserCommand command = BrowserCommand.parse(System.getProperty("reval.browserCommand", "reval clog forestry Valgusruum").replace('|', ' '));
-        BrowserApi api = new BrowserApi(new OkHttpClient(), gson);
+        // No game login here, so nothing is ever linked and no account-scoped read can be made: the store is never touched.
+        OkHttpClient http = new OkHttpClient();
+        BrowserApi api = new BrowserApi(http, gson, new LinkTokenManager(new CredentialStore(null, gson), http, gson));
         SwingUtilities.invokeLater(() -> {
             ClanBrowserWindow window = new ClanBrowserWindow(null, api, icons::get); window.identity(0, "Valgusruum"); window.open(command);
             window.setSize(Integer.getInteger("reval.browserWidth", window.getWidth()), Integer.getInteger("reval.browserHeight", window.getHeight()));

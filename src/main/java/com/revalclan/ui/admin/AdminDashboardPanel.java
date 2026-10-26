@@ -16,17 +16,17 @@ import java.util.function.Consumer;
 
 public class AdminDashboardPanel extends JPanel {
 	private final RevalApiService apiService;
-	private final String memberCode;
+	private final AdminManager.Session session;
 	private final Consumer<String> onNavigate;
 
 	private JPanel statsPanel;
 	private int pendingRankupsCount = 0;
 
-	public AdminDashboardPanel(RevalApiService apiService, String memberCode,
+	public AdminDashboardPanel(RevalApiService apiService, AdminManager.Session session,
 	                           AdminAuthResponse.AdminAuthData authData,
 	                           Consumer<String> onNavigate) {
 		this.apiService = apiService;
-		this.memberCode = memberCode;
+		this.session = session;
 		this.onNavigate = onNavigate;
 
 		setLayout(new BorderLayout());
@@ -81,14 +81,18 @@ public class AdminDashboardPanel extends JPanel {
 	}
 
 	private void loadStats() {
-		apiService.fetchPendingRankChanges(memberCode,
+		if (!session.isCurrent()) return;
+		apiService.fetchPendingRankChanges(
 			response -> SwingUtilities.invokeLater(() -> {
+				if (!session.isCurrent()) return;
 				if (response.getData() != null) {
 					pendingRankupsCount = response.getData().getTotal();
 				}
 				updateStats();
 			}),
-			error -> SwingUtilities.invokeLater(this::updateStats)
+			error -> SwingUtilities.invokeLater(() -> {
+				if (session.isCurrent()) updateStats();
+			})
 		);
 	}
 

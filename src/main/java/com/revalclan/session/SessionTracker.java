@@ -2,6 +2,7 @@ package com.revalclan.session;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
+import com.revalclan.auth.LinkTokenManager;
 import com.revalclan.session.SessionStore.PersistedSession;
 import com.revalclan.util.ClanMembership;
 import com.revalclan.util.Json;
@@ -42,6 +43,9 @@ import java.util.UUID;
  * Every persist goes straight to disk ({@link SessionStore}); the local copy is
  * deleted only when the server answers {@code sessionStored} = stored, duplicate
  * or rejected. The server dedupes on sessionId, so a replay can never double-store.
+ * A standalone send is "in flight" from the moment it starts until it has ended one way or the other
+ * (answered, or failed after the webhook's own retry); only then may it be replayed again, at the next
+ * login or when the account gets linked. A failed send never touches the file.
  *
  * A session starts the moment the player is logged in — before clan membership
  * is known — and accumulates regardless; only SENDING is gated on membership.
@@ -99,7 +103,7 @@ public class SessionTracker {
 	private Map<String, Integer> countersStart;
 	private Map<String, Integer> countersEnd;
 
-	/** Summaries sent and not yet answered — a login right after startup must not send them twice */
+	/** Summaries sent and not yet ended (answered or failed) — a login right after startup must not send them twice */
 	private final Set<String> inFlight = new HashSet<>();
 
 	// ------------------------------------------------------------------ lifecycle
@@ -167,6 +171,7 @@ public class SessionTracker {
 
 		// Player, skills and varps can land a tick or two after LOGGED_IN — fill the blanks
 		if (username == null) username = playerName();
+		backfillAccountHash();
 		if (snapshotEmpty(startSnapshot)) {
 			startSnapshot = buildSnapshot();
 			endSnapshot = startSnapshot;
@@ -192,6 +197,25 @@ public class SessionTracker {
 			ticksSinceHeartbeat = 0;
 			if (membership.isMember()) sendHeartbeat();
 		}
+	}
+
+	/**
+	 * The account hash can still be unset (0 / -1) when LOGGED_IN fires. A session without one cannot be
+	 * sent with anyone's credential, so it is filled in on the first tick the client has it, before the
+	 * session is persisted, sent or replayed. Signed 64-bit hashes are routinely negative: only 0 and -1
+	 * mean "not known yet".
+	 * <p>
+	 * It is only ever filled in, never replaced, and only for the player this session started as: the
+	 * logged-in player must still be the one the session recorded (same name), so a quick logout and
+	 * login as somebody else can never stamp their hash onto this session.
+	 */
+	private void backfillAccountHash() {
+		if (LinkTokenManager.isValidHash(accountHash) || client.getGameState() != GameState.LOGGED_IN) return;
+		long hash = client.getAccountHash();
+		String name = playerName();
+		if (!LinkTokenManager.isValidHash(hash) || name == null || !name.equals(username)) return;
+		accountHash = hash;
+		dirty = true;
 	}
 
 	/** VarClientIntChanged for ACCOUNT_SUMMARY_PLAYTIME — the server re-sends it at login, hop and region load. */
@@ -269,6 +293,8 @@ public class SessionTracker {
 		for (PersistedSession persisted : store.readAll()) {
 			String id = persisted.sessionId();
 			if (id.equals(sessionId) || inFlight.contains(id)) continue;
+			// A session that never learned its account hash cannot be attributed to anybody, so it is not sent
+			if (!LinkTokenManager.isValidHash(persisted.accountHash)) continue;
 			if (persisted.member || persisted.accountHash == provenAccountHash) send(persisted);
 		}
 	}
@@ -279,8 +305,24 @@ public class SessionTracker {
 		inFlight.add(id);
 		Map<String, Object> payload = envelope("SESSION_SUMMARY", persisted.username, persisted.accountHash, persisted.world, persisted.worldFlags);
 		payload.put("sessionSummary", persisted.summary);
-		webhookService.sendDataAsync(payload, response -> confirmDelivered(id, response));
+		// Sent with the token of the account the session was recorded for. Without one it stays on
+		// disk, and goes out at a later login or when that account is linked.
+		if (!webhookService.sendDataTracked(payload, response -> confirmDelivered(id, response), () -> sendEnded(id))) {
+			inFlight.remove(id);
+			return;
+		}
 		log.info("Sending session {} ({})", id, persisted.summary.get("endReason"));
+	}
+
+	/**
+	 * The send ended without an answer (network, refusal, server error, link lost; any thread — hops onto the
+	 * client thread). The file stays exactly as it is and the session may be offered again by the next replay.
+	 */
+	private void sendEnded(String endedSessionId) {
+		clientThread.invokeLater(() -> {
+			inFlight.remove(endedSessionId);
+			log.info("Session {} not delivered — keeping local copy for a later replay", endedSessionId);
+		});
 	}
 
 	private void sendHeartbeat() {

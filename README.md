@@ -159,6 +159,22 @@ All webhooks are protected by clan membership validation. Only members of the "R
 
 Configure the plugin in the RuneLite settings panel:
 
+### Account link
+The plugin identifies you to Reval with a credential that belongs to your game account, not with a shared code.
+1. Sign in to your Reval account on the website with Discord and have your game account approved by clan staff.
+2. Create a **Link code**: members do it in their account settings on the website; administrators do it from their own member record in the Reval admin console with **Link my RuneLite plugin** (the public member app cannot issue admin-capable codes). It is single-use and expires after 10 minutes.
+3. Log in to the approved game account, open the Reval Clan settings and paste the code into **Link code**.
+
+The plugin exchanges the code for a credential that is valid for 90 days, then clears the field. Until an account is linked, the plugin sends no events for it and tells you how to link in chat; anything that changes something or shows your own account data (event registration, votes, the **Profile** tab, notifications, admin tools) needs the link too. The credential is only ever sent to `https://api.revalosrs.ee`.
+
+**Where it is kept.** In one small file per game account under `.runelite/reval-clan/link/` in your user folder, not in your RuneLite settings, so RuneLite's cloud profile sync (a RuneLite feature, unrelated to the **Profile** tab) does not upload it. On macOS and Linux the folder is readable only by you (`0700`, files `0600`); on Windows it relies on the permissions of your user profile. The file is **not encrypted**: other programs running as you, or a copy of your `.runelite` folder, can read it. Do not share that folder. If it may have leaked, revoke the link in your Reval account settings. Two RuneLite clients using the same folder coordinate through a small empty `.lock` file there, so one client forgetting a rejected link cannot delete a newer one the other client just saved. Only the Link code you paste is an ordinary setting, and only for the minutes until it is used and cleared.
+
+**Expiry and your clock.** Only Reval ending a link (revoked, expired or unknown on the server) removes the stored credential. If this computer thinks the 90 days are over, the plugin stops using the link and says so, but keeps the file: a wrong date must not be able to erase a valid link. If your system date or time is wrong (the plugin notices when it differs from Reval's by more than a day), set it to update automatically and log in again; smaller differences are corrected automatically. If the link really expired, create a new Link code. A link that Reval refused for some other reason is kept, and the plugin tells you to try again.
+
+**What this does and does not prove.** The link shows which Reval account events come from and stops anyone else from sending events as you. It does not prove that what the game client reports is true.
+
+> Version 2.24.0 needs the Reval backend that supports `POST /plugin/auth/pair`, bearer authentication (also for every request that names an account) and the `X-Reval-Event-Id` / `X-Reval-Sent-At` event headers. The admin screen no longer asks for a code: it uses your linked account and the server's admin list, and only opens for accounts that hold admin permissions.
+
 ### Main Settings
 - **Enable Webhook**: Master toggle for all webhook notifications
 - **Save Local JSON**: Save collected data to local JSON files on logout
@@ -216,3 +232,7 @@ Portions of this plugin were inspired by or derived from:
 - [TempleOSRS](https://github.com/SMaloney2017/Temple-OSRS-Plugin) - Licensed under BSD 2-Clause License
 
 See the LICENSES directory for third-party license details.
+
+### Administrator pairing
+
+Administrators create a Link code from their **own member record in the Reval admin console** using **Link my RuneLite plugin**. The public member app cannot issue admin-capable plugin credentials. Paste the code into the same Link code setting while logged into the approved game account.

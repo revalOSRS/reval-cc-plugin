@@ -8,6 +8,11 @@ import com.revalclan.api.admin.ActualizeRankChangeResponse;
 import com.revalclan.api.admin.AdminAuthResponse;
 import com.revalclan.api.admin.AdminLoginRequest;
 import com.revalclan.api.admin.PendingRankChangesResponse;
+import com.revalclan.auth.ApiOrigin;
+import com.revalclan.auth.LinkException;
+import com.revalclan.auth.LinkTokenManager;
+import com.revalclan.auth.SecureHttp;
+import com.revalclan.auth.ServerError;
 import com.revalclan.api.challenges.ChallengesResponse;
 import com.revalclan.api.leagues.LeaguesConfigResponse;
 import com.revalclan.api.competitions.*;
@@ -27,6 +32,7 @@ import com.revalclan.api.leaguesbingo.LeaguesBingoMeResponse;
 import com.revalclan.api.leaguesbingo.LeaguesBingoPickResponse;
 import com.revalclan.api.leaguesbingo.LeaguesBingoResponse;
 import com.revalclan.util.PluginVersion;
+import com.revalclan.util.BoundedImageDecoder;
 import okhttp3.*;
 
 import javax.inject.Inject;
@@ -43,13 +49,36 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * Service for fetching data from the Reval Plugin API.
+ * <p>
+ * Requests are authenticated with the bearer token of the logged-in game
+ * account's link ({@link LinkTokenManager}); no identity travels in any other
+ * header. Mutations, admin and notification calls and every read that names an
+ * account ({@code accountHash} query) require a link and fail locally, before
+ * anything is sent, when there is none or when the hash is not the logged-in
+ * account's. Every other read is public and anonymous. Whatever the
+ * authentication, a response (or failure) is dropped if the account that made
+ * the request has logged out or been switched away from in the meantime.
+ * <p>
+ * Only a 401 whose body says {@code invalid_plugin_credential} removes a link;
+ * any other 401 keeps it.
  */
 @Singleton
 public class RevalApiService {
     private static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
 
+    /** How a request authenticates. */
+    private enum Auth {
+        /** Public data: never a token. */
+        NONE,
+        /** Private data, a change, or anything that names an account: fails locally unless the logged-in account is linked. */
+        REQUIRED
+    }
+
     private final Gson gson;
     private final OkHttpClient httpClient;
+    private final LinkTokenManager tokens;
+    private final ApiOrigin origin;
+    private volatile OkHttpClient credentialedClient;
 
     // Cache durations
     private static final long CACHE_DURATION_MS = 5 * 60 * 1000;
@@ -74,9 +103,25 @@ public class RevalApiService {
     private LeaguesConfigResponse.LeaguesConfig cachedLeaguesConfig;
 
     @Inject
-    public RevalApiService(OkHttpClient httpClient, Gson gson) {
+    public RevalApiService(OkHttpClient httpClient, Gson gson, LinkTokenManager tokens) {
+        this(httpClient, gson, tokens, ApiOrigin.PRODUCTION);
+    }
+
+    RevalApiService(OkHttpClient httpClient, Gson gson, LinkTokenManager tokens, ApiOrigin origin) {
         this.httpClient = httpClient;
         this.gson = gson;
+        this.tokens = tokens;
+        this.origin = origin;
+    }
+
+    /** Client for requests that carry a token: no redirects, no cache, same-origin only. */
+    OkHttpClient credentialedClient() {
+        OkHttpClient client = credentialedClient;
+        if (client == null) {
+            client = SecureHttp.harden(httpClient, origin, SecureHttp.API_TIMEOUT_MS);
+            credentialedClient = client;
+        }
+        return client;
     }
 
     // ==================== POINTS API ====================
@@ -176,7 +221,7 @@ public class RevalApiService {
     /** What this account may do in a Leagues Bingo event (team, role, may pick). */
     public void fetchLeaguesBingoMe(String eventId, long accountHash,
                                     Consumer<LeaguesBingoMeResponse> onSuccess, Consumer<Exception> onError) {
-        get(ApiEndpoints.leaguesBingoMe(eventId, accountHash), LeaguesBingoMeResponse.class, onSuccess, onError);
+        getPrivate(ApiEndpoints.leaguesBingoMe(eventId, accountHash), LeaguesBingoMeResponse.class, onSuccess, onError);
     }
 
     /**
@@ -189,18 +234,18 @@ public class RevalApiService {
         body.put("accountHash", String.valueOf(accountHash));
         body.put("region", region);
         if (teamId != null) body.put("teamId", teamId);
-        post(ApiEndpoints.leaguesBingoPick(eventId), gson.toJson(body), LeaguesBingoPickResponse.class, onSuccess, onError);
+        post(ApiEndpoints.leaguesBingoPick(eventId), gson.toJson(body), accountHash, LeaguesBingoPickResponse.class, onSuccess, onError);
     }
 
     public void registerForEvent(String eventId, long accountHash,
                                  Consumer<RegistrationResponse> onSuccess, Consumer<Exception> onError) {
-        post(ApiEndpoints.eventRegister(eventId), "{\"accountHash\":\"" + accountHash + "\"}", 
+        post(ApiEndpoints.eventRegister(eventId), "{\"accountHash\":\"" + accountHash + "\"}", accountHash,
             RegistrationResponse.class, onSuccess, onError);
     }
 
     public void cancelEventRegistration(String eventId, long accountHash,
                                         Consumer<RegistrationResponse> onSuccess, Consumer<Exception> onError) {
-        delete(ApiEndpoints.eventRegister(eventId), "{\"accountHash\":\"" + accountHash + "\"}",
+        delete(ApiEndpoints.eventRegister(eventId), "{\"accountHash\":\"" + accountHash + "\"}", accountHash,
             RegistrationResponse.class, onSuccess, onError);
     }
 
@@ -312,12 +357,14 @@ public class RevalApiService {
             onError.accept(new IOException("Invalid event image URL"));
             return;
         }
-        httpClient.newCall(new Request.Builder().url(url).build()).enqueue(new Callback() {
+        httpClient.newBuilder().callTimeout(15, java.util.concurrent.TimeUnit.SECONDS).build()
+            .newCall(new Request.Builder().url(url).build()).enqueue(new Callback() {
             @Override public void onFailure(Call call, IOException error) { onError.accept(error); }
             @Override public void onResponse(Call call, Response response) {
                 try (Response result = response) {
                     if (!result.isSuccessful() || result.body() == null) throw new IOException("Event image unavailable");
-                    BufferedImage image = ImageIO.read(result.body().byteStream());
+                    if (result.body().contentLength() > BoundedImageDecoder.MAX_BYTES) throw new IOException("Event image exceeds the download limit");
+                    BufferedImage image = BoundedImageDecoder.read(result.body().byteStream());
                     if (image == null) throw new IOException("Unsupported event image format");
                     onSuccess.accept(image);
                 } catch (IOException error) { onError.accept(error); }
@@ -345,8 +392,10 @@ public class RevalApiService {
 
     public void castVote(String voteId, String optionId, long accountHash,
                          Consumer<CastVoteResponse> onSuccess, Consumer<Exception> onError) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("optionId", optionId);
         post(ApiEndpoints.voteCast(voteId) + "?accountHash=" + accountHash,
-            "{\"optionId\":\"" + optionId + "\"}", CastVoteResponse.class, onSuccess, onError);
+            gson.toJson(body), accountHash, CastVoteResponse.class, onSuccess, onError);
     }
 
     public void fetchMyVote(String voteId, long accountHash,
@@ -356,27 +405,48 @@ public class RevalApiService {
     }
 
     // ==================== ADMIN API ====================
+    // Authority comes from the linked account (bearer token) and the server's admin list.
 
-    public void adminLogin(String memberCode, Long accountHash, String osrsNickname,
+    public void adminLogin(Long accountHash, String osrsNickname,
                            Consumer<AdminAuthResponse> onSuccess, Consumer<Exception> onError) {
         AdminLoginRequest requestBody = new AdminLoginRequest(
             accountHash != null ? String.valueOf(accountHash) : null,
             osrsNickname
         );
-        postAdmin(ApiEndpoints.ADMIN_AUTH_LOGIN, gson.toJson(requestBody), memberCode,
-            AdminAuthResponse.class, onSuccess, onError);
+        request(ApiEndpoints.url(ApiEndpoints.ADMIN_AUTH_LOGIN), "POST", gson.toJson(requestBody), Auth.REQUIRED,
+            accountHash, AdminAuthResponse.class, onSuccess, onError);
     }
 
-    public void fetchPendingRankChanges(String memberCode,
-                                        Consumer<PendingRankChangesResponse> onSuccess, Consumer<Exception> onError) {
-        getAdmin(ApiEndpoints.ADMIN_RANK_CHANGES_PENDING + "?limit=100", memberCode,
+    public void fetchPendingRankChanges(Consumer<PendingRankChangesResponse> onSuccess, Consumer<Exception> onError) {
+        getPrivate(ApiEndpoints.ADMIN_RANK_CHANGES_PENDING + "?limit=100",
             PendingRankChangesResponse.class, onSuccess, onError);
     }
 
-    public void actualizeRankChange(String memberCode, int rankChangeId,
+    public void actualizeRankChange(int rankChangeId,
                                     Consumer<ActualizeRankChangeResponse> onSuccess, Consumer<Exception> onError) {
-        postAdmin(ApiEndpoints.rankChangeActualize(rankChangeId), null, memberCode,
-            ActualizeRankChangeResponse.class, onSuccess, onError);
+        request(ApiEndpoints.url(ApiEndpoints.rankChangeActualize(rankChangeId)), "POST", null, Auth.REQUIRED,
+            null, ActualizeRankChangeResponse.class, onSuccess, onError);
+    }
+
+    /** @deprecated The numeric member code no longer authenticates anything; it is ignored and never sent. */
+    @Deprecated
+    public void adminLogin(String ignoredMemberCode, Long accountHash, String osrsNickname,
+                           Consumer<AdminAuthResponse> onSuccess, Consumer<Exception> onError) {
+        adminLogin(accountHash, osrsNickname, onSuccess, onError);
+    }
+
+    /** @deprecated The numeric member code no longer authenticates anything; it is ignored and never sent. */
+    @Deprecated
+    public void fetchPendingRankChanges(String ignoredMemberCode,
+                                        Consumer<PendingRankChangesResponse> onSuccess, Consumer<Exception> onError) {
+        fetchPendingRankChanges(onSuccess, onError);
+    }
+
+    /** @deprecated The numeric member code no longer authenticates anything; it is ignored and never sent. */
+    @Deprecated
+    public void actualizeRankChange(String ignoredMemberCode, int rankChangeId,
+                                    Consumer<ActualizeRankChangeResponse> onSuccess, Consumer<Exception> onError) {
+        actualizeRankChange(rankChangeId, onSuccess, onError);
     }
 
     // ==================== ANNOUNCEMENTS API ====================
@@ -388,7 +458,7 @@ public class RevalApiService {
     // ==================== NOTIFICATIONS API ====================
 
     public void fetchNotifications(long accountHash, Consumer<NotificationsResponse> onSuccess, Consumer<Exception> onError) {
-        get(ApiEndpoints.NOTIFICATIONS + "?accountHash=" + accountHash,
+        getPrivate(ApiEndpoints.NOTIFICATIONS + "?accountHash=" + accountHash,
             NotificationsResponse.class, onSuccess, onError);
     }
 
@@ -397,7 +467,7 @@ public class RevalApiService {
         Map<String, Object> body = new HashMap<>();
         body.put("accountHash", String.valueOf(accountHash));
         body.put("notificationIds", notificationIds);
-        post(ApiEndpoints.NOTIFICATIONS_ACK, gson.toJson(body),
+        post(ApiEndpoints.NOTIFICATIONS_ACK, gson.toJson(body), accountHash,
             NotificationAckResponse.class, onSuccess, onError);
     }
 
@@ -430,49 +500,76 @@ public class RevalApiService {
 
     // ==================== HTTP HELPERS ====================
 
+    /**
+     * Read of the plugin API. A read that names an account (an {@code accountHash} query) needs the bearer,
+     * exactly as the backend requires, and can only be made for the logged-in account; any other read is
+     * public and goes out without one.
+     */
     private <T extends ApiResponse> void get(String endpoint, Class<T> responseClass,
                                              Consumer<T> onSuccess, Consumer<Exception> onError) {
-        request(ApiEndpoints.url(endpoint), "GET", null, null, responseClass, onSuccess, onError);
+        String url = ApiEndpoints.url(endpoint);
+        HttpUrl parsed = HttpUrl.parse(url);
+        Auth auth = parsed != null && parsed.queryParameterNames().contains("accountHash") ? Auth.REQUIRED : Auth.NONE;
+        request(url, "GET", null, auth, null, responseClass, onSuccess, onError);
     }
 
-    /** GET against the public API (full URL, {success, data} envelope). */
+    /** Read of private data: needs the logged-in account's link. */
+    private <T extends ApiResponse> void getPrivate(String endpoint, Class<T> responseClass,
+                                                    Consumer<T> onSuccess, Consumer<Exception> onError) {
+        request(ApiEndpoints.url(endpoint), "GET", null, Auth.REQUIRED, null, responseClass, onSuccess, onError);
+    }
+
+    /** GET against the public API (full URL, {success, data} envelope). Never carries a token. */
     private <T extends PublicApiResponse> void getPublic(String url, Class<T> responseClass,
                                                          Consumer<T> onSuccess, Consumer<Exception> onError) {
-        request(url, "GET", null, null, responseClass, onSuccess, onError);
+        request(url, "GET", null, Auth.NONE, null, responseClass, onSuccess, onError);
     }
 
-    private <T extends ApiResponse> void getAdmin(String endpoint, String memberCode, Class<T> responseClass,
-                                                  Consumer<T> onSuccess, Consumer<Exception> onError) {
-        request(ApiEndpoints.url(endpoint), "GET", null, memberCode, responseClass, onSuccess, onError);
-    }
-
-    private <T extends ApiResponse> void post(String endpoint, String body, Class<T> responseClass,
+    /** Change on behalf of {@code accountHash}, which must be the logged-in, linked account. */
+    private <T extends ApiResponse> void post(String endpoint, String body, long accountHash, Class<T> responseClass,
                                               Consumer<T> onSuccess, Consumer<Exception> onError) {
-        request(ApiEndpoints.url(endpoint), "POST", body, null, responseClass, onSuccess, onError);
+        request(ApiEndpoints.url(endpoint), "POST", body, Auth.REQUIRED, accountHash, responseClass, onSuccess, onError);
     }
 
-    private <T extends ApiResponse> void postAdmin(String endpoint, String body, String memberCode,
-                                                   Class<T> responseClass, Consumer<T> onSuccess, Consumer<Exception> onError) {
-        request(ApiEndpoints.url(endpoint), "POST", body, memberCode, responseClass, onSuccess, onError);
-    }
-
-    private <T extends ApiResponse> void delete(String endpoint, String body, Class<T> responseClass,
+    private <T extends ApiResponse> void delete(String endpoint, String body, long accountHash, Class<T> responseClass,
                                                 Consumer<T> onSuccess, Consumer<Exception> onError) {
-        request(ApiEndpoints.url(endpoint), "DELETE", body, null, responseClass, onSuccess, onError);
+        request(ApiEndpoints.url(endpoint), "DELETE", body, Auth.REQUIRED, accountHash, responseClass, onSuccess, onError);
     }
 
-    /** One HTTP round-trip; callers pass a full URL and the envelope type they expect. */
-    private <T extends ApiEnvelope> void request(String url, String method, String body,
-                                                 String memberCode, Class<T> responseClass,
+    /**
+     * One HTTP round-trip; callers pass a full URL and the envelope type they expect.
+     *
+     * @param bodyAccountHash the account hash inside the body, if any: it must be the logged-in account's
+     */
+    private <T extends ApiEnvelope> void request(String url, String method, String body, Auth auth,
+                                                 Long bodyAccountHash, Class<T> responseClass,
                                                  Consumer<T> onSuccess, Consumer<Exception> onError) {
+        HttpUrl parsedUrl = HttpUrl.parse(url);
+        if (parsedUrl == null) {
+            onError.accept(new IOException("Invalid request URL"));
+            return;
+        }
+
+        LinkTokenManager.Grant grant = null;
+        if (auth == Auth.REQUIRED) {
+            try {
+                grant = tokens.grantForCurrentAccount(parsedUrl, bodyAccountHash);
+            } catch (LinkException e) {
+                onError.accept(e);
+                return;
+            }
+        }
+        // The login this request belongs to, with or without a token: an answer for an ended login is dropped.
+        final LinkTokenManager.Login login = grant != null ? grant.login() : tokens.currentLogin();
+
         Request.Builder requestBuilder = new Request.Builder()
-            .url(url)
+            .url(parsedUrl)
             .addHeader("Accept", "application/json")
             .addHeader("User-Agent", PluginVersion.userAgent())
             .addHeader("Content-Type", "application/json");
 
-        if (memberCode != null && !memberCode.isEmpty()) {
-            requestBuilder.addHeader("X-Member-Code", memberCode);
+        if (grant != null) {
+            grant.applyTo(requestBuilder);
         }
 
         if (body != null && !body.isEmpty()) {
@@ -492,25 +589,40 @@ public class RevalApiService {
             }
         }
 
-        httpClient.newCall(requestBuilder.build()).enqueue(new Callback() {
+        final LinkTokenManager.Grant sentWith = grant;
+        OkHttpClient client = grant != null ? credentialedClient() : httpClient;
+        client.newCall(requestBuilder.build()).enqueue(new Callback() {
             @Override
             public void onFailure(Call call, IOException e) {
+                if (!tokens.isCurrent(login)) return;
                 onError.accept(e);
             }
 
             @Override
             public void onResponse(Call call, Response response) {
                 try {
+                    tokens.observeServerTime(response);
+                    if (!tokens.isCurrent(login)) return;
+
+                    if (response.isRedirect()) {
+                        onError.accept(new IOException("Unexpected redirect from the Reval API"));
+                        return;
+                    }
+
                     if (!response.isSuccessful()) {
-                        String errorBody = response.body() != null ? response.body().string() : null;
-                        T errorResponse = null;
-                        if (errorBody != null && !errorBody.isEmpty()) {
-                            try {
-                                errorResponse = gson.fromJson(errorBody, responseClass);
-                            } catch (Exception ignored) {}
+                        ServerError error = ServerError.read(response, gson);
+                        if (sentWith != null && response.code() == 401) {
+                            if (error.is(ServerError.INVALID_PLUGIN_CREDENTIAL)) {
+                                // The server itself says this token is revoked, expired or unknown.
+                                tokens.rejected(sentWith);
+                                onError.accept(new LinkException(LinkException.Kind.EXPIRED));
+                            } else {
+                                // Some other 401: the token may be perfectly good, so it is kept.
+                                onError.accept(new LinkException(LinkException.Kind.REFUSED));
+                            }
+                            return;
                         }
-                        onError.accept(new Exception(errorResponse != null && errorResponse.getErrorMessage() != null
-                            ? errorResponse.getErrorMessage() : "HTTP " + response.code()));
+                        onError.accept(new Exception(failureMessage(error, responseClass, response.code())));
                         return;
                     }
 
@@ -521,7 +633,8 @@ public class RevalApiService {
 
                     String jsonResponse = response.body().string();
                     T parsedResponse = gson.fromJson(jsonResponse, responseClass);
-                    
+
+                    if (!tokens.isCurrent(login)) return;
                     if (parsedResponse == null) {
                         onError.accept(new Exception("Failed to parse response"));
                     } else if (!parsedResponse.isSuccess()) {
@@ -537,5 +650,19 @@ public class RevalApiService {
                 }
             }
         });
+    }
+
+    /** The server's reason from an already-read error body, in the shape of the envelope the caller expects, else the status. */
+    private <T extends ApiEnvelope> String failureMessage(ServerError error, Class<T> responseClass, int status) {
+        T envelope = null;
+        if (error.json() != null) {
+            try {
+                envelope = gson.fromJson(error.json(), responseClass);
+            } catch (RuntimeException ignored) {
+                // not the expected shape
+            }
+        }
+        String message = envelope != null ? ServerError.oneLine(envelope.getErrorMessage()) : null;
+        return message != null ? message : "HTTP " + status;
     }
 }
