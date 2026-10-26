@@ -85,6 +85,7 @@ public class SessionTracker {
 	private String sessionId;
 	private long startedAtMs;
 	private long lastUpdateMs;
+	/** Name at session start (filled in once the player loads), refreshed with each heartbeat: a rename can land mid-session */
 	private String username;
 	private long accountHash;
 	private int world;
