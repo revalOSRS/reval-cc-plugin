@@ -1,5 +1,7 @@
 package com.revalclan.ui;
 
+import com.revalclan.util.RequestScope;
+
 import com.revalclan.RevalClanConfig;
 import com.revalclan.api.RevalApiService;
 import com.revalclan.api.account.AccountResponse;
@@ -49,6 +51,10 @@ public class ProfilePanel extends JPanel {
 	private PointsResponse.PointsData pointsData;
 	private List<AccountResponse.PointsLogEntry> pointsLog;
 	private boolean isLoading = false;
+	private final RequestScope viewScope = new RequestScope();
+	private RequestScope accountScope = new RequestScope();
+	private Timer accountRetry;
+	private Timer syncLabelReset;
 
 	public ProfilePanel() {
 		setLayout(new BorderLayout());
@@ -114,23 +120,40 @@ public class ProfilePanel extends JPanel {
 	private void fetchRanks() {
 		if (apiService == null) return;
 		apiService.fetchPoints(
-			response -> {
+			response -> SwingUtilities.invokeLater(() -> {
+				if (!viewScope.isActive()) return;
 				if (response.getData() != null) {
 					pointsData = response.getData();
 					if (response.getData().getRanks() != null) {
 						ranks = response.getData().getRanks();
 					}
 					if (currentAccount != null) {
-						SwingUtilities.invokeLater(this::buildProfile);
+						buildProfile();
 					}
 				}
-			},
+			}),
 			error -> {}
 		);
 	}
 
 	public void onLoggedOut() {
+		accountScope.cancel();
+		accountScope = new RequestScope();
+		isLoading = false;
+		currentAccount = null;
+		pointsLog = null;
+		if (accountRetry != null) { accountRetry.stop(); accountRetry = null; }
+		if (syncLabelReset != null) { syncLabelReset.stop(); syncLabelReset = null; }
+		disposeAlbum();
 		showNotLoggedIn();
+	}
+
+	public void shutDown() {
+		viewScope.cancel();
+		onLoggedOut();
+		pointsData = null;
+		ranks = null;
+		onAccountLoaded = null;
 	}
 
 	public void loadCurrentAccount() {
@@ -138,6 +161,8 @@ public class ProfilePanel extends JPanel {
 	}
 
 	public void loadCurrentAccount(boolean retry) {
+		if (!viewScope.isActive()) return;
+		if (accountRetry != null) { accountRetry.stop(); accountRetry = null; }
 		if (client == null || apiService == null) {
 			showNotLoggedIn();
 			return;
@@ -148,9 +173,9 @@ public class ProfilePanel extends JPanel {
 			if (retry) {
 				showError("Not logged into RuneLite account");
 			} else {
-				Timer timer = new Timer(2000, e -> loadCurrentAccount(true));
-				timer.setRepeats(false);
-				timer.start();
+				accountRetry = new Timer(2000, e -> loadCurrentAccount(true));
+				accountRetry.setRepeats(false);
+				accountRetry.start();
 				showLoading();
 			}
 			return;
@@ -159,15 +184,18 @@ public class ProfilePanel extends JPanel {
 	}
 
 	public void loadAccount(long accountHash) {
-		if (isLoading) return;
+		if (!viewScope.isActive() || isLoading) return;
+		accountScope.cancel();
+		RequestScope owner = accountScope = new RequestScope();
 		isLoading = true;
 		showLoading();
 		if (pointsData == null) fetchRanks();
 
 		apiService.fetchAccount(accountHash,
 			response -> {
-				isLoading = false;
 				SwingUtilities.invokeLater(() -> {
+					if (!viewScope.isActive() || !owner.isActive()) return;
+					isLoading = false;
 					currentAccount = response.getData();
 					if (currentAccount != null) {
 						pointsLog = currentAccount.getPointsLog();
@@ -177,30 +205,39 @@ public class ProfilePanel extends JPanel {
 				});
 			},
 			error -> {
-				isLoading = false;
-				SwingUtilities.invokeLater(() -> showError(error.getMessage() != null ? error.getMessage() : "Failed to fetch account data"));
+				SwingUtilities.invokeLater(() -> {
+					if (!viewScope.isActive() || !owner.isActive()) return;
+					isLoading = false;
+					showError(error.getMessage() != null ? error.getMessage() : "Failed to fetch account data");
+				});
 			}
 		);
 	}
 
 	public void loadAccountById(int osrsAccountId) {
-		if (isLoading) return;
+		if (!viewScope.isActive() || isLoading) return;
+		accountScope.cancel();
+		RequestScope owner = accountScope = new RequestScope();
 		isLoading = true;
 		showLoading();
 		if (pointsData == null) fetchRanks();
 
 		apiService.fetchAccountById(osrsAccountId,
 			response -> {
-				isLoading = false;
 				SwingUtilities.invokeLater(() -> {
+					if (!viewScope.isActive() || !owner.isActive()) return;
+					isLoading = false;
 					currentAccount = response.getData();
 					if (currentAccount != null) pointsLog = currentAccount.getPointsLog();
 					if (pointsData != null) buildProfile();
 				});
 			},
 			error -> {
-				isLoading = false;
-				SwingUtilities.invokeLater(() -> showError(error.getMessage() != null ? error.getMessage() : "Player not found"));
+				SwingUtilities.invokeLater(() -> {
+					if (!viewScope.isActive() || !owner.isActive()) return;
+					isLoading = false;
+					showError(error.getMessage() != null ? error.getMessage() : "Player not found");
+				});
 			}
 		);
 	}
@@ -218,7 +255,7 @@ public class ProfilePanel extends JPanel {
 	 */
 	public void rebuild() {
 		if (currentAccount != null && pointsData != null) {
-			SwingUtilities.invokeLater(this::buildProfile);
+			SwingUtilities.invokeLater(viewScope.guard(this::buildProfile));
 		}
 	}
 
@@ -359,9 +396,10 @@ public class ProfilePanel extends JPanel {
 		btn.addActionListener(e -> {
 			if (onSyncGuide != null) onSyncGuide.run();
 			btn.setText("Check your Collection Log in-game");
-			Timer reset = new Timer(4000, ev -> btn.setText("Sync missing points"));
-			reset.setRepeats(false);
-			reset.start();
+			if (syncLabelReset != null) syncLabelReset.stop();
+			syncLabelReset = new Timer(4000, ev -> btn.setText("Sync missing points"));
+			syncLabelReset.setRepeats(false);
+			syncLabelReset.start();
 		});
 		return btn;
 	}

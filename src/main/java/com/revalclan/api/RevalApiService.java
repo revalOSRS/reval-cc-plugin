@@ -8,7 +8,6 @@ import com.revalclan.api.admin.ActualizeRankChangeResponse;
 import com.revalclan.api.admin.AdminAuthResponse;
 import com.revalclan.api.admin.AdminLoginRequest;
 import com.revalclan.api.admin.PendingRankChangesResponse;
-import com.revalclan.api.challenges.ChallengesResponse;
 import com.revalclan.api.leagues.LeaguesConfigResponse;
 import com.revalclan.api.competitions.*;
 import com.revalclan.api.announcements.AnnouncementsResponse;
@@ -27,11 +26,14 @@ import com.revalclan.api.leaguesbingo.LeaguesBingoMeResponse;
 import com.revalclan.api.leaguesbingo.LeaguesBingoPickResponse;
 import com.revalclan.api.leaguesbingo.LeaguesBingoResponse;
 import com.revalclan.util.PluginVersion;
+import com.revalclan.util.RequestScope;
+import javax.inject.Named;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import okhttp3.*;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
-import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -50,31 +52,23 @@ public class RevalApiService {
 
     private final Gson gson;
     private final OkHttpClient httpClient;
+    private volatile RequestScope requests = new RequestScope();
+
+    public void startUp() { requests.cancel(); requests = new RequestScope(); }
+    public void shutDown() { requests.cancel(); clearCache(); resetEventsSession(); }
 
     // Cache durations
     private static final long CACHE_DURATION_MS = 5 * 60 * 1000;
     private static final long ACCOUNT_CACHE_DURATION_MS = 2 * 60 * 1000;
 
-    // Cached responses
-    private PointsResponse cachedPoints;
-    private long lastPointsFetch = 0;
-    private AccountResponse cachedAccount;
-    private String cachedAccountIdentifier;
-    private long lastAccountFetch = 0;
-    private ActiveTeamsResponse cachedActiveTeams;
-    private long lastActiveTeamsFetch = 0;
-    private AchievementsResponse cachedAchievements;
-    private long lastAchievementsFetch = 0;
-    private DiariesResponse cachedDiaries;
-    private long lastDiariesFetch = 0;
-    private ChallengesResponse cachedChallenges;
-    private long lastChallengesFetch = 0;
-
-    // Leagues config - session-level cache (no TTL, cleared on logout)
-    private LeaguesConfigResponse.LeaguesConfig cachedLeaguesConfig;
+    private final CachedFetch<PointsResponse> points = new CachedFetch<>(CACHE_DURATION_MS);
+    private final CachedFetch<AccountResponse> account = new CachedFetch<>(ACCOUNT_CACHE_DURATION_MS);
+    private final CachedFetch<ActiveTeamsResponse> teams = new CachedFetch<>(CACHE_DURATION_MS);
+    private final CachedFetch<DiariesResponse> diaries = new CachedFetch<>(CACHE_DURATION_MS);
+    private final CachedFetch<LeaguesConfigResponse> leagues = new CachedFetch<>(0);
 
     @Inject
-    public RevalApiService(OkHttpClient httpClient, Gson gson) {
+    public RevalApiService(@Named("reval-http") OkHttpClient httpClient, Gson gson) {
         this.httpClient = httpClient;
         this.gson = gson;
     }
@@ -82,32 +76,14 @@ public class RevalApiService {
     // ==================== POINTS API ====================
 
     public void fetchPoints(Consumer<PointsResponse> onSuccess, Consumer<Exception> onError) {
-        if (cachedPoints != null && System.currentTimeMillis() - lastPointsFetch < CACHE_DURATION_MS) {
-            onSuccess.accept(cachedPoints);
-            return;
-        }
-        get(ApiEndpoints.POINTS, PointsResponse.class, response -> {
-            cachedPoints = response;
-            lastPointsFetch = System.currentTimeMillis();
-            onSuccess.accept(response);
-        }, onError);
+        observe(points.get(null, () -> getFuture(ApiEndpoints.POINTS, PointsResponse.class)), onSuccess, onError);
     }
 
     // ==================== ACCOUNT API ====================
 
     public void fetchAccount(long accountHash, Consumer<AccountResponse> onSuccess, Consumer<Exception> onError) {
-        String identifier = String.valueOf(accountHash);
-        if (cachedAccount != null && identifier.equals(cachedAccountIdentifier)
-            && System.currentTimeMillis() - lastAccountFetch < ACCOUNT_CACHE_DURATION_MS) {
-            onSuccess.accept(cachedAccount);
-            return;
-        }
-        get(ApiEndpoints.ACCOUNT + "?accountHash=" + accountHash, AccountResponse.class, response -> {
-            cachedAccount = response;
-            cachedAccountIdentifier = identifier;
-            lastAccountFetch = System.currentTimeMillis();
-            onSuccess.accept(response);
-        }, onError);
+        observe(account.get(accountHash, () -> getFuture(ApiEndpoints.ACCOUNT + "?accountHash=" + accountHash,
+            AccountResponse.class)), onSuccess, onError);
     }
 
     public void fetchAccountById(int osrsAccountId, Consumer<AccountResponse> onSuccess, Consumer<Exception> onError) {
@@ -123,7 +99,7 @@ public class RevalApiService {
     // ==================== EVENTS API ====================
 
     private final CopyOnWriteArrayList<Consumer<EventsResponse>> eventsListeners = new CopyOnWriteArrayList<>();
-    private long eventsGeneration;
+    private volatile RequestScope eventsScope = new RequestScope();
 
     /** Successful event responses, or an empty response on session reset. Never mutate Swing directly here. */
     public void addEventsListener(Consumer<EventsResponse> listener) {
@@ -131,37 +107,23 @@ public class RevalApiService {
     }
 
     /** End the session without allowing an old in-flight response to restore its marks. */
-    public synchronized void resetEventsSession() {
-        eventsGeneration++;
+    public void resetEventsSession() {
+        eventsScope.cancel();
+        eventsScope = new RequestScope();
         eventsListeners.forEach(listener -> listener.accept(new EventsResponse()));
     }
 
     public void fetchEvents(Consumer<EventsResponse> onSuccess, Consumer<Exception> onError) {
-        final long generation;
-        synchronized (this) { generation = ++eventsGeneration; }
-        get(ApiEndpoints.EVENTS, EventsResponse.class, response -> {
-            synchronized (this) {
-                if (generation != eventsGeneration) return;
-                eventsListeners.forEach(listener -> listener.accept(response));
-                onSuccess.accept(response);
-            }
-        }, error -> {
-            synchronized (this) {
-                if (generation == eventsGeneration) onError.accept(error);
-            }
-        });
+        eventsScope.cancel();
+        RequestScope owner = eventsScope = new RequestScope();
+        observe(owner.track(getFuture(ApiEndpoints.EVENTS, EventsResponse.class)), response -> {
+            if (owner.isActive()) eventsListeners.forEach(listener -> listener.accept(response));
+            onSuccess.accept(response);
+        }, onError);
     }
 
     public void fetchActiveTeams(Consumer<ActiveTeamsResponse> onSuccess, Consumer<Exception> onError) {
-        if (cachedActiveTeams != null && System.currentTimeMillis() - lastActiveTeamsFetch < CACHE_DURATION_MS) {
-            onSuccess.accept(cachedActiveTeams);
-            return;
-        }
-        get(ApiEndpoints.EVENTS_ACTIVE_TEAMS, ActiveTeamsResponse.class, response -> {
-            cachedActiveTeams = response;
-            lastActiveTeamsFetch = System.currentTimeMillis();
-            onSuccess.accept(response);
-        }, onError);
+        observe(teams.get(null, () -> getFuture(ApiEndpoints.EVENTS_ACTIVE_TEAMS, ActiveTeamsResponse.class)), onSuccess, onError);
     }
 
     /**
@@ -206,97 +168,33 @@ public class RevalApiService {
 
     // ==================== ACHIEVEMENTS API ====================
 
-    public void fetchAchievementDefinitions(Long accountHash,
-                                           Consumer<AchievementsResponse> onSuccess, Consumer<Exception> onError) {
-        if (accountHash == null && cachedAchievements != null 
-            && System.currentTimeMillis() - lastAchievementsFetch < CACHE_DURATION_MS) {
-            onSuccess.accept(cachedAchievements);
-            return;
-        }
-        String endpoint = accountHash != null 
-            ? ApiEndpoints.ACHIEVEMENTS + "?accountHash=" + accountHash
-            : ApiEndpoints.ACHIEVEMENTS;
-        get(endpoint, AchievementsResponse.class, response -> {
-            if (accountHash == null) {
-                cachedAchievements = response;
-                lastAchievementsFetch = System.currentTimeMillis();
-            }
-            onSuccess.accept(response);
-        }, onError);
-    }
-
-    public void fetchAchievementDefinitions(Consumer<AchievementsResponse> onSuccess, Consumer<Exception> onError) {
-        fetchAchievementDefinitions(null, onSuccess, onError);
+    public void fetchAchievementDefinitions(long accountHash, Consumer<AchievementsResponse> onSuccess, Consumer<Exception> onError) {
+        get(ApiEndpoints.ACHIEVEMENTS + "?accountHash=" + accountHash, AchievementsResponse.class, onSuccess, onError);
     }
 
     // ==================== DIARIES API ====================
 
     public void fetchDiaries(Long accountHash, Consumer<DiariesResponse> onSuccess, Consumer<Exception> onError) {
-        if (cachedDiaries != null && accountHash == null 
-            && System.currentTimeMillis() - lastDiariesFetch < CACHE_DURATION_MS) {
-            onSuccess.accept(cachedDiaries);
-            return;
+        if (accountHash == null) {
+            observe(diaries.get(null, () -> getFuture(ApiEndpoints.DIARIES, DiariesResponse.class)), onSuccess, onError);
+        } else {
+            get(ApiEndpoints.DIARIES + "?accountHash=" + accountHash, DiariesResponse.class, onSuccess, onError);
         }
-        String endpoint = accountHash != null 
-            ? ApiEndpoints.DIARIES + "?accountHash=" + accountHash
-            : ApiEndpoints.DIARIES;
-        get(endpoint, DiariesResponse.class, response -> {
-            if (accountHash == null) {
-                cachedDiaries = response;
-                lastDiariesFetch = System.currentTimeMillis();
-            }
-            onSuccess.accept(response);
-        }, onError);
-    }
-
-    public void fetchDiaries(Consumer<DiariesResponse> onSuccess, Consumer<Exception> onError) {
-        fetchDiaries(null, onSuccess, onError);
-    }
-
-    // ==================== CHALLENGES API ====================
-
-    public void fetchChallenges(Long accountHash, Consumer<ChallengesResponse> onSuccess, Consumer<Exception> onError) {
-        if (accountHash == null && cachedChallenges != null 
-            && System.currentTimeMillis() - lastChallengesFetch < CACHE_DURATION_MS) {
-            onSuccess.accept(cachedChallenges);
-            return;
-        }
-        String endpoint = accountHash != null 
-            ? ApiEndpoints.CHALLENGES + "?accountHash=" + accountHash
-            : ApiEndpoints.CHALLENGES;
-        get(endpoint, ChallengesResponse.class, response -> {
-            if (accountHash == null) {
-                cachedChallenges = response;
-                lastChallengesFetch = System.currentTimeMillis();
-            }
-            onSuccess.accept(response);
-        }, onError);
-    }
-    
-    public void fetchChallenges(Consumer<ChallengesResponse> onSuccess, Consumer<Exception> onError) {
-        fetchChallenges(null, onSuccess, onError);
     }
 
     // ==================== LEAGUES API ====================
 
     public void fetchLeaguesConfig(Consumer<LeaguesConfigResponse.LeaguesConfig> onSuccess, Consumer<Exception> onError) {
-        if (cachedLeaguesConfig != null) {
-            onSuccess.accept(cachedLeaguesConfig);
-            return;
-        }
-        get(ApiEndpoints.LEAGUES_CONFIG, LeaguesConfigResponse.class, response -> {
-            cachedLeaguesConfig = response.getData();
-            onSuccess.accept(cachedLeaguesConfig);
-        }, onError);
+        observe(leagues.get(null, () -> getFuture(ApiEndpoints.LEAGUES_CONFIG, LeaguesConfigResponse.class)),
+            response -> onSuccess.accept(response.getData()), onError);
     }
 
     public LeaguesConfigResponse.LeaguesConfig getCachedLeaguesConfig() {
-        return cachedLeaguesConfig;
+        LeaguesConfigResponse response = leagues.peek();
+        return response != null ? response.getData() : null;
     }
 
-    public void clearLeaguesCache() {
-        cachedLeaguesConfig = null;
-    }
+    public void clearLeaguesCache() { leagues.clear(); }
 
     // ==================== COMPETITIONS API ====================
 
@@ -312,17 +210,10 @@ public class RevalApiService {
             onError.accept(new IOException("Invalid event image URL"));
             return;
         }
-        httpClient.newCall(new Request.Builder().url(url).build()).enqueue(new Callback() {
-            @Override public void onFailure(Call call, IOException error) { onError.accept(error); }
-            @Override public void onResponse(Call call, Response response) {
-                try (Response result = response) {
-                    if (!result.isSuccessful() || result.body() == null) throw new IOException("Event image unavailable");
-                    BufferedImage image = ImageIO.read(result.body().byteStream());
-                    if (image == null) throw new IOException("Unsupported event image format");
-                    onSuccess.accept(image);
-                } catch (IOException error) { onError.accept(error); }
-            }
-        });
+        observe(requests.request(httpClient, new Request.Builder().url(url).build(), response -> {
+            if (!response.isSuccessful() || response.body() == null) throw new IOException("Event image unavailable");
+            return CompetitionArtwork.read(response.body());
+        }), onSuccess, onError);
     }
 
     public void fetchScheduledCompetitions(Consumer<CompetitionsResponse> onSuccess, Consumer<Exception> onError) {
@@ -404,29 +295,10 @@ public class RevalApiService {
     // ==================== CACHE MANAGEMENT ====================
 
     public void clearCache() {
-        cachedPoints = null;
-        lastPointsFetch = 0;
-        cachedAccount = null;
-        cachedAccountIdentifier = null;
-        lastAccountFetch = 0;
-        cachedActiveTeams = null;
-        lastActiveTeamsFetch = 0;
-        cachedAchievements = null;
-        lastAchievementsFetch = 0;
-        cachedDiaries = null;
-        lastDiariesFetch = 0;
-        cachedChallenges = null;
-        lastChallengesFetch = 0;
-        cachedLeaguesConfig = null;
+        points.clear(); account.clear(); teams.clear(); diaries.clear(); leagues.clear();
     }
 
-    public void clearAccountCache() {
-        cachedAccount = null;
-        cachedAccountIdentifier = null;
-        lastAccountFetch = 0;
-        cachedAchievements = null;
-        lastAchievementsFetch = 0;
-    }
+    public void clearAccountCache() { account.clear(); }
 
     // ==================== HTTP HELPERS ====================
 
@@ -461,81 +333,46 @@ public class RevalApiService {
         request(ApiEndpoints.url(endpoint), "DELETE", body, null, responseClass, onSuccess, onError);
     }
 
-    /** One HTTP round-trip; callers pass a full URL and the envelope type they expect. */
-    private <T extends ApiEnvelope> void request(String url, String method, String body,
-                                                 String memberCode, Class<T> responseClass,
-                                                 Consumer<T> onSuccess, Consumer<Exception> onError) {
-        Request.Builder requestBuilder = new Request.Builder()
-            .url(url)
-            .addHeader("Accept", "application/json")
-            .addHeader("User-Agent", PluginVersion.userAgent())
-            .addHeader("Content-Type", "application/json");
+    private <T extends ApiResponse> CompletableFuture<T> getFuture(String endpoint, Class<T> type) {
+        return requestFuture(ApiEndpoints.url(endpoint), "GET", null, null, type);
+    }
 
-        if (memberCode != null && !memberCode.isEmpty()) {
-            requestBuilder.addHeader("X-Member-Code", memberCode);
-        }
-
-        if (body != null && !body.isEmpty()) {
-            RequestBody requestBody = RequestBody.create(JSON, body.getBytes(StandardCharsets.UTF_8));
-            if ("POST".equals(method)) {
-                requestBuilder.post(requestBody);
-            } else if ("DELETE".equals(method)) {
-                requestBuilder.delete(requestBody);
+    /** Exactly one success or error callback, including cancellation and a stopped plugin. */
+    private static <T> void observe(CompletableFuture<T> request, Consumer<T> success, Consumer<Exception> failure) {
+        request.whenComplete((response, error) -> {
+            if (error == null) success.accept(response);
+            else {
+                Throwable cause = error instanceof CompletionException && error.getCause() != null ? error.getCause() : error;
+                failure.accept(cause instanceof Exception ? (Exception) cause : new Exception(cause));
             }
-        } else {
-            if ("POST".equals(method)) {
-                requestBuilder.post(RequestBody.create(JSON, new byte[0]));
-            } else if ("DELETE".equals(method)) {
-                requestBuilder.delete();
-            } else {
-                requestBuilder.get();
+        });
+    }
+
+    private <T extends ApiEnvelope> void request(String url, String method, String body, String memberCode,
+                                                 Class<T> type, Consumer<T> success, Consumer<Exception> failure) {
+        observe(requestFuture(url, method, body, memberCode, type), success, failure);
+    }
+
+    private <T extends ApiEnvelope> CompletableFuture<T> requestFuture(String url, String method, String body,
+                                                                      String memberCode, Class<T> type) {
+        Request.Builder request = new Request.Builder().url(url)
+            .header("Accept", "application/json").header("User-Agent", PluginVersion.userAgent());
+        if (memberCode != null && !memberCode.isEmpty()) request.header("X-Member-Code", memberCode);
+        RequestBody payload = body == null ? null : RequestBody.create(JSON, body.getBytes(StandardCharsets.UTF_8));
+        if ("POST".equals(method)) request.post(payload != null ? payload : RequestBody.create(JSON, new byte[0]));
+        else if ("DELETE".equals(method)) request.delete(payload);
+        return requests.request(httpClient, request.build(), response -> {
+            String json = response.body() == null ? null : response.body().string();
+            T parsed = null;
+            if (json != null && !json.isEmpty()) {
+                try { parsed = gson.fromJson(json, type); }
+                catch (RuntimeException error) { if (response.isSuccessful()) throw error; }
             }
-        }
-
-        httpClient.newCall(requestBuilder.build()).enqueue(new Callback() {
-            @Override
-            public void onFailure(Call call, IOException e) {
-                onError.accept(e);
-            }
-
-            @Override
-            public void onResponse(Call call, Response response) {
-                try {
-                    if (!response.isSuccessful()) {
-                        String errorBody = response.body() != null ? response.body().string() : null;
-                        T errorResponse = null;
-                        if (errorBody != null && !errorBody.isEmpty()) {
-                            try {
-                                errorResponse = gson.fromJson(errorBody, responseClass);
-                            } catch (Exception ignored) {}
-                        }
-                        onError.accept(new Exception(errorResponse != null && errorResponse.getErrorMessage() != null
-                            ? errorResponse.getErrorMessage() : "HTTP " + response.code()));
-                        return;
-                    }
-
-                    if (response.body() == null) {
-                        onError.accept(new Exception("Empty response body"));
-                        return;
-                    }
-
-                    String jsonResponse = response.body().string();
-                    T parsedResponse = gson.fromJson(jsonResponse, responseClass);
-                    
-                    if (parsedResponse == null) {
-                        onError.accept(new Exception("Failed to parse response"));
-                    } else if (!parsedResponse.isSuccess()) {
-                        onError.accept(new Exception(parsedResponse.getErrorMessage() != null
-                            ? parsedResponse.getErrorMessage() : "Request failed"));
-                    } else {
-                        onSuccess.accept(parsedResponse);
-                    }
-                } catch (Exception e) {
-                    onError.accept(e);
-                } finally {
-                    response.close();
-                }
-            }
+            if (!response.isSuccessful()) throw new IOException(parsed != null && parsed.getErrorMessage() != null
+                ? parsed.getErrorMessage() : "HTTP " + response.code());
+            if (parsed == null) throw new IOException("Empty or invalid response");
+            if (!parsed.isSuccess()) throw new IOException(parsed.getErrorMessage() != null ? parsed.getErrorMessage() : "Request failed");
+            return parsed;
         });
     }
 }

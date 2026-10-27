@@ -1,5 +1,8 @@
 package com.revalclan.combat;
 
+import com.revalclan.session.SessionScoped;
+import com.revalclan.session.SessionState;
+
 import net.runelite.api.Actor;
 import net.runelite.api.Client;
 import net.runelite.api.Hitsplat;
@@ -22,7 +25,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * (session counts, DETAILED_KILL webhook), see RevalClanPlugin.onActorDeath.
  */
 @Singleton
-public class KillTracker {
+public class KillTracker implements SessionScoped {
+	@Inject void registerSessionState(SessionState state) { state.register(this); }
 	@Inject private Client client;
 	@Inject private ItemManager itemManager;
 
