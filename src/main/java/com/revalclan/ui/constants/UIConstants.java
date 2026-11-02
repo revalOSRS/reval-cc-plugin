@@ -9,8 +9,8 @@ import java.awt.Color;
 public class UIConstants {
     
     // ========== Background Colors ==========
-    // The themed colours (non-final) get their values from setHalloweenTheme, run with
-    // false when the class loads; the default and Halloween values are listed there.
+    // The themed colours (non-final) get their values from setSeason, run with
+    // Season.NONE when the class loads; every season's values are listed there.
     
     /** Main background color used for panels and containers */
     public static Color BACKGROUND;
@@ -132,50 +132,63 @@ public class UIConstants {
     /** Mythic rarity color */
     public static final Color RARITY_MYTHIC = new Color(239, 83, 80);
 
-    // ========== Jack-o'-Lantern seasonal appearance ==========
+    // ========== Seasonal appearance ==========
 
-    public static final Color HALLOWEEN_ACCENT = new Color(245, 163, 75);
-    public static final Color HALLOWEEN_TAB = new Color(163, 87, 33);
-    public static final Color HALLOWEEN_TAB_BORDER = new Color(209, 138, 69);
-    public static final Color HALLOWEEN_TAB_TEXT = new Color(255, 241, 211);
-    public static final Color HALLOWEEN_STAT_GREEN = new Color(177, 201, 126);
-    public static final Color COBWEB = new Color(224, 203, 164, 50);
-    public static final Color PUMPKIN_BODY = new Color(217, 119, 41);
-    public static final Color PUMPKIN_LIGHT = new Color(255, 184, 88);
-    public static final Color PUMPKIN_OUTLINE = new Color(81, 42, 22);
-    public static final Color PUMPKIN_FACE = new Color(65, 36, 25);
-    public static final Color PUMPKIN_GLOW = new Color(255, 208, 114);
-    public static final Color PUMPKIN_STEM = new Color(126, 153, 97);
+    /** Panel title, Refresh button and rank progress bar */
+    public static Color SEASON_ACCENT;
 
-    private static boolean halloweenTheme;
+    /** Selected navigation tab: fill, seasonal outline and text */
+    public static Color NAV_TAB;
+    public static Color NAV_TAB_BORDER;
+    public static Color NAV_TAB_TEXT;
+
+    /** Profile stat values: clickable point sources, then the other coloured stats */
+    public static Color SEASON_STAT;
+    public static Color SEASON_STAT_GREEN;
+
+    private static Season season;
 
     static {
-        setHalloweenTheme(false);
+        setSeason(Season.NONE);
     }
 
-    public static boolean isHalloweenTheme() {
-        return halloweenTheme;
+    public static Season season() {
+        return season;
+    }
+
+    public static boolean isSeasonal() {
+        return season != Season.NONE;
     }
 
     /** Apply before constructing the panel tree; the plugin sets it once when it starts. */
-    public static void setHalloweenTheme(boolean enabled) {
-        halloweenTheme = enabled;
-        BACKGROUND = enabled ? new Color(18, 18, 15) : new Color(15, 17, 17);
-        CARD_BG = enabled ? new Color(33, 27, 22) : new Color(28, 31, 33);
-        CARD_HOVER = enabled ? new Color(45, 35, 26) : new Color(35, 38, 42);
-        BORDER_COLOR = enabled ? new Color(71, 50, 34) : new Color(50, 54, 58);
-        PROGRESS_BG = enabled ? new Color(57, 42, 29) : new Color(40, 43, 47);
-        ROW_BG = enabled ? new Color(24, 22, 18) : new Color(22, 24, 26);
-        TAB_ACTIVE = enabled ? HALLOWEEN_TAB : new Color(45, 48, 52);
-        TAB_HOVER = enabled ? CARD_HOVER : new Color(38, 42, 46);
-        TEXT_PRIMARY = enabled ? new Color(231, 225, 210) : new Color(230, 230, 220);
-        TEXT_SECONDARY = enabled ? new Color(175, 162, 142) : new Color(150, 150, 140);
-        TEXT_MUTED = enabled ? new Color(119, 105, 87) : new Color(100, 100, 95);
-        ACCENT_GOLD = enabled ? new Color(227, 182, 104) : new Color(218, 165, 32);
+    public static void setSeason(Season value) {
+        season = value;
+        BACKGROUND = pick(new Color(15, 17, 17), new Color(18, 18, 15), new Color(13, 18, 18));
+        CARD_BG = pick(new Color(28, 31, 33), new Color(33, 27, 22), new Color(23, 32, 31));
+        CARD_HOVER = pick(new Color(35, 38, 42), new Color(45, 35, 26), new Color(31, 44, 42));
+        BORDER_COLOR = pick(new Color(50, 54, 58), new Color(71, 50, 34), new Color(46, 66, 62));
+        PROGRESS_BG = pick(new Color(40, 43, 47), new Color(57, 42, 29), new Color(35, 50, 47));
+        ROW_BG = pick(new Color(22, 24, 26), new Color(24, 22, 18), new Color(18, 25, 25));
+        TEXT_PRIMARY = pick(new Color(230, 230, 220), new Color(231, 225, 210), new Color(236, 238, 233));
+        TEXT_SECONDARY = pick(new Color(150, 150, 140), new Color(175, 162, 142), new Color(160, 175, 170));
+        TEXT_MUTED = pick(new Color(100, 100, 95), new Color(119, 105, 87), new Color(105, 121, 116));
+        ACCENT_GOLD = pick(new Color(218, 165, 32), new Color(227, 182, 104), new Color(233, 190, 96));
+        SEASON_ACCENT = pick(ACCENT_GOLD, new Color(245, 163, 75), new Color(232, 92, 88));
+        NAV_TAB = pick(ACCENT_BLUE, new Color(163, 87, 33), new Color(152, 35, 45));
+        NAV_TAB_BORDER = pick(ACCENT_BLUE, new Color(209, 138, 69), new Color(222, 108, 104));
+        NAV_TAB_TEXT = pick(Color.WHITE, new Color(255, 241, 211), new Color(255, 242, 236));
+        SEASON_STAT = pick(ACCENT_GOLD, SEASON_ACCENT, ACCENT_GOLD);
+        SEASON_STAT_GREEN = pick(ACCENT_GREEN, new Color(177, 201, 126), new Color(132, 198, 128));
+        TAB_ACTIVE = isSeasonal() ? NAV_TAB : new Color(45, 48, 52);
+        TAB_HOVER = isSeasonal() ? CARD_HOVER : new Color(38, 42, 46);
+    }
+
+    private static Color pick(Color plain, Color halloween, Color christmas) {
+        return season == Season.HALLOWEEN ? halloween : season == Season.CHRISTMAS ? christmas : plain;
     }
 
     public static Color panelAccent() {
-        return halloweenTheme ? HALLOWEEN_ACCENT : ACCENT_GOLD;
+        return SEASON_ACCENT;
     }
     
     // ========== Private Constructor ==========

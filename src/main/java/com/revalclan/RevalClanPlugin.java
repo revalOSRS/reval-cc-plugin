@@ -16,7 +16,8 @@ import com.revalclan.pbs.CombatAchievementPersonalBestCapture;
 import com.revalclan.session.SessionTracker;
 import com.revalclan.util.ClanMembership;
 import com.revalclan.ui.RevalPanel;
-import com.revalclan.ui.components.HalloweenDecoration;
+import com.revalclan.ui.components.SeasonalDecoration;
+import com.revalclan.ui.constants.Season;
 import com.revalclan.ui.constants.UIConstants;
 import com.revalclan.util.AnnouncementService;
 import com.revalclan.util.ClanRankIconResolver;
@@ -29,8 +30,6 @@ import com.google.inject.Provides;
 import com.google.gson.JsonObject;
 
 import java.awt.image.BufferedImage;
-import java.time.LocalDate;
-import java.time.Month;
 
 import javax.inject.Inject;
 import javax.swing.SwingUtilities;
@@ -212,9 +211,9 @@ public class RevalClanPlugin extends Plugin {
 		}
 	}
 
-	/** Build the side panel; the Halloween theme is used throughout October. */
+	/** Build the side panel in the season's appearance (see Season.on). */
 	private void buildSidepanel() {
-		UIConstants.setHalloweenTheme(LocalDate.now().getMonth() == Month.OCTOBER);
+		UIConstants.setSeason(Season.current());
 		revalPanel = new RevalPanel();
 		revalPanel.init(revalApiService, client, uiAssetLoader, itemManager, spriteManager, config,
 			rankIconResolver);
@@ -231,10 +230,10 @@ public class RevalClanPlugin extends Plugin {
 		});
 		revalPanel.showTab("PROFILE");
 
-		BufferedImage icon = UIConstants.isHalloweenTheme()
-			? HalloweenDecoration.pumpkinImage(30) : uiAssetLoader.getImage("reval.png");
+		BufferedImage icon = UIConstants.isSeasonal()
+			? SeasonalDecoration.image(30) : uiAssetLoader.getImage("reval.png");
 		navButton = NavigationButton.builder()
-			.tooltip(UIConstants.isHalloweenTheme() ? "Reval Clan - Halloween" : "Reval Clan")
+			.tooltip(UIConstants.season().tooltip)
 			.icon(icon)
 			.priority(1)
 			.panel(revalPanel)
