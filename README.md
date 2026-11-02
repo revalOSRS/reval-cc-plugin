@@ -40,7 +40,7 @@ search. The `?` button opens a guide with syntax, examples, and chat-sharing ins
 | `!reval leaderboard bosses toa` | A specific boss or raid; omit the boss for all bosses |
 
 Leaderboard statistics: `clog`, `pets`, `points`, `greenlogs`, `monthly-clog`, `monthly-points`,
-`clues`, `combat`, `bosses`, and `xp`. Boss aliases include `cox`, `tob`, `toa`, and `bandos`.
+`clues`, `combat`, `bosses`, and `xp`. Boss aliases include `cox`, `tob`, `toa`, `tfa`, and `bandos`.
 Player names containing spaces can be quoted, or supplied with `--player "Love Yourz"`.
 
 Standings include every available account and retain their original ranks when searched. Global
