@@ -9,6 +9,7 @@ import com.revalclan.ui.components.Labels;
 import com.revalclan.ui.components.LoginPrompt;
 import com.revalclan.ui.components.RoundedPanel;
 import com.revalclan.ui.components.ScrollWrap;
+import com.revalclan.ui.components.SeasonalDecoration;
 import com.revalclan.ui.constants.UIConstants;
 import com.revalclan.ui.components.ArrowIcon;
 import com.revalclan.ui.components.BlockButton;
@@ -644,8 +645,8 @@ public class ProfilePanel extends JPanel {
 
 	private JPanel createStatCard(String value, String label, Color accentColor, String sourceType) {
 		Color valueColor = accentColor;
-		if (UIConstants.isHalloweenTheme() && !UIConstants.TEXT_SECONDARY.equals(accentColor)) {
-			valueColor = sourceType != null ? UIConstants.HALLOWEEN_ACCENT : UIConstants.HALLOWEEN_STAT_GREEN;
+		if (UIConstants.isSeasonal() && !UIConstants.TEXT_SECONDARY.equals(accentColor)) {
+			valueColor = sourceType != null ? UIConstants.SEASON_STAT : UIConstants.SEASON_STAT_GREEN;
 		}
 		JPanel card = new JPanel() {
 			private boolean hovered = false;
@@ -686,7 +687,7 @@ public class ProfilePanel extends JPanel {
 	}
 
 	private JPanel wrapInRoundedPanel(JPanel content) {
-		if (UIConstants.isHalloweenTheme()) content.setOpaque(false);
+		if (UIConstants.isSeasonal()) content.setOpaque(false);
 		JPanel wrapper = new JPanel(new BorderLayout()) {
 			@Override
 			protected void paintComponent(Graphics g) {
@@ -698,16 +699,17 @@ public class ProfilePanel extends JPanel {
 		return wrapper;
 	}
 
-	/** Rounded card background, outlined in the Halloween theme. Colours are read at paint time. */
+	/** Rounded card background, outlined during a season. Colours are read at paint time. */
 	private static void paintCard(Graphics g, Component c, Color fill, int arc) {
 		Graphics2D g2d = (Graphics2D) g.create();
 		g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 		g2d.setColor(fill);
 		g2d.fillRoundRect(0, 0, c.getWidth(), c.getHeight(), arc, arc);
-		if (UIConstants.isHalloweenTheme()) {
+		if (UIConstants.isSeasonal()) {
 			g2d.setColor(UIConstants.BORDER_COLOR);
 			g2d.drawRoundRect(0, 0, c.getWidth() - 1, c.getHeight() - 1, arc, arc);
 		}
+		SeasonalDecoration.paintCard(g2d, c.getWidth());
 		g2d.dispose();
 	}
 

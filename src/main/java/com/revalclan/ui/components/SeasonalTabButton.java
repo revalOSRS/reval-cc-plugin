@@ -8,12 +8,12 @@ import java.awt.Graphics2D;
 import java.awt.Insets;
 import java.awt.RenderingHints;
 
-/** Navigation button with a rounded pumpkin background during Halloween. */
-public class HalloweenTabButton extends JButton {
+/** Navigation button with a rounded, outlined background during a season. */
+public class SeasonalTabButton extends JButton {
 
-	public HalloweenTabButton(String text) {
+	public SeasonalTabButton(String text) {
 		super(text);
-		if (UIConstants.isHalloweenTheme()) {
+		if (UIConstants.isSeasonal()) {
 			setContentAreaFilled(false);
 			setOpaque(false);
 			setRolloverEnabled(true);
@@ -23,18 +23,19 @@ public class HalloweenTabButton extends JButton {
 
 	@Override
 	protected void paintComponent(Graphics g) {
-		if (UIConstants.isHalloweenTheme()) {
+		if (UIConstants.isSeasonal()) {
 			Graphics2D background = (Graphics2D) g.create();
 			background.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 			background.setColor(getModel().isRollover() && !isSelected()
 				? UIConstants.CARD_HOVER : getBackground());
 			background.fillRoundRect(0, 0, getWidth(), getHeight(), 6, 6);
 			if (isSelected()) {
-				background.setColor(UIConstants.HALLOWEEN_TAB_BORDER);
+				background.setColor(UIConstants.NAV_TAB_BORDER);
 				background.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 6, 6);
 			}
 			background.dispose();
 		}
 		super.paintComponent(g);
+		SeasonalDecoration.paintTab(g, getWidth(), isSelected(), getText());
 	}
 }

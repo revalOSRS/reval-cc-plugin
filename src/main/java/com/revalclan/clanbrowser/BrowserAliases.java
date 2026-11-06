@@ -49,6 +49,7 @@ final class BrowserAliases {
         {"Chambers of Xeric", "cox", "xeric", "chambers", "olm", "raids"},
         {"Theatre of Blood", "tob", "theatre", "verzik", "verzik vitur", "raids 2"},
         {"Tombs of Amascut", "toa", "tomb", "tombs", "tomb of amascut", "amascut", "warden", "wardens", "raids 3"},
+        {"The Fractured Archive", "tfa", "fractured archive", "archive", "raids 4"},
         {"Guardians of the Rift", "rifts closed"}
     };
 

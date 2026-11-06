@@ -4,6 +4,16 @@ A comprehensive RuneLite plugin for the Reval clan in Old School RuneScape. Feat
 
 ## Features
 
+### Seasonal side panel
+
+The side panel uses a Halloween theme from 1 August through 31 October and
+Gingerbread Village from 1 December through 31 December. Christmas adds a cocoa
+palette, snowy gingerbread houses, peppermint tabs, icing on profile cards, and a
+gingerbread toolbar icon. Other months use the normal appearance.
+
+For a local preview, start the development client with the JVM property
+`-Dreval.season=christmas`, `halloween`, or `none`.
+
 ### Raid party deaths
 
 Raid loot and completion events include known per-member death counts in
@@ -40,7 +50,7 @@ search. The `?` button opens a guide with syntax, examples, and chat-sharing ins
 | `!reval leaderboard bosses toa` | A specific boss or raid; omit the boss for all bosses |
 
 Leaderboard statistics: `clog`, `pets`, `points`, `greenlogs`, `monthly-clog`, `monthly-points`,
-`clues`, `combat`, `bosses`, and `xp`. Boss aliases include `cox`, `tob`, `toa`, and `bandos`.
+`clues`, `combat`, `bosses`, and `xp`. Boss aliases include `cox`, `tob`, `toa`, `tfa`, and `bandos`.
 Player names containing spaces can be quoted, or supplied with `--player "Love Yourz"`.
 
 Standings include every available account and retain their original ranks when searched. Global
