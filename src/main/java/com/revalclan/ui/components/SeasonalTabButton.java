@@ -36,5 +36,6 @@ public class SeasonalTabButton extends JButton {
 			background.dispose();
 		}
 		super.paintComponent(g);
+		SeasonalDecoration.paintTab(g, getWidth(), isSelected(), getText());
 	}
 }

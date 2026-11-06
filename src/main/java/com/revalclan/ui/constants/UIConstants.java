@@ -163,22 +163,22 @@ public class UIConstants {
     /** Apply before constructing the panel tree; the plugin sets it once when it starts. */
     public static void setSeason(Season value) {
         season = value;
-        BACKGROUND = pick(new Color(15, 17, 17), new Color(18, 18, 15), new Color(13, 18, 18));
-        CARD_BG = pick(new Color(28, 31, 33), new Color(33, 27, 22), new Color(23, 32, 31));
-        CARD_HOVER = pick(new Color(35, 38, 42), new Color(45, 35, 26), new Color(31, 44, 42));
-        BORDER_COLOR = pick(new Color(50, 54, 58), new Color(71, 50, 34), new Color(46, 66, 62));
-        PROGRESS_BG = pick(new Color(40, 43, 47), new Color(57, 42, 29), new Color(35, 50, 47));
-        ROW_BG = pick(new Color(22, 24, 26), new Color(24, 22, 18), new Color(18, 25, 25));
-        TEXT_PRIMARY = pick(new Color(230, 230, 220), new Color(231, 225, 210), new Color(236, 238, 233));
-        TEXT_SECONDARY = pick(new Color(150, 150, 140), new Color(175, 162, 142), new Color(160, 175, 170));
-        TEXT_MUTED = pick(new Color(100, 100, 95), new Color(119, 105, 87), new Color(105, 121, 116));
-        ACCENT_GOLD = pick(new Color(218, 165, 32), new Color(227, 182, 104), new Color(233, 190, 96));
-        SEASON_ACCENT = pick(ACCENT_GOLD, new Color(245, 163, 75), new Color(232, 92, 88));
-        NAV_TAB = pick(ACCENT_BLUE, new Color(163, 87, 33), new Color(152, 35, 45));
-        NAV_TAB_BORDER = pick(ACCENT_BLUE, new Color(209, 138, 69), new Color(222, 108, 104));
-        NAV_TAB_TEXT = pick(Color.WHITE, new Color(255, 241, 211), new Color(255, 242, 236));
-        SEASON_STAT = pick(ACCENT_GOLD, SEASON_ACCENT, ACCENT_GOLD);
-        SEASON_STAT_GREEN = pick(ACCENT_GREEN, new Color(177, 201, 126), new Color(132, 198, 128));
+        BACKGROUND = pick(new Color(15, 17, 17), new Color(18, 18, 15), new Color(0x1d1411));
+        CARD_BG = pick(new Color(28, 31, 33), new Color(33, 27, 22), new Color(0x2d211b));
+        CARD_HOVER = pick(new Color(35, 38, 42), new Color(45, 35, 26), new Color(0x3b2c23));
+        BORDER_COLOR = pick(new Color(50, 54, 58), new Color(71, 50, 34), new Color(0x5a4334));
+        PROGRESS_BG = pick(new Color(40, 43, 47), new Color(57, 42, 29), new Color(0x5a4334));
+        ROW_BG = pick(new Color(22, 24, 26), new Color(24, 22, 18), new Color(0x221814));
+        TEXT_PRIMARY = pick(new Color(230, 230, 220), new Color(231, 225, 210), new Color(0xf8eee2));
+        TEXT_SECONDARY = pick(new Color(150, 150, 140), new Color(175, 162, 142), new Color(0xd3bca6));
+        TEXT_MUTED = pick(new Color(100, 100, 95), new Color(119, 105, 87), new Color(0x977f6b));
+        ACCENT_GOLD = pick(new Color(218, 165, 32), new Color(227, 182, 104), new Color(0xf1c47c));
+        SEASON_ACCENT = pick(ACCENT_GOLD, new Color(245, 163, 75), new Color(0xfff1e0));
+        NAV_TAB = pick(ACCENT_BLUE, new Color(163, 87, 33), new Color(0xc23a4c));
+        NAV_TAB_BORDER = pick(ACCENT_BLUE, new Color(209, 138, 69), new Color(0xfbe3e5));
+        NAV_TAB_TEXT = pick(Color.WHITE, new Color(255, 241, 211), new Color(0xfff6f2));
+        SEASON_STAT = pick(ACCENT_GOLD, SEASON_ACCENT, new Color(0xf5a9ae));
+        SEASON_STAT_GREEN = pick(ACCENT_GREEN, new Color(177, 201, 126), new Color(0xa9dfb9));
         TAB_ACTIVE = isSeasonal() ? NAV_TAB : new Color(45, 48, 52);
         TAB_HOVER = isSeasonal() ? CARD_HOVER : new Color(38, 42, 46);
     }

@@ -9,6 +9,7 @@ import com.revalclan.ui.components.Labels;
 import com.revalclan.ui.components.LoginPrompt;
 import com.revalclan.ui.components.RoundedPanel;
 import com.revalclan.ui.components.ScrollWrap;
+import com.revalclan.ui.components.SeasonalDecoration;
 import com.revalclan.ui.constants.UIConstants;
 import com.revalclan.ui.components.ArrowIcon;
 import com.revalclan.ui.components.BlockButton;
@@ -708,6 +709,7 @@ public class ProfilePanel extends JPanel {
 			g2d.setColor(UIConstants.BORDER_COLOR);
 			g2d.drawRoundRect(0, 0, c.getWidth() - 1, c.getHeight() - 1, arc, arc);
 		}
+		SeasonalDecoration.paintCard(g2d, c.getWidth());
 		g2d.dispose();
 	}
 

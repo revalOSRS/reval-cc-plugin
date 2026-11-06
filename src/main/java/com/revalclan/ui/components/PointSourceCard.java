@@ -88,5 +88,6 @@ public class PointSourceCard extends JPanel {
 	@Override
 	protected void paintComponent(Graphics g) {
 		RoundedPanel.fill(g, this, getBackground(), 4);
+		SeasonalDecoration.paintCard(g, getWidth());
 	}
 }
