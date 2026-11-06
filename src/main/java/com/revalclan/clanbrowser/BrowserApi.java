@@ -10,6 +10,7 @@ import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.function.Consumer;
 import javax.inject.Inject;
+import javax.inject.Named;
 import javax.inject.Singleton;
 import javax.swing.SwingUtilities;
 import okhttp3.Call;
@@ -28,11 +29,18 @@ public class BrowserApi {
     private volatile long cachedAt;
     private final Map<String, BrowserModels.View> views = new LinkedHashMap<>(16, .75f, true);
 
-    @Inject public BrowserApi(OkHttpClient http, Gson gson) { this.http = http; this.gson = gson; }
+    @Inject public BrowserApi(@Named("reval-http") OkHttpClient http, Gson gson) { this.http = http; this.gson = gson; }
+
+    public void clearCache() {
+        synchronized (views) { views.clear(); }
+        cached = null;
+        cachedAt = 0;
+    }
 
     public Call catalogue(Consumer<BrowserModels.Catalogue> success, Consumer<String> failure) {
-        if (cached != null && System.currentTimeMillis() - cachedAt < 3600_000) {
-            SwingUtilities.invokeLater(() -> success.accept(cached));
+        BrowserModels.Catalogue saved = cached;
+        if (saved != null && System.currentTimeMillis() - cachedAt < 3600_000) {
+            SwingUtilities.invokeLater(() -> success.accept(saved));
             return null;
         }
         return get("catalogue", null, BrowserModels.Catalogue.class, data -> {

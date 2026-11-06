@@ -5,6 +5,9 @@
  */
 package com.revalclan.collectionlog;
 
+import com.revalclan.session.SessionScoped;
+import com.revalclan.session.SessionState;
+
 import com.revalclan.notifiers.SyncNotifier;
 import com.revalclan.util.ClanMembership;
 import lombok.extern.slf4j.Slf4j;
@@ -30,7 +33,8 @@ import java.util.*;
  */
 @Slf4j
 @Singleton
-public class CollectionLogSyncButton {
+public class CollectionLogSyncButton implements SessionScoped {
+	@Inject void registerSessionState(SessionState state) { state.register(this); }
 	private static final int DRAW_BURGER_MENU = 7812;
 	private static final int FONT_COLOR = 0xFF981F;
 	private static final int FONT_COLOR_ACTIVE = 0xFFFFFF;
@@ -65,6 +69,14 @@ public class CollectionLogSyncButton {
 
 	public void shutDown() {
 		eventBus.unregister(this);
+	}
+
+	public void reset() {
+		pendingSyncTick = -1;
+		lastAttemptedSync = -1;
+		baseMenuHeight = -1;
+		syncGuide.disarm();
+		syncGuide.setSyncButtonWidget(null);
 	}
 
 	@Subscribe

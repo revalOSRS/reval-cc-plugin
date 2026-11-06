@@ -13,6 +13,7 @@ import com.revalclan.ui.components.ScrollWrap;
 import com.revalclan.ui.constants.UIConstants;
 import com.revalclan.util.Colors;
 import com.revalclan.util.DateTimeUtil;
+import com.revalclan.util.RequestScope;
 import net.runelite.api.Client;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.ui.FontManager;
@@ -27,8 +28,10 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.regex.Matcher;
@@ -69,8 +72,10 @@ public class CompetitionsPanel extends JPanel {
 	private RaceEventCard raceDetailCard;
 	private String raceArtworkUrl;
 	private boolean artworkLoading;
+	private final RequestScope lifetime = new RequestScope();
 	private final Map<String, BufferedImage> objectiveArtwork = new HashMap<>();
-	private final Map<String, List<Consumer<BufferedImage>>> objectiveArtworkCallbacks = new HashMap<>();
+	private final Set<String> objectiveArtworkLoading = new HashSet<>();
+	private static final int MAX_OBJECTIVE_ARTWORK = 8;
 
 	public CompetitionsPanel() {
 		setLayout(new BorderLayout());
@@ -118,6 +123,7 @@ public class CompetitionsPanel extends JPanel {
 	}
 
 	public void onLoggedOut() {
+		if (!lifetime.isActive()) return;
 		loadGeneration++;
 		myVotes.clear();
 		activeVotes = new ArrayList<>();
@@ -132,9 +138,12 @@ public class CompetitionsPanel extends JPanel {
 	}
 
 	public void refresh() {
+		if (!lifetime.isActive()) return;
 		refreshRace();
 		loadData();
 	}
+
+	private void onEdt(Runnable callback) { SwingUtilities.invokeLater(lifetime.guard(callback)); }
 
 	private void updateLoading() {
 		refreshButton.setLoading(raceLoading || memberLoading);
@@ -142,11 +151,11 @@ public class CompetitionsPanel extends JPanel {
 
 	/** Public data is useful before release and does not require a game login. */
 	public void refreshRace() {
-		if (apiService == null || raceLoading) return;
+		if (!lifetime.isActive() || apiService == null || raceLoading) return;
 		final int generation = ++raceGeneration;
 		raceLoading = true;
 		updateLoading();
-		apiService.fetchFeaturedRace(response -> SwingUtilities.invokeLater(() -> {
+		apiService.fetchFeaturedRace(response -> onEdt(() -> {
 			if (generation != raceGeneration) return;
 			raceLoading = false;
 			updateLoading();
@@ -154,7 +163,7 @@ public class CompetitionsPanel extends JPanel {
 			objectiveArtwork.clear();
 			refreshArtwork();
 			renderRace();
-		}), error -> SwingUtilities.invokeLater(() -> {
+		}), error -> onEdt(() -> {
 			if (generation != raceGeneration) return;
 			raceLoading = false;
 			updateLoading();
@@ -173,37 +182,66 @@ public class CompetitionsPanel extends JPanel {
 		if (url == null || raceArtwork != null || artworkLoading) return;
 		artworkLoading = true;
 		final String requestedUrl = url;
-		apiService.fetchCompetitionArtwork(url, image -> SwingUtilities.invokeLater(() -> {
+		apiService.fetchCompetitionArtwork(url, image -> onEdt(() -> {
 			if (!Objects.equals(requestedUrl, raceArtworkUrl)) return;
 			artworkLoading = false;
 			raceArtwork = image;
 			if (!swapRaceDetailArtwork()) renderRace();
-		}), error -> SwingUtilities.invokeLater(() -> {
+		}), error -> onEdt(() -> {
 			if (Objects.equals(requestedUrl, raceArtworkUrl)) artworkLoading = false;
 		}));
 	}
 
-	/** Cache optional task artwork across the overview and detail card. Callbacks run on the EDT. */
+	/** One request per optional image; render current cards rather than retaining callbacks to replaced cards. */
 	private void loadObjectiveArtwork(String imageUrl, Consumer<BufferedImage> onSuccess) {
+		if (!lifetime.isActive()) return;
 		String url = imageUrl.trim();
-		BufferedImage cached = objectiveArtwork.get(url);
-		if (cached != null) {
-			onSuccess.accept(cached);
+		if (objectiveArtwork.containsKey(url)) {
+			BufferedImage cached = objectiveArtwork.get(url);
+			if (cached != null) onSuccess.accept(cached);
 			return;
 		}
-		List<Consumer<BufferedImage>> callbacks = objectiveArtworkCallbacks.get(url);
-		if (callbacks != null) {
-			callbacks.add(onSuccess);
-			return;
-		}
-		callbacks = new ArrayList<>();
-		callbacks.add(onSuccess);
-		objectiveArtworkCallbacks.put(url, callbacks);
-		apiService.fetchCompetitionArtwork(url, image -> SwingUtilities.invokeLater(() -> {
-			objectiveArtwork.put(url, image);
-			List<Consumer<BufferedImage>> waiting = objectiveArtworkCallbacks.remove(url);
-			if (waiting != null) waiting.forEach(callback -> callback.accept(image));
-		}), error -> SwingUtilities.invokeLater(() -> objectiveArtworkCallbacks.remove(url)));
+		if (objectiveArtwork.size() + objectiveArtworkLoading.size() >= MAX_OBJECTIVE_ARTWORK
+			|| !objectiveArtworkLoading.add(url)) return;
+		apiService.fetchCompetitionArtwork(url, image -> onEdt(() -> {
+			objectiveArtworkLoading.remove(url);
+			if (usesObjectiveArtwork(url)) objectiveArtwork.put(url, image);
+			if (!swapRaceDetailArtwork()) buildContent();
+		}), error -> onEdt(() -> {
+			objectiveArtworkLoading.remove(url);
+			// A failed URL keeps its fallback until the next explicit race refresh.
+			if (usesObjectiveArtwork(url)) objectiveArtwork.put(url, null);
+			if (!swapRaceDetailArtwork()) buildContent();
+		}));
+	}
+
+	private boolean usesObjectiveArtwork(String url) {
+		return featuredRace != null && featuredRace.getObjectives() != null
+			&& featuredRace.getObjectives().stream().anyMatch(objective -> objective != null
+				&& objective.getImageUrl() != null && url.equals(objective.getImageUrl().trim()));
+	}
+
+	/** Terminal: queued EDT replies must not rebuild a detached panel or start more requests. */
+	public void shutDown() {
+		lifetime.cancel();
+		loadGeneration++;
+		raceGeneration++;
+		detailGeneration++;
+		objectiveArtwork.clear();
+		objectiveArtworkLoading.clear();
+		activeVotes = new ArrayList<>();
+		activeCompetitions = new ArrayList<>();
+		scheduledCompetitions = new ArrayList<>();
+		myVotes.clear();
+		featuredRace = null;
+		raceArtwork = null;
+		raceArtworkUrl = null;
+		raceDetailCard = null;
+		selectedRaceId = null;
+		raceLoading = memberLoading = artworkLoading = false;
+		contentPanel.removeAll();
+		detailViewPanel.removeAll();
+		updateLoading();
 	}
 
 	/**
@@ -237,7 +275,7 @@ public class CompetitionsPanel extends JPanel {
 	}
 
 	private void loadData() {
-		if (apiService == null) return;
+		if (!lifetime.isActive() || apiService == null) return;
 		if (client == null || client.getAccountHash() == -1) {
 			onLoggedOut();
 			return;
@@ -249,7 +287,7 @@ public class CompetitionsPanel extends JPanel {
 
 		// Each request stores its result on the EDT unless a newer load started; the content rebuilds once all three are in
 		final boolean[] loaded = {false, false, false};
-		BiConsumer<Integer, Runnable> onResult = (slot, store) -> SwingUtilities.invokeLater(() -> {
+		BiConsumer<Integer, Runnable> onResult = (slot, store) -> onEdt(() -> {
 			if (generation != loadGeneration) return;
 			store.run();
 			loaded[slot] = true;
@@ -290,7 +328,7 @@ public class CompetitionsPanel extends JPanel {
 		myVotes.clear();
 		for (VotesResponse.Vote vote : votes) {
 			apiService.fetchMyVote(vote.getId(), client.getAccountHash(),
-				response -> SwingUtilities.invokeLater(() -> {
+				response -> onEdt(() -> {
 					if (generation != loadGeneration) return;
 					if (response.getData() != null && response.getData().getHasVoted() && response.getData().getOptionId() != null) {
 						myVotes.put(vote.getId(), response.getData().getOptionId());
@@ -370,13 +408,13 @@ public class CompetitionsPanel extends JPanel {
 				extras.revalidate();
 				extras.repaint();
 			};
-			apiService.fetchCompetitionDetails(race.getKc().getId(), response -> SwingUtilities.invokeLater(() -> {
+			apiService.fetchCompetitionDetails(race.getKc().getId(), response -> onEdt(() -> {
 				if (generation != detailGeneration) return;
 				if (response.getData() == null) unavailable.run();
 				else addSideQuests(extras, response.getData().getSideQuests());
 				extras.revalidate();
 				extras.repaint();
-			}), error -> SwingUtilities.invokeLater(unavailable));
+			}), error -> onEdt(unavailable));
 		}
 	}
 
@@ -437,13 +475,13 @@ public class CompetitionsPanel extends JPanel {
 		}
 
 		apiService.castVote(voteId, optionId, client.getAccountHash(),
-			response -> SwingUtilities.invokeLater(() -> {
+			response -> onEdt(() -> {
 				String msg = response.getData() != null && response.getData().getPreviousOptionId() != null
 					? "Vote changed!" : "Vote cast!";
 				JOptionPane.showMessageDialog(this, msg, "Voted", JOptionPane.INFORMATION_MESSAGE);
 				refresh();
 			}),
-			error -> SwingUtilities.invokeLater(() ->
+			error -> onEdt(() ->
 				JOptionPane.showMessageDialog(this, "Failed: " + error.getMessage(), "Error", JOptionPane.ERROR_MESSAGE))
 		);
 	}
@@ -498,7 +536,7 @@ public class CompetitionsPanel extends JPanel {
 		int generation = ++detailGeneration;
 		JPanel body = detailBody(() -> showCompetitionDetails(summary, active));
 		body.add(statusLabel("Loading leaderboard...", UIConstants.TEXT_SECONDARY));
-		apiService.fetchCompetitionDetails(summary.getId(), response -> SwingUtilities.invokeLater(() -> {
+		apiService.fetchCompetitionDetails(summary.getId(), response -> onEdt(() -> {
 			if (generation != detailGeneration) return;
 			body.removeAll();
 			CompetitionsResponse.Competition comp = response.getData();
@@ -506,7 +544,7 @@ public class CompetitionsPanel extends JPanel {
 			else body.add(createCompetitionCard(comp, comp.getStatus() == null ? active : "active".equalsIgnoreCase(comp.getStatus()), Integer.MAX_VALUE));
 			body.revalidate();
 			body.repaint();
-		}), error -> SwingUtilities.invokeLater(() -> {
+		}), error -> onEdt(() -> {
 			if (generation != detailGeneration) return;
 			body.removeAll();
 			body.add(statusLabel("Failed to load: " + error.getMessage(), UIConstants.ERROR_COLOR));

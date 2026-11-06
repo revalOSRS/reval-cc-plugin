@@ -22,6 +22,32 @@ import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;
 
 public class CompetitionsPanelTest {
+    @Test public void closingTheSidePanelRejectsRaceSuccessAlreadyQueuedOnTheEdt() throws Exception {
+        List<Consumer<FeaturedRaceResponse>> pendingRace = new ArrayList<>();
+        FakeApi api = new FakeApi() {
+            @Override public void fetchFeaturedRace(Consumer<FeaturedRaceResponse> ok, Consumer<Exception> error) {
+                pendingRace.add(ok);
+            }
+        };
+        RevalPanel[] root = new RevalPanel[1];
+        edt(() -> {
+            root[0] = new RevalPanel();
+            root[0].init(api, mock(Client.class), mock(com.revalclan.util.UIAssetLoader.class),
+                mock(net.runelite.client.game.ItemManager.class), mock(net.runelite.client.game.SpriteManager.class),
+                mock(com.revalclan.RevalClanConfig.class), mock(com.revalclan.util.ClanRankIconResolver.class));
+            root[0].showTab("COMPETITIONS");
+        });
+        FeaturedRaceResponse response = new FeaturedRaceResponse();
+        FeaturedRaceResponse.RaceData data = new FeaturedRaceResponse.RaceData();
+        data.setRace(race("event-id", "kc-id"));
+        response.setData(data);
+        edt(() -> {
+            pendingRace.get(0).accept(response);
+            root[0].shutDown();
+        });
+        assertTrue("A disposed panel must not rebuild race cards", find(root[0], RaceEventCard.class, card -> true).isEmpty());
+    }
+
     @Test public void onlyTheLinkedKcCompetitionIsHidden() throws Exception {
         FakeApi api = new FakeApi();
         api.race = race("event-id", "kc-id");
@@ -35,6 +61,75 @@ public class CompetitionsPanelTest {
         assertEquals(1, buttons(panel, "Full leaderboard >").size());
         assertEquals(1, find(panel, JLabel.class, l -> String.valueOf(l.getText()).contains(">other-race<")).size());
         assertTrue(find(panel, JLabel.class, l -> String.valueOf(l.getText()).contains(">kc-id<")).isEmpty());
+    }
+
+    @Test public void artworkArrivalOnlyUpdatesTheCurrentCardsAfterRepeatedRebuilds() throws Exception {
+        FakeApi api = new FakeApi();
+        api.race = race("event-id", "kc-id");
+        api.race.setObjectives(Collections.singletonList(objective("/task.png")));
+        CompetitionsPanel panel = panel(api);
+        edt(() -> { for (int i = 0; i < 100; i++) panel.onLoggedOut(); });
+        assertEquals("Rebuilds share the outstanding image request", 1, api.artwork.size());
+        java.util.concurrent.atomic.AtomicInteger widthReads = new java.util.concurrent.atomic.AtomicInteger();
+        BufferedImage image = new BufferedImage(32, 32, BufferedImage.TYPE_INT_RGB) {
+            @Override public int getWidth() { widthReads.incrementAndGet(); return super.getWidth(); }
+        };
+        edt(() -> api.artwork.get(0).accept(image));
+        assertTrue("Detached cards must not each resize the arriving image", widthReads.get() < 20);
+        assertEquals(1, find(panel, RaceEventCard.class, card -> true).size());
+    }
+
+    @Test public void optionalArtworkHasABoundedCacheAndRequestSet() throws Exception {
+        FakeApi api = new FakeApi();
+        api.race = race("event-id", "kc-id");
+        List<FeaturedRaceResponse.Objective> objectives = new ArrayList<>();
+        for (int i = 0; i < 20; i++) objectives.add(objective("/task-" + i + ".png"));
+        api.race.setObjectives(objectives);
+        CompetitionsPanel panel = panel(api);
+        assertEquals(8, api.artwork.size());
+        edt(() -> api.artwork.get(0).accept(new BufferedImage(32, 32, BufferedImage.TYPE_INT_RGB)));
+        assertEquals("Successful loads cannot grow retained artwork beyond the same bound", 8, api.artwork.size());
+        edt(panel::shutDown);
+    }
+
+    @Test public void pendingArtworkIsSharedAcrossRaceRefreshes() throws Exception {
+        FakeApi api = new FakeApi();
+        api.race = race("event-id", "kc-id");
+        api.race.setObjectives(Collections.singletonList(objective("/task.png")));
+        CompetitionsPanel panel = panel(api);
+        for (int i = 0; i < 20; i++) {
+            api.race = race("event-id", "kc-id");
+            api.race.setObjectives(Collections.singletonList(objective("/task.png")));
+            edt(panel::refreshRace);
+        }
+        assertEquals(1, api.artwork.size());
+        edt(() -> api.artwork.get(0).accept(new BufferedImage(32, 32, BufferedImage.TYPE_INT_RGB)));
+        assertEquals("The pending image remains reusable by the refreshed race", 1, api.artwork.size());
+        edt(panel::shutDown);
+    }
+
+    @Test public void lateArtworkCannotRestoreDisposedRaceDetails() throws Exception {
+        FakeApi api = new FakeApi();
+        api.race = race("event-id", "kc-id");
+        api.race.setImageUrl("/banner.png");
+        api.active = Collections.singletonList(competition("weekly", "boss_kills", 8));
+        CompetitionsPanel panel = panel(api);
+        click(panel, "Full KC leaderboard >");
+        edt(() -> {
+            panel.shutDown();
+            api.artwork.get(0).accept(new BufferedImage(4, 2, BufferedImage.TYPE_INT_RGB));
+            panel.refresh();
+        });
+        assertEquals(Collections.singletonList("kc-id"), api.detailIds);
+        assertTrue(find(panel, RaceEventCard.class, card -> true).isEmpty());
+    }
+
+    private static FeaturedRaceResponse.Objective objective(String url) {
+        FeaturedRaceResponse.Objective objective = new FeaturedRaceResponse.Objective();
+        objective.setKind("pet");
+        objective.setTitle("First pet");
+        objective.setImageUrl(url);
+        return objective;
     }
 
     @Test public void absentLinkedIdDoesNotHideCompetitions() throws Exception {

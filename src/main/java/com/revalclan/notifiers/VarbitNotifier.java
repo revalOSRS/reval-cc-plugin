@@ -34,7 +34,9 @@ public class VarbitNotifier extends BaseNotifier {
 	private final Map<Integer, Integer> sent = new HashMap<>();
 	private int ticksSinceFlush = 0;
 
-	@Inject private ClientThread clientThread;
+	private final ClientThread clientThread;
+
+	@Inject public VarbitNotifier(ClientThread clientThread) { this.clientThread = clientThread; }
 
 	/**
 	 * Send the current value of every watched varbit. A varbit only raises an
@@ -46,8 +48,11 @@ public class VarbitNotifier extends BaseNotifier {
 	 */
 	public void syncBaselines() {
 		clientThread.invokeLater(() -> {
-			if (client.getGameState() != GameState.LOGGED_IN || !isEnabled()) return;
-			for (int id : filterManager.getFilters().getVarbitWatch()) {
+			if (client.getGameState() != GameState.LOGGED_IN) return;
+			Set<Integer> watched = filterManager.getFilters().getVarbitWatch();
+			latest.keySet().retainAll(watched);
+			sent.keySet().retainAll(watched);
+			for (int id : watched) {
 				int value = client.getVarbitValue(id);
 				latest.put(id, value);
 				sent.put(id, value);
