@@ -277,6 +277,7 @@ public class RankingPanel extends JPanel {
 
 	private String formatCategoryName(String name) {
 		if (name == null) return name;
+		if (name.equals("TFA_CAPES")) return "TFA Capes";
 		if (name.toLowerCase().equals("valuable_pvm_drops")) return "Valuable Drops";
 
 		// Default: capitalize words ("COLLECTION_LOG" -> "Collection Log")
