@@ -12,4 +12,16 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: gradle
+      - name: Bootstrap Gradle
+        timeout-minutes: 5
+        run: |
+          for attempt in 1 2 3; do
+            if ./gradlew --version; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              sleep 5
+            fi
+          done
+          exit 1
       - run: ./gradlew test --no-daemon --console=plain
