@@ -11,8 +11,8 @@ import okhttp3.Request;
 import okhttp3.Response;
 
 /**
- * Work owned by one plugin, account or view lifetime. Cancellation is terminal:
- * every tracked future completes, and its HTTP call is cancelled. UI callbacks
+ * Work owned by one plugin, account or view lifetime. Cancellation is terminal
+ * for callers: every tracked future completes, and its HTTP call is cancelled. UI callbacks
  * queued on another thread use guard() to check the same lifetime when run.
  * No external callback runs under a scope monitor.
  */
@@ -43,31 +43,54 @@ public final class RequestScope {
 
 	/** Response ownership stays here, including late responses after cancellation. */
 	public <T> CompletableFuture<T> request(OkHttpClient http, Request request, ResponseReader<T> reader) {
+		return exchange(http, request, reader).result();
+	}
+
+	/** Caller cancellation can precede the actual release of a queued HTTP call. */
+	<T> Exchange<T> exchange(OkHttpClient http, Request request, ResponseReader<T> reader) {
 		CompletableFuture<T> result = track(new CompletableFuture<>());
-		if (result.isDone()) return result;
+		Exchange<T> exchange = new Exchange<>(result);
+		if (result.isDone()) {
+			exchange.finished.complete(null);
+			return exchange;
+		}
 		try {
 			Call call = http.newCall(request);
 			result.whenComplete((value, error) -> { if (result.isCancelled()) call.cancel(); });
-			if (result.isDone()) return result;
+			if (result.isDone()) {
+				exchange.finished.complete(null);
+				return exchange;
+			}
 			call.enqueue(new Callback() {
 				@Override public void onFailure(Call ignored, IOException error) {
-					result.completeExceptionally(error);
+					try { result.completeExceptionally(error); }
+					finally { exchange.finished.complete(null); }
 				}
 				@Override public void onResponse(Call ignored, Response response) {
-					T value;
-					try (Response closed = response) {
-						if (result.isDone()) return;
-						value = reader.read(closed);
-					} catch (Exception error) {
-						result.completeExceptionally(error);
-						return;
-					}
-					result.complete(value);
+					try {
+						T value;
+						try (Response closed = response) {
+							if (result.isDone()) return;
+							value = reader.read(closed);
+						}
+						result.complete(value);
+					} catch (Exception error) { result.completeExceptionally(error); }
+					finally { exchange.finished.complete(null); }
 				}
 			});
 		} catch (RuntimeException error) {
 			result.completeExceptionally(error);
+			exchange.finished.complete(null);
 		}
-		return result;
+		return exchange;
+	}
+
+	/** The terminal signal is never cancelled by a scope or caller. */
+	static final class Exchange<T> {
+		private final CompletableFuture<T> result;
+		private final CompletableFuture<Void> finished = new CompletableFuture<>();
+		private Exchange(CompletableFuture<T> result) { this.result = result; }
+		CompletableFuture<T> result() { return result; }
+		CompletableFuture<Void> finished() { return finished; }
 	}
 }

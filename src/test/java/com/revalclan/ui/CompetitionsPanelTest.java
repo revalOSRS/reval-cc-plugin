@@ -70,6 +70,7 @@ public class CompetitionsPanelTest {
         CompetitionsPanel panel = panel(api);
         edt(() -> { for (int i = 0; i < 100; i++) panel.onLoggedOut(); });
         assertEquals("Rebuilds share the outstanding image request", 1, api.artwork.size());
+        RaceEventCard current = find(panel, RaceEventCard.class, card -> true).get(0);
         java.util.concurrent.atomic.AtomicInteger widthReads = new java.util.concurrent.atomic.AtomicInteger();
         BufferedImage image = new BufferedImage(32, 32, BufferedImage.TYPE_INT_RGB) {
             @Override public int getWidth() { widthReads.incrementAndGet(); return super.getWidth(); }
@@ -77,6 +78,7 @@ public class CompetitionsPanelTest {
         edt(() -> api.artwork.get(0).accept(image));
         assertTrue("Detached cards must not each resize the arriving image", widthReads.get() < 20);
         assertEquals(1, find(panel, RaceEventCard.class, card -> true).size());
+        assertSame("Artwork updates the current card in place", current, find(panel, RaceEventCard.class, card -> true).get(0));
     }
 
     @Test public void optionalArtworkHasABoundedCacheAndRequestSet() throws Exception {
@@ -106,6 +108,102 @@ public class CompetitionsPanelTest {
         edt(() -> api.artwork.get(0).accept(new BufferedImage(32, 32, BufferedImage.TYPE_INT_RGB)));
         assertEquals("The pending image remains reusable by the refreshed race", 1, api.artwork.size());
         edt(panel::shutDown);
+    }
+
+    @Test public void rebuildingCardsDoesNotStartArtworkRequests() throws Exception {
+        FakeApi api = new FakeApi();
+        api.race = race("event-id", "kc-id");
+        CompetitionsPanel panel = panel(api);
+        // Change the model without publishing a race response to isolate construction
+        // from data loading: rebuilding a card must only read available images.
+        api.race.setObjectives(Collections.singletonList(objective("/task.png")));
+        edt(panel::onLoggedOut);
+        assertEquals(1, find(panel, JPanel.class, row -> "race-objective-pet".equals(row.getName())).size());
+        assertTrue(api.artwork.isEmpty());
+        edt(panel::refreshRace);
+        assertEquals(Collections.singletonList("/task.png"), api.artworkUrls);
+    }
+
+    @Test public void objectiveUrlsAreNormalizedAndSharedBeforeAnyCardNeedsThem() throws Exception {
+        FakeApi api = new FakeApi();
+        api.race = race("event-id", "kc-id");
+        api.race.setObjectives(Arrays.asList(objective(" /task.png "), objective("/task.png"), objective("  "), objective(null)));
+        CompetitionsPanel panel = panel(api);
+        assertEquals(Collections.singletonList("/task.png"), api.artworkUrls);
+        edt(() -> api.artwork.get(0).accept(new BufferedImage(32, 32, BufferedImage.TYPE_INT_RGB)));
+        assertEquals(2, find(panel, JLabel.class, label -> label.getIcon() != null).size());
+        click(panel, "Full KC leaderboard >");
+        assertEquals("Opening the detail only reads the loaded images", 1, api.artwork.size());
+        assertEquals(2, find(panel, JLabel.class, label -> label.getIcon() != null).size());
+    }
+
+    @Test public void oldPendingArtworkMakesRoomForTheNewRaceWithoutARender() throws Exception {
+        FakeApi api = new FakeApi();
+        api.race = race("old-event", "old-kc");
+        List<FeaturedRaceResponse.Objective> objectives = new ArrayList<>();
+        for (int i = 0; i < 8; i++) objectives.add(objective("/old-" + i + ".png"));
+        api.race.setObjectives(objectives);
+        CompetitionsPanel panel = panel(api);
+        api.race = race("new-event", "new-kc");
+        api.race.setObjectives(Arrays.asList(objective("/current-a.png"), objective("/current-b.png")));
+        edt(panel::refreshRace);
+        RaceEventCard current = find(panel, RaceEventCard.class, card -> true).get(0);
+        assertEquals("Old requests still occupy all eight slots", 8, api.artwork.size());
+
+        BufferedImage image = new BufferedImage(32, 32, BufferedImage.TYPE_INT_RGB);
+        edt(() -> api.artwork.get(0).accept(image));
+        assertEquals("/current-a.png", api.artworkUrls.get(8));
+        assertTrue("An old race image must not reach current objectives", find(panel, JLabel.class, label -> label.getIcon() != null).isEmpty());
+        edt(() -> api.artworkErrors.get(1).accept(new Exception("old request failed")));
+        assertEquals("/current-b.png", api.artworkUrls.get(9));
+        edt(() -> {
+            for (int i = 2; i < 8; i++) api.artwork.get(i).accept(image);
+            api.artwork.get(8).accept(image);
+            api.artwork.get(9).accept(image);
+        });
+        assertEquals(10, api.artwork.size());
+        assertEquals(2, find(panel, JLabel.class, label -> label.getIcon() != null).size());
+        assertSame("Admission and completion do not rebuild the card", current, find(panel, RaceEventCard.class, card -> true).get(0));
+    }
+
+    @Test public void nullAndFailedArtworkKeepFallbacksUntilExplicitRefresh() throws Exception {
+        FakeApi api = new FakeApi();
+        api.race = race("event-id", "kc-id");
+        api.race.setObjectives(Arrays.asList(objective("/empty.png"), objective("/failed.png")));
+        CompetitionsPanel panel = panel(api);
+        edt(() -> {
+            api.artwork.get(0).accept(null);
+            api.artworkErrors.get(1).accept(new Exception("unavailable"));
+        });
+        RaceEventCard current = find(panel, RaceEventCard.class, card -> true).get(0);
+        assertTrue(find(panel, JLabel.class, label -> label.getIcon() != null).isEmpty());
+        click(panel, "Full KC leaderboard >");
+        click(panel, "< Competitions");
+        assertSame(current, find(panel, RaceEventCard.class, card -> true).get(0));
+        edt(panel::onLoggedOut);
+        assertEquals(2, api.artwork.size());
+        edt(panel::refreshRace);
+        assertEquals(Arrays.asList("/empty.png", "/failed.png", "/empty.png", "/failed.png"), api.artworkUrls);
+    }
+
+    @Test public void closingWhileOldArtworkIsPendingCannotAdmitTheWaitingRaceImages() throws Exception {
+        FakeApi api = new FakeApi();
+        api.race = race("old-event", "old-kc");
+        List<FeaturedRaceResponse.Objective> objectives = new ArrayList<>();
+        for (int i = 0; i < 8; i++) objectives.add(objective("/old-" + i + ".png"));
+        api.race.setObjectives(objectives);
+        CompetitionsPanel panel = panel(api);
+        api.race = race("new-event", "new-kc");
+        api.race.setObjectives(Collections.singletonList(objective("/waiting.png")));
+        edt(panel::refreshRace);
+        edt(() -> {
+            // Both an already queued success and a later failure must be ignored.
+            api.artwork.get(0).accept(new BufferedImage(32, 32, BufferedImage.TYPE_INT_RGB));
+            panel.shutDown();
+            api.artworkErrors.get(1).accept(new Exception("late"));
+        });
+        assertEquals(8, api.artwork.size());
+        assertTrue(find(panel, RaceEventCard.class, card -> true).isEmpty());
     }
 
     @Test public void lateArtworkCannotRestoreDisposedRaceDetails() throws Exception {
@@ -222,12 +320,14 @@ public class CompetitionsPanelTest {
         api.race.setImageUrl("https://example.invalid/banner.png");
         CompetitionsPanel panel = panel(api);
         click(panel, "Full KC leaderboard >");
+        RaceEventCard current = find(panel, RaceEventCard.class, card -> true).get(0);
         assertEquals(1, api.artwork.size());
         edt(() -> api.artwork.get(0).accept(new BufferedImage(4, 2, BufferedImage.TYPE_INT_RGB)));
         edt(() -> { });
         // The banner swaps into the open card: no second side-quest fetch, and the
         // pending one still lands in the same detail view.
         assertEquals(Collections.singletonList("kc-id"), api.detailIds);
+        assertSame("The banner updates the existing detail card", current, find(panel, RaceEventCard.class, card -> true).get(0));
         CompetitionsResponse.Competition comp = competition("kc-id", "boss_kills", 12);
         CompetitionsResponse.SideQuest quest = new CompetitionsResponse.SideQuest();
         quest.setName("Bonus task");
@@ -235,6 +335,43 @@ public class CompetitionsPanelTest {
         comp.setSideQuests(Collections.singletonList(quest));
         reply(api, 0, comp);
         assertFalse(labels(panel, "Side Quests").isEmpty());
+    }
+
+    @Test public void objectiveArrivalPreservesBothCardsSideQuestsAndDetailScroll() throws Exception {
+        FakeApi api = new FakeApi();
+        api.race = race("event-id", "kc-id");
+        api.race.setObjectives(Collections.singletonList(objective("/task.png")));
+        CompetitionsPanel panel = panel(api);
+        RaceEventCard overview = find(panel, RaceEventCard.class, card -> true).get(0);
+        click(panel, "Full KC leaderboard >");
+        RaceEventCard detail = find(panel, RaceEventCard.class, card -> true).get(0);
+        CompetitionsResponse.Competition comp = competition("kc-id", "boss_kills", 12);
+        CompetitionsResponse.SideQuest quest = new CompetitionsResponse.SideQuest();
+        quest.setName("Bonus task");
+        quest.setLeaderboard(Collections.singletonList(comp.getLeaderboard().get(0)));
+        comp.setSideQuests(Collections.singletonList(quest));
+        reply(api, 0, comp);
+        JLabel sideQuestTitle = labels(panel, "Side Quests").get(0);
+        List<JPanel> standings = rows(panel);
+        JScrollPane scroll = find(panel, JScrollPane.class, pane -> true).get(0);
+        edt(() -> {
+            panel.setSize(225, 300);
+            layout(panel);
+            scroll.getVerticalScrollBar().setValue(60);
+        });
+        int position = scroll.getVerticalScrollBar().getValue();
+        assertTrue("The detail has enough content to scroll", position > 0);
+        edt(() -> api.artwork.get(0).accept(new BufferedImage(32, 32, BufferedImage.TYPE_INT_RGB)));
+        assertSame(detail, find(panel, RaceEventCard.class, card -> true).get(0));
+        assertSame(scroll, find(panel, JScrollPane.class, pane -> true).get(0));
+        assertEquals(position, scroll.getVerticalScrollBar().getValue());
+        assertSame(sideQuestTitle, labels(panel, "Side Quests").get(0));
+        assertEquals(standings, rows(panel));
+        assertEquals(Collections.singletonList("kc-id"), api.detailIds);
+        assertEquals(1, find(panel, JLabel.class, label -> label.getIcon() != null).size());
+        click(panel, "< Competitions");
+        assertSame(overview, find(panel, RaceEventCard.class, card -> true).get(0));
+        assertEquals(1, find(panel, JLabel.class, label -> label.getIcon() != null).size());
     }
 
     @Test public void placementRewardsFollowBackendPrecedence() {
@@ -395,8 +532,10 @@ public class CompetitionsPanelTest {
         final List<String> detailIds = new ArrayList<>();
         final List<Consumer<CompetitionDetailsResponse>> pending = new ArrayList<>();
         final List<Consumer<BufferedImage>> artwork = new ArrayList<>();
+        final List<String> artworkUrls = new ArrayList<>();
+        final List<Consumer<Exception>> artworkErrors = new ArrayList<>();
 
-        FakeApi() { super(null, null); }
+        FakeApi() { super(null, null, null); }
 
         @Override public void fetchFeaturedRace(Consumer<FeaturedRaceResponse> ok, Consumer<Exception> error) {
             FeaturedRaceResponse response = new FeaturedRaceResponse();
@@ -409,7 +548,9 @@ public class CompetitionsPanelTest {
         @Override public void fetchActiveCompetitions(Consumer<CompetitionsResponse> ok, Consumer<Exception> error) { ok.accept(response(active)); }
         @Override public void fetchScheduledCompetitions(Consumer<CompetitionsResponse> ok, Consumer<Exception> error) { ok.accept(response(scheduled)); }
         @Override public void fetchCompetitionArtwork(String imageUrl, Consumer<BufferedImage> ok, Consumer<Exception> error) {
+            artworkUrls.add(imageUrl);
             artwork.add(ok);
+            artworkErrors.add(error);
         }
         @Override public void fetchCompetitionDetails(String id, Consumer<CompetitionDetailsResponse> ok, Consumer<Exception> error) {
             detailIds.add(id);
