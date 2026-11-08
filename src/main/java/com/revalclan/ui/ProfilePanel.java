@@ -244,6 +244,8 @@ public class ProfilePanel extends JPanel {
 	}
 
 	public void refresh() {
+		// Clearing the shared cache cancels its fetch; keep an active load intact.
+		if (!viewScope.isActive() || isLoading) return;
 		if (apiService != null && client != null) {
 			apiService.clearAccountCache();
 			loadCurrentAccount();
