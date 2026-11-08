@@ -83,6 +83,9 @@ public final class ClanBrowserWindow extends JFrame {
         super("Reval · Clan browser");
         // Retain component buffering without the separate native window's stale swap buffer.
         getRootPane().setDoubleBuffered(false);
+        // Lightweight tooltips overlap the content in this layer. Buffer their
+        // shared repaint so clearing the board cannot flash before its rows draw.
+        getLayeredPane().setDoubleBuffered(true);
         this.api = api; this.icons = icons;
         setDefaultCloseOperation(DISPOSE_ON_CLOSE); setSize(1180, 820);
         setLocationRelativeTo(anchor);
