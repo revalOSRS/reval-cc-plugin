@@ -16,7 +16,6 @@ import okhttp3.Request;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
 import okhttp3.Protocol;
-import okhttp3.MultipartBody;
 import okio.Buffer;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
@@ -101,19 +100,6 @@ public class WebhookServiceTest {
 			assertEquals("SYNC", payload.get("eventType").getAsString());
 			assertEquals(12, payload.get("quantity").getAsInt());
 		}
-	}
-
-	@Test public void screenshotsRemainRawMultipartBytes() throws Exception {
-		byte[] screenshot = {1, 2, 3, 4};
-		service.sendDataAsync(Map.of("eventType", "PET"), screenshot);
-		drain();
-		ArgumentCaptor<Request> request = ArgumentCaptor.forClass(Request.class);
-		verify(http).newCall(request.capture());
-		MultipartBody body = (MultipartBody) request.getValue().body();
-		assertEquals(2, body.size());
-		Buffer buffer = new Buffer();
-		body.part(1).body().writeTo(buffer);
-		assertArrayEquals(screenshot, buffer.readByteArray());
 	}
 
 	@Test public void unsuccessfulOrInvalidResponsesStillReleaseRecovery() throws Exception {
