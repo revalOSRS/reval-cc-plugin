@@ -9,6 +9,7 @@ import com.revalclan.util.UIAssetLoader;
 import java.util.function.Consumer;
 import javax.swing.SwingUtilities;
 import net.runelite.api.Client;
+import net.runelite.client.callback.ClientThread;
 import net.runelite.client.game.ItemManager;
 import okhttp3.Call;
 import okhttp3.Callback;
@@ -70,7 +71,7 @@ public class ProfilePanelTest {
 			Request request = invocation.getArgument(0);
 			return request.url().queryParameter("accountHash") == null ? points : account;
 		});
-		RevalApiService api = new RevalApiService(http, new Gson());
+		RevalApiService api = new RevalApiService(http, new Gson(), mock(ClientThread.class));
 		Client client = mock(Client.class);
 		when(client.getAccountHash()).thenReturn(123L);
 		ProfilePanel[] holder = new ProfilePanel[1];
