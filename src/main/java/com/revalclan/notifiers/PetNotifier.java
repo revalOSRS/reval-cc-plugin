@@ -1,7 +1,9 @@
 package com.revalclan.notifiers;
 
+import com.revalclan.collectionlog.GreenlogCounterSnapshot;
 import net.runelite.client.util.Text;
 
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.HashMap;
 import java.util.Map;
@@ -12,6 +14,8 @@ import java.util.regex.Pattern;
 
 @Singleton
 public class PetNotifier extends BaseNotifier {
+	@Inject private GreenlogCounterSnapshot greenlogCounterSnapshot;
+
 	/**
 	 * Pattern matching the initial pet drop message
 	 */
@@ -78,6 +82,12 @@ public class PetNotifier extends BaseNotifier {
 	 * Number of ticks waited for pet name
 	 */
 	private final AtomicInteger ticksWaited = new AtomicInteger(0);
+
+	/**
+	 * Event data started on the first tick after the personal message, with the
+	 * game counters read then (e.g. Rifts closed), not when the name arrives
+	 */
+	private volatile Map<String, Object> pendingData = null;
 
 	@Override
 	public boolean isEnabled() {
@@ -170,6 +180,12 @@ public class PetNotifier extends BaseNotifier {
 			return;
 		}
 
+		// First tick after the game message: the drop tick's varp and XP updates are applied
+		if (this.pendingData == null) {
+			this.pendingData = new HashMap<>();
+			greenlogCounterSnapshot.attachTo(this.pendingData, null);
+		}
+
 		// We have the game message - check if we have complete info or should wait
 		if (this.petName != null) {
 			handleNotify();
@@ -195,7 +211,8 @@ public class PetNotifier extends BaseNotifier {
 		// Determine if pet was obtained or duplicate based on game message
 		boolean obtained = this.gameMessage != null && !this.gameMessage.contains("would have been");
 
-		Map<String, Object> petData = new HashMap<>();
+		// Started by onGameTick on the first tick after the game message
+		Map<String, Object> petData = this.pendingData;
 		petData.put("message", this.gameMessage);
 		petData.put("obtained", obtained);
 
@@ -220,6 +237,7 @@ public class PetNotifier extends BaseNotifier {
 		this.gameMessage = null;
 		this.petName = null;
 		this.killCount = null;
+		this.pendingData = null;
 		this.ticksWaited.set(0);
 	}
 

@@ -18,10 +18,10 @@ import com.revalclan.session.SessionState;
 import net.runelite.client.events.ClientShutdown;
 import com.revalclan.util.ClanMembership;
 import com.revalclan.ui.RevalPanel;
-import com.revalclan.ui.components.HalloweenDecoration;
+import com.revalclan.ui.components.SeasonalDecoration;
+import com.revalclan.ui.constants.Season;
 import com.revalclan.ui.constants.UIConstants;
 import com.revalclan.util.AnnouncementService;
-import com.revalclan.util.ArchiveLootBroadcasts;
 import com.revalclan.util.ClanRankIconResolver;
 import com.revalclan.util.EventFilterManager;
 import com.revalclan.util.RaidPartyTracker;
@@ -38,8 +38,6 @@ import javax.inject.Singleton;
 import java.util.concurrent.TimeUnit;
 
 import java.awt.image.BufferedImage;
-import java.time.LocalDate;
-import java.time.Month;
 
 import javax.inject.Inject;
 import javax.swing.SwingUtilities;
@@ -61,7 +59,6 @@ import net.runelite.api.events.StatChanged;
 import net.runelite.api.events.VarbitChanged;
 import net.runelite.api.events.WidgetLoaded;
 import net.runelite.api.events.ScriptPreFired;
-import net.runelite.api.events.ScriptCallbackEvent;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.events.ConfigChanged;
@@ -231,9 +228,9 @@ public class RevalClanPlugin extends Plugin {
 		}
 	}
 
-	/** Build the side panel; the Halloween theme is used throughout October. */
+	/** Build the side panel in the season's appearance (see Season.on). */
 	private void buildSidepanel() {
-		UIConstants.setHalloweenTheme(LocalDate.now().getMonth() == Month.OCTOBER);
+		UIConstants.setSeason(Season.current());
 		revalPanel = new RevalPanel();
 		revalPanel.init(revalApiService, client, uiAssetLoader, itemManager, spriteManager, config,
 			rankIconResolver);
@@ -250,10 +247,10 @@ public class RevalClanPlugin extends Plugin {
 		});
 		revalPanel.showTab("PROFILE");
 
-		BufferedImage icon = UIConstants.isHalloweenTheme()
-			? HalloweenDecoration.pumpkinImage(30) : uiAssetLoader.getImage("reval.png");
+		BufferedImage icon = UIConstants.isSeasonal()
+			? SeasonalDecoration.image(30) : uiAssetLoader.getImage("reval.png");
 		navButton = NavigationButton.builder()
-			.tooltip(UIConstants.isHalloweenTheme() ? "Reval Clan - Halloween" : "Reval Clan")
+			.tooltip(UIConstants.season().tooltip)
 			.icon(icon)
 			.priority(1)
 			.panel(revalPanel)
@@ -498,11 +495,6 @@ public class RevalClanPlugin extends Plugin {
 		} else if (type == ChatMessageType.CLAN_MESSAGE) {
 			petNotifier.onClanNotification(cleanMessage);
 		}
-	}
-
-	@Subscribe
-	public void onScriptCallbackEvent(ScriptCallbackEvent event) {
-		ArchiveLootBroadcasts.filter(client, event);
 	}
 
 	@Subscribe
