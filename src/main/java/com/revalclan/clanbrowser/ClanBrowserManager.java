@@ -41,7 +41,10 @@ public class ClanBrowserManager {
         running = false;
         if (chatCatalogueCall != null) chatCatalogueCall.cancel();
         clientThread.invoke(() -> { chatEnabled = false; chatLinks.clear(); });
-        SwingUtilities.invokeLater(() -> { if (window != null) { window.dispose(); window = null; } });
+        SwingUtilities.invokeLater(() -> {
+            if (window != null) { window.dispose(); window = null; }
+            api.clearCache();
+        });
     }
     private void applyChatSetting() {
         boolean enabled = running && config.enableChatCommands();

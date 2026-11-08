@@ -22,24 +22,22 @@ import java.util.Collections;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.stream.Collectors;
-import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 
 /** A native inventory-style race card, backed by the same verified results as the homepage. */
 public final class RaceEventCard extends JPanel {
     private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("d MMM", Locale.ENGLISH);
     private final FeaturedRaceResponse.Race race;
-    private final BufferedImage artwork;
+    private BufferedImage artwork;
     private final ItemManager itemManager;
-    private final BiConsumer<String, Consumer<BufferedImage>> imageLoader;
+    private final List<ObjectiveIcon> objectiveIcons = new ArrayList<>();
 
     public RaceEventCard(FeaturedRaceResponse.Race race, BufferedImage artwork, ItemManager itemManager,
-                         BiConsumer<String, Consumer<BufferedImage>> imageLoader, boolean details, Runnable open) {
+                         Map<String, BufferedImage> objectiveArtwork, boolean details, Runnable open) {
         this.race = race;
         this.artwork = artwork;
         this.itemManager = itemManager;
-        this.imageLoader = imageLoader;
         setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
         setBackground(UIConstants.CARD_BG);
         setBorder(BorderFactory.createLineBorder(UIConstants.ACCENT_GOLD));
@@ -51,6 +49,7 @@ public final class RaceEventCard extends JPanel {
         body.add(section("Race firsts"));
         List<FeaturedRaceResponse.Objective> objectives = race.getObjectives() == null ? Collections.emptyList() : race.getObjectives();
         for (FeaturedRaceResponse.Objective objective : objectives) {
+            if (objective == null) continue;
             body.add(objectiveRow(objective));
             body.add(Box.createVerticalStrut(5));
         }
@@ -66,6 +65,7 @@ public final class RaceEventCard extends JPanel {
             body.add(Box.createVerticalStrut(10));
             body.add(button("Full KC leaderboard >", open));
         }
+        updateArtwork(artwork, objectiveArtwork);
     }
 
     @Override public Dimension getPreferredSize() { return new Dimension(1, super.getPreferredSize().height); }
@@ -81,10 +81,8 @@ public final class RaceEventCard extends JPanel {
         List<String> members = objective.getWinner() == null ? null : objective.getWinner().getMembers();
         row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 51));
         row.setPreferredSize(new Dimension(1, 51));
-        JLabel slot = new JLabel();
-        slot.setBorder(BorderFactory.createLineBorder(UIConstants.BORDER_COLOR));
-        slot.setPreferredSize(new Dimension(34, 39));
-        loadObjectiveIcon(objective, slot);
+        ObjectiveIcon slot = new ObjectiveIcon(objective);
+        objectiveIcons.add(slot);
         row.add(slot, BorderLayout.WEST);
         JPanel copy = column();
         copy.add(Labels.small(objective.getTitle(), UIConstants.TEXT_PRIMARY));
@@ -100,27 +98,42 @@ public final class RaceEventCard extends JPanel {
         return row;
     }
 
-    private void loadObjectiveIcon(FeaturedRaceResponse.Objective objective, JLabel slot) {
-        int fallbackId = "completion".equals(objective.getKind()) ? ItemID.CA_BOOK
-            : "pet".equals(objective.getKind()) ? ItemID.CHAOSELEPET
-            : "purple".equals(objective.getKind()) ? ItemID.BIRTHDAY_CAKE : ItemID.COLLECTION_LOG;
-        int itemId = objective.getIconItemId() != null && objective.getIconItemId() > 0 ? objective.getIconItemId() : fallbackId;
-        boolean[] customLoaded = {false};
-        if (itemManager != null) {
-            try {
-                AsyncBufferedImage image = itemManager.getImage(itemId);
-                image.onLoaded(() -> SwingUtilities.invokeLater(() -> {
-                    if (!customLoaded[0]) slot.setIcon(SpriteIcons.fit(image, 32));
-                }));
-            } catch (RuntimeException ignored) {
-                // An unavailable cache item must not prevent the race from rendering.
+    /** Synchronous display update: artwork requests belong to CompetitionsPanel. */
+    void updateArtwork(BufferedImage banner, Map<String, BufferedImage> images) {
+        artwork = banner;
+        for (ObjectiveIcon slot : objectiveIcons) {
+            BufferedImage image = slot.imageUrl == null ? null : images.get(slot.imageUrl);
+            if (image != null && image != slot.customArtwork) {
+                slot.customArtwork = image;
+                slot.setIcon(SpriteIcons.fit(image, 32));
             }
         }
-        if (imageLoader != null && objective.getImageUrl() != null && !objective.getImageUrl().trim().isEmpty()) {
-            imageLoader.accept(objective.getImageUrl(), image -> {
-                customLoaded[0] = true;
-                slot.setIcon(SpriteIcons.fit(image, 32));
-            });
+        repaint();
+    }
+
+    private final class ObjectiveIcon extends JLabel {
+        private final String imageUrl;
+        private BufferedImage customArtwork;
+
+        ObjectiveIcon(FeaturedRaceResponse.Objective objective) {
+            String url = objective.getImageUrl();
+            imageUrl = url == null || url.trim().isEmpty() ? null : url.trim();
+            setBorder(BorderFactory.createLineBorder(UIConstants.BORDER_COLOR));
+            setPreferredSize(new Dimension(34, 39));
+            int fallbackId = "completion".equals(objective.getKind()) ? ItemID.CA_BOOK
+                : "pet".equals(objective.getKind()) ? ItemID.CHAOSELEPET
+                : "purple".equals(objective.getKind()) ? ItemID.BIRTHDAY_CAKE : ItemID.COLLECTION_LOG;
+            int itemId = objective.getIconItemId() != null && objective.getIconItemId() > 0 ? objective.getIconItemId() : fallbackId;
+            if (itemManager != null) {
+                try {
+                    AsyncBufferedImage image = itemManager.getImage(itemId);
+                    image.onLoaded(() -> SwingUtilities.invokeLater(() -> {
+                        if (customArtwork == null) setIcon(SpriteIcons.fit(image, 32));
+                    }));
+                } catch (RuntimeException ignored) {
+                    // An unavailable cache item must not prevent the race from rendering.
+                }
+            }
         }
     }
 

@@ -60,6 +60,7 @@ public class ClanTeamColors {
 
 	/** Restore default name colors; chat lines already colored stay as sent. */
 	public void shutDown() {
+		activeTeams.reset();
 		clientThread.invoke(this::resetSidepanel);
 	}
 
