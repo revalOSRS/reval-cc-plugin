@@ -126,6 +126,37 @@ public class WebhookServiceTest {
 		verifyNoInteractions(http);
 	}
 
+	@Test public void preparationFailuresReleaseCapacityAndNeverRunSuccessCallbacks() {
+		Runnable success = mock(Runnable.class);
+		for (int i = 0; i < 128; i++) {
+			CompletableFuture<JsonObject> result = service.sendDataAsync(Map.of("eventType", "LOGIN", "value", Double.NaN));
+			result.thenRun(success);
+			drain();
+			assertTrue(result.isCompletedExceptionally());
+		}
+		verifyNoInteractions(success, http);
+		assertFullCapacityAvailable();
+	}
+
+	@Test public void repeatedExecutorRejectionDoesNotLeakAdmissionSlots() {
+		doThrow(new java.util.concurrent.RejectedExecutionException()).when(executor).execute(any(Runnable.class));
+		for (int i = 0; i < 128; i++) {
+			assertTrue(service.sendDataAsync(Map.of("eventType", "LOGIN")).isCompletedExceptionally());
+		}
+		doAnswer(invocation -> tasks.add(invocation.getArgument(0))).when(executor).execute(any(Runnable.class));
+		assertFullCapacityAvailable();
+	}
+
+	@Test public void repeatedEnqueueRejectionDoesNotLeakAdmissionSlots() {
+		doThrow(new java.util.concurrent.RejectedExecutionException()).when(call).enqueue(any());
+		for (int i = 0; i < 128; i++) {
+			CompletableFuture<JsonObject> result = service.sendDataAsync(Map.of("eventType", "LOGIN"));
+			drain();
+			assertTrue(result.isCompletedExceptionally());
+		}
+		assertFullCapacityAvailable();
+	}
+
 	@Test public void successfulResponsesWithoutHintsAreDifferentFromDeliveryFailure() throws Exception {
 		CompletableFuture<JsonObject> result = service.sendDataAsync(Map.of("eventType", "LOGIN"));
 		drain();
@@ -196,4 +227,32 @@ public class WebhookServiceTest {
 		drain();
 	}
 
+
+	@Test public void callerCancelledCallsReleaseEachSlotOnlyOnceOnRepeatedTerminalCallbacks() {
+		Runnable success = mock(Runnable.class);
+		for (int i = 0; i < 64; i++) {
+			CompletableFuture<JsonObject> result = service.sendDataAsync(Map.of("eventType", "LOGIN"));
+			result.thenRun(success);
+			drain();
+			assertTrue(result.cancel(false));
+		}
+		ArgumentCaptor<Callback> callbacks = ArgumentCaptor.forClass(Callback.class);
+		verify(call, times(64)).enqueue(callbacks.capture());
+		verify(call, times(64)).cancel();
+		assertTrue(service.sendDataAsync(Map.of("eventType", "LOGIN")).isCompletedExceptionally());
+		for (Callback callback : callbacks.getAllValues()) {
+			callback.onFailure(call, new IOException("cancelled"));
+			callback.onFailure(call, new IOException("duplicate terminal callback"));
+		}
+		verifyNoInteractions(success);
+		assertFullCapacityAvailable();
+	}
+
+	private void assertFullCapacityAvailable() {
+		for (int i = 0; i < 64; i++) assertFalse(service.sendDataAsync(Map.of("eventType", "LOGIN")).isDone());
+		assertTrue(service.sendDataAsync(Map.of("eventType", "LOGIN")).isCompletedExceptionally());
+		assertEquals(64, tasks.size());
+		service.shutDown();
+		drain();
+	}
 }

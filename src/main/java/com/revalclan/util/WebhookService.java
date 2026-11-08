@@ -25,8 +25,9 @@ import java.util.zip.GZIPOutputStream;
  * At most 64 deliveries are admitted, with 16 slots reserved for login/logout,
  * sync and session events. Rejected ordinary events have no durable replay;
  * persisted sessions remain recoverable. A saturation warning rearms only once
- * all work drains. Cancelled preparation keeps its slot until dequeued, bounding
- * retained payloads even across rapid plugin restarts while the worker is blocked.
+ * all work drains. Cancellation keeps its slot until preparation exits and any
+ * HTTP call delivers its terminal callback, bounding retained payloads across
+ * rapid plugin restarts with blocked workers or HTTP dispatchers.
  */
 @Slf4j
 @Singleton
@@ -53,47 +54,38 @@ public class WebhookService {
 	/** Callers transfer ownership of data and must not mutate it after sending. */
 	public CompletableFuture<JsonObject> sendDataAsync(Map<String, Object> data) {
 		RequestScope owner = scope;
-		CompletableFuture<JsonObject> result = owner.track(new CompletableFuture<>());
-		if (result.isDone()) return result;
+		if (!owner.isActive()) return owner.track(new CompletableFuture<>());
 		boolean critical = WebhookCapacity.isCritical(data.get("eventType"));
 		if (!capacity.acquire(critical)) {
+			CompletableFuture<JsonObject> result = owner.track(new CompletableFuture<>());
 			result.completeExceptionally(new RejectedExecutionException("Webhook backlog is full"));
 			return result;
 		}
-		CompletableFuture<Void> prepared = new CompletableFuture<>();
-		// Cancellation finishes the caller immediately; queued preparation must
-		// also leave the executor before its retained payload frees a slot.
-		prepared.thenCombine(result.handle((response, error) -> null), (a, b) -> {
-			capacity.release(critical);
-			return null;
-		});
+		WebhookDelivery delivery = new WebhookDelivery(owner, () -> capacity.release(critical));
+		CompletableFuture<JsonObject> result = delivery.result();
 		result.whenComplete((response, error) -> {
 			if (error != null && !(error instanceof CancellationException)) log.warn("Webhook delivery failed: {}", error.toString());
 		});
-		if (result.isDone()) { prepared.complete(null); return result; }
+		if (result.isDone()) { delivery.finishPreparation(); return result; }
 		try {
 			executor.execute(() -> {
 				try {
 					if (result.isDone()) return;
 					Request request = prepare(data);
 					if (result.isDone()) return;
-					CompletableFuture<JsonObject> delivery = owner.request(httpClient, request, response -> {
+					delivery.send(httpClient, request, response -> {
 						if (!response.isSuccessful()) throw new IOException("HTTP " + response.code());
 						if (response.body() == null) throw new IOException("Empty webhook response");
 						JsonObject parsed = gson.fromJson(response.body().string(), JsonObject.class);
 						if (parsed == null) throw new IOException("Invalid webhook response");
 						return parsed;
 					});
-					result.whenComplete((response, error) -> { if (result.isCancelled()) delivery.cancel(false); });
-					delivery.whenComplete((response, error) -> {
-						if (error == null) result.complete(response); else result.completeExceptionally(error);
-					});
 				} catch (Exception error) { result.completeExceptionally(error); }
-				finally { prepared.complete(null); }
+				finally { delivery.finishPreparation(); }
 			});
 		} catch (RuntimeException error) {
 			result.completeExceptionally(error);
-			prepared.complete(null);
+			delivery.finishPreparation();
 		}
 		return result;
 	}

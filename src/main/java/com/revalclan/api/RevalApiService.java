@@ -28,9 +28,11 @@ import com.revalclan.api.leaguesbingo.LeaguesBingoResponse;
 import com.revalclan.util.PluginVersion;
 import com.revalclan.util.RequestScope;
 import javax.inject.Named;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import okhttp3.*;
+import net.runelite.client.callback.ClientThread;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -52,9 +54,10 @@ public class RevalApiService {
 
     private final Gson gson;
     private final OkHttpClient httpClient;
+    private final ClientThread clientThread;
     private volatile RequestScope requests = new RequestScope();
 
-    public void startUp() { requests.cancel(); requests = new RequestScope(); }
+    public void startUp() { requests.cancel(); requests = new RequestScope(); resetEventsSession(); }
     public void shutDown() { requests.cancel(); clearCache(); resetEventsSession(); }
 
     // Cache durations
@@ -68,9 +71,10 @@ public class RevalApiService {
     private final CachedFetch<LeaguesConfigResponse> leagues = new CachedFetch<>(0);
 
     @Inject
-    public RevalApiService(@Named("reval-http") OkHttpClient httpClient, Gson gson) {
+    public RevalApiService(@Named("reval-http") OkHttpClient httpClient, Gson gson, ClientThread clientThread) {
         this.httpClient = httpClient;
         this.gson = gson;
+        this.clientThread = clientThread;
     }
 
     // ==================== POINTS API ====================
@@ -99,27 +103,53 @@ public class RevalApiService {
     // ==================== EVENTS API ====================
 
     private final CopyOnWriteArrayList<Consumer<EventsResponse>> eventsListeners = new CopyOnWriteArrayList<>();
-    private volatile RequestScope eventsScope = new RequestScope();
+    // Only the client thread replaces this lifetime or applies event state.
+    private RequestScope eventsScope = new RequestScope();
 
-    /** Successful event responses, or an empty response on session reset. Never mutate Swing directly here. */
+    /** Successful event responses, or an empty response on reset, on the client thread. */
     public void addEventsListener(Consumer<EventsResponse> listener) {
         eventsListeners.add(listener);
     }
 
-    /** End the session without allowing an old in-flight response to restore its marks. */
+    /** Queue reset behind any publication already running; listeners never overlap or run under a service lock. */
     public void resetEventsSession() {
-        eventsScope.cancel();
-        eventsScope = new RequestScope();
-        eventsListeners.forEach(listener -> listener.accept(new EventsResponse()));
+        RequestScope plugin = requests;
+        clientThread.invokeLater(() -> {
+            if (plugin != requests) return;
+            eventsScope.cancel();
+            eventsScope = new RequestScope();
+            eventsListeners.forEach(listener -> listener.accept(new EventsResponse()));
+        });
     }
 
+    /** Event callbacks run on the client thread, once, including cancellation. */
     public void fetchEvents(Consumer<EventsResponse> onSuccess, Consumer<Exception> onError) {
-        eventsScope.cancel();
-        RequestScope owner = eventsScope = new RequestScope();
-        observe(owner.track(getFuture(ApiEndpoints.EVENTS, EventsResponse.class)), response -> {
-            if (owner.isActive()) eventsListeners.forEach(listener -> listener.accept(response));
-            onSuccess.accept(response);
-        }, onError);
+        RequestScope plugin = requests;
+        clientThread.invokeLater(() -> {
+            // A caller delayed before enqueue must not disturb a newer plugin lifetime.
+            if (!plugin.isActive()) {
+                onError.accept(new CancellationException());
+                return;
+            }
+            eventsScope.cancel();
+            RequestScope owner = eventsScope = new RequestScope();
+            // Keep completion cancellable until the queued state application actually runs.
+            CompletableFuture<EventsResponse> result = owner.track(new CompletableFuture<>());
+            observe(result, onSuccess, onError);
+            owner.track(requestFuture(plugin, ApiEndpoints.url(ApiEndpoints.EVENTS), "GET", null, null,
+                EventsResponse.class)).whenComplete((response, error) -> clientThread.invokeLater(() -> {
+                    if (!owner.isActive() || !plugin.isActive()) result.cancel(false);
+                    else if (error != null) result.completeExceptionally(error);
+                    else {
+                        try {
+                            eventsListeners.forEach(listener -> listener.accept(response));
+                            result.complete(response);
+                        } catch (RuntimeException publicationError) {
+                            result.completeExceptionally(publicationError);
+                        }
+                    }
+                }));
+        });
     }
 
     public void fetchActiveTeams(Consumer<ActiveTeamsResponse> onSuccess, Consumer<Exception> onError) {
@@ -355,13 +385,18 @@ public class RevalApiService {
 
     private <T extends ApiEnvelope> CompletableFuture<T> requestFuture(String url, String method, String body,
                                                                       String memberCode, Class<T> type) {
+        return requestFuture(requests, url, method, body, memberCode, type);
+    }
+
+    private <T extends ApiEnvelope> CompletableFuture<T> requestFuture(RequestScope scope, String url, String method,
+                                                                      String body, String memberCode, Class<T> type) {
         Request.Builder request = new Request.Builder().url(url)
             .header("Accept", "application/json").header("User-Agent", PluginVersion.userAgent());
         if (memberCode != null && !memberCode.isEmpty()) request.header("X-Member-Code", memberCode);
         RequestBody payload = body == null ? null : RequestBody.create(JSON, body.getBytes(StandardCharsets.UTF_8));
         if ("POST".equals(method)) request.post(payload != null ? payload : RequestBody.create(JSON, new byte[0]));
         else if ("DELETE".equals(method)) request.delete(payload);
-        return requests.request(httpClient, request.build(), response -> {
+        return scope.request(httpClient, request.build(), response -> {
             String json = response.body() == null ? null : response.body().string();
             T parsed = null;
             if (json != null && !json.isEmpty()) {
