@@ -285,6 +285,7 @@ public class ProfilePanel extends JPanel {
 		addSection(buildItemChecklistSection("Monkey Backpacks", "MONKEY_BACKPACKS"));
 		addSection(buildItemChecklistSection("ToA Capes", "TOA_CAPES"));
 		addSection(buildItemChecklistSection("ToB Capes", "TOB_CAPES"));
+		addSection(buildItemChecklistSection("TFA Capes", "TFA_CAPES"));
 		addComponent(buildItemChecklistSection("CM Capes", "CM_CAPES"));
 		addSpacing(16);
 
