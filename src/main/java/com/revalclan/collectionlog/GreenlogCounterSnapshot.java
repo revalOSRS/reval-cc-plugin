@@ -26,4 +26,13 @@ public class GreenlogCounterSnapshot {
 		snapshot.put("pages", collectionLogManager.getCounterSnapshot(itemIds));
 		return snapshot;
 	}
+
+	/** Optional context: a failed read leaves the event unchanged. */
+	public void attachTo(Map<String, Object> data, Collection<Integer> itemIds) {
+		try {
+			data.put("greenlogCounters", capture(itemIds));
+		} catch (RuntimeException ignored) {
+			// Unavailable counters must never prevent the event.
+		}
+	}
 }
