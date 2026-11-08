@@ -26,9 +26,9 @@ import java.awt.image.BufferedImage;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -37,7 +37,6 @@ import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 
 public class CompetitionsPanel extends JPanel {
 	private static final Pattern TOP_RANGE = Pattern.compile("^top(\\d+)$");
@@ -69,12 +68,14 @@ public class CompetitionsPanel extends JPanel {
 	private boolean memberContentAvailable;
 	private String selectedRaceId;
 	private BufferedImage raceArtwork;
+	private RaceEventCard raceOverviewCard;
 	private RaceEventCard raceDetailCard;
 	private String raceArtworkUrl;
 	private boolean artworkLoading;
 	private final RequestScope lifetime = new RequestScope();
 	private final Map<String, BufferedImage> objectiveArtwork = new HashMap<>();
 	private final Set<String> objectiveArtworkLoading = new HashSet<>();
+	private final Set<String> objectiveArtworkUrls = new LinkedHashSet<>();
 	private static final int MAX_OBJECTIVE_ARTWORK = 8;
 
 	public CompetitionsPanel() {
@@ -161,6 +162,15 @@ public class CompetitionsPanel extends JPanel {
 			updateLoading();
 			featuredRace = response.getData() == null ? null : response.getData().getRace();
 			objectiveArtwork.clear();
+			objectiveArtworkUrls.clear();
+			if (featuredRace != null && featuredRace.getObjectives() != null) {
+				for (FeaturedRaceResponse.Objective objective : featuredRace.getObjectives()) {
+					if (objective != null && objective.getImageUrl() != null && !objective.getImageUrl().trim().isEmpty()) {
+						objectiveArtworkUrls.add(objective.getImageUrl().trim());
+					}
+				}
+			}
+			prefetchObjectiveArtwork();
 			refreshArtwork();
 			renderRace();
 		}), error -> onEdt(() -> {
@@ -186,39 +196,32 @@ public class CompetitionsPanel extends JPanel {
 			if (!Objects.equals(requestedUrl, raceArtworkUrl)) return;
 			artworkLoading = false;
 			raceArtwork = image;
-			if (!swapRaceDetailArtwork()) renderRace();
+			updateRaceArtwork();
 		}), error -> onEdt(() -> {
 			if (Objects.equals(requestedUrl, raceArtworkUrl)) artworkLoading = false;
 		}));
 	}
 
-	/** One request per optional image; render current cards rather than retaining callbacks to replaced cards. */
-	private void loadObjectiveArtwork(String imageUrl, Consumer<BufferedImage> onSuccess) {
-		if (!lifetime.isActive()) return;
-		String url = imageUrl.trim();
-		if (objectiveArtwork.containsKey(url)) {
-			BufferedImage cached = objectiveArtwork.get(url);
-			if (cached != null) onSuccess.accept(cached);
-			return;
+	/** Data changes own requests; building cards only reads the current artwork snapshot. */
+	private void prefetchObjectiveArtwork() {
+		for (String url : objectiveArtworkUrls) {
+			if (objectiveArtwork.size() + objectiveArtworkLoading.size() >= MAX_OBJECTIVE_ARTWORK) return;
+			if (objectiveArtwork.containsKey(url) || !objectiveArtworkLoading.add(url)) continue;
+			apiService.fetchCompetitionArtwork(url,
+				image -> onEdt(() -> objectiveArtworkArrived(url, image)),
+				error -> onEdt(() -> objectiveArtworkArrived(url, null)));
 		}
-		if (objectiveArtwork.size() + objectiveArtworkLoading.size() >= MAX_OBJECTIVE_ARTWORK
-			|| !objectiveArtworkLoading.add(url)) return;
-		apiService.fetchCompetitionArtwork(url, image -> onEdt(() -> {
-			objectiveArtworkLoading.remove(url);
-			if (usesObjectiveArtwork(url)) objectiveArtwork.put(url, image);
-			if (!swapRaceDetailArtwork()) buildContent();
-		}), error -> onEdt(() -> {
-			objectiveArtworkLoading.remove(url);
-			// A failed URL keeps its fallback until the next explicit race refresh.
-			if (usesObjectiveArtwork(url)) objectiveArtwork.put(url, null);
-			if (!swapRaceDetailArtwork()) buildContent();
-		}));
 	}
 
-	private boolean usesObjectiveArtwork(String url) {
-		return featuredRace != null && featuredRace.getObjectives() != null
-			&& featuredRace.getObjectives().stream().anyMatch(objective -> objective != null
-				&& objective.getImageUrl() != null && url.equals(objective.getImageUrl().trim()));
+	private void objectiveArtworkArrived(String url, BufferedImage image) {
+		objectiveArtworkLoading.remove(url);
+		if (objectiveArtworkUrls.contains(url)) {
+			// Null (including failure) keeps the item fallback until an explicit race refresh.
+			objectiveArtwork.put(url, image);
+			updateRaceArtwork();
+		}
+		// Old race requests still count toward the bound. Admit current URLs as they finish.
+		prefetchObjectiveArtwork();
 	}
 
 	/** Terminal: queued EDT replies must not rebuild a detached panel or start more requests. */
@@ -229,6 +232,7 @@ public class CompetitionsPanel extends JPanel {
 		detailGeneration++;
 		objectiveArtwork.clear();
 		objectiveArtworkLoading.clear();
+		objectiveArtworkUrls.clear();
 		activeVotes = new ArrayList<>();
 		activeCompetitions = new ArrayList<>();
 		scheduledCompetitions = new ArrayList<>();
@@ -236,6 +240,7 @@ public class CompetitionsPanel extends JPanel {
 		featuredRace = null;
 		raceArtwork = null;
 		raceArtworkUrl = null;
+		raceOverviewCard = null;
 		raceDetailCard = null;
 		selectedRaceId = null;
 		raceLoading = memberLoading = artworkLoading = false;
@@ -244,23 +249,10 @@ public class CompetitionsPanel extends JPanel {
 		updateLoading();
 	}
 
-	/**
-	 * With the race detail open, put the banner into its card without rebuilding the detail:
-	 * a rebuild would fetch the side quests again and reset the scroll position.
-	 */
-	private boolean swapRaceDetailArtwork() {
-		if (raceDetailCard == null || featuredRace == null || selectedRaceId == null
-			|| !selectedRaceId.equals(featuredRace.getId())) return false;
-		Container parent = raceDetailCard.getParent();
-		if (parent == null) return false;
-		buildContent();
-		int index = Arrays.asList(parent.getComponents()).indexOf(raceDetailCard);
-		raceDetailCard = new RaceEventCard(featuredRace, raceArtwork, itemManager, this::loadObjectiveArtwork, true, null);
-		parent.remove(index);
-		parent.add(raceDetailCard, index);
-		parent.revalidate();
-		parent.repaint();
-		return true;
+	/** Preserve the current cards, side quests, navigation and scroll position on image arrival. */
+	private void updateRaceArtwork() {
+		if (raceOverviewCard != null) raceOverviewCard.updateArtwork(raceArtwork, objectiveArtwork);
+		if (raceDetailCard != null) raceDetailCard.updateArtwork(raceArtwork, objectiveArtwork);
 	}
 
 	private void renderRace() {
@@ -342,11 +334,13 @@ public class CompetitionsPanel extends JPanel {
 
 	private void buildContent() {
 		contentPanel.removeAll();
+		raceOverviewCard = null;
 		boolean hasContent = false;
 		if (featuredRace != null) {
 			hasContent = true;
 			addSection("Race events");
-			contentPanel.add(new RaceEventCard(featuredRace, raceArtwork, itemManager, this::loadObjectiveArtwork, false, () -> showRaceDetails(featuredRace)));
+			raceOverviewCard = new RaceEventCard(featuredRace, raceArtwork, itemManager, objectiveArtwork, false, () -> showRaceDetails(featuredRace));
+			contentPanel.add(raceOverviewCard);
 			contentPanel.add(Box.createVerticalStrut(12));
 		}
 
@@ -393,7 +387,7 @@ public class CompetitionsPanel extends JPanel {
 		selectedRaceId = race.getId();
 		int generation = ++detailGeneration;
 		JPanel body = detailBody(this::refreshRace);
-		raceDetailCard = new RaceEventCard(race, raceArtwork, itemManager, this::loadObjectiveArtwork, true, null);
+		raceDetailCard = new RaceEventCard(race, raceArtwork, itemManager, objectiveArtwork, true, null);
 		body.add(raceDetailCard);
 		// Side quests are member data, absent from the public race feed. Keep them reachable here.
 		if (memberContentAvailable && race.getKc() != null && race.getKc().getId() != null) {
@@ -555,6 +549,7 @@ public class CompetitionsPanel extends JPanel {
 
 	/** Back/refresh stay separate from the wrapped title, even for long competition names. */
 	private JPanel detailBody(Runnable refresh) {
+		raceDetailCard = null;
 		detailViewPanel.removeAll();
 		JPanel header = new JPanel(new BorderLayout());
 		header.setBackground(UIConstants.CARD_BG);
@@ -627,6 +622,7 @@ public class CompetitionsPanel extends JPanel {
 
 	private void showListView() {
 		selectedRaceId = null;
+		raceDetailCard = null;
 		detailGeneration++;
 		detailViewPanel.removeAll();
 		cardLayout.show(cardContainer, "LIST");
