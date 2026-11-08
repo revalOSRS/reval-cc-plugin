@@ -15,7 +15,6 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.Semaphore;
 import java.util.zip.GZIPOutputStream;
 
 /**
@@ -23,11 +22,12 @@ import java.util.zip.GZIPOutputStream;
  * A slow preparation can delay other scheduled work; no client state is read here.
  * A send completes with a parsed response, or exceptionally on failure/cancellation.
  * Successful responses without version hints remain distinct from failed delivery.
- * At most 64 deliveries retain payloads. Cancellation keeps its slot until
- * preparation exits and any HTTP call delivers its terminal callback, bounding
- * retained payloads across rapid plugin restarts with blocked workers or HTTP
- * dispatchers. Rejected ordinary events have no durable replay;
- * persisted sessions remain recoverable.
+ * At most 64 deliveries are admitted, with 16 slots reserved for login/logout,
+ * sync and session events. Rejected ordinary events have no durable replay;
+ * persisted sessions remain recoverable. A saturation warning rearms only once
+ * all work drains. Cancellation keeps its slot until preparation exits and any
+ * HTTP call delivers its terminal callback, bounding retained payloads across
+ * rapid plugin restarts with blocked workers or HTTP dispatchers.
  */
 @Slf4j
 @Singleton
@@ -37,7 +37,8 @@ public class WebhookService {
 	private final OkHttpClient httpClient;
 	private final Gson gson;
 	private final ScheduledExecutorService executor;
-	private final Semaphore capacity = new Semaphore(64);
+	private final WebhookCapacity capacity = new WebhookCapacity(() ->
+		log.warn("Webhook backlog is full; rejecting new events until capacity is available"));
 	private volatile RequestScope scope = new RequestScope();
 
 	@Inject
@@ -54,12 +55,13 @@ public class WebhookService {
 	public CompletableFuture<JsonObject> sendDataAsync(Map<String, Object> data) {
 		RequestScope owner = scope;
 		if (!owner.isActive()) return owner.track(new CompletableFuture<>());
-		if (!capacity.tryAcquire()) {
+		boolean critical = WebhookCapacity.isCritical(data.get("eventType"));
+		if (!capacity.acquire(critical)) {
 			CompletableFuture<JsonObject> result = owner.track(new CompletableFuture<>());
 			result.completeExceptionally(new RejectedExecutionException("Webhook backlog is full"));
 			return result;
 		}
-		WebhookDelivery delivery = new WebhookDelivery(owner, capacity::release);
+		WebhookDelivery delivery = new WebhookDelivery(owner, () -> capacity.release(critical));
 		CompletableFuture<JsonObject> result = delivery.result();
 		result.whenComplete((response, error) -> {
 			if (error != null && !(error instanceof CancellationException)) log.warn("Webhook delivery failed: {}", error.toString());

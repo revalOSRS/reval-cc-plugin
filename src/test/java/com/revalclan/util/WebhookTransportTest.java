@@ -88,6 +88,48 @@ public class WebhookTransportTest {
 		assertEquals(0, dispatcher.runningCallsCount());
 	}
 
+	@Test public void cancelledOrdinaryTransportsKeepReservedSlotsAndReleaseTheCorrectCategory() {
+		HeldExecutor transport = new HeldExecutor();
+		Dispatcher dispatcher = new Dispatcher(transport);
+		dispatcher.setMaxRequests(1);
+		dispatcher.setMaxRequestsPerHost(1);
+		OkHttpClient http = localHttp(dispatcher, new AtomicReference<>());
+		http.newCall(new Request.Builder().url("https://api.revalosrs.ee/blocker").build()).enqueue(new Callback() {
+			@Override public void onFailure(Call call, IOException error) { fail(error.toString()); }
+			@Override public void onResponse(Call call, Response response) { response.close(); }
+		});
+		WebhookService service = new WebhookService(http, new Gson(), directPreparation());
+		try {
+			for (int i = 0; i < 48; i++) assertFalse(service.sendDataAsync(Map.of("eventType", "CHAT")).isDone());
+			service.shutDown();
+			service.startUp();
+			assertTrue(service.sendDataAsync(Map.of("eventType", "CHAT")).isCompletedExceptionally());
+			for (int i = 0; i < 16; i++) assertFalse(service.sendDataAsync(Map.of("eventType", "LOGIN")).isDone());
+			assertEquals(64, dispatcher.queuedCallsCount());
+			service.shutDown();
+			service.startUp();
+			assertTrue(service.sendDataAsync(Map.of("eventType", "LOGIN")).isCompletedExceptionally());
+			transport.runNext(); // The unrelated blocker releases no Reval admission lease.
+			assertTrue(service.sendDataAsync(Map.of("eventType", "CHAT")).isCompletedExceptionally());
+			transport.runNext(); // A cancelled ordinary call now acknowledges termination.
+			assertFalse(service.sendDataAsync(Map.of("eventType", "CHAT")).isDone());
+			assertTrue(service.sendDataAsync(Map.of("eventType", "CHAT")).isCompletedExceptionally());
+			transport.drain();
+			assertEquals(0, dispatcher.queuedCallsCount());
+			assertEquals(0, dispatcher.runningCallsCount());
+			// Releasing priority calls must not decrement the ordinary counter.
+			for (int i = 0; i < 48; i++) assertFalse(service.sendDataAsync(Map.of("eventType", "CHAT")).isDone());
+			assertTrue(service.sendDataAsync(Map.of("eventType", "CHAT")).isCompletedExceptionally());
+			for (int i = 0; i < 16; i++) assertFalse(service.sendDataAsync(Map.of("eventType", "LOGIN")).isDone());
+			assertTrue(service.sendDataAsync(Map.of("eventType", "SYNC")).isCompletedExceptionally());
+		} finally {
+			service.shutDown();
+			transport.drain();
+		}
+		assertEquals(0, dispatcher.queuedCallsCount());
+		assertEquals(0, dispatcher.runningCallsCount());
+	}
+
 	private static OkHttpClient localHttp(Dispatcher dispatcher, AtomicReference<Request> sent) {
 		return new OkHttpClient.Builder().dispatcher(dispatcher).callTimeout(30, TimeUnit.SECONDS)
 			.addInterceptor(chain -> {
