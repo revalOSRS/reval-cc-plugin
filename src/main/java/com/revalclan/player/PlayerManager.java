@@ -3,6 +3,7 @@ package com.revalclan.player;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.Skill;
+import net.runelite.api.WorldType;
 import net.runelite.api.gameval.VarbitID;
 
 import javax.inject.Inject;
@@ -33,7 +34,7 @@ public class PlayerManager {
 		}
 		
 		metadata.put("accountHash", client.getAccountHash());
-		metadata.put("accountType", getAccountType(client.getVarbitValue(VarbitID.IRONMAN)));
+		metadata.put("accountType", getAccountType(client.getVarbitValue(VarbitID.IRONMAN), client.getWorldType().contains(WorldType.HARDCORE_MAIN)));
 		metadata.put("totalLevel", client.getTotalLevel());
 		metadata.put("totalExperience", client.getOverallExperience());
 		
@@ -49,7 +50,11 @@ public class PlayerManager {
 		return metadata;
 	}
 
-	private static String getAccountType(int varbitValue) {
+	/**
+	 * Hardcore Mains are not an ironman type: they are told apart by playing on a
+	 * Hardcore World, which only Hardcore Main characters can enter.
+	 */
+	static String getAccountType(int varbitValue, boolean hardcoreWorld) {
 		switch (varbitValue) {
 			case 1: return "IRONMAN";
 			case 2: return "ULTIMATE_IRONMAN";
@@ -57,7 +62,7 @@ public class PlayerManager {
 			case 4: return "GROUP_IRONMAN";
 			case 5: return "HARDCORE_GROUP_IRONMAN";
 			case 6: return "UNRANKED_GROUP_IRONMAN";
-			default: return "NORMAL";
+			default: return hardcoreWorld ? "HARDCORE_MAIN" : "NORMAL";
 		}
 	}
 }
