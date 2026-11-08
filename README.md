@@ -45,6 +45,7 @@ search. The `?` button opens a guide with syntax, examples, and chat-sharing ins
 | `!reval luck vorkath` | Lowest saved greenlog completion counters first |
 | `!reval deserved vorkath` | Highest saved greenlog completion counters first |
 | `!reval dryboard vorkath` | Kills since the last recorded unique, including duplicates |
+| `!reval dryboard historical vorkath` | Longest recorded ended or ongoing streak per account |
 | `!reval leaderboard xp` | Full clan standings for a statistic |
 | `!reval leaderboard clues hard` | A specific clue tier; omit the tier for all seven tabs |
 | `!reval leaderboard bosses toa` | A specific boss or raid; omit the boss for all bosses |
@@ -62,8 +63,19 @@ unfinished logs. Double-click a category-board row to open that account’s coll
 
 Collection logs use RuneLite’s cached item sprites, adaptive cell sizes, and hover names.
 Enter an account in **Find a clan member** and press Enter to load its log; **Find me** returns to your own. Completion counters remain frozen at their saved greenlog value; `~` marks an
-estimated value. Dryboard uses recorded drop history and omits accounts without comparable current
-and last-drop counters. These views read clan data and do not trigger a sync or modify points.
+estimated value. Current Dryboard uses recorded drop history and omits accounts without comparable
+current and last-drop counters, unless a trusted empty collection log proves no unique was obtained. These views read clan data and do not trigger a sync or modify points.
+
+### Historical Dryboard
+
+In the clan browser, choose **Dryboard → Historical**, or share
+`!reval dryboard historical vorkath` in chat. The board shows each account's longest recorded
+ended or ongoing streak, with the KC range and ending/last unique. Current remains the default.
+Historical and current views are cached separately; Refresh reloads the selected view.
+
+This uses recorded history: offline/unrecorded drops may hide resets, and `~` marks estimated
+raid counters. It cannot certify a lifetime record. Release the platform's historical Dryboard
+API before this client update; no schema migration or new game-data capture is required.
 
 The client keeps its 64 most recently viewed selections in memory for the session. Reopening a
 cached view makes no HTTP or database request; leaderboard searches are local too. Refresh

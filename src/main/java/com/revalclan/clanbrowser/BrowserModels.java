@@ -30,6 +30,8 @@ public final class BrowserModels {
         public String kind;
         public String title;
         public String subtitle;
+        public String mode;
+        public String historyNote;
         public String valueLabel;
         public String generatedAt;
         public Integer completedTotal;
@@ -91,6 +93,9 @@ public final class BrowserModels {
         public Integer totalItems;
         public Long current;
         public Long last;
+        public Long start;
+        public Long end;
+        public boolean ongoing;
         public String item;
         @Override public String toString() {
             return (rank == null ? "" : "#" + rank + " ") + player + " " +
