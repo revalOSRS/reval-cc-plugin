@@ -217,7 +217,7 @@ Created by **Lightroom** for the Reval clan community.
 
 ## Version
 
-Current Version: 2.23.6
+Current Version: 2.24.0
 
 ## Acknowledgments
 
