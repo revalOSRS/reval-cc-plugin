@@ -324,9 +324,8 @@ public class RaidPartyTracker implements SessionScoped {
 	 * loaded roster means guest.
 	 */
 	private Set<String> revalRoster() {
-		if (ClanValidator.isCheckDisabled()) return null;
 		ClanSettings settings = client.getClanSettings();
-		if (settings == null || !ClanValidator.REQUIRED_CLAN_NAME.equalsIgnoreCase(settings.getName())) return null;
+		if (settings == null || !ClanMembership.CLAN_NAME.equalsIgnoreCase(settings.getName())) return null;
 		List<ClanMember> members = settings.getMembers();
 		if (members == null || members.isEmpty()) return null;
 
@@ -346,7 +345,7 @@ public class RaidPartyTracker implements SessionScoped {
 		names.add(name);
 	}
 
-	private static String sanitize(String raw) {
+	static String sanitize(String raw) {
 		if (raw == null || raw.isEmpty()) return "";
 		return Text.removeTags(raw).replace(' ', ' ').trim();
 	}

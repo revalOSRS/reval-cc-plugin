@@ -6,7 +6,6 @@ import net.runelite.api.Player;
 import net.runelite.api.WorldView;
 import net.runelite.api.gameval.VarbitID;
 import net.runelite.api.gameval.VarClientID;
-import net.runelite.client.util.Text;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -43,7 +42,7 @@ final class ArchiveRoster {
 			boolean occupied = client.getVarbitValue(VarbitID.TFA_CLIENT_P0 + i) > 0;
 			if (occupied) size++;
 			String raw = client.getVarcStrValue(VarClientID.TFA_CLIENT_NAME0 + i);
-			String name = raw == null ? "" : Text.removeTags(raw).replace('\u00a0', ' ').trim();
+			String name = RaidPartyTracker.sanitize(raw);
 			String key = RaidPartyTracker.nameKey(name);
 			if (!PLAYER_NAME.matcher(name).matches() || key.trim().isEmpty()) continue;
 			liveNames.add(key);
