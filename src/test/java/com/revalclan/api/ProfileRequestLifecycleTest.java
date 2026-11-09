@@ -35,6 +35,26 @@ public class ProfileRequestLifecycleTest {
 
     @After public void tearDown() throws Exception { rig.close(); }
 
+    @Test public void unlinkedViewersCanOpenPublicLeaderboardProfiles() throws Exception {
+        rig.tokens.onLoggedOut();
+        rig.tokens.onAccount(ACCOUNT_C);
+        rig.http.responder = request -> json(request, 200, request.url().encodedPath().endsWith("/account/456")
+            ? "{\"status\":\"success\",\"data\":{\"osrsAccount\":{\"osrsNickname\":\"Member\"}}}"
+            : "{\"status\":\"success\"}");
+        SwingUtilities.invokeAndWait(() -> panel.loadAccountById(456));
+        SwingUtilities.invokeAndWait(() -> {
+            try {
+                java.lang.reflect.Field current = ProfilePanel.class.getDeclaredField("currentAccount");
+                current.setAccessible(true);
+                com.revalclan.api.account.AccountResponse.AccountData data =
+                    (com.revalclan.api.account.AccountResponse.AccountData) current.get(panel);
+                assertNotNull("public profiles do not require a credential", data);
+                assertEquals("Member", data.getOsrsAccount().getOsrsNickname());
+            } catch (ReflectiveOperationException error) { throw new AssertionError(error); }
+        });
+        assertTrue(rig.http.requests.stream().allMatch(request -> request.header("Authorization") == null));
+    }
+
     @Test public void logoutDuringAnAccountRequestDoesNotWedgeTheNextLogin() throws Exception {
         AtomicInteger reads = new AtomicInteger();
         rig.http.responder = request -> {

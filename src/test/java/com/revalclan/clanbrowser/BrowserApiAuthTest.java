@@ -388,6 +388,7 @@ public class BrowserApiAuthTest {
 		try {
 			api.view(command(OWN_CLOG), ACCOUNT_A, false, view -> titles.add(view.title), failures::add);
 			rig.http.responder = request -> json(request, 200, pairResponse(ACCOUNT_A, TOKEN_NEW).toString());
+			rig.tokens.onPlayerName(ACCOUNT_A, "Main");
 			rig.tokens.submitLinkCode(LINK_CODE, true);
 		} finally { release.countDown(); }
 		flushEdt();

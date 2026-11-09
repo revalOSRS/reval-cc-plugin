@@ -215,7 +215,7 @@ public class ProfilePanel extends JPanel {
 		if (!viewScope.isActive() || isLoading) return;
 		accountScope.cancel();
 		RequestScope owner = accountScope = new RequestScope();
-		BooleanSupplier authority = apiService.accountScope();
+		BooleanSupplier authority = own ? apiService.accountScope() : () -> true;
 		isLoading = true;
 		showLoading();
 		if (pointsData == null) fetchRanks();

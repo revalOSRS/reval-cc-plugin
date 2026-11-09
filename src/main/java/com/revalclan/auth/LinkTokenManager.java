@@ -81,6 +81,7 @@ public class LinkTokenManager {
 	private final Object lock = new Object();
 	private final AtomicLong generation = new AtomicLong();
 	private volatile long currentAccountHash = NO_ACCOUNT;
+	private volatile String currentName;
 	private final ConcurrentMap<Long, LinkCredential> cache = new ConcurrentHashMap<>();
 	/** A skipped file deletion must never make a known-rejected token usable again in this process. */
 	private final ConcurrentMap<Long, String> rejectedTokens = new ConcurrentHashMap<>();
@@ -177,8 +178,8 @@ public class LinkTokenManager {
 
 	/**
 	 * The game reports who is logged in. A new account starts a new session
-	 * (generation) and loads only its own stored credential; a configured Link
-	 * code is then tried for it. Returns whether the account changed.
+	 * (generation) and loads only its own stored credential. Pairing waits for
+	 * the player's name on the game tick. Returns whether the account changed.
 	 */
 	public boolean onAccount(long accountHash) {
 		if (!isValidHash(accountHash)) return false;
@@ -188,9 +189,9 @@ public class LinkTokenManager {
 			cache.clear();
 			noticed.clear();
 			currentAccountHash = accountHash;
+			currentName = null;
 		}
 		credentialFor(accountHash);
-		applyConfiguredLinkCode();
 		return true;
 	}
 
@@ -203,6 +204,7 @@ public class LinkTokenManager {
 		synchronized (lock) {
 			generation.incrementAndGet();
 			currentAccountHash = NO_ACCOUNT;
+			currentName = null;
 			cache.clear();
 			noticed.clear();
 		}
@@ -367,10 +369,20 @@ public class LinkTokenManager {
 
 	// ------------------------------------------------------------------ pairing
 
+	/** Called on the game thread once the player's name is available for first-time pairing. */
+	public void onPlayerName(long accountHash, String name) {
+		if (!isValidHash(accountHash) || name == null || name.isBlank()) return;
+		synchronized (lock) {
+			if (accountHash != currentAccountHash || name.equals(currentName)) return;
+			currentName = name;
+		}
+		applyConfiguredLinkCode();
+	}
+
 	/** Uses the Link code setting for the logged-in account unless it is already linked. */
 	public void applyConfiguredLinkCode() {
 		long hash = currentAccountHash;
-		if (!isValidHash(hash) || credentialFor(hash) != null) return;
+		if (!isValidHash(hash) || currentName == null || credentialFor(hash) != null) return;
 		submitLinkCode(store.configuredLinkCode(), false);
 	}
 
@@ -385,11 +397,13 @@ public class LinkTokenManager {
 		if (code.isEmpty()) return;
 		long hash;
 		long startGeneration;
+		String name;
 		String problem = null;
 		synchronized (lock) {
 			hash = currentAccountHash;
+			name = currentName;
 			startGeneration = generation.get();
-			if (!isValidHash(hash)) {
+			if (!isValidHash(hash) || name == null) {
 				problem = explicit ? LOGIN_FIRST : "";
 			} else if (!LINK_CODE.matcher(code).matches()) {
 				problem = explicit ? BAD_FORMAT : "";
@@ -407,13 +421,14 @@ public class LinkTokenManager {
 			if (!problem.isEmpty()) messages.accept(problem);
 			return;
 		}
-		pair(code, hash, startGeneration);
+		pair(code, hash, name, startGeneration);
 	}
 
-	private void pair(String code, long accountHash, long startGeneration) {
+	private void pair(String code, long accountHash, String name, long startGeneration) {
 		JsonObject body = new JsonObject();
 		body.addProperty("code", code);
 		body.addProperty("accountHash", String.valueOf(accountHash));
+		body.addProperty("username", name);
 		Request request;
 		try {
 			request = new Request.Builder()

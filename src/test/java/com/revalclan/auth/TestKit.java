@@ -325,6 +325,7 @@ public final class TestKit {
 			Responder previous = http.responder;
 			try {
 				http.responder = request -> json(request, 200, pairResponse(accountHash, token).toString());
+				tokens.onPlayerName(accountHash, "Member");
 				tokens.submitLinkCode(LINK_CODE, true);
 			} finally { http.responder = previous; }
 		}

@@ -415,6 +415,8 @@ public class RevalClanPlugin extends Plugin {
 		// Safety net for a login whose account hash was not ready at LOGGED_IN
 		linkTokens.onAccount(client.getAccountHash());
 
+		if (client.getLocalPlayer() != null) linkTokens.onPlayerName(client.getAccountHash(), client.getLocalPlayer().getName());
+
 		// The session and its kill attribution record regardless of clan state — only sending is gated
 		sessionTracker.onGameTick();
 		killTracker.onGameTick();

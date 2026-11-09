@@ -41,6 +41,12 @@ public class LinkTokenManagerTest {
 		rig.close();
 	}
 
+	private boolean logIn(long accountHash) {
+		boolean changed = rig.tokens.onAccount(accountHash);
+		rig.tokens.onPlayerName(accountHash, accountHash == ACCOUNT_A ? "Main" : "Alt");
+		return changed;
+	}
+
 	private void succeedWith(long accountHash, String token) {
 		rig.http.responder = request -> json(request, 200, pairResponse(accountHash, token).toString());
 	}
@@ -61,8 +67,8 @@ public class LinkTokenManagerTest {
 	// ------------------------------------------------------------------ pairing request and result
 
 	@Test
-	public void pairingSendsOnlyTheCodeAndTheAccountHashWithoutAnyBearer() throws Exception {
-		rig.tokens.onAccount(ACCOUNT_A);
+	public void pairingSendsTheCodeHashAndPlayerNameWithoutAnyBearer() throws Exception {
+		logIn(ACCOUNT_A);
 		succeedWith(ACCOUNT_A, TOKEN_NEW);
 
 		rig.tokens.submitLinkCode(LINK_CODE, true);
@@ -72,8 +78,9 @@ public class LinkTokenManagerTest {
 		assertEquals("POST", request.method());
 		assertEquals(PAIR_URL, request.url().toString());
 		JsonObject body = new Gson().fromJson(bodyText(request), JsonObject.class);
-		assertEquals(new HashSet<>(Arrays.asList("code", "accountHash")), body.keySet());
+		assertEquals(new HashSet<>(Arrays.asList("code", "accountHash", "username")), body.keySet());
 		assertEquals(LINK_CODE, body.get("code").getAsString());
+		assertEquals("Main", body.get("username").getAsString());
 		assertTrue("the hash is a JSON string", body.get("accountHash").getAsJsonPrimitive().isString());
 		assertEquals(String.valueOf(ACCOUNT_A), body.get("accountHash").getAsString());
 		assertNull(request.header("Authorization"));
@@ -85,7 +92,7 @@ public class LinkTokenManagerTest {
 	@Test
 	public void successStoresActivatesAndConsumesTheCode() throws Exception {
 		rig.config.values.put("linkCode", LINK_CODE);
-		rig.tokens.onAccount(ACCOUNT_A);
+		logIn(ACCOUNT_A);
 		rig.http.requests.clear();
 		rig.messages.clear();
 		succeedWith(ACCOUNT_A, TOKEN_NEW);
@@ -103,7 +110,7 @@ public class LinkTokenManagerTest {
 	@Test
 	public void aCodeTypedWhilePairingIsNotClearedByTheOldOnesSuccess() throws Exception {
 		rig.config.values.put("linkCode", LINK_CODE);
-		rig.tokens.onAccount(ACCOUNT_A);
+		logIn(ACCOUNT_A);
 		String newer = repeat('e', 64);
 		rig.http.responder = request -> {
 			rig.config.values.put("linkCode", newer);
@@ -119,7 +126,7 @@ public class LinkTokenManagerTest {
 	@Test
 	public void failuresKeepTheCodeStoreNothingAndExplainThemselves() throws Exception {
 		rig.config.values.put("linkCode", LINK_CODE);
-		rig.tokens.onAccount(ACCOUNT_A);
+		logIn(ACCOUNT_A);
 		rig.http.requests.clear();
 		rig.messages.clear();
 
@@ -155,7 +162,7 @@ public class LinkTokenManagerTest {
 
 	@Test
 	public void serverMessagesAreCappedAtOneShortLine() {
-		rig.tokens.onAccount(ACCOUNT_A);
+		logIn(ACCOUNT_A);
 		rig.messages.clear();
 		String huge = repeat('x', 1000);
 		rig.http.responder = request -> json(request, 403, "{\"message\":\"" + huge + "\"}");
@@ -165,7 +172,7 @@ public class LinkTokenManagerTest {
 
 	@Test
 	public void aRedirectIsAFailureNotSomethingToFollow() {
-		rig.tokens.onAccount(ACCOUNT_A);
+		logIn(ACCOUNT_A);
 		rig.messages.clear();
 		rig.http.responder = request -> {
 			okhttp3.Response redirect = json(request, 302, "");
@@ -181,7 +188,7 @@ public class LinkTokenManagerTest {
 	@Test
 	public void invalidSuccessResponsesAreNeverStored() throws Exception {
 		rig.config.values.put("linkCode", LINK_CODE);
-		rig.tokens.onAccount(ACCOUNT_A);
+		logIn(ACCOUNT_A);
 		rig.messages.clear();
 		String invalidMessage = new LinkException(LinkException.Kind.INVALID_RESPONSE).getMessage();
 
@@ -204,8 +211,48 @@ public class LinkTokenManagerTest {
 	// ------------------------------------------------------------------ input checks
 
 	@Test
-	public void codesThatAreNotSixtyFourLowercaseHexNeverReachTheNetwork() {
+	public void aSavedMainCodeWaitsForTheNameAndCannotLinkTheAlt() throws Exception {
+		rig.config.values.put("linkCode", LINK_CODE);
+		rig.http.responder = request -> {
+			JsonObject body = rig.gson.fromJson(bodyText(request), JsonObject.class);
+			return "Main".equals(body.get("username").getAsString())
+				? json(request, 200, pairResponse(ACCOUNT_A, TOKEN_NEW).toString())
+				: json(request, 403, "{\"code\":\"account_mismatch\",\"message\":\"Wrong account\"}");
+		};
+		rig.tokens.onAccount(ACCOUNT_B);
+		assertTrue("wait for the game tick to identify the character", rig.http.requests.isEmpty());
+		rig.tokens.onPlayerName(ACCOUNT_B, "Alt");
+		assertFalse(rig.hasCredential(ACCOUNT_B));
+		assertEquals(LINK_CODE, rig.config.values.get("linkCode"));
+		rig.tokens.onLoggedOut();
 		rig.tokens.onAccount(ACCOUNT_A);
+		rig.tokens.onPlayerName(ACCOUNT_B, "Alt");
+		assertEquals("neither the previous name nor a stale account update can trigger pairing", 1, rig.http.requests.size());
+		rig.tokens.onPlayerName(ACCOUNT_A, "Main");
+		assertTrue(rig.tokens.isLinked(ACCOUNT_A));
+		assertFalse(rig.config.values.containsKey("linkCode"));
+		assertEquals("Main", rig.gson.fromJson(bodyText(rig.http.last()), JsonObject.class).get("username").getAsString());
+	}
+
+	@Test
+	public void aCodeEnteredBeforeTheNameIsReadyWaitsWithoutSpendingAnAttempt() throws Exception {
+		rig.tokens.onAccount(ACCOUNT_A);
+		rig.config.values.put("linkCode", LINK_CODE);
+		succeedWith(ACCOUNT_A, TOKEN_NEW);
+		rig.tokens.submitLinkCode(LINK_CODE, true);
+		rig.tokens.onPlayerName(ACCOUNT_A, null);
+		rig.tokens.onPlayerName(ACCOUNT_A, " ");
+		assertTrue(rig.http.requests.isEmpty());
+		rig.tokens.onPlayerName(ACCOUNT_A, "Main");
+		assertEquals(1, rig.http.requests.size());
+		assertTrue(rig.tokens.isLinked(ACCOUNT_A));
+		rig.tokens.onPlayerName(ACCOUNT_A, "Main");
+		assertEquals("later ticks do not pair again", 1, rig.http.requests.size());
+	}
+
+	@Test
+	public void codesThatAreNotSixtyFourLowercaseHexNeverReachTheNetwork() {
+		logIn(ACCOUNT_A);
 		rig.messages.clear();
 		String[] bad = {"123456", repeat('D', 64), repeat('d', 63), repeat('d', 65), repeat('g', 64),
 			repeat('d', 32) + " " + repeat('d', 31), "rp_" + repeat('d', 64)};
@@ -219,7 +266,7 @@ public class LinkTokenManagerTest {
 
 	@Test
 	public void surroundingWhitespaceIsTrimmedBeforeSending() throws Exception {
-		rig.tokens.onAccount(ACCOUNT_A);
+		logIn(ACCOUNT_A);
 		succeedWith(ACCOUNT_A, TOKEN_NEW);
 		rig.tokens.submitLinkCode("  " + LINK_CODE + "\r\n", true);
 		JsonObject body = new Gson().fromJson(bodyText(rig.http.last()), JsonObject.class);
@@ -239,7 +286,7 @@ public class LinkTokenManagerTest {
 
 	@Test
 	public void theSameCodeIsNotSentTwiceWhileOneIsInFlight() {
-		rig.tokens.onAccount(ACCOUNT_A);
+		logIn(ACCOUNT_A);
 		rig.http.responder = request -> {
 			rig.tokens.submitLinkCode(LINK_CODE, true);
 			return json(request, 200, pairResponse(ACCOUNT_A, TOKEN_NEW).toString());
@@ -253,16 +300,16 @@ public class LinkTokenManagerTest {
 		rig.config.values.put("linkCode", LINK_CODE);
 		rig.http.responder = request -> json(request, 403, "{\"message\":\"Wrong account\"}");
 
-		rig.tokens.onAccount(ACCOUNT_A);
+		logIn(ACCOUNT_A);
 		assertEquals(1, rig.http.requests.size());
 		assertEquals("Wrong account", rig.messages.get(0));
 
 		rig.tokens.onLoggedOut();
-		rig.tokens.onAccount(ACCOUNT_A);
+		logIn(ACCOUNT_A);
 		assertEquals("same code, same account: not retried by itself", 1, rig.http.requests.size());
 
 		rig.tokens.onLoggedOut();
-		rig.tokens.onAccount(ACCOUNT_B);
+		logIn(ACCOUNT_B);
 		assertEquals("another account is a new attempt", 2, rig.http.requests.size());
 		assertEquals(String.valueOf(ACCOUNT_B),
 			new Gson().fromJson(bodyText(rig.http.last()), JsonObject.class).get("accountHash").getAsString());
@@ -276,7 +323,7 @@ public class LinkTokenManagerTest {
 	public void aSavedCodeIsNotUsedWhenTheAccountIsAlreadyLinked() {
 		rig.link(ACCOUNT_A, TOKEN_A);
 		rig.config.values.put("linkCode", LINK_CODE);
-		rig.tokens.onAccount(ACCOUNT_A);
+		logIn(ACCOUNT_A);
 		assertTrue(rig.http.requests.isEmpty());
 	}
 
@@ -285,7 +332,7 @@ public class LinkTokenManagerTest {
 	@Test
 	public void aPairingThatFinishesAfterLogoutIsStoredButNeverActivated() throws Exception {
 		rig.config.values.put("linkCode", LINK_CODE);
-		rig.tokens.onAccount(ACCOUNT_A);
+		logIn(ACCOUNT_A);
 		rig.http.responder = request -> {
 			rig.tokens.onLoggedOut();
 			return json(request, 200, pairResponse(ACCOUNT_A, TOKEN_NEW).toString());
@@ -301,16 +348,16 @@ public class LinkTokenManagerTest {
 		assertTrue("the spent code is not left lying around", !rig.config.values.containsKey("linkCode"));
 		assertTrue("kept for its own account", rig.hasCredential(ACCOUNT_A));
 
-		rig.tokens.onAccount(ACCOUNT_A);
+		logIn(ACCOUNT_A);
 		assertEquals("found again at that account's next login", TOKEN_NEW, required(API, null).getCredential().getToken());
 	}
 
 	@Test
 	public void aPairingThatFinishesAfterSwitchingAccountsNeverActsForTheNewOne() throws Exception {
-		rig.tokens.onAccount(ACCOUNT_A);
+		logIn(ACCOUNT_A);
 		rig.http.responder = request -> {
 			rig.tokens.onLoggedOut();
-			rig.tokens.onAccount(ACCOUNT_B);
+			logIn(ACCOUNT_B);
 			return json(request, 200, pairResponse(ACCOUNT_A, TOKEN_NEW).toString());
 		};
 		rig.messages.clear();
@@ -328,7 +375,7 @@ public class LinkTokenManagerTest {
 
 	@Test
 	public void shutdownInvalidatesAPairingInFlight() throws Exception {
-		rig.tokens.onAccount(ACCOUNT_A);
+		logIn(ACCOUNT_A);
 		rig.http.responder = request -> {
 			rig.tokens.shutDown();
 			return json(request, 200, pairResponse(ACCOUNT_A, TOKEN_NEW).toString());
@@ -345,10 +392,10 @@ public class LinkTokenManagerTest {
 
 	@Test
 	public void aFailureAfterLogoutIsNotShownToWhoeverIsThereNow() {
-		rig.tokens.onAccount(ACCOUNT_A);
+		logIn(ACCOUNT_A);
 		rig.http.responder = request -> {
 			rig.tokens.onLoggedOut();
-			rig.tokens.onAccount(ACCOUNT_B);
+			logIn(ACCOUNT_B);
 			return json(request, 403, "{\"message\":\"Wrong account\"}");
 		};
 		rig.messages.clear();
@@ -360,21 +407,21 @@ public class LinkTokenManagerTest {
 	public void grantsGoStaleOnLogoutSwitchAndShutdownButNotOnAHop() throws Exception {
 		rig.link(ACCOUNT_A, TOKEN_A);
 		rig.link(ACCOUNT_B, TOKEN_B);
-		rig.tokens.onAccount(ACCOUNT_A);
+		logIn(ACCOUNT_A);
 
 		Grant first = required(API, null);
 		assertTrue(rig.tokens.isCurrent(first));
-		assertFalse("a world hop reports the same account again", rig.tokens.onAccount(ACCOUNT_A));
+		assertFalse("a world hop reports the same account again", logIn(ACCOUNT_A));
 		assertTrue(rig.tokens.isCurrent(first));
 
 		rig.tokens.onLoggedOut();
 		assertFalse(rig.tokens.isCurrent(first));
-		rig.tokens.onAccount(ACCOUNT_A);
+		logIn(ACCOUNT_A);
 		assertFalse("logging in again is a new session", rig.tokens.isCurrent(first));
 
 		Grant second = required(API, null);
 		assertTrue(rig.tokens.isCurrent(second));
-		assertTrue(rig.tokens.onAccount(ACCOUNT_B));
+		assertTrue(logIn(ACCOUNT_B));
 		assertFalse("switching accounts", rig.tokens.isCurrent(second));
 
 		Grant third = required(API, null);
@@ -384,11 +431,11 @@ public class LinkTokenManagerTest {
 
 	@Test
 	public void invalidAccountHashesAreIgnored() {
-		assertFalse(rig.tokens.onAccount(-1));
-		assertFalse(rig.tokens.onAccount(0));
+		assertFalse(logIn(-1));
+		assertFalse(logIn(0));
 		assertEquals(-1, rig.tokens.currentAccountHash());
-		rig.tokens.onAccount(ACCOUNT_A);
-		assertFalse(rig.tokens.onAccount(-1));
+		logIn(ACCOUNT_A);
+		assertFalse(logIn(-1));
 		assertEquals("only the login screen ends a session", ACCOUNT_A, rig.tokens.currentAccountHash());
 	}
 
@@ -399,22 +446,22 @@ public class LinkTokenManagerTest {
 		rig.link(ACCOUNT_A, TOKEN_A);
 		rig.link(ACCOUNT_B, TOKEN_B);
 
-		rig.tokens.onAccount(ACCOUNT_A);
+		logIn(ACCOUNT_A);
 		assertEquals(TOKEN_A, required(API, null).getCredential().getToken());
 		rig.tokens.onLoggedOut();
 		assertRefused(LinkException.Kind.NOT_LOGGED_IN, API, null);
 
-		rig.tokens.onAccount(ACCOUNT_B);
+		logIn(ACCOUNT_B);
 		assertEquals(TOKEN_B, required(API, null).getCredential().getToken());
 		rig.tokens.onLoggedOut();
-		rig.tokens.onAccount(ACCOUNT_C);
+		logIn(ACCOUNT_C);
 		assertRefused(LinkException.Kind.NOT_LINKED, API, null);
 	}
 
 	@Test
 	public void anAccountHashInTheQueryOrBodyMustBeTheLoggedInAccounts() throws Exception {
 		rig.link(ACCOUNT_A, TOKEN_A);
-		rig.tokens.onAccount(ACCOUNT_A);
+		logIn(ACCOUNT_A);
 		String base = "https://api.revalosrs.ee/plugin/notifications?accountHash=";
 
 		assertNotNull(required(HttpUrl.get(base + ACCOUNT_A), null));
@@ -432,7 +479,7 @@ public class LinkTokenManagerTest {
 	@Test
 	public void credentialsAreNeverGrantedForAnotherOrigin() throws Exception {
 		rig.link(ACCOUNT_A, TOKEN_A);
-		rig.tokens.onAccount(ACCOUNT_A);
+		logIn(ACCOUNT_A);
 		String[] foreign = {
 			"http://api.revalosrs.ee/plugin/events",
 			"https://www.revalosrs.ee/plugin/events",
@@ -451,7 +498,7 @@ public class LinkTokenManagerTest {
 	public void aBufferedEventKeepsTheTokenOfTheAccountItWasRecordedFor() throws Exception {
 		rig.link(ACCOUNT_A, TOKEN_A);
 		rig.link(ACCOUNT_B, TOKEN_B);
-		rig.tokens.onAccount(ACCOUNT_B);
+		logIn(ACCOUNT_B);
 
 		assertEquals(TOKEN_A, rig.tokens.grantForEvent(HOOK, ACCOUNT_A).getCredential().getToken());
 		assertEquals(TOKEN_B, rig.tokens.grantForEvent(HOOK, ACCOUNT_B).getCredential().getToken());
@@ -465,7 +512,7 @@ public class LinkTokenManagerTest {
 	@Test
 	public void eventGrantsSurviveLogoutBecauseTheyBelongToTheEventNotTheSession() throws Exception {
 		rig.link(ACCOUNT_A, TOKEN_A);
-		rig.tokens.onAccount(ACCOUNT_A);
+		logIn(ACCOUNT_A);
 		Grant grant = rig.tokens.grantForEvent(HOOK, ACCOUNT_A);
 		rig.tokens.onLoggedOut();
 		assertTrue(rig.tokens.isCurrent(grant));
@@ -475,7 +522,7 @@ public class LinkTokenManagerTest {
 	@Test
 	public void aCredentialThatLooksExpiredIsNotUsedButIsKept() throws Exception {
 		rig.link(ACCOUNT_A, TOKEN_A);
-		rig.tokens.onAccount(ACCOUNT_A);
+		logIn(ACCOUNT_A);
 		assertNotNull(required(API, null));
 
 		rig.clock.advance(Duration.ofDays(91));
@@ -491,13 +538,13 @@ public class LinkTokenManagerTest {
 	public void aClockThatWasAheadAndIsFixedGetsTheSameCredentialBack() throws Exception {
 		rig.link(ACCOUNT_A, TOKEN_A);
 		rig.clock.advance(Duration.ofDays(3650)); // ten years ahead
-		rig.tokens.onAccount(ACCOUNT_A);
+		logIn(ACCOUNT_A);
 		assertRefused(LinkException.Kind.EXPIRED_LOCALLY, API, null);
 		assertNull(rig.tokens.credentialFor(ACCOUNT_A));
 
 		rig.clock.set(NOW); // the player fixed the system time
 		rig.tokens.onLoggedOut();
-		rig.tokens.onAccount(ACCOUNT_A);
+		logIn(ACCOUNT_A);
 
 		assertEquals("a 90-day server token survived a wrong clock", TOKEN_A, required(API, null).getCredential().getToken());
 	}
@@ -506,7 +553,7 @@ public class LinkTokenManagerTest {
 	public void aClockThatIsFarOffIsNamedAsTheReasonWhenTheServersDateShowsIt() throws Exception {
 		rig.link(ACCOUNT_A, TOKEN_A);
 		rig.clock.advance(Duration.ofDays(3650));
-		rig.tokens.onAccount(ACCOUNT_A);
+		logIn(ACCOUNT_A);
 		rig.http.responder = request -> withDate(json(request, 403, "{}"), NOW.plus(Duration.ofDays(3650)).minus(Duration.ofDays(3650)));
 		rig.tokens.submitLinkCode(LINK_CODE, true); // any answer from the API tells the server's time
 
@@ -523,7 +570,7 @@ public class LinkTokenManagerTest {
 	public void theExpiryMessageIsGivenOncePerLoginAndKeepsTheFile() throws Exception {
 		rig.link(ACCOUNT_A, TOKEN_A);
 		rig.clock.advance(Duration.ofDays(120));
-		rig.tokens.onAccount(ACCOUNT_A);
+		logIn(ACCOUNT_A);
 
 		rig.tokens.noticeLinkRequired(ACCOUNT_A);
 		rig.tokens.noticeLinkRequired(ACCOUNT_A);
@@ -536,7 +583,7 @@ public class LinkTokenManagerTest {
 	public void aNewLinkReplacesAnExpiredLookingOneAndWorks() throws Exception {
 		rig.link(ACCOUNT_A, TOKEN_A);
 		rig.clock.advance(Duration.ofDays(120));
-		rig.tokens.onAccount(ACCOUNT_A);
+		logIn(ACCOUNT_A);
 		succeedWithClock(ACCOUNT_A, TOKEN_NEW);
 
 		rig.tokens.submitLinkCode(LINK_CODE, true);
@@ -552,7 +599,7 @@ public class LinkTokenManagerTest {
 		rig.config.values.put("linkCode", LINK_CODE);
 		succeedWithClock(ACCOUNT_A, TOKEN_NEW);
 
-		rig.tokens.onAccount(ACCOUNT_A);
+		logIn(ACCOUNT_A);
 
 		assertEquals(1, rig.http.requests.size());
 		assertTrue(rig.messages.contains(LinkTokenManager.LINKED));
@@ -568,7 +615,7 @@ public class LinkTokenManagerTest {
 	@Test
 	public void aRejectedTokenIsForgottenButANewerOneIsNot() throws Exception {
 		rig.link(ACCOUNT_A, TOKEN_A);
-		rig.tokens.onAccount(ACCOUNT_A);
+		logIn(ACCOUNT_A);
 		Grant old = required(API, null);
 
 		rig.link(ACCOUNT_A, TOKEN_NEW); // re-linked meanwhile
@@ -585,7 +632,7 @@ public class LinkTokenManagerTest {
 
 	@Test public void aBusyCleanupCannotResurrectAKnownRejectedCredential() throws Exception {
 		rig.link(ACCOUNT_A, TOKEN_A);
-		rig.tokens.onAccount(ACCOUNT_A);
+		logIn(ACCOUNT_A);
 		Grant old = required(API, null);
 		try (java.nio.channels.FileChannel channel = java.nio.channels.FileChannel.open(
 			rig.store.directory().resolve(CredentialStore.LOCK_FILE), java.nio.file.StandardOpenOption.WRITE);
@@ -595,7 +642,7 @@ public class LinkTokenManagerTest {
 			assertFalse(rig.tokens.isCurrent(old));
 			assertNull(rig.tokens.credentialFor(ACCOUNT_A));
 			rig.tokens.onLoggedOut();
-			rig.tokens.onAccount(ACCOUNT_A);
+			logIn(ACCOUNT_A);
 			assertRefused(LinkException.Kind.NOT_LINKED, API, null);
 		}
 		succeedWith(ACCOUNT_A, TOKEN_NEW);
@@ -609,7 +656,7 @@ public class LinkTokenManagerTest {
 	public void rejectionTellsThePlayerOncePerLoginAndNeverTheWrongPlayer() throws Exception {
 		rig.link(ACCOUNT_A, TOKEN_A);
 		rig.link(ACCOUNT_B, TOKEN_B);
-		rig.tokens.onAccount(ACCOUNT_A);
+		logIn(ACCOUNT_A);
 		Grant a = required(API, null);
 		Grant eventForB = rig.tokens.grantForEvent(HOOK, ACCOUNT_B);
 
@@ -623,7 +670,7 @@ public class LinkTokenManagerTest {
 
 	@Test
 	public void theLinkInstructionIsGivenOncePerLoginAndOnlyToTheLoggedInAccount() {
-		rig.tokens.onAccount(ACCOUNT_A);
+		logIn(ACCOUNT_A);
 		rig.tokens.noticeLinkRequired(ACCOUNT_A);
 		rig.tokens.noticeLinkRequired(ACCOUNT_A);
 		rig.tokens.noticeLinkRequired(ACCOUNT_A);
@@ -635,7 +682,7 @@ public class LinkTokenManagerTest {
 		rig.tokens.noticeLinkRequired(ACCOUNT_A);
 		assertEquals("nobody is logged in", 1, rig.messages.size());
 
-		rig.tokens.onAccount(ACCOUNT_A);
+		logIn(ACCOUNT_A);
 		rig.tokens.noticeLinkRequired(ACCOUNT_A);
 		assertEquals("a new login hears it again", 2, rig.messages.size());
 	}
@@ -644,7 +691,7 @@ public class LinkTokenManagerTest {
 
 	private void answerWithServerTime(java.time.Instant serverTime) {
 		rig.http.responder = request -> withDate(json(request, 403, "{}"), serverTime);
-		rig.tokens.onAccount(ACCOUNT_A);
+		logIn(ACCOUNT_A);
 		rig.tokens.submitLinkCode(LINK_CODE, true);
 	}
 
@@ -675,7 +722,7 @@ public class LinkTokenManagerTest {
 		answerWithServerTime(NOW.plus(Duration.ofMinutes(12)));
 		assertNotEquals(NOW.toEpochMilli(), rig.tokens.serverNowMillis());
 		rig.tokens.onLoggedOut();
-		rig.tokens.onAccount(ACCOUNT_B);
+		logIn(ACCOUNT_B);
 		rig.http.responder = request -> withDate(json(request, 403, "{}"), NOW);
 		rig.tokens.submitLinkCode(LINK_CODE, true);
 		assertEquals("the user fixed their clock", NOW.toEpochMilli(), rig.tokens.serverNowMillis());
@@ -688,7 +735,7 @@ public class LinkTokenManagerTest {
 			okhttp3.Response earlier = json(request, 200, "{}").newBuilder().body(null).build();
 			return fromCache.newBuilder().cacheResponse(earlier).build();
 		};
-		rig.tokens.onAccount(ACCOUNT_A);
+		logIn(ACCOUNT_A);
 		rig.tokens.submitLinkCode(LINK_CODE, true);
 
 		assertEquals("a Date from last night's cache entry is not the time now", NOW.toEpochMilli(), rig.tokens.serverNowMillis());
@@ -704,7 +751,7 @@ public class LinkTokenManagerTest {
 
 	@Test
 	public void onlyAResponseThatReallyCameFromTheApiOriginTeachesTheClock() {
-		rig.tokens.onAccount(ACCOUNT_A);
+		logIn(ACCOUNT_A);
 		for (String foreign : new String[] {
 			"https://www.revalosrs.ee/some/page", "https://evil.example/api", "http://api.revalosrs.ee/plugin/events",
 			"https://api.revalosrs.ee:8443/plugin/events", "https://api.revalosrs.ee.evil.example/x"}) {
@@ -756,7 +803,7 @@ public class LinkTokenManagerTest {
 
 	@Test
 	public void aPairingAnswerThatIsAlreadyOverByACorrectedClockIsInvalid() {
-		rig.tokens.onAccount(ACCOUNT_A);
+		logIn(ACCOUNT_A);
 		rig.messages.clear();
 		// Ordinary 12 minute drift is corrected, so an expiry 5 minutes ago is still in the past
 		rig.http.responder = request -> withDate(json(request, 200, withExpiry(NOW.minus(Duration.ofMinutes(5))).toString()), NOW.plus(Duration.ofMinutes(12)));
@@ -769,7 +816,7 @@ public class LinkTokenManagerTest {
 
 	@Test
 	public void aPairingAnswerUsesTheCorrectedClockNotTheRawOne() throws Exception {
-		rig.tokens.onAccount(ACCOUNT_A);
+		logIn(ACCOUNT_A);
 		rig.messages.clear();
 		// The PC is 20 minutes slow: by the raw clock this expiry (10 min from "now") is valid, by the server's it is long gone
 		rig.clock.set(NOW.minus(Duration.ofMinutes(20)));
@@ -784,7 +831,7 @@ public class LinkTokenManagerTest {
 	@Test
 	public void aComputerClockTenYearsAheadIsToldToFixItsTimeInsteadOfBeingBlamedOnTheServer() {
 		rig.clock.advance(Duration.ofDays(3650));
-		rig.tokens.onAccount(ACCOUNT_A);
+		logIn(ACCOUNT_A);
 		rig.messages.clear();
 		rig.http.responder = request -> withDate(json(request, 200, withExpiry(NOW.plus(Duration.ofDays(90))).toString()), NOW);
 
@@ -826,6 +873,7 @@ public class LinkTokenManagerTest {
 				ApiOrigin.unsafeForTests(origin), origin + "/plugin/auth/pair", rig.clock, 400);
 			manager.start(rig.messages::add, rig.linked::add);
 			manager.onAccount(ACCOUNT_A);
+			manager.onPlayerName(ACCOUNT_A, "Main");
 			rig.messages.clear();
 
 			manager.submitLinkCode(LINK_CODE, true);
@@ -856,7 +904,7 @@ public class LinkTokenManagerTest {
 
 	@Test
 	public void theInstructionIsHeldBackWhileALinkIsBeingSetUp() {
-		rig.tokens.onAccount(ACCOUNT_A);
+		logIn(ACCOUNT_A);
 		rig.http.responder = request -> {
 			rig.tokens.noticeLinkRequired(ACCOUNT_A);
 			return json(request, 200, pairResponse(ACCOUNT_A, TOKEN_NEW).toString());
