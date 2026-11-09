@@ -7,6 +7,7 @@
  */
 package com.revalclan.notifiers;
 
+import com.revalclan.diaries.AchievementDiaryManager;
 import net.runelite.api.GameState;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.VarbitChanged;
@@ -27,10 +28,7 @@ public class DiaryNotifier extends BaseNotifier {
 	private static final int COMPLETED_TASKS_SCRIPT_ID = 3971;
 	private static final int TOTAL_TASKS_SCRIPT_ID = 3980;
 
-	/**
-	 * Map of diary varbit IDs to their completion status
-	 * Key: varbit ID, Value: completion value (0 = not started, 1 = completed, 2 = completed for Karamja special case)
-	 */
+	/** Diary varbit id → "Area_Tier". */
 	private static final Map<Integer, String> DIARY_VARBITS = createDiaryMap();
 
 	@Inject private ClientThread clientThread;
@@ -94,7 +92,7 @@ public class DiaryNotifier extends BaseNotifier {
 		if (value > previous) {
 			diaryCompletionById.put(id, value);
 
-			if (isComplete(id, value)) {
+			if (AchievementDiaryManager.isComplete(id, value)) {
 				clientThread.invokeLater(() -> {
 					handleDiaryCompletion(diaryInfo, id);
 					return true;
@@ -142,16 +140,9 @@ public class DiaryNotifier extends BaseNotifier {
 	private int getTotalCompleted() {
 		int count = 0;
 		for (Map.Entry<Integer, Integer> entry : diaryCompletionById.entrySet()) {
-			if (isComplete(entry.getKey(), entry.getValue())) count++;
+			if (AchievementDiaryManager.isComplete(entry.getKey(), entry.getValue())) count++;
 		}
 		return count;
-	}
-
-	private static boolean isComplete(int varbitId, int value) {
-		if (varbitId == 3578 || varbitId == 3599 || varbitId == 3611) {
-			return value > 1;
-		}
-		return value > 0;
 	}
 
 	public void reset() {
