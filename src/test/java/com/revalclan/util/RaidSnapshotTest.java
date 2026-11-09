@@ -3,6 +3,7 @@ package com.revalclan.util;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.gameval.VarbitID;
+import net.runelite.api.gameval.VarClientID;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -248,6 +249,55 @@ public class RaidSnapshotTest {
 		assertEquals(1, ((Map<?, ?>) data.get("raid")).get("partySize"));
 		tracker.onGameStateChanged(GameState.HOPPING);
 		assertNull(tracker.snapshotFor(FRACTURED_ARCHIVE));
+	}
+
+	@Test public void archiveRewardExcludesNamesLeftInEmptySlotsFromThePreviousParty() {
+		tracker = com.google.inject.Guice.createInjector(binder -> binder.bind(Client.class).toInstance(client))
+			.getInstance(RaidPartyTracker.class);
+		net.runelite.api.WorldView world = mock(net.runelite.api.WorldView.class);
+		net.runelite.api.Player local = mock(net.runelite.api.Player.class);
+		when(client.getTopLevelWorldView()).thenReturn(world);
+		when(world.isInstance()).thenReturn(true);
+		when(client.getLocalPlayer()).thenReturn(local);
+		when(local.getName()).thenReturn("Raider");
+		when(client.getVarbitValue(VarbitID.TFA_CLIENT_PARTYSTATUS)).thenReturn(2);
+		when(client.getVarbitValue(VarbitID.TFA_CLIENT_P0)).thenReturn(1);
+		when(client.getVarbitValue(VarbitID.TFA_CLIENT_P0 + 1)).thenReturn(1);
+		when(client.getVarbitValue(VarbitID.TFA_CLIENT_P0 + 2)).thenReturn(1);
+		when(client.getVarcStrValue(VarClientID.TFA_CLIENT_NAME0)).thenReturn("Raider");
+		when(client.getVarcStrValue(VarClientID.TFA_CLIENT_NAME0 + 1)).thenReturn("Guest");
+		when(client.getVarcStrValue(VarClientID.TFA_CLIENT_NAME0 + 2)).thenReturn("Old raider");
+		chat(RaidDeathTracker.ARCHIVE_START_MESSAGE);
+		tick();
+		complete(FRACTURED_ARCHIVE, 8);
+		tick();
+
+		// The next run is smaller, but its empty slot still holds an old name.
+		when(client.getVarbitValue(VarbitID.TFA_CLIENT_P0 + 2)).thenReturn(0);
+		when(client.getVarcStrValue(VarClientID.TFA_CLIENT_NAME0 + 1)).thenReturn("");
+		chat(RaidDeathTracker.ARCHIVE_START_MESSAGE);
+		tick();
+		Map<String, Object> partial = new HashMap<>();
+		tracker.snapshotFor(FRACTURED_ARCHIVE).addTo(partial);
+		assertEquals(java.util.List.of("Raider"), partial.get("partyMembers"));
+		assertEquals(false, ((Map<?, ?>) partial.get("party")).get("rosterComplete"));
+		when(client.getVarcStrValue(VarClientID.TFA_CLIENT_NAME0 + 1)).thenReturn("New guest");
+		tick();
+		// A real member who leaves after being observed must still be retained.
+		when(client.getVarbitValue(VarbitID.TFA_CLIENT_P0 + 1)).thenReturn(0);
+		tick();
+		complete(FRACTURED_ARCHIVE, 9);
+		tick();
+		Map<String, Object> reward = new HashMap<>();
+		tracker.snapshotFor(FRACTURED_ARCHIVE).addTo(reward);
+		assertEquals(java.util.List.of("Raider", "New guest"), reward.get("partyMembers"));
+		Map<?, ?> party = (Map<?, ?>) reward.get("party");
+		assertEquals(2, party.get("size"));
+		assertEquals(true, party.get("rosterComplete"));
+		java.util.List<?> members = (java.util.List<?>) party.get("members");
+		assertEquals(2, members.size());
+		assertEquals("New guest", ((Map<?, ?>) members.get(1)).get("name"));
+		assertEquals(0, ((Map<?, ?>) members.get(1)).get("deaths"));
 	}
 
 	@Test public void equalCountsInDifferentModesAreDifferentCompletions() {

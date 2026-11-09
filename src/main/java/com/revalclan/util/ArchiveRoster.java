@@ -36,22 +36,20 @@ final class ArchiveRoster {
 			|| world == null || !world.isInstance()) return;
 
 		int size = 0;
-		Set<String> liveNames = new HashSet<>();
 		Set<String> occupiedNames = new HashSet<>();
 		for (int i = 0; i < MAX_PARTY_SIZE; i++) {
-			boolean occupied = client.getVarbitValue(VarbitID.TFA_CLIENT_P0 + i) > 0;
-			if (occupied) size++;
+			// Empty slots can retain names from a previous party.
+			if (client.getVarbitValue(VarbitID.TFA_CLIENT_P0 + i) <= 0) continue;
+			size++;
 			String raw = client.getVarcStrValue(VarClientID.TFA_CLIENT_NAME0 + i);
 			String name = RaidPartyTracker.sanitize(raw);
 			String key = RaidPartyTracker.nameKey(name);
 			if (!PLAYER_NAME.matcher(name).matches() || key.trim().isEmpty()) continue;
-			liveNames.add(key);
-			if (occupied) occupiedNames.add(key);
+			occupiedNames.add(key);
 			names.putIfAbsent(key, name);
 		}
 		maxSize = Math.max(maxSize, size);
-		// Stale names in empty slots cannot fill an unknown occupied slot.
-		if (size > 0 && occupiedNames.size() == size && occupiedNames.equals(liveNames)) {
+		if (size > 0 && occupiedNames.size() == size) {
 			verifiedSize = Math.max(verifiedSize, size);
 		}
 	}
