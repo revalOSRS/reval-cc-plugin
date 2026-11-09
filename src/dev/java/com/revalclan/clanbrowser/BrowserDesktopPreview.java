@@ -26,10 +26,10 @@ public class BrowserDesktopPreview {
                 icons.put(Integer.parseInt(entry.getKey()), atlas.getSubimage(sprite.get("x").getAsInt(), sprite.get("y").getAsInt(), sprite.get("width").getAsInt(), sprite.get("height").getAsInt()));
             });
         }
-        BrowserCommand command = BrowserCommand.parse(System.getProperty("reval.browserCommand", "reval clog forestry Valgusruum").replace('|', ' '));
+        BrowserCommand command = BrowserCommand.parse(System.getProperty("reval.browserCommand", "reval clog forestry Woodcutter").replace('|', ' '));
         BrowserApi api = new BrowserApi(new OkHttpClient(), gson);
         SwingUtilities.invokeLater(() -> {
-            ClanBrowserWindow window = new ClanBrowserWindow(null, api, icons::get); window.identity(0, "Valgusruum"); window.open(command);
+            ClanBrowserWindow window = new ClanBrowserWindow(null, api, icons::get); window.identity(0, "Woodcutter"); window.open(command);
             window.setSize(Integer.getInteger("reval.browserWidth", window.getWidth()), Integer.getInteger("reval.browserHeight", window.getHeight()));
             String screenshot = System.getProperty("reval.browserScreenshot");
             if (screenshot != null) {
