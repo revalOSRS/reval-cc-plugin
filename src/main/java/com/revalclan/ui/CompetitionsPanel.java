@@ -22,18 +22,13 @@ import com.revalclan.ui.components.LoginPrompt;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
-import java.awt.image.BufferedImage;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.Locale;
-import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.function.BiConsumer;
@@ -67,16 +62,7 @@ public class CompetitionsPanel extends JPanel {
 	private boolean memberLoading;
 	private boolean memberContentAvailable;
 	private String selectedRaceId;
-	private BufferedImage raceArtwork;
-	private RaceEventCard raceOverviewCard;
-	private RaceEventCard raceDetailCard;
-	private String raceArtworkUrl;
-	private boolean artworkLoading;
 	private final RequestScope lifetime = new RequestScope();
-	private final Map<String, BufferedImage> objectiveArtwork = new HashMap<>();
-	private final Set<String> objectiveArtworkLoading = new HashSet<>();
-	private final Set<String> objectiveArtworkUrls = new LinkedHashSet<>();
-	private static final int MAX_OBJECTIVE_ARTWORK = 8;
 
 	public CompetitionsPanel() {
 		setLayout(new BorderLayout());
@@ -161,17 +147,6 @@ public class CompetitionsPanel extends JPanel {
 			raceLoading = false;
 			updateLoading();
 			featuredRace = response.getData() == null ? null : response.getData().getRace();
-			objectiveArtwork.clear();
-			objectiveArtworkUrls.clear();
-			if (featuredRace != null && featuredRace.getObjectives() != null) {
-				for (FeaturedRaceResponse.Objective objective : featuredRace.getObjectives()) {
-					if (objective != null && objective.getImageUrl() != null && !objective.getImageUrl().trim().isEmpty()) {
-						objectiveArtworkUrls.add(objective.getImageUrl().trim());
-					}
-				}
-			}
-			prefetchObjectiveArtwork();
-			refreshArtwork();
 			renderRace();
 		}), error -> onEdt(() -> {
 			if (generation != raceGeneration) return;
@@ -181,78 +156,22 @@ public class CompetitionsPanel extends JPanel {
 		}));
 	}
 
-	private void refreshArtwork() {
-		String url = featuredRace == null ? null : featuredRace.getImageUrl();
-		url = url == null || url.trim().isEmpty() ? null : url.trim();
-		if (!Objects.equals(url, raceArtworkUrl)) {
-			raceArtworkUrl = url;
-			raceArtwork = null;
-			artworkLoading = false;
-		}
-		if (url == null || raceArtwork != null || artworkLoading) return;
-		artworkLoading = true;
-		final String requestedUrl = url;
-		apiService.fetchCompetitionArtwork(url, image -> onEdt(() -> {
-			if (!Objects.equals(requestedUrl, raceArtworkUrl)) return;
-			artworkLoading = false;
-			raceArtwork = image;
-			updateRaceArtwork();
-		}), error -> onEdt(() -> {
-			if (Objects.equals(requestedUrl, raceArtworkUrl)) artworkLoading = false;
-		}));
-	}
-
-	/** Data changes own requests; building cards only reads the current artwork snapshot. */
-	private void prefetchObjectiveArtwork() {
-		for (String url : objectiveArtworkUrls) {
-			if (objectiveArtwork.size() + objectiveArtworkLoading.size() >= MAX_OBJECTIVE_ARTWORK) return;
-			if (objectiveArtwork.containsKey(url) || !objectiveArtworkLoading.add(url)) continue;
-			apiService.fetchCompetitionArtwork(url,
-				image -> onEdt(() -> objectiveArtworkArrived(url, image)),
-				error -> onEdt(() -> objectiveArtworkArrived(url, null)));
-		}
-	}
-
-	private void objectiveArtworkArrived(String url, BufferedImage image) {
-		objectiveArtworkLoading.remove(url);
-		if (objectiveArtworkUrls.contains(url)) {
-			// Null (including failure) keeps the item fallback until an explicit race refresh.
-			objectiveArtwork.put(url, image);
-			updateRaceArtwork();
-		}
-		// Old race requests still count toward the bound. Admit current URLs as they finish.
-		prefetchObjectiveArtwork();
-	}
-
 	/** Terminal: queued EDT replies must not rebuild a detached panel or start more requests. */
 	public void shutDown() {
 		lifetime.cancel();
 		loadGeneration++;
 		raceGeneration++;
 		detailGeneration++;
-		objectiveArtwork.clear();
-		objectiveArtworkLoading.clear();
-		objectiveArtworkUrls.clear();
 		activeVotes = new ArrayList<>();
 		activeCompetitions = new ArrayList<>();
 		scheduledCompetitions = new ArrayList<>();
 		myVotes.clear();
 		featuredRace = null;
-		raceArtwork = null;
-		raceArtworkUrl = null;
-		raceOverviewCard = null;
-		raceDetailCard = null;
 		selectedRaceId = null;
-		raceLoading = memberLoading = artworkLoading = false;
+		raceLoading = memberLoading = false;
 		contentPanel.removeAll();
 		detailViewPanel.removeAll();
 		updateLoading();
-	}
-
-	/** Preserve the current cards, side quests, navigation and scroll position on image arrival. */
-	private void updateRaceArtwork() {
-		if (raceOverviewCard != null) raceOverviewCard.updateArtwork(raceArtwork, objectiveArtwork);
-		if (raceDetailCard != null) raceDetailCard.updateArtwork(raceArtwork, objectiveArtwork);
 	}
 
 	private void renderRace() {
@@ -334,13 +253,11 @@ public class CompetitionsPanel extends JPanel {
 
 	private void buildContent() {
 		contentPanel.removeAll();
-		raceOverviewCard = null;
 		boolean hasContent = false;
 		if (featuredRace != null) {
 			hasContent = true;
 			addSection("Race events");
-			raceOverviewCard = new RaceEventCard(featuredRace, raceArtwork, itemManager, objectiveArtwork, false, () -> showRaceDetails(featuredRace));
-			contentPanel.add(raceOverviewCard);
+			contentPanel.add(new RaceEventCard(featuredRace, itemManager, false, () -> showRaceDetails(featuredRace)));
 			contentPanel.add(Box.createVerticalStrut(12));
 		}
 
@@ -387,8 +304,7 @@ public class CompetitionsPanel extends JPanel {
 		selectedRaceId = race.getId();
 		int generation = ++detailGeneration;
 		JPanel body = detailBody(this::refreshRace);
-		raceDetailCard = new RaceEventCard(race, raceArtwork, itemManager, objectiveArtwork, true, null);
-		body.add(raceDetailCard);
+		body.add(new RaceEventCard(race, itemManager, true, null));
 		// Side quests are member data, absent from the public race feed. Keep them reachable here.
 		if (memberContentAvailable && race.getKc() != null && race.getKc().getId() != null) {
 			JPanel extras = Labels.column();
@@ -549,7 +465,6 @@ public class CompetitionsPanel extends JPanel {
 
 	/** Back/refresh stay separate from the wrapped title, even for long competition names. */
 	private JPanel detailBody(Runnable refresh) {
-		raceDetailCard = null;
 		detailViewPanel.removeAll();
 		JPanel header = new JPanel(new BorderLayout());
 		header.setBackground(UIConstants.CARD_BG);
@@ -622,7 +537,6 @@ public class CompetitionsPanel extends JPanel {
 
 	private void showListView() {
 		selectedRaceId = null;
-		raceDetailCard = null;
 		detailGeneration++;
 		detailViewPanel.removeAll();
 		cardLayout.show(cardContainer, "LIST");

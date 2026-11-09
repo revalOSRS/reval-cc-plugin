@@ -8,7 +8,6 @@ import com.revalclan.api.admin.ActualizeRankChangeResponse;
 import com.revalclan.api.admin.AdminAuthResponse;
 import com.revalclan.api.admin.AdminLoginRequest;
 import com.revalclan.api.admin.PendingRankChangesResponse;
-import com.revalclan.api.leagues.LeaguesConfigResponse;
 import com.revalclan.api.competitions.*;
 import com.revalclan.api.announcements.AnnouncementsResponse;
 import com.revalclan.api.common.ApiEndpoints;
@@ -36,7 +35,6 @@ import net.runelite.client.callback.ClientThread;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
-import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
@@ -68,7 +66,6 @@ public class RevalApiService {
     private final CachedFetch<AccountResponse> account = new CachedFetch<>(ACCOUNT_CACHE_DURATION_MS);
     private final CachedFetch<ActiveTeamsResponse> teams = new CachedFetch<>(CACHE_DURATION_MS);
     private final CachedFetch<DiariesResponse> diaries = new CachedFetch<>(CACHE_DURATION_MS);
-    private final CachedFetch<LeaguesConfigResponse> leagues = new CachedFetch<>(0);
 
     @Inject
     public RevalApiService(@Named("reval-http") OkHttpClient httpClient, Gson gson, ClientThread clientThread) {
@@ -212,38 +209,10 @@ public class RevalApiService {
         }
     }
 
-    // ==================== LEAGUES API ====================
-
-    public void fetchLeaguesConfig(Consumer<LeaguesConfigResponse.LeaguesConfig> onSuccess, Consumer<Exception> onError) {
-        observe(leagues.get(null, () -> getFuture(ApiEndpoints.LEAGUES_CONFIG, LeaguesConfigResponse.class)),
-            response -> onSuccess.accept(response.getData()), onError);
-    }
-
-    public LeaguesConfigResponse.LeaguesConfig getCachedLeaguesConfig() {
-        LeaguesConfigResponse response = leagues.peek();
-        return response != null ? response.getData() : null;
-    }
-
-    public void clearLeaguesCache() { leagues.clear(); }
-
     // ==================== COMPETITIONS API ====================
 
     public void fetchFeaturedRace(Consumer<FeaturedRaceResponse> onSuccess, Consumer<Exception> onError) {
         getPublic(ApiEndpoints.publicUrl(ApiEndpoints.PUBLIC_FEATURED_RACE), FeaturedRaceResponse.class, onSuccess, onError);
-    }
-
-    /** Banner and task artwork is optional; decoding and network IO stay off the Swing thread. */
-    public void fetchCompetitionArtwork(String imageUrl, Consumer<BufferedImage> onSuccess, Consumer<Exception> onError) {
-        String source = imageUrl.trim();
-        HttpUrl url = HttpUrl.parse(source.startsWith("/") ? "https://www.revalosrs.ee" + source : source);
-        if (url == null || !"https".equals(url.scheme())) {
-            onError.accept(new IOException("Invalid event image URL"));
-            return;
-        }
-        observe(requests.request(httpClient, new Request.Builder().url(url).build(), response -> {
-            if (!response.isSuccessful() || response.body() == null) throw new IOException("Event image unavailable");
-            return CompetitionArtwork.read(response.body());
-        }), onSuccess, onError);
     }
 
     public void fetchScheduledCompetitions(Consumer<CompetitionsResponse> onSuccess, Consumer<Exception> onError) {
@@ -325,7 +294,7 @@ public class RevalApiService {
     // ==================== CACHE MANAGEMENT ====================
 
     public void clearCache() {
-        points.clear(); account.clear(); teams.clear(); diaries.clear(); leagues.clear();
+        points.clear(); account.clear(); teams.clear(); diaries.clear();
     }
 
     public void clearAccountCache() { account.clear(); }

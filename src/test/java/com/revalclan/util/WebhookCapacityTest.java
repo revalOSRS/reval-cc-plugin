@@ -22,7 +22,7 @@ public class WebhookCapacityTest {
 	}
 
 	@Test public void lifecycleAndSyncEventsUseReservedCapacity() {
-		for (String event : new String[] {"LOGIN", "LOGOUT", "SYNC", "LEAGUES_SYNC", "SESSION_SUMMARY", "SESSION_HEARTBEAT"}) {
+		for (String event : new String[] {"LOGIN", "LOGOUT", "SYNC", "SESSION_SUMMARY", "SESSION_HEARTBEAT"}) {
 			assertTrue(event, WebhookCapacity.isCritical(event));
 		}
 		for (Object event : new Object[] {"CHAT", "EMOTE", "MUSIC", "LOOT", null}) assertFalse(WebhookCapacity.isCritical(event));

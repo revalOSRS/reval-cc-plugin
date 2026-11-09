@@ -20,7 +20,6 @@ public class FeaturedRaceResponse extends PublicApiResponse {
     public static class Race {
         private String id;
         private String name;
-        private String imageUrl;
         private String state;
         private String plannedStartDate;
         private String startDate;
@@ -34,7 +33,6 @@ public class FeaturedRaceResponse extends PublicApiResponse {
         private String kind;
         private String title;
         private Integer iconItemId;
-        private String imageUrl;
         private int points;
         private boolean clanPartyOnly;
         private Winner winner;

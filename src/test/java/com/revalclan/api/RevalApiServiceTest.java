@@ -72,14 +72,14 @@ public class RevalApiServiceTest {
 			.body(ResponseBody.create(null, "{\"status\":\"success\",\"data\":{}}")).build());
 		assertTrue(delivered.get());
 	}
-	@Test public void shutdownCancelsCompetitionArtworkAndCompletesItsConsumer() {
+	@Test public void shutdownCancelsPendingRequestsAndCompletesTheirConsumer() {
 		OkHttpClient http = mock(OkHttpClient.class);
 		Call call = mock(Call.class);
 		when(http.newCall(any(Request.class))).thenReturn(call);
 		RevalApiService api = new RevalApiService(http, new Gson(), mock(ClientThread.class));
-		Consumer<java.awt.image.BufferedImage> success = mock(Consumer.class);
+		Consumer<com.revalclan.api.competitions.FeaturedRaceResponse> success = mock(Consumer.class);
 		Consumer<Exception> failure = mock(Consumer.class);
-		api.fetchCompetitionArtwork("/race/banner.png", success, failure);
+		api.fetchFeaturedRace(success, failure);
 		api.shutDown();
 		verify(call).cancel();
 		verify(failure).accept(isA(java.util.concurrent.CancellationException.class));
@@ -96,14 +96,13 @@ public class RevalApiServiceTest {
 			api.fetchAccount(123L, response -> {}, error -> {});
 			api.fetchActiveTeams(response -> {}, error -> {});
 			api.fetchDiaries(null, response -> {}, error -> {});
-			api.fetchLeaguesConfig(response -> {}, error -> {});
 		};
 		for (int i = 0; i < 1000; i++) fetch.run();
 		ArgumentCaptor<Callback> callbacks = ArgumentCaptor.forClass(Callback.class);
-		verify(call, times(5)).enqueue(callbacks.capture());
+		verify(call, times(4)).enqueue(callbacks.capture());
 		for (Callback callback : callbacks.getAllValues()) callback.onFailure(call, new IOException("offline"));
 		for (int i = 0; i < 1000; i++) fetch.run();
-		verify(http, times(5)).newCall(any());
+		verify(http, times(4)).newCall(any());
 	}
 
 	@Test public void eventPublicationAndCompletionWaitForTheClientThread() throws Exception {
