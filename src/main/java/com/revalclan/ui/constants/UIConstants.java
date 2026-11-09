@@ -132,6 +132,12 @@ public class UIConstants {
     /** Mythic rarity color */
     public static final Color RARITY_MYTHIC = new Color(239, 83, 80);
 
+    /** Gold/silver/bronze for competition placings "1".."3"; any other place gets the fallback. */
+    public static Color medalColor(String place, Color fallback) {
+        return "1".equals(place) ? new Color(255, 215, 0) : "2".equals(place) ? new Color(198, 198, 198)
+            : "3".equals(place) ? new Color(205, 127, 80) : fallback;
+    }
+
     // ========== Seasonal appearance ==========
 
     /** Panel title, Refresh button and rank progress bar */

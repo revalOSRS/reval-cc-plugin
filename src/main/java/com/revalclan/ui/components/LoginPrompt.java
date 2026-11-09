@@ -22,4 +22,12 @@ public class LoginPrompt extends JPanel {
 		add(Box.createRigidArea(new Dimension(0, 6)));
 		add(hint);
 	}
+
+	/** Replaces the panel's content with the prompt for this feature. */
+	public static void showIn(JPanel panel, String featureName) {
+		panel.removeAll();
+		panel.add(new LoginPrompt(featureName));
+		panel.revalidate();
+		panel.repaint();
+	}
 }

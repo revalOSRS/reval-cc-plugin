@@ -5,6 +5,7 @@ import com.revalclan.api.points.PointsResponse;
 import com.revalclan.ui.components.*;
 import com.revalclan.ui.constants.UIConstants;
 import com.revalclan.util.ClanRankIconResolver;
+import com.revalclan.util.RankNames;
 import com.revalclan.util.SpriteIcons;
 import net.runelite.api.SpriteID;
 import net.runelite.client.game.ItemManager;
@@ -251,15 +252,6 @@ public class RankingPanel extends JPanel {
 		if (name.equals("TFA_CAPES")) return "TFA Capes";
 		if (name.toLowerCase().equals("valuable_pvm_drops")) return "Valuable Drops";
 
-		// Default: capitalize words ("COLLECTION_LOG" -> "Collection Log")
-		StringBuilder result = new StringBuilder();
-		for (String word : name.split("[_\\s]+")) {
-			if (result.length() > 0) result.append(" ");
-			if (!word.isEmpty()) {
-				result.append(Character.toUpperCase(word.charAt(0)));
-				if (word.length() > 1) result.append(word.substring(1).toLowerCase());
-			}
-		}
-		return result.toString();
+		return name.isEmpty() ? name : RankNames.display(name); // "COLLECTION_LOG" -> "Collection Log"
 	}
 }

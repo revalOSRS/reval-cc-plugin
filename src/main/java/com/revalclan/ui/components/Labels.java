@@ -7,12 +7,14 @@ import javax.swing.BoxLayout;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.JTextArea;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.FontMetrics;
+import java.awt.Insets;
 
 /** Small Swing builders shared by the side panel views. */
 public final class Labels {
@@ -88,6 +90,22 @@ public final class Labels {
 		JPanel p = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
 		p.setOpaque(false);
 		return p;
+	}
+
+	/** Read-only word-wrapping small-font text that blends into its card. */
+	public static JTextArea textArea(String text, Color color) {
+		JTextArea area = new JTextArea(text);
+		area.setFont(FontManager.getRunescapeSmallFont());
+		area.setForeground(color);
+		area.setEditable(false);
+		area.setFocusable(false);
+		area.setLineWrap(true);
+		area.setWrapStyleWord(true);
+		area.setOpaque(false);
+		area.setBorder(null);
+		area.setMargin(new Insets(0, 0, 0, 0));
+		area.setAlignmentX(Component.LEFT_ALIGNMENT);
+		return area;
 	}
 
 	public static JComponent centered(JComponent inner) {

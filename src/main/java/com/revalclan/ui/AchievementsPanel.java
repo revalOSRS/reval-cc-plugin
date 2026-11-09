@@ -10,7 +10,6 @@ import com.revalclan.ui.components.RefreshButton;
 import com.revalclan.ui.components.ScrollWrap;
 import com.revalclan.ui.constants.UIConstants;
 import net.runelite.api.Client;
-import net.runelite.client.ui.FontManager;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -71,12 +70,7 @@ public class AchievementsPanel extends JPanel {
 		);
 	}
 
-	private void showNotLoggedIn() {
-		contentPanel.removeAll();
-		contentPanel.add(new LoginPrompt("Achievements"));
-		contentPanel.revalidate();
-		contentPanel.repaint();
-	}
+	private void showNotLoggedIn() { LoginPrompt.showIn(contentPanel, "Achievements"); }
 
 	private void buildUI() {
 		contentPanel.removeAll();
@@ -113,7 +107,7 @@ public class AchievementsPanel extends JPanel {
 
 	private JPanel createCard(AchievementsResponse.Achievement achievement) {
 		boolean completed = achievement.getProgress() != null && achievement.getProgress().isCompleted();
-		Color rarityColor = getRarityColor(achievement.getRarity());
+		Color rarityColor = Badge.getRarityColor(achievement.getRarity());
 
 		JPanel card = new JPanel() {
 			@Override
@@ -137,48 +131,16 @@ public class AchievementsPanel extends JPanel {
 		card.setBorder(new EmptyBorder(8, 8, 8, 8));
 		card.setPreferredSize(new Dimension(0, 100));
 
-		Badge badge = completed ? Badge.rarity(achievement.getRarity()) : new Badge(capitalize(achievement.getRarity()), UIConstants.TEXT_MUTED);
+		Badge badge = completed ? Badge.rarity(achievement.getRarity()) : new Badge(Badge.capitalize(achievement.getRarity()), UIConstants.TEXT_MUTED);
 		badge.setAlignmentX(Component.LEFT_ALIGNMENT);
 
 		card.add(badge);
 		card.add(Box.createRigidArea(new Dimension(0, 3)));
-		card.add(textArea(achievement.getName() != null ? achievement.getName() : "Unknown",
+		card.add(Labels.textArea(achievement.getName() != null ? achievement.getName() : "Unknown",
 			completed ? rarityColor : UIConstants.TEXT_SECONDARY));
 		card.add(Box.createRigidArea(new Dimension(0, 3)));
-		card.add(textArea(achievement.getDescription() != null ? achievement.getDescription() : "", UIConstants.TEXT_MUTED));
+		card.add(Labels.textArea(achievement.getDescription() != null ? achievement.getDescription() : "", UIConstants.TEXT_MUTED));
 
 		return card;
-	}
-
-	private static JTextArea textArea(String text, Color color) {
-		JTextArea area = new JTextArea(text);
-		area.setFont(FontManager.getRunescapeSmallFont());
-		area.setForeground(color);
-		area.setEditable(false);
-		area.setFocusable(false);
-		area.setLineWrap(true);
-		area.setWrapStyleWord(true);
-		area.setOpaque(false);
-		area.setBorder(null);
-		area.setMargin(new Insets(0, 0, 0, 0));
-		area.setAlignmentX(Component.LEFT_ALIGNMENT);
-		return area;
-	}
-
-	private Color getRarityColor(String rarity) {
-		if (rarity == null) return UIConstants.RARITY_COMMON;
-		switch (rarity.toLowerCase()) {
-			case "uncommon": return UIConstants.RARITY_UNCOMMON;
-			case "rare": return UIConstants.RARITY_RARE;
-			case "epic": return UIConstants.RARITY_EPIC;
-			case "legendary": return UIConstants.RARITY_LEGENDARY;
-			case "mythic": return UIConstants.RARITY_MYTHIC;
-			default: return UIConstants.RARITY_COMMON;
-		}
-	}
-
-	private String capitalize(String s) {
-		if (s == null || s.isEmpty()) return "Unknown";
-		return s.substring(0, 1).toUpperCase() + s.substring(1).toLowerCase();
 	}
 }

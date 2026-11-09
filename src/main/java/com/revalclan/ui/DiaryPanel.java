@@ -4,7 +4,7 @@ import com.revalclan.api.RevalApiService;
 import com.revalclan.api.diaries.DiariesResponse;
 import com.revalclan.ui.components.ArrowIcon;
 import com.revalclan.ui.components.BackButton;
-import com.revalclan.ui.components.CheckIcon;
+import com.revalclan.ui.components.Badge;
 import com.revalclan.ui.components.Clickable;
 import com.revalclan.ui.components.Labels;
 import com.revalclan.ui.components.LoginPrompt;
@@ -17,7 +17,6 @@ import com.revalclan.ui.constants.UIConstants;
 import com.revalclan.util.UIAssetLoader;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
-import net.runelite.client.ui.FontManager;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -96,12 +95,7 @@ public class DiaryPanel extends JPanel {
 		);
 	}
 
-	private void showNotLoggedIn() {
-		contentPanel.removeAll();
-		contentPanel.add(new LoginPrompt("Clan Diaries"));
-		contentPanel.revalidate();
-		contentPanel.repaint();
-	}
+	private void showNotLoggedIn() { LoginPrompt.showIn(contentPanel, "Clan Diaries"); }
 
 	private void buildUI() {
 		contentPanel.removeAll();
@@ -303,7 +297,7 @@ public class DiaryPanel extends JPanel {
 			tasksContainer.add(empty);
 		} else {
 			for (DiariesResponse.Diary.DiaryTask task : activeTasks) {
-				JPanel taskCard = createTaskCard(task, tier.color);
+				JPanel taskCard = createTaskCard(task, tier.color());
 				taskCard.setAlignmentX(Component.LEFT_ALIGNMENT);
 				tasksContainer.add(taskCard);
 				tasksContainer.add(Box.createRigidArea(new Dimension(0, 6)));
@@ -344,7 +338,7 @@ public class DiaryPanel extends JPanel {
 			@Override
 			protected void paintComponent(Graphics g) {
 				RoundedPanel.fill(g, this, tierComplete ? UIConstants.TASK_COMPLETE : UIConstants.CARD_BG, 6);
-				paintAccentBar(g, this, tier.color);
+				paintAccentBar(g, this, tier.color());
 			}
 		};
 		header.setOpaque(false);
@@ -357,11 +351,10 @@ public class DiaryPanel extends JPanel {
 		JPanel nameRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
 		nameRow.setOpaque(false);
 		nameRow.setAlignmentX(Component.LEFT_ALIGNMENT);
-		nameRow.add(Labels.bold(tier.displayName, tier.color));
+		nameRow.add(Labels.bold(tier.displayName(), tier.color()));
 
 		if (tierComplete) {
-			ImageIcon icon = assetLoader != null ? assetLoader.getIcon("checkmark.png", 16) : null;
-			JLabel checkIcon = new JLabel(icon != null ? icon : new CheckIcon(14, UIConstants.TIER_EASY));
+			JLabel checkIcon = new JLabel(assetLoader.getIcon("checkmark.png", 16));
 			nameRow.add(Box.createRigidArea(new Dimension(6, 0)));
 			nameRow.add(checkIcon);
 		}
@@ -436,13 +429,13 @@ public class DiaryPanel extends JPanel {
 		JPanel mainPanel = Labels.column();
 		mainPanel.add(Labels.bold(task.getName(), isComplete ? UIConstants.SUCCESS_COLOR : UIConstants.TIER_ELITE));
 		mainPanel.add(Box.createRigidArea(new Dimension(0, 4)));
-		mainPanel.add(textArea(task.getDescription() != null ? task.getDescription() : "No description", UIConstants.TEXT_SECONDARY));
+		mainPanel.add(Labels.textArea(task.getDescription() != null ? task.getDescription() : "No description", UIConstants.TEXT_SECONDARY));
 		mainPanel.add(Box.createRigidArea(new Dimension(0, 6)));
 		mainPanel.add(createProgressBar(progress, current, target, progressPercent, isComplete, tierColor));
 
 		if (task.getHint() != null && !task.getHint().isEmpty()) {
 			mainPanel.add(Box.createRigidArea(new Dimension(0, 4)));
-			mainPanel.add(textArea("Hint: " + task.getHint(), UIConstants.TEXT_MUTED));
+			mainPanel.add(Labels.textArea("Hint: " + task.getHint(), UIConstants.TEXT_MUTED));
 		}
 
 		card.add(mainPanel, BorderLayout.CENTER);
@@ -518,20 +511,6 @@ public class DiaryPanel extends JPanel {
 		g2.dispose();
 	}
 
-	private static JTextArea textArea(String text, Color color) {
-		JTextArea area = new JTextArea(text);
-		area.setFont(FontManager.getRunescapeSmallFont());
-		area.setForeground(color);
-		area.setEditable(false);
-		area.setFocusable(false);
-		area.setWrapStyleWord(true);
-		area.setLineWrap(true);
-		area.setOpaque(false);
-		area.setBorder(null);
-		area.setAlignmentX(Component.LEFT_ALIGNMENT);
-		return area;
-	}
-
 	private List<DiariesResponse.Diary.DiaryTask> getActiveTasks(DiariesResponse.Diary.DiaryTier tier) {
 		List<DiariesResponse.Diary.DiaryTask> active = new ArrayList<>();
 		if (tier.getTasks() != null) {
@@ -571,21 +550,12 @@ public class DiaryPanel extends JPanel {
 		return category.substring(0, 1).toUpperCase() + category.substring(1).toLowerCase().replace("_", " ");
 	}
 
+	/** Tiers the panel shows; label and colour come from the shared difficulty badge. */
 	private enum DiaryTier {
-		EASY("Easy", UIConstants.TIER_EASY),
-		MEDIUM("Medium", UIConstants.TIER_MEDIUM),
-		HARD("Hard", UIConstants.TIER_HARD),
-		ELITE("Elite", UIConstants.TIER_ELITE),
-		MASTER("Master", UIConstants.TIER_MASTER),
-		GRANDMASTER("Grandmaster", UIConstants.TIER_GRANDMASTER);
+		EASY, MEDIUM, HARD, ELITE, MASTER, GRANDMASTER;
 
-		final String displayName;
-		final Color color;
-
-		DiaryTier(String displayName, Color color) {
-			this.displayName = displayName;
-			this.color = color;
-		}
+		String displayName() { return Badge.capitalize(name()); }
+		Color color() { return Badge.getDifficultyColor(name()); }
 	}
 
 	private DiaryTier parseTier(String tier) {

@@ -70,8 +70,7 @@ final class CompetitionStandings extends JPanel {
         row.setAlignmentX(LEFT_ALIGNMENT);
         Font font = header ? FontManager.getRunescapeSmallFont().deriveFont(12f) : FontManager.getRunescapeSmallFont();
         Color text = header ? UIConstants.TEXT_SECONDARY : UIConstants.TEXT_PRIMARY;
-        Color rankColor = header ? text : "1".equals(rank) ? new Color(255, 215, 0)
-            : "2".equals(rank) ? new Color(198, 198, 198) : "3".equals(rank) ? new Color(205, 127, 80) : text;
+        Color rankColor = header ? text : UIConstants.medalColor(rank, text);
         JLabel place = Labels.label(rank, font, rankColor);
         place.setPreferredSize(new Dimension(rankWidth, 17));
         row.add(place, BorderLayout.WEST);

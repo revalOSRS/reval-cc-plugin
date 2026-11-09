@@ -35,9 +35,6 @@ import java.util.function.BiConsumer;
 
 public class CompetitionsPanel extends JPanel {
 	private static final Pattern TOP_RANGE = Pattern.compile("^top(\\d+)$");
-	private static final Color MEDAL_GOLD = new Color(255, 215, 0);
-	private static final Color MEDAL_SILVER = new Color(198, 198, 198);
-	private static final Color MEDAL_BRONZE = new Color(205, 127, 80);
 
 	private RevalApiService apiService;
 	private Client client;
@@ -624,8 +621,7 @@ public class CompetitionsPanel extends JPanel {
 			if (points == null) return;
 			String place = "1".equals(rank) ? "1st" : "2".equals(rank) ? "2nd" : "3".equals(rank) ? "3rd"
 				: rank.startsWith("top") ? "Top " + rank.substring(3) : "#" + rank;
-			Color color = "1".equals(rank) ? MEDAL_GOLD : "2".equals(rank) ? MEDAL_SILVER
-				: "3".equals(rank) ? MEDAL_BRONZE : UIConstants.TEXT_SECONDARY;
+			Color color = UIConstants.medalColor(rank, UIConstants.TEXT_SECONDARY);
 			JPanel cell = Labels.row();
 			cell.add(Labels.small(place, color), BorderLayout.WEST);
 			cell.add(Labels.small(points + " pts", UIConstants.ACCENT_GOLD), BorderLayout.EAST);
