@@ -411,11 +411,6 @@ public class CompetitionsPanel extends JPanel {
 		if (comp.getParticipantCount() != null && comp.getParticipantCount() > 0) {
 			card.add(Labels.small(comp.getParticipantCount() + " participants", UIConstants.TEXT_MUTED));
 		}
-		if (comp.getRewardConfig() != null && !comp.getRewardConfig().isEmpty()) {
-			card.add(Box.createVerticalStrut(8));
-			card.add(Labels.small("PRIZES", UIConstants.TEXT_MUTED));
-			card.add(createRewardsGrid(comp.getRewardConfig()));
-		}
 		// In the overview, upcoming competitions have no standings yet: no table and no full view
 		boolean hasStandings = rowLimit != 5 || active || (comp.getLeaderboard() != null && !comp.getLeaderboard().isEmpty());
 		if (hasStandings) {
@@ -609,27 +604,6 @@ public class CompetitionsPanel extends JPanel {
 		} catch (Exception e) {
 			return dateStr;
 		}
-	}
-
-	/** Prize breakdown rows: place on the left, points on the right */
-	private JPanel createRewardsGrid(Map<String, Integer> rewards) {
-		JPanel grid = new JPanel(new GridLayout(0, 1, 0, 3));
-		grid.setOpaque(false);
-		grid.setAlignmentX(Component.LEFT_ALIGNMENT);
-
-		rewards.forEach((rank, points) -> {
-			if (points == null) return;
-			String place = "1".equals(rank) ? "1st" : "2".equals(rank) ? "2nd" : "3".equals(rank) ? "3rd"
-				: rank.startsWith("top") ? "Top " + rank.substring(3) : "#" + rank;
-			Color color = UIConstants.medalColor(rank, UIConstants.TEXT_SECONDARY);
-			JPanel cell = Labels.row();
-			cell.add(Labels.small(place, color), BorderLayout.WEST);
-			cell.add(Labels.small(points + " pts", UIConstants.ACCENT_GOLD), BorderLayout.EAST);
-			grid.add(cell);
-		});
-
-		grid.setMaximumSize(new Dimension(Integer.MAX_VALUE, grid.getPreferredSize().height));
-		return grid;
 	}
 
 }
