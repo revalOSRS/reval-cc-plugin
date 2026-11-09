@@ -4,6 +4,7 @@ import com.revalclan.collectionlog.CollectionLogManager;
 import com.revalclan.session.SessionTracker;
 import com.revalclan.util.EventFilterManager;
 import com.revalclan.util.RaidRewardLedger;
+import com.revalclan.util.RaidRunTracker;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -18,6 +19,7 @@ import static org.mockito.Mockito.*;
 public class LootNotifierTest {
 	@org.mockito.Mock private SessionTracker sessionTracker;
 	@org.mockito.Mock private RaidRewardLedger raidRewardLedger;
+	@org.mockito.Mock private RaidRunTracker raidRunTracker;
 	@org.mockito.Mock private CollectionLogManager collectionLogManager;
 	private final List<Map<String, Object>> sent = new ArrayList<>();
 	@org.mockito.InjectMocks private LootNotifier notifier = new LootNotifier() {

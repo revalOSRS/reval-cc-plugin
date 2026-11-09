@@ -14,6 +14,23 @@ gingerbread toolbar icon. Other months use the normal appearance.
 For a local preview, start the development client with the JVM property
 `-Dreval.season=christmas`, `halloween`, or `none`.
 
+### Raid size and difficulty
+
+Raid completion and reward events include a `raid` snapshot: native party size,
+the starting party size when entry was observed, mode and mode-specific completion
+count. CoX records total scaled size separately from actual players. ToA records
+starting and final invocation levels, including a valid level zero. ToB's `scale`
+is its ordinary HP bracket (minimum three outside Entry); Archive uses minimum two.
+
+Entry fields settle over the first ten ticks. Enabling the plugin mid-raid or
+reconnecting leaves starting values unknown. Completion snapshots are frozen after
+the final server tick and retained for delayed reward claims during that login;
+logout, connection loss and hopping discard them. External Archive spectators
+are excluded; dead party members remain included.
+
+Deploy the platform's raid-completion migration and ingestion support before this
+client release. No historical sizes or invocation levels are fabricated.
+
 ### Raid party deaths
 
 Raid loot and completion events include known per-member death counts in
@@ -229,7 +246,7 @@ Created by **Lightroom** for the Reval clan community.
 
 ## Version
 
-Current Version: 2.24.0
+Current Version: 2.25.0
 
 ## Acknowledgments
 

@@ -48,11 +48,7 @@ public class RaidDeathTracker {
 
 	/** @return true only for an explicit new-raid start. */
 	public boolean onChatMessage(String message) {
-		String started = null;
-		if ("The raid has begun!".equals(message)) started = RaidPartyTracker.CHAMBERS_OF_XERIC;
-		if (message.startsWith("You enter the Theatre of Blood")) started = RaidPartyTracker.THEATRE_OF_BLOOD;
-		if (message.startsWith("You enter the Tombs of Amascut")) started = RaidPartyTracker.TOMBS_OF_AMASCUT;
-		if (ARCHIVE_START_MESSAGE.equals(message)) started = RaidPartyTracker.FRACTURED_ARCHIVE;
+		String started = startedRaid(message);
 		if (started != null) {
 			reset();
 			raid = started;
@@ -85,6 +81,13 @@ public class RaidDeathTracker {
 			covered = false;
 		}
 		return false;
+	}
+
+	static String startedRaid(String message) {
+		if ("The raid has begun!".equals(message)) return RaidPartyTracker.CHAMBERS_OF_XERIC;
+		if (message.startsWith("You enter the Theatre of Blood")) return RaidPartyTracker.THEATRE_OF_BLOOD;
+		if (message.startsWith("You enter the Tombs of Amascut")) return RaidPartyTracker.TOMBS_OF_AMASCUT;
+		return ARCHIVE_START_MESSAGE.equals(message) ? RaidPartyTracker.FRACTURED_ARCHIVE : null;
 	}
 
 	public void onActorDeath(ActorDeath event) {

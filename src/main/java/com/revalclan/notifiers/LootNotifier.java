@@ -4,6 +4,7 @@ import com.revalclan.session.SessionTracker;
 import com.revalclan.collectionlog.CollectionLogManager;
 import com.revalclan.collectionlog.GreenlogCounterSnapshot;
 import com.revalclan.util.RaidPartyTracker;
+import com.revalclan.util.RaidRunTracker;
 import com.revalclan.util.RaidRewardLedger;
 import net.runelite.api.Item;
 import net.runelite.api.ItemContainer;
@@ -37,6 +38,7 @@ public class LootNotifier extends BaseNotifier {
 
 	@Inject
 	private RaidPartyTracker raidPartyTracker;
+	@Inject private RaidRunTracker raidRunTracker;
 
 	@Inject
 	private RaidRewardLedger raidRewardLedger;
@@ -118,13 +120,15 @@ public class LootNotifier extends BaseNotifier {
 		final int lootTick;
 		final int sendOnTick;
 		final RaidPartyTracker.Party party;
+		final RaidRunTracker.Run raid;
 
-		PendingLoot(Map<String, Object> lootData, List<Map<String, Object>> items, int lootTick, int sendOnTick, RaidPartyTracker.Party party) {
+		PendingLoot(Map<String, Object> lootData, List<Map<String, Object>> items, int lootTick, int sendOnTick, RaidPartyTracker.Party party, RaidRunTracker.Run raid) {
 			this.lootData = lootData;
 			this.items = items;
 			this.lootTick = lootTick;
 			this.sendOnTick = sendOnTick;
 			this.party = party;
+			this.raid = raid;
 		}
 	}
 
@@ -633,6 +637,7 @@ public class LootNotifier extends BaseNotifier {
 
 						if (!clogIds.isEmpty()) greenlogCounterSnapshot.attachTo(pending.lootData, clogIds);
 						if (pending.party != null) pending.party.addTo(pending.lootData);
+						if (pending.raid != null) pending.raid.addTo(pending.lootData);
 						sendNotification(pending.lootData);
 					} catch (Exception ignored) {
 						// Never let one payload break the tick dispatch for
@@ -745,6 +750,7 @@ public class LootNotifier extends BaseNotifier {
 
 		// Buffer for the clog correlation window instead of sending immediately;
 		// onGameTick stamps isNewCollectionLogItem on each item and sends
-		pendingLoot.add(new PendingLoot(lootData, itemsList, tickCounter, tickCounter + LOOT_BUFFER_TICKS, party));
+		pendingLoot.add(new PendingLoot(lootData, itemsList, tickCounter, tickCounter + LOOT_BUFFER_TICKS, party,
+			raidRunTracker.forSource(source)));
 	}
 }

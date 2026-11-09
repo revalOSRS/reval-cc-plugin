@@ -61,12 +61,13 @@ public class RaidPartyTracker implements SessionScoped {
 	/** Where a party was read. */
 	public enum Origin { LIVE, FINAL_BOSS, COMPLETION }
 
-	private static final Pattern COMPLETED = Pattern.compile(
+	static final Pattern COMPLETED = Pattern.compile(
 		"^Your completed (.+?) count is: ([\\d,]+)\\.?$", Pattern.CASE_INSENSITIVE);
 
 	@Inject private Client client;
 	@Inject private RaidDeathTracker deathTracker;
 	@Inject private ArchiveRoster archiveRoster;
+	@Inject private RaidRunTracker runTracker;
 	private final Map<String, Party> completedParties = new LinkedHashMap<>();
 
 	private Party savedParty;
@@ -124,6 +125,7 @@ public class RaidPartyTracker implements SessionScoped {
 		if (type != ChatMessageType.GAMEMESSAGE && type != ChatMessageType.FRIENDSCHATNOTIFICATION
 			&& type != ChatMessageType.SPAM && type != ChatMessageType.ENGINE) return;
 		String message = sanitize(rawMessage);
+		runTracker.onChatMessage(message);
 		if (deathTracker.onChatMessage(message)) {
 			savedParty = null;
 			savedAtMs = 0;
@@ -167,6 +169,7 @@ public class RaidPartyTracker implements SessionScoped {
 	}
 
 	public void onGameTick() {
+		runTracker.onGameTick();
 		archiveRoster.observe();
 		// Finish the server tick before freezing: a final death and completion
 		// can arrive in either order. Buffered loot/KC retain this same snapshot.
@@ -191,6 +194,7 @@ public class RaidPartyTracker implements SessionScoped {
 		deathTracker.reset();
 		completedParties.clear();
 		archiveRoster.reset();
+		runTracker.reset();
 	}
 
 	/**
