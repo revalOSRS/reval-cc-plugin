@@ -1,6 +1,7 @@
 package com.revalclan.ui;
 
 import com.google.gson.Gson;
+import com.revalclan.auth.TestKit.Rig;
 import com.revalclan.RevalClanConfig;
 import com.revalclan.api.RevalApiService;
 import com.revalclan.api.account.AccountResponse;
@@ -25,8 +26,17 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 public class ProfilePanelTest {
+	private Rig rig;
+	@org.junit.Before public void openRig() {
+		rig = new Rig();
+		rig.link(123L, com.revalclan.auth.TestKit.TOKEN_A);
+		rig.tokens.onAccount(123L);
+	}
+	@org.junit.After public void closeRig() throws Exception { rig.close(); }
+
 	@Test public void aLateAccountResponseCannotRestoreALoggedOutProfile() throws Exception {
 		RevalApiService api = mock(RevalApiService.class);
+		when(api.accountScope()).thenReturn(() -> true);
 		ProfilePanel[] holder = new ProfilePanel[1];
 		Consumer<AccountResponse.AccountData> loaded = mock(Consumer.class);
 		SwingUtilities.invokeAndWait(() -> {
@@ -50,6 +60,7 @@ public class ProfilePanelTest {
 
 	@Test public void disposedPanelsCannotStartNewRequests() throws Exception {
 		RevalApiService api = mock(RevalApiService.class);
+		when(api.accountScope()).thenReturn(() -> true);
 		SwingUtilities.invokeAndWait(() -> {
 			ProfilePanel panel = new ProfilePanel();
 			panel.init(api, mock(Client.class), mock(UIAssetLoader.class), mock(RevalClanConfig.class),
@@ -67,11 +78,12 @@ public class ProfilePanelTest {
 		OkHttpClient http = mock(OkHttpClient.class);
 		Call account = mock(Call.class);
 		Call points = mock(Call.class);
+		com.revalclan.auth.TestKit.deriveMockClient(http);
 		when(http.newCall(any(Request.class))).thenAnswer(invocation -> {
 			Request request = invocation.getArgument(0);
 			return request.url().queryParameter("accountHash") == null ? points : account;
 		});
-		RevalApiService api = new RevalApiService(http, new Gson(), mock(ClientThread.class));
+		RevalApiService api = new RevalApiService(http, new Gson(), rig.tokens, mock(ClientThread.class));
 		Client client = mock(Client.class);
 		when(client.getAccountHash()).thenReturn(123L);
 		ProfilePanel[] holder = new ProfilePanel[1];

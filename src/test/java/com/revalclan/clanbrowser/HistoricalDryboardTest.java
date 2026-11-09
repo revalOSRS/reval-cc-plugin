@@ -1,6 +1,7 @@
 package com.revalclan.clanbrowser;
 
 import com.google.gson.Gson;
+import com.revalclan.auth.TestKit.Rig;
 import java.awt.Component;
 import java.awt.Container;
 import java.awt.GraphicsEnvironment;
@@ -23,6 +24,9 @@ import static org.junit.Assert.*;
 import static org.junit.Assume.assumeFalse;
 
 public class HistoricalDryboardTest {
+    private final Rig rig = new Rig();
+    @org.junit.After public void closeRig() throws Exception { rig.close(); }
+
     @Test public void historicalCommandPreservesModeThroughAliasesCategoryChangesAndSharing() {
         BrowserModels.Page cox = new BrowserModels.Page(); cox.category = "Raids"; cox.value = "chambers-of-xeric";
         cox.label = "Chambers of Xeric"; cox.aliases.add("cox");
@@ -48,7 +52,7 @@ public class HistoricalDryboardTest {
                 .body(ResponseBody.create(MediaType.parse("application/json"), payload)).build();
         }).build();
         try {
-            BrowserApi api = new BrowserApi(http, new Gson());
+            BrowserApi api = new BrowserApi(http, new Gson(), rig.tokens);
             BrowserCommand current = BrowserCommand.parse("reval dryboard vorkath"), historical = BrowserCommand.parse("reval dryboard historical vorkath");
             assertEquals("current", read(api, current, false).mode);
             BrowserModels.View view = read(api, historical, false);
@@ -67,7 +71,7 @@ public class HistoricalDryboardTest {
         AtomicReference<Boolean> refreshed = new AtomicReference<>(false);
         BrowserModels.Page page = new BrowserModels.Page(); page.category = "Bosses"; page.subcategory = "Vorkath"; page.value = "vorkath"; page.label = "Vorkath";
         BrowserModels.Catalogue catalogue = new BrowserModels.Catalogue(); catalogue.pages.add(page);
-        BrowserApi api = new BrowserApi(new OkHttpClient(), new Gson()) {
+        BrowserApi api = new BrowserApi(new OkHttpClient(), new Gson(), rig.tokens) {
             @Override public Call catalogue(Consumer<BrowserModels.Catalogue> success, Consumer<String> failure) { success.accept(catalogue); return null; }
             @Override public Call view(BrowserCommand command, long accountHash, boolean refresh, Consumer<BrowserModels.View> success, Consumer<String> failure) {
                 sent.set(command); refreshed.set(refresh);

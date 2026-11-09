@@ -1,0 +1,202 @@
+package com.revalclan.session;
+
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import com.revalclan.util.ClanMembership;
+import com.revalclan.util.WebhookService;
+import net.runelite.api.Client;
+import net.runelite.client.callback.ClientThread;
+import org.junit.Before;
+import org.junit.Test;
+import org.mockito.ArgumentCaptor;
+
+import java.lang.reflect.Field;
+import java.util.Collections;
+import java.util.Map;
+import java.util.function.Consumer;
+
+import static org.junit.Assert.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+/** A recorded session is replayed under the account it was recorded for, and only counts as sent once it really went out. */
+public class SessionTrackerReplayTest {
+	private static final long RECORDED_FOR = 1_111_111_111_111L;
+
+	private SessionTracker tracker;
+	private WebhookService webhook;
+	private SessionStore store;
+
+	@Before
+	public void setUp() throws Exception {
+		webhook = mock(WebhookService.class);
+		store = mock(SessionStore.class);
+		JsonObject summary = new JsonObject();
+		summary.addProperty("sessionId", "session-1");
+		summary.addProperty("startedAt", System.currentTimeMillis());
+		summary.addProperty("endReason", "logout");
+		SessionStore.PersistedSession persisted = new SessionStore.PersistedSession();
+		persisted.accountHash = RECORDED_FOR;
+		persisted.username = "Zezima";
+		persisted.world = 301;
+		persisted.member = true;
+		persisted.summary = summary;
+		when(store.readAll()).thenReturn(java.util.concurrent.CompletableFuture.completedFuture(Collections.singletonList(persisted)));
+
+		// the real one hands work to the game thread; here that thread is the caller
+		ClientThread clientThread = mock(ClientThread.class);
+		doAnswer(call -> {
+			((Runnable) call.getArgument(0)).run();
+			return null;
+		}).when(clientThread).invokeLater(any(Runnable.class));
+
+		tracker = new SessionTracker(mock(Client.class), clientThread, new Gson(), webhook, store, mock(ClanMembership.class));
+	}
+
+
+	@Test
+	@SuppressWarnings("unchecked")
+	public void theReplayCarriesTheAccountTheSessionWasRecordedFor() {
+		when(webhook.sendDataAsync(anyMap())).thenAnswer(call -> { delivery = new java.util.concurrent.CompletableFuture<>(); return delivery; });
+
+		tracker.recoverPersistedSessions(0);
+
+		ArgumentCaptor<Map<String, Object>> payload = ArgumentCaptor.forClass(Map.class);
+		verify(webhook).sendDataAsync(payload.capture());
+		assertEquals("SESSION_SUMMARY", payload.getValue().get("eventType"));
+		assertEquals("the webhook picks the token from this, not from whoever is logged in",
+			RECORDED_FOR, payload.getValue().get("accountHash"));
+	}
+
+	private static SessionStore.PersistedSession session(String id, long accountHash, boolean member) {
+		JsonObject summary = new JsonObject();
+		summary.addProperty("sessionId", id);
+		summary.addProperty("startedAt", System.currentTimeMillis());
+		SessionStore.PersistedSession persisted = new SessionStore.PersistedSession();
+		persisted.accountHash = accountHash;
+		persisted.member = member;
+		persisted.summary = summary;
+		return persisted;
+	}
+
+	@Test
+	public void aSessionThatNeverLearnedItsAccountIsNeverSentForAnyone() {
+		when(store.readAll()).thenReturn(java.util.concurrent.CompletableFuture.completedFuture(java.util.Arrays.asList(session("none-0", 0, true), session("none-1", -1, true),
+			session("none-0-proven", 0, false))));
+		when(webhook.sendDataAsync(anyMap())).thenAnswer(call -> { delivery = new java.util.concurrent.CompletableFuture<>(); return delivery; });
+
+		tracker.recoverPersistedSessions(0);
+		tracker.recoverPersistedSessions(-1);
+		tracker.recoverPersistedSessions(RECORDED_FOR);
+
+		verify(webhook, times(0)).sendDataAsync(anyMap());
+	}
+
+	@Test
+	public void aSessionOfAnAccountWithANegativeHashIsReplayedLikeAnyOther() {
+		long negative = -4_611_686_018_427_387_904L;
+		when(store.readAll()).thenReturn(java.util.concurrent.CompletableFuture.completedFuture(Collections.singletonList(session("negative", negative, true))));
+		when(webhook.sendDataAsync(anyMap())).thenAnswer(call -> { delivery = new java.util.concurrent.CompletableFuture<>(); return delivery; });
+
+		tracker.recoverPersistedSessions(0);
+
+		@SuppressWarnings("unchecked")
+		ArgumentCaptor<Map<String, Object>> payload = ArgumentCaptor.forClass(Map.class);
+		verify(webhook).sendDataAsync(payload.capture());
+		assertEquals(negative, payload.getValue().get("accountHash"));
+	}
+
+	@Test
+	public void aNotYetProvenSessionWaitsForItsOwnAccountAndNobodyElses() {
+		long negative = -4_611_686_018_427_387_904L;
+		when(store.readAll()).thenReturn(java.util.concurrent.CompletableFuture.completedFuture(Collections.singletonList(session("waiting", negative, false))));
+		when(webhook.sendDataAsync(anyMap())).thenAnswer(call -> { delivery = new java.util.concurrent.CompletableFuture<>(); return delivery; });
+
+		tracker.recoverPersistedSessions(RECORDED_FOR);
+		verify(webhook, times(0)).sendDataAsync(anyMap());
+
+		tracker.recoverPersistedSessions(negative);
+		verify(webhook, times(1)).sendDataAsync(anyMap());
+	}
+
+	@Test
+	public void aSessionThatCouldNotBeSentIsOfferedAgainNotMarkedInFlightForever() {
+		when(webhook.sendDataAsync(anyMap())).thenAnswer(call -> java.util.concurrent.CompletableFuture.failedFuture(new java.io.IOException("offline")));
+
+		tracker.recoverPersistedSessions(0);
+		tracker.recoverPersistedSessions(0);
+
+		verify(webhook, times(2)).sendDataAsync(anyMap());
+	}
+
+	@Test
+	public void aSessionThatWasSentIsNotSentTwiceWhileItsAnswerIsPending() {
+		when(webhook.sendDataAsync(anyMap())).thenAnswer(call -> { delivery = new java.util.concurrent.CompletableFuture<>(); return delivery; });
+
+		tracker.recoverPersistedSessions(0);
+		tracker.recoverPersistedSessions(0);
+
+		verify(webhook, times(1)).sendDataAsync(anyMap());
+	}
+
+	// ------------------------------------------------------------------ how a send ends
+
+	/** Starts the replay and returns what the webhook was handed to call back when the send ends. */
+	private java.util.concurrent.CompletableFuture<JsonObject> delivery;
+	private Ends replayOnce() {
+		tracker.recoverPersistedSessions(0);
+		return new Ends(delivery);
+	}
+
+	private static final class Ends {
+		final java.util.function.Consumer<JsonObject> answered;
+		final Runnable failed;
+		Ends(java.util.concurrent.CompletableFuture<JsonObject> delivery) {
+			answered = delivery::complete;
+			failed = () -> delivery.completeExceptionally(new java.io.IOException("offline"));
+		}
+	}
+
+	private static JsonObject stored(String outcome) {
+		JsonObject response = new JsonObject();
+		if (outcome != null) response.addProperty("sessionStored", outcome);
+		return response;
+	}
+
+	@Test
+	public void aSendThatEndedWithoutAnAnswerFreesTheSessionForTheNextReplayAndKeepsItsFile() {
+		when(webhook.sendDataAsync(anyMap())).thenAnswer(call -> { delivery = new java.util.concurrent.CompletableFuture<>(); return delivery; });
+
+		Ends first = replayOnce();
+		tracker.recoverPersistedSessions(0);
+		verify(webhook, times(1)).sendDataAsync(anyMap()); // still pending: no concurrent duplicate
+
+		first.failed.run();
+		tracker.recoverPersistedSessions(0);
+
+		verify(webhook, times(2)).sendDataAsync(anyMap());
+		verify(store, never()).delete(anyString());
+	}
+
+	@Test
+	public void aDefinitiveAnswerDeletesTheFileAndAnythingElseKeepsItForAReplay() {
+		when(webhook.sendDataAsync(anyMap())).thenAnswer(call -> { delivery = new java.util.concurrent.CompletableFuture<>(); return delivery; });
+
+		Ends first = replayOnce();
+		first.answered.accept(stored(null)); // an older backend that does not say
+		verify(store, never()).delete(anyString());
+		tracker.recoverPersistedSessions(0);
+		verify(webhook, times(2)).sendDataAsync(anyMap());
+
+		delivery.complete(stored("stored"));
+
+		verify(store).delete("session-1");
+	}
+}

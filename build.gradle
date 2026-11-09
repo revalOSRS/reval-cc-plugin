@@ -30,7 +30,7 @@ dependencies {
 	annotationProcessor 'org.projectlombok:lombok:1.18.30'
 
 	testImplementation 'junit:junit:4.13.2'
-	testImplementation 'org.mockito:mockito-core:4.11.0'
+	testImplementation 'org.mockito:mockito-core:5.17.0'
 	testImplementation group: 'net.runelite', name:'client', version: runeLiteVersion
 
 	devImplementation group: 'net.runelite', name:'client', version: runeLiteVersion
@@ -53,6 +53,13 @@ processResources {
 tasks.withType(JavaCompile).configureEach {
 	options.encoding = 'UTF-8'
 	options.release.set(11)
+}
+
+tasks.withType(Test).configureEach {
+	systemProperty 'java.awt.headless', 'true'
+	// RuneLite can initialize logging/config classes even in a unit test.
+	// Keep that initialization away from the developer's real profile.
+	systemProperty 'user.home', layout.buildDirectory.dir('test-home').get().asFile.absolutePath
 }
 
 tasks.register('shadowJar', Jar) {

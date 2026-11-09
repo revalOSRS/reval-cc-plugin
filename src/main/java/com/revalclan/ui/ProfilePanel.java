@@ -31,6 +31,7 @@ import java.util.*;
 import java.util.List;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.function.BooleanSupplier;
 
 public class ProfilePanel extends JPanel {
 	private final JPanel contentPanel;
@@ -139,6 +140,10 @@ public class ProfilePanel extends JPanel {
 	}
 
 	public void onLoggedOut() {
+		if (!SwingUtilities.isEventDispatchThread()) {
+			SwingUtilities.invokeLater(() -> onLoggedOut());
+			return;
+		}
 		accountScope.cancel();
 		accountScope = new RequestScope();
 		isLoading = false;
@@ -151,6 +156,10 @@ public class ProfilePanel extends JPanel {
 	}
 
 	public void shutDown() {
+		if (!SwingUtilities.isEventDispatchThread()) {
+			SwingUtilities.invokeLater(() -> shutDown());
+			return;
+		}
 		viewScope.cancel();
 		onLoggedOut();
 		pointsData = null;
@@ -163,6 +172,10 @@ public class ProfilePanel extends JPanel {
 	}
 
 	public void loadCurrentAccount(boolean retry) {
+		if (!SwingUtilities.isEventDispatchThread()) {
+			SwingUtilities.invokeLater(() -> loadCurrentAccount(retry));
+			return;
+		}
 		if (!viewScope.isActive()) return;
 		if (accountRetry != null) { accountRetry.stop(); accountRetry = null; }
 		if (client == null || apiService == null) {
@@ -195,9 +208,14 @@ public class ProfilePanel extends JPanel {
 
 	/** Shared load flow; only the logged-in player's own account notifies onAccountLoaded. */
 	private void load(BiConsumer<Consumer<AccountResponse>, Consumer<Exception>> fetch, boolean own, String fallbackError) {
+		if (!SwingUtilities.isEventDispatchThread()) {
+			SwingUtilities.invokeLater(() -> load(fetch, own, fallbackError));
+			return;
+		}
 		if (!viewScope.isActive() || isLoading) return;
 		accountScope.cancel();
 		RequestScope owner = accountScope = new RequestScope();
+		BooleanSupplier authority = apiService.accountScope();
 		isLoading = true;
 		showLoading();
 		if (pointsData == null) fetchRanks();
@@ -207,6 +225,7 @@ public class ProfilePanel extends JPanel {
 				SwingUtilities.invokeLater(() -> {
 					if (!viewScope.isActive() || !owner.isActive()) return;
 					isLoading = false;
+					if (!authority.getAsBoolean()) { onLoggedOut(); return; }
 					currentAccount = response.getData();
 					if (currentAccount != null) {
 						pointsLog = currentAccount.getPointsLog();
@@ -226,10 +245,13 @@ public class ProfilePanel extends JPanel {
 	}
 
 	public void refresh() {
-		// Clearing the shared cache cancels its fetch; keep an active load intact.
+		if (!SwingUtilities.isEventDispatchThread()) {
+			SwingUtilities.invokeLater(() -> refresh());
+			return;
+		}
+		// Keep the current load; its owner completes or is invalidated by logout/shutdown.
 		if (!viewScope.isActive() || isLoading) return;
 		if (apiService != null && client != null) {
-			apiService.clearAccountCache();
 			loadCurrentAccount();
 		}
 	}

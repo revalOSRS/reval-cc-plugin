@@ -1,6 +1,9 @@
 package com.revalclan.util;
 
 import com.google.gson.Gson;
+import com.revalclan.auth.TestKit.Rig;
+import static com.revalclan.auth.TestKit.ACCOUNT_A;
+import static com.revalclan.auth.TestKit.TOKEN_A;
 import com.google.gson.JsonObject;
 import java.io.IOException;
 import java.util.ArrayDeque;
@@ -28,21 +31,33 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 public class WebhookServiceTest {
+	private Rig rig;
+	@org.junit.Before public void linkAccount() {
+		rig = new Rig();
+		rig.link(ACCOUNT_A, TOKEN_A);
+	}
+	@org.junit.After public void closeAccount() throws Exception { rig.close(); }
+
 	private final Queue<Runnable> tasks = new ArrayDeque<>();
+	private final Queue<Runnable> retries = new ArrayDeque<>();
 	private final OkHttpClient http = mock(OkHttpClient.class);
 	private final Call call = mock(Call.class);
 	private final ScheduledExecutorService executor = mock(ScheduledExecutorService.class);
 	private WebhookService service;
 
 	@Before public void setUp() {
+		com.revalclan.auth.TestKit.deriveMockClient(http);
 		when(http.newCall(any(Request.class))).thenReturn(call);
 		when(call.timeout()).thenReturn(new okio.Timeout());
 		doAnswer(invocation -> tasks.add(invocation.getArgument(0))).when(executor).execute(any(Runnable.class));
-		service = new WebhookService(http, new Gson(), executor);
+		when(executor.schedule(any(Runnable.class), anyLong(), any(java.util.concurrent.TimeUnit.class)))
+			.thenAnswer(invocation -> { retries.add(invocation.getArgument(0)); return null; });
+		service = new WebhookService(http, new Gson(), rig.tokens, executor);
+		clearInvocations(http);
 	}
 
 	@Test public void payloadPreparationIsDeferred() {
-		service.sendDataAsync(Map.of("eventType", "SYNC"));
+		service.sendDataAsync(Map.of("accountHash", ACCOUNT_A, "eventType", "SYNC"));
 		verifyNoInteractions(http);
 		drain();
 		verify(http).newCall(any(Request.class));
@@ -50,31 +65,35 @@ public class WebhookServiceTest {
 
 	@Test public void failedDeliveryReleasesTheSessionRecoveryCallback() {
 		CompletableFuture<JsonObject> result;
-		result = service.sendDataAsync(Map.of("eventType", "SESSION_SUMMARY"));
+		result = service.sendDataAsync(Map.of("accountHash", ACCOUNT_A, "eventType", "SESSION_SUMMARY"));
 		drain();
 		ArgumentCaptor<Callback> callback = ArgumentCaptor.forClass(Callback.class);
 		verify(call).enqueue(callback.capture());
 		callback.getValue().onFailure(call, new IOException("offline"));
+		assertFalse("the one retry is still pending", result.isDone());
+		retries.remove().run();
+		verify(call, times(2)).enqueue(callback.capture());
+		callback.getValue().onFailure(call, new IOException("still offline"));
 		assertTrue(result.isCompletedExceptionally());
 	}
 
 
 	@Test public void shutdownDropsQueuedPayloadsAndAllowsRestart() {
 		CompletableFuture<JsonObject> result;
-		result = service.sendDataAsync(Map.of("eventType", "SESSION_SUMMARY"));
+		result = service.sendDataAsync(Map.of("accountHash", ACCOUNT_A, "eventType", "SESSION_SUMMARY"));
 		service.shutDown();
 		drain();
 		verifyNoInteractions(http);
 		assertTrue(result.isCompletedExceptionally());
 		service.startUp();
-		service.sendDataAsync(Map.of("eventType", "CHAT"));
+		service.sendDataAsync(Map.of("accountHash", ACCOUNT_A, "eventType", "CHAT"));
 		drain();
 		verify(http).newCall(any(Request.class));
 	}
 
 	@Test public void shutdownCancelsOnlyOwnedRequestsAndCompletesOnce() {
 		CompletableFuture<JsonObject> result;
-		result = service.sendDataAsync(Map.of("eventType", "SESSION_SUMMARY"));
+		result = service.sendDataAsync(Map.of("accountHash", ACCOUNT_A, "eventType", "SESSION_SUMMARY"));
 		drain();
 		ArgumentCaptor<Callback> callback = ArgumentCaptor.forClass(Callback.class);
 		verify(call).enqueue(callback.capture());
@@ -88,7 +107,7 @@ public class WebhookServiceTest {
 
 
 	@Test public void payloadStillUsesTheExistingGzipWireFormat() throws Exception {
-		service.sendDataAsync(Map.of("eventType", "SYNC", "quantity", 12));
+		service.sendDataAsync(Map.of("accountHash", ACCOUNT_A, "eventType", "SYNC", "quantity", 12));
 		drain();
 		ArgumentCaptor<Request> request = ArgumentCaptor.forClass(Request.class);
 		verify(http).newCall(request.capture());
@@ -106,7 +125,7 @@ public class WebhookServiceTest {
 		for (int status : new int[] {500, 200}) {
 			clearInvocations(call);
 			CompletableFuture<JsonObject> result;
-			result = service.sendDataAsync(Map.of("eventType", "SESSION_SUMMARY"));
+			result = service.sendDataAsync(Map.of("accountHash", ACCOUNT_A, "eventType", "SESSION_SUMMARY"));
 			drain();
 			ArgumentCaptor<Callback> callback = ArgumentCaptor.forClass(Callback.class);
 			verify(call).enqueue(callback.capture());
@@ -121,7 +140,7 @@ public class WebhookServiceTest {
 	@Test public void rejectedExecutorCompletesTheCallback() {
 		doThrow(new java.util.concurrent.RejectedExecutionException()).when(executor).execute(any(Runnable.class));
 		CompletableFuture<JsonObject> result;
-		result = service.sendDataAsync(Map.of("eventType", "SESSION_SUMMARY"));
+		result = service.sendDataAsync(Map.of("accountHash", ACCOUNT_A, "eventType", "SESSION_SUMMARY"));
 		assertTrue(result.isCompletedExceptionally());
 		verifyNoInteractions(http);
 	}
@@ -129,7 +148,7 @@ public class WebhookServiceTest {
 	@Test public void preparationFailuresReleaseCapacityAndNeverRunSuccessCallbacks() {
 		Runnable success = mock(Runnable.class);
 		for (int i = 0; i < 128; i++) {
-			CompletableFuture<JsonObject> result = service.sendDataAsync(Map.of("eventType", "LOGIN", "value", Double.NaN));
+			CompletableFuture<JsonObject> result = service.sendDataAsync(Map.of("accountHash", ACCOUNT_A, "eventType", "LOGIN", "value", Double.NaN));
 			result.thenRun(success);
 			drain();
 			assertTrue(result.isCompletedExceptionally());
@@ -141,7 +160,7 @@ public class WebhookServiceTest {
 	@Test public void repeatedExecutorRejectionDoesNotLeakAdmissionSlots() {
 		doThrow(new java.util.concurrent.RejectedExecutionException()).when(executor).execute(any(Runnable.class));
 		for (int i = 0; i < 128; i++) {
-			assertTrue(service.sendDataAsync(Map.of("eventType", "LOGIN")).isCompletedExceptionally());
+			assertTrue(service.sendDataAsync(Map.of("accountHash", ACCOUNT_A, "eventType", "LOGIN")).isCompletedExceptionally());
 		}
 		doAnswer(invocation -> tasks.add(invocation.getArgument(0))).when(executor).execute(any(Runnable.class));
 		assertFullCapacityAvailable();
@@ -150,7 +169,7 @@ public class WebhookServiceTest {
 	@Test public void repeatedEnqueueRejectionDoesNotLeakAdmissionSlots() {
 		doThrow(new java.util.concurrent.RejectedExecutionException()).when(call).enqueue(any());
 		for (int i = 0; i < 128; i++) {
-			CompletableFuture<JsonObject> result = service.sendDataAsync(Map.of("eventType", "LOGIN"));
+			CompletableFuture<JsonObject> result = service.sendDataAsync(Map.of("accountHash", ACCOUNT_A, "eventType", "LOGIN"));
 			drain();
 			assertTrue(result.isCompletedExceptionally());
 		}
@@ -158,7 +177,7 @@ public class WebhookServiceTest {
 	}
 
 	@Test public void successfulResponsesWithoutHintsAreDifferentFromDeliveryFailure() throws Exception {
-		CompletableFuture<JsonObject> result = service.sendDataAsync(Map.of("eventType", "LOGIN"));
+		CompletableFuture<JsonObject> result = service.sendDataAsync(Map.of("accountHash", ACCOUNT_A, "eventType", "LOGIN"));
 		drain();
 		ArgumentCaptor<Callback> callback = ArgumentCaptor.forClass(Callback.class);
 		verify(call).enqueue(callback.capture());
@@ -172,20 +191,25 @@ public class WebhookServiceTest {
 
 	private void drain() { while (!tasks.isEmpty()) tasks.remove().run(); }
 	@Test public void offlineBurstsRetainAtMostSixtyFourPayloads() {
-		for (int i = 0; i < 64; i++) assertFalse(service.sendDataAsync(Map.of("eventType", "SESSION_HEARTBEAT")).isDone());
-		for (int i = 0; i < 1000; i++) assertTrue(service.sendDataAsync(Map.of("eventType", "SESSION_HEARTBEAT")).isCompletedExceptionally());
+		for (int i = 0; i < 64; i++) assertFalse(service.sendDataAsync(Map.of("accountHash", ACCOUNT_A, "eventType", "SESSION_HEARTBEAT")).isDone());
+		for (int i = 0; i < 1000; i++) assertTrue(service.sendDataAsync(Map.of("accountHash", ACCOUNT_A, "eventType", "SESSION_HEARTBEAT")).isCompletedExceptionally());
 		assertEquals(64, tasks.size());
 		service.shutDown();
 		drain();
 	}
 
 	@Test public void networkFailuresReleaseTheDeliveryLimit() {
-		for (int i = 0; i < 64; i++) service.sendDataAsync(Map.of("eventType", "SESSION_HEARTBEAT"));
+		for (int i = 0; i < 64; i++) service.sendDataAsync(Map.of("accountHash", ACCOUNT_A, "eventType", "SESSION_HEARTBEAT"));
 		drain();
 		ArgumentCaptor<Callback> callbacks = ArgumentCaptor.forClass(Callback.class);
 		verify(call, times(64)).enqueue(callbacks.capture());
 		for (Callback callback : callbacks.getAllValues()) callback.onFailure(call, new IOException("offline"));
-		for (int i = 0; i < 64; i++) assertFalse(service.sendDataAsync(Map.of("eventType", "SESSION_HEARTBEAT")).isDone());
+		while (!retries.isEmpty()) retries.remove().run();
+		ArgumentCaptor<Callback> secondAttempts = ArgumentCaptor.forClass(Callback.class);
+		verify(call, times(128)).enqueue(secondAttempts.capture());
+		for (Callback callback : secondAttempts.getAllValues().subList(64, 128))
+			callback.onFailure(call, new IOException("still offline"));
+		for (int i = 0; i < 64; i++) assertFalse(service.sendDataAsync(Map.of("accountHash", ACCOUNT_A, "eventType", "SESSION_HEARTBEAT")).isDone());
 		assertEquals(64, tasks.size());
 		service.shutDown();
 		drain();
@@ -193,22 +217,22 @@ public class WebhookServiceTest {
 
 	@Test public void repeatedRestartsCannotAccumulatePayloadsOnABlockedWorker() {
 		for (int i = 0; i < 1000; i++) {
-			service.sendDataAsync(Map.of("eventType", "LOGIN"));
+			service.sendDataAsync(Map.of("accountHash", ACCOUNT_A, "eventType", "LOGIN"));
 			service.shutDown();
 			service.startUp();
 		}
 		assertEquals(64, tasks.size());
 		drain();
 		verifyNoInteractions(http);
-		assertFalse(service.sendDataAsync(Map.of("eventType", "LOGIN")).isDone());
+		assertFalse(service.sendDataAsync(Map.of("accountHash", ACCOUNT_A, "eventType", "LOGIN")).isDone());
 		service.shutDown();
 		drain();
 	}
 	@Test public void ordinaryBurstsLeaveSixteenSlotsForSessionAndSyncEvents() {
-		for (int i = 0; i < 48; i++) assertFalse(service.sendDataAsync(Map.of("eventType", "CHAT")).isDone());
-		for (int i = 0; i < 1000; i++) assertTrue(service.sendDataAsync(Map.of("eventType", "CHAT")).isCompletedExceptionally());
-		for (int i = 0; i < 16; i++) assertFalse(service.sendDataAsync(Map.of("eventType", "LOGIN")).isDone());
-		assertTrue(service.sendDataAsync(Map.of("eventType", "SYNC")).isCompletedExceptionally());
+		for (int i = 0; i < 48; i++) assertFalse(service.sendDataAsync(Map.of("accountHash", ACCOUNT_A, "eventType", "CHAT")).isDone());
+		for (int i = 0; i < 1000; i++) assertTrue(service.sendDataAsync(Map.of("accountHash", ACCOUNT_A, "eventType", "CHAT")).isCompletedExceptionally());
+		for (int i = 0; i < 16; i++) assertFalse(service.sendDataAsync(Map.of("accountHash", ACCOUNT_A, "eventType", "LOGIN")).isDone());
+		assertTrue(service.sendDataAsync(Map.of("accountHash", ACCOUNT_A, "eventType", "SYNC")).isCompletedExceptionally());
 		assertEquals(64, tasks.size());
 		drain();
 		verify(http, times(64)).newCall(any(Request.class));
@@ -216,12 +240,17 @@ public class WebhookServiceTest {
 	}
 
 	@Test public void failedRequestsReleaseCapacityForTheNextBurst() {
-		for (int i = 0; i < 48; i++) service.sendDataAsync(Map.of("eventType", "CHAT"));
+		for (int i = 0; i < 48; i++) service.sendDataAsync(Map.of("accountHash", ACCOUNT_A, "eventType", "CHAT"));
 		drain();
 		ArgumentCaptor<Callback> callbacks = ArgumentCaptor.forClass(Callback.class);
 		verify(call, times(48)).enqueue(callbacks.capture());
 		for (Callback callback : callbacks.getAllValues()) callback.onFailure(call, new IOException("offline"));
-		for (int i = 0; i < 48; i++) assertFalse(service.sendDataAsync(Map.of("eventType", "CHAT")).isDone());
+		while (!retries.isEmpty()) retries.remove().run();
+		ArgumentCaptor<Callback> secondAttempts = ArgumentCaptor.forClass(Callback.class);
+		verify(call, times(96)).enqueue(secondAttempts.capture());
+		for (Callback callback : secondAttempts.getAllValues().subList(48, 96))
+			callback.onFailure(call, new IOException("still offline"));
+		for (int i = 0; i < 48; i++) assertFalse(service.sendDataAsync(Map.of("accountHash", ACCOUNT_A, "eventType", "CHAT")).isDone());
 		assertEquals(48, tasks.size());
 		service.shutDown();
 		drain();
@@ -231,7 +260,7 @@ public class WebhookServiceTest {
 	@Test public void callerCancelledCallsReleaseEachSlotOnlyOnceOnRepeatedTerminalCallbacks() {
 		Runnable success = mock(Runnable.class);
 		for (int i = 0; i < 64; i++) {
-			CompletableFuture<JsonObject> result = service.sendDataAsync(Map.of("eventType", "LOGIN"));
+			CompletableFuture<JsonObject> result = service.sendDataAsync(Map.of("accountHash", ACCOUNT_A, "eventType", "LOGIN"));
 			result.thenRun(success);
 			drain();
 			assertTrue(result.cancel(false));
@@ -239,7 +268,7 @@ public class WebhookServiceTest {
 		ArgumentCaptor<Callback> callbacks = ArgumentCaptor.forClass(Callback.class);
 		verify(call, times(64)).enqueue(callbacks.capture());
 		verify(call, times(64)).cancel();
-		assertTrue(service.sendDataAsync(Map.of("eventType", "LOGIN")).isCompletedExceptionally());
+		assertTrue(service.sendDataAsync(Map.of("accountHash", ACCOUNT_A, "eventType", "LOGIN")).isCompletedExceptionally());
 		for (Callback callback : callbacks.getAllValues()) {
 			callback.onFailure(call, new IOException("cancelled"));
 			callback.onFailure(call, new IOException("duplicate terminal callback"));
@@ -249,8 +278,8 @@ public class WebhookServiceTest {
 	}
 
 	private void assertFullCapacityAvailable() {
-		for (int i = 0; i < 64; i++) assertFalse(service.sendDataAsync(Map.of("eventType", "LOGIN")).isDone());
-		assertTrue(service.sendDataAsync(Map.of("eventType", "LOGIN")).isCompletedExceptionally());
+		for (int i = 0; i < 64; i++) assertFalse(service.sendDataAsync(Map.of("accountHash", ACCOUNT_A, "eventType", "LOGIN")).isDone());
+		assertTrue(service.sendDataAsync(Map.of("accountHash", ACCOUNT_A, "eventType", "LOGIN")).isCompletedExceptionally());
 		assertEquals(64, tasks.size());
 		service.shutDown();
 		drain();

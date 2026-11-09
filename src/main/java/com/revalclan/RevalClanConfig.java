@@ -13,6 +13,31 @@ import net.runelite.client.config.ConfigSection;
 @ConfigGroup("revalclan")
 public interface RevalClanConfig extends Config {
 
+	// ── Account link ───────────────────────────────────────────────────
+	@ConfigSection(
+		name = "Account link",
+		description = "Link this game account to your Reval account",
+		position = 1
+	)
+	String linkSection = "linkSection";
+
+	/**
+	 * The one-use code from the Reval account settings on the website (administrators: from their own member
+	 * record in the admin console). The plugin exchanges it for a credential (kept per game account, not
+	 * shown here) and then clears the field.
+	 */
+	@ConfigItem(
+		keyName = "linkCode",
+		name = "Link code",
+		description = "Paste the one-use Link code while logged in to the game account you want to link. Members create it in their Reval account settings (revalosrs.ee); administrators create it from their own member record in the Reval admin console (Link my RuneLite plugin). It is cleared once the link works.",
+		section = linkSection,
+		position = 0,
+		secret = true
+	)
+	default String linkCode() {
+		return "";
+	}
+
 	// ── Panel Settings ─────────────────────────────────────────────────
 	@ConfigSection(
 		name = "Panel Settings",

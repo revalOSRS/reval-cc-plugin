@@ -320,11 +320,8 @@ public class RevalPanel extends PluginPanel {
 					return;
 				}
 				if (adminLoginPanel == null) {
-					adminLoginPanel = new AdminLoginPanel(apiService, client,
-						authData -> {
-							adminManager.setSession(adminLoginPanel.getEnteredCode(), authData);
-							navigateToAdmin("DASHBOARD");
-						},
+					adminLoginPanel = new AdminLoginPanel(apiService, client, adminManager,
+						() -> navigateToAdmin("DASHBOARD"),
 						() -> showTab("PROFILE")
 					);
 					contentPanel.add(adminLoginPanel, "ADMIN_LOGIN");
@@ -339,7 +336,7 @@ public class RevalPanel extends PluginPanel {
 				}
 				if (adminDashboardPanel == null) {
 					adminDashboardPanel = new AdminDashboardPanel(
-						apiService, adminManager.getMemberCode(),
+						apiService, adminManager.session(),
 						adminManager.getAuthData(), this::navigateToAdmin
 					);
 					contentPanel.add(adminDashboardPanel, "ADMIN_DASHBOARD");
@@ -356,7 +353,7 @@ public class RevalPanel extends PluginPanel {
 				}
 				if (pendingRankupsPanel == null) {
 					pendingRankupsPanel = new PendingRankupsPanel(
-						apiService, adminManager.getMemberCode(),
+						apiService, adminManager.session(),
 						() -> navigateToAdmin("DASHBOARD"), assetLoader,
 						rankIconResolver
 					);
@@ -414,7 +411,7 @@ public class RevalPanel extends PluginPanel {
 		memberClickLoads.put("EVENTS", eventsPanel::refresh);
 		memberLoads.put("DIARY", diaryPanel::refresh);
 
-		adminManager = new AdminManager();
+		adminManager = new AdminManager(client::getAccountHash, apiService::accountScope);
 
 		// Enable admin button when account loads — check in-game clan rank
 		profilePanel.setOnAccountLoaded(account -> {
@@ -456,6 +453,21 @@ public class RevalPanel extends PluginPanel {
 		profilePanel.shutDown();
 		competitionsPanel.shutDown();
 		eventsPanel.onLoggedOut();
+		SwingUtilities.invokeLater(this::clearAdminSession);
+	}
+
+	private void clearAdminSession() {
+		if (adminManager != null) adminManager.clearSession();
+		if (adminLoginPanel != null) {
+			adminLoginPanel.invalidate();
+			contentPanel.remove(adminLoginPanel);
+		}
+		if (adminDashboardPanel != null) contentPanel.remove(adminDashboardPanel);
+		if (pendingRankupsPanel != null) contentPanel.remove(pendingRankupsPanel);
+		adminLoginPanel = null;
+		adminDashboardPanel = null;
+		pendingRankupsPanel = null;
+		cardLayout.show(contentPanel, selectedTab);
 	}
 
 	// ==================== Lifecycle ====================
@@ -463,6 +475,8 @@ public class RevalPanel extends PluginPanel {
 	public void onLoggedIn() {
 		SwingUtilities.invokeLater(() -> {
 			if (disposed) return;
+			// An admin session never carries over to a different game account
+			if (adminManager != null && adminManager.isForAnotherAccount()) clearAdminSession();
 			clanValidated = true;
 			memberTabsLoaded.clear();
 			profilePanel.refresh();
@@ -483,6 +497,7 @@ public class RevalPanel extends PluginPanel {
 			eventsPanel.onLoggedOut();
 			diaryPanel.onLoggedOut();
 			if (adminButton != null) adminButton.setAdmin(false);
+			clearAdminSession();
 		});
 	}
 }

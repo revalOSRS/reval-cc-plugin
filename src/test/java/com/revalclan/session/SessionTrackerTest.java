@@ -128,6 +128,7 @@ public class SessionTrackerTest {
 	private SessionStore.PersistedSession previous() {
 		SessionStore.PersistedSession session = SessionStoreTest.session("previous");
 		session.member = true;
+		session.accountHash = 123;
 		return session;
 	}
 	private void drain() { while (!tasks.isEmpty()) tasks.remove().run(); }

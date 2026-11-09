@@ -1,6 +1,7 @@
 package com.revalclan.util;
 
 import com.revalclan.api.RevalApiService;
+import com.revalclan.auth.LinkException;
 import com.revalclan.api.announcements.AnnouncementsResponse.Announcement;
 import com.revalclan.api.notifications.NotificationsResponse.Notification;
 import net.runelite.api.ChatMessageType;
@@ -128,7 +129,8 @@ public class AnnouncementService {
 				synchronized (AnnouncementService.this) {
 					if (generation != sessionGeneration) return;
 					notificationFetchInProgress = false;
-					notificationTicksRemaining = RETRY_TICKS;
+					// Not linked is not a transient failure: linking triggers a fetch itself
+					notificationTicksRemaining = error instanceof LinkException ? NOTIFICATION_INTERVAL_TICKS : RETRY_TICKS;
 				}
 			}
 		);

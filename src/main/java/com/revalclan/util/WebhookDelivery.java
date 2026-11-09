@@ -15,7 +15,7 @@ final class WebhookDelivery {
 	private final CompletableFuture<JsonObject> result;
 	private final Runnable release;
 	private final AtomicBoolean preparationFinished = new AtomicBoolean();
-	// Only the preparation worker assigns this, before finishing preparation.
+	// Attempts are sequential; final preparation completes only after the last queued attempt exits.
 	private CompletableFuture<Void> transportFinished = CompletableFuture.completedFuture(null);
 
 	WebhookDelivery(RequestScope owner, Runnable release) {
@@ -26,13 +26,11 @@ final class WebhookDelivery {
 
 	CompletableFuture<JsonObject> result() { return result; }
 
-	void send(OkHttpClient http, Request request, RequestScope.ResponseReader<JsonObject> reader) {
+	CompletableFuture<JsonObject> send(OkHttpClient http, Request request, RequestScope.ResponseReader<JsonObject> reader) {
 		RequestScope.Exchange<JsonObject> transport = owner.exchange(http, request, reader);
-		transportFinished = transport.finished();
+		transportFinished = CompletableFuture.allOf(transportFinished, transport.finished());
 		result.whenComplete((response, error) -> { if (result.isCancelled()) transport.result().cancel(false); });
-		transport.result().whenComplete((response, error) -> {
-			if (error == null) result.complete(response); else result.completeExceptionally(error);
-		});
+		return transport.result();
 	}
 
 	void finishPreparation() {

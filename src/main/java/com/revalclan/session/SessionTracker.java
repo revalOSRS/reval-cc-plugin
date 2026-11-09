@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.revalclan.session.SessionStore.PersistedSession;
 import com.revalclan.util.ClanMembership;
+import com.revalclan.auth.LinkTokenManager;
 import com.revalclan.util.Json;
 import com.revalclan.util.WebhookService;
 import com.revalclan.util.RequestScope;
@@ -187,6 +188,7 @@ public class SessionTracker {
 
 		// Player, skills and varps can land a tick or two after LOGGED_IN — fill the blanks
 		if (username == null) username = playerName();
+		backfillAccountHash();
 		if (snapshotEmpty(startSnapshot)) {
 			startSnapshot = buildSnapshot();
 			endSnapshot = startSnapshot;
@@ -212,6 +214,25 @@ public class SessionTracker {
 			ticksSinceHeartbeat = 0;
 			if (membership.isMember()) sendHeartbeat();
 		}
+	}
+
+	/**
+	 * The account hash can still be unset (0 / -1) when LOGGED_IN fires. A session without one cannot be
+	 * sent with anyone's credential, so it is filled in on the first tick the client has it, before the
+	 * session is persisted, sent or replayed. Signed 64-bit hashes are routinely negative: only 0 and -1
+	 * mean "not known yet".
+	 * <p>
+	 * It is only ever filled in, never replaced, and only for the player this session started as: the
+	 * logged-in player must still be the one the session recorded (same name), so a quick logout and
+	 * login as somebody else can never stamp their hash onto this session.
+	 */
+	private void backfillAccountHash() {
+		if (LinkTokenManager.isValidHash(accountHash) || client.getGameState() != GameState.LOGGED_IN) return;
+		long hash = client.getAccountHash();
+		String name = playerName();
+		if (!LinkTokenManager.isValidHash(hash) || name == null || !name.equals(username)) return;
+		accountHash = hash;
+		dirty = true;
 	}
 
 	/** VarClientIntChanged for ACCOUNT_SUMMARY_PLAYTIME — the server re-sends it at login, hop and region load. */
@@ -291,6 +312,7 @@ public class SessionTracker {
 			for (PersistedSession persisted : sessions) {
 				String id = persisted.sessionId();
 				if (id == null || id.equals(sessionId) || inFlight.contains(id)) continue;
+				if (!LinkTokenManager.isValidHash(persisted.accountHash)) continue;
 				if (persisted.member || persisted.accountHash == provenAccountHash) send(persisted);
 			}
 		})));

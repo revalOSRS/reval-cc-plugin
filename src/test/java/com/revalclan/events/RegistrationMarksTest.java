@@ -1,6 +1,7 @@
 package com.revalclan.events;
 
 import com.google.gson.Gson;
+import com.revalclan.auth.TestKit.Rig;
 import com.revalclan.api.RevalApiService;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
@@ -22,6 +23,14 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 public class RegistrationMarksTest {
+	private Rig rig;
+	@org.junit.Before public void openRig() {
+		rig = new Rig();
+		rig.link(123L, com.revalclan.auth.TestKit.TOKEN_A);
+		rig.tokens.onAccount(123L);
+	}
+	@org.junit.After public void closeRig() throws Exception { rig.close(); }
+
 	@Test public void resetCannotBeOvertakenByAnAlreadyStartedEventPublication() throws Exception {
 		ConcurrentLinkedQueue<Runnable> clientTasks = new ConcurrentLinkedQueue<>();
 		ClientThread clientThread = mock(ClientThread.class);
@@ -30,7 +39,7 @@ public class RegistrationMarksTest {
 		OkHttpClient http = mock(OkHttpClient.class);
 		Call call = mock(Call.class);
 		when(http.newCall(any(Request.class))).thenReturn(call);
-		RevalApiService api = new RevalApiService(http, new Gson(), clientThread);
+		RevalApiService api = new RevalApiService(http, new Gson(), rig.tokens, clientThread);
 		CountDownLatch publishing = new CountDownLatch(1);
 		CountDownLatch resume = new CountDownLatch(1);
 		api.addEventsListener(response -> {

@@ -1,6 +1,7 @@
 package com.revalclan.api;
 
 import com.google.gson.Gson;
+import com.revalclan.auth.TestKit.Rig;
 import com.revalclan.api.points.PointsResponse;
 import com.revalclan.api.events.EventsResponse;
 import java.util.ArrayList;
@@ -25,6 +26,14 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 public class RevalApiServiceTest {
+	private Rig rig;
+	@org.junit.Before public void openRig() {
+		rig = new Rig();
+		rig.link(123L, com.revalclan.auth.TestKit.TOKEN_A);
+		rig.tokens.onAccount(123L);
+	}
+	@org.junit.After public void closeRig() throws Exception { rig.close(); }
+
 	@Test public void shutdownCancelsOwnedCallsAndSuppressesTheirLateResponses() throws IOException {
 		OkHttpClient http = mock(OkHttpClient.class);
 		Call call = mock(Call.class);
@@ -33,7 +42,7 @@ public class RevalApiServiceTest {
 		AtomicBoolean canceled = new AtomicBoolean();
 		doAnswer(invocation -> { canceled.set(true); return null; }).when(call).cancel();
 		when(call.isCanceled()).thenAnswer(invocation -> canceled.get());
-		RevalApiService api = new RevalApiService(http, new Gson(), mock(ClientThread.class));
+		RevalApiService api = new RevalApiService(http, new Gson(), rig.tokens, mock(ClientThread.class));
 		Consumer<PointsResponse> success = mock(Consumer.class);
 		Consumer<Exception> failure = mock(Consumer.class);
 		api.fetchPoints(success, failure);
@@ -58,7 +67,7 @@ public class RevalApiServiceTest {
 		Call call = mock(Call.class);
 		when(call.timeout()).thenReturn(new okio.Timeout());
 		when(http.newCall(any(Request.class))).thenReturn(call);
-		RevalApiService api = new RevalApiService(http, new Gson(), mock(ClientThread.class));
+		RevalApiService api = new RevalApiService(http, new Gson(), rig.tokens, mock(ClientThread.class));
 		AtomicBoolean delivered = new AtomicBoolean();
 		api.fetchPoints(response -> {
 			assertFalse("A service lock in a callback can deadlock the game tick", Thread.holdsLock(api));
@@ -76,7 +85,7 @@ public class RevalApiServiceTest {
 		OkHttpClient http = mock(OkHttpClient.class);
 		Call call = mock(Call.class);
 		when(http.newCall(any(Request.class))).thenReturn(call);
-		RevalApiService api = new RevalApiService(http, new Gson(), mock(ClientThread.class));
+		RevalApiService api = new RevalApiService(http, new Gson(), rig.tokens, mock(ClientThread.class));
 		Consumer<com.revalclan.api.competitions.FeaturedRaceResponse> success = mock(Consumer.class);
 		Consumer<Exception> failure = mock(Consumer.class);
 		api.fetchFeaturedRace(success, failure);
@@ -90,19 +99,18 @@ public class RevalApiServiceTest {
 		OkHttpClient http = mock(OkHttpClient.class);
 		Call call = mock(Call.class);
 		when(http.newCall(any(Request.class))).thenReturn(call);
-		RevalApiService api = new RevalApiService(http, new Gson(), mock(ClientThread.class));
+		RevalApiService api = new RevalApiService(http, new Gson(), rig.tokens, mock(ClientThread.class));
 		Runnable fetch = () -> {
 			api.fetchPoints(response -> {}, error -> {});
-			api.fetchAccount(123L, response -> {}, error -> {});
 			api.fetchActiveTeams(response -> {}, error -> {});
 			api.fetchDiaries(null, response -> {}, error -> {});
 		};
 		for (int i = 0; i < 1000; i++) fetch.run();
 		ArgumentCaptor<Callback> callbacks = ArgumentCaptor.forClass(Callback.class);
-		verify(call, times(4)).enqueue(callbacks.capture());
+		verify(call, times(3)).enqueue(callbacks.capture());
 		for (Callback callback : callbacks.getAllValues()) callback.onFailure(call, new IOException("offline"));
 		for (int i = 0; i < 1000; i++) fetch.run();
-		verify(http, times(4)).newCall(any());
+		verify(http, times(3)).newCall(any());
 	}
 
 	@Test public void eventPublicationAndCompletionWaitForTheClientThread() throws Exception {
@@ -262,7 +270,7 @@ public class RevalApiServiceTest {
 		assertEquals(1, fixture.failures.size());
 	}
 
-	private static final class EventsFixture {
+	private final class EventsFixture {
 		final ConcurrentLinkedQueue<Runnable> tasks = new ConcurrentLinkedQueue<>();
 		final OkHttpClient http = mock(OkHttpClient.class);
 		final RevalApiService api;
@@ -275,7 +283,7 @@ public class RevalApiServiceTest {
 			ClientThread clientThread = mock(ClientThread.class);
 			doAnswer(invocation -> { tasks.add(invocation.getArgument(0)); return null; })
 				.when(clientThread).invokeLater(any(Runnable.class));
-			api = new RevalApiService(http, new Gson(), clientThread);
+			api = new RevalApiService(http, new Gson(), rig.tokens, clientThread);
 			api.addEventsListener(response -> publications.add(response.getData() == null ? "reset"
 				: response.getData().getEvents().get(0).getName()));
 		}

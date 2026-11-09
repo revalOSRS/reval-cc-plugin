@@ -24,6 +24,11 @@ import com.revalclan.api.common.PublicApiResponse;
 import com.revalclan.api.leaguesbingo.LeaguesBingoMeResponse;
 import com.revalclan.api.leaguesbingo.LeaguesBingoPickResponse;
 import com.revalclan.api.leaguesbingo.LeaguesBingoResponse;
+import com.revalclan.auth.ApiOrigin;
+import com.revalclan.auth.LinkException;
+import com.revalclan.auth.LinkTokenManager;
+import com.revalclan.auth.SecureHttp;
+import com.revalclan.auth.ServerError;
 import com.revalclan.util.PluginVersion;
 import com.revalclan.util.RequestScope;
 import javax.inject.Named;
@@ -41,6 +46,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.util.function.BooleanSupplier;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
@@ -52,6 +58,10 @@ public class RevalApiService {
 
     private final Gson gson;
     private final OkHttpClient httpClient;
+    private enum Auth { NONE, REQUIRED }
+    private final LinkTokenManager tokens;
+    private final ApiOrigin origin;
+    private volatile OkHttpClient credentialedClient;
     private final ClientThread clientThread;
     private volatile RequestScope requests = new RequestScope();
 
@@ -60,18 +70,43 @@ public class RevalApiService {
 
     // Cache durations
     private static final long CACHE_DURATION_MS = 5 * 60 * 1000;
-    private static final long ACCOUNT_CACHE_DURATION_MS = 2 * 60 * 1000;
 
     private final CachedFetch<PointsResponse> points = new CachedFetch<>(CACHE_DURATION_MS);
-    private final CachedFetch<AccountResponse> account = new CachedFetch<>(ACCOUNT_CACHE_DURATION_MS);
     private final CachedFetch<ActiveTeamsResponse> teams = new CachedFetch<>(CACHE_DURATION_MS);
     private final CachedFetch<DiariesResponse> diaries = new CachedFetch<>(CACHE_DURATION_MS);
 
     @Inject
-    public RevalApiService(@Named("reval-http") OkHttpClient httpClient, Gson gson, ClientThread clientThread) {
+    public RevalApiService(@Named("reval-http") OkHttpClient httpClient, Gson gson,
+                           LinkTokenManager tokens, ClientThread clientThread) {
+        this(httpClient, gson, tokens, clientThread, ApiOrigin.PRODUCTION);
+    }
+
+    RevalApiService(OkHttpClient httpClient, Gson gson, LinkTokenManager tokens,
+                    ClientThread clientThread, ApiOrigin origin) {
         this.httpClient = httpClient;
         this.gson = gson;
+        this.tokens = tokens;
         this.clientThread = clientThread;
+        this.origin = origin;
+    }
+
+    /** Client for requests that carry a token: no redirects, no cache, same-origin only. */
+    OkHttpClient credentialedClient() {
+        OkHttpClient client = credentialedClient;
+        if (client == null) {
+            client = SecureHttp.harden(httpClient, origin, SecureHttp.API_TIMEOUT_MS);
+            credentialedClient = client;
+        }
+        return client;
+    }
+
+    /** Capture authority for delayed UI application; relinking never revives an earlier response. */
+    public BooleanSupplier accountScope() {
+        RequestScope owner = requests;
+        try {
+            LinkTokenManager.Grant grant = tokens.grantForCurrentAccount(HttpUrl.get(ApiEndpoints.BASE_URL), null);
+            return () -> owner.isActive() && tokens.isCurrent(grant);
+        } catch (LinkException error) { return () -> false; }
     }
 
     // ==================== POINTS API ====================
@@ -83,8 +118,7 @@ public class RevalApiService {
     // ==================== ACCOUNT API ====================
 
     public void fetchAccount(long accountHash, Consumer<AccountResponse> onSuccess, Consumer<Exception> onError) {
-        observe(account.get(accountHash, () -> getFuture(ApiEndpoints.ACCOUNT + "?accountHash=" + accountHash,
-            AccountResponse.class)), onSuccess, onError);
+        get(ApiEndpoints.ACCOUNT + "?accountHash=" + accountHash, AccountResponse.class, onSuccess, onError);
     }
 
     public void fetchAccountById(int osrsAccountId, Consumer<AccountResponse> onSuccess, Consumer<Exception> onError) {
@@ -133,7 +167,7 @@ public class RevalApiService {
             // Keep completion cancellable until the queued state application actually runs.
             CompletableFuture<EventsResponse> result = owner.track(new CompletableFuture<>());
             observe(result, onSuccess, onError);
-            owner.track(requestFuture(plugin, ApiEndpoints.url(ApiEndpoints.EVENTS), "GET", null, null,
+            owner.track(requestFuture(plugin, ApiEndpoints.url(ApiEndpoints.EVENTS), "GET", null, Auth.NONE, null,
                 EventsResponse.class)).whenComplete((response, error) -> clientThread.invokeLater(() -> {
                     if (!owner.isActive() || !plugin.isActive()) result.cancel(false);
                     else if (error != null) result.completeExceptionally(error);
@@ -178,18 +212,18 @@ public class RevalApiService {
         body.put("accountHash", String.valueOf(accountHash));
         body.put("region", region);
         if (teamId != null) body.put("teamId", teamId);
-        post(ApiEndpoints.leaguesBingoPick(eventId), gson.toJson(body), LeaguesBingoPickResponse.class, onSuccess, onError);
+        post(ApiEndpoints.leaguesBingoPick(eventId), gson.toJson(body), accountHash, LeaguesBingoPickResponse.class, onSuccess, onError);
     }
 
     public void registerForEvent(String eventId, long accountHash,
                                  Consumer<RegistrationResponse> onSuccess, Consumer<Exception> onError) {
-        post(ApiEndpoints.eventRegister(eventId), "{\"accountHash\":\"" + accountHash + "\"}", 
+        post(ApiEndpoints.eventRegister(eventId), "{\"accountHash\":\"" + accountHash + "\"}", accountHash,
             RegistrationResponse.class, onSuccess, onError);
     }
 
     public void cancelEventRegistration(String eventId, long accountHash,
                                         Consumer<RegistrationResponse> onSuccess, Consumer<Exception> onError) {
-        delete(ApiEndpoints.eventRegister(eventId), "{\"accountHash\":\"" + accountHash + "\"}",
+        delete(ApiEndpoints.eventRegister(eventId), "{\"accountHash\":\"" + accountHash + "\"}", accountHash,
             RegistrationResponse.class, onSuccess, onError);
     }
 
@@ -235,8 +269,10 @@ public class RevalApiService {
 
     public void castVote(String voteId, String optionId, long accountHash,
                          Consumer<CastVoteResponse> onSuccess, Consumer<Exception> onError) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("optionId", optionId);
         post(ApiEndpoints.voteCast(voteId) + "?accountHash=" + accountHash,
-            "{\"optionId\":\"" + optionId + "\"}", CastVoteResponse.class, onSuccess, onError);
+            gson.toJson(body), accountHash, CastVoteResponse.class, onSuccess, onError);
     }
 
     public void fetchMyVote(String voteId, long accountHash,
@@ -247,26 +283,25 @@ public class RevalApiService {
 
     // ==================== ADMIN API ====================
 
-    public void adminLogin(String memberCode, Long accountHash, String osrsNickname,
+    public void adminLogin(Long accountHash, String osrsNickname,
                            Consumer<AdminAuthResponse> onSuccess, Consumer<Exception> onError) {
         AdminLoginRequest requestBody = new AdminLoginRequest(
             accountHash != null ? String.valueOf(accountHash) : null,
             osrsNickname
         );
-        postAdmin(ApiEndpoints.ADMIN_AUTH_LOGIN, gson.toJson(requestBody), memberCode,
-            AdminAuthResponse.class, onSuccess, onError);
+        request(ApiEndpoints.url(ApiEndpoints.ADMIN_AUTH_LOGIN), "POST", gson.toJson(requestBody), Auth.REQUIRED,
+            accountHash, AdminAuthResponse.class, onSuccess, onError);
     }
 
-    public void fetchPendingRankChanges(String memberCode,
-                                        Consumer<PendingRankChangesResponse> onSuccess, Consumer<Exception> onError) {
-        getAdmin(ApiEndpoints.ADMIN_RANK_CHANGES_PENDING + "?limit=100", memberCode,
+    public void fetchPendingRankChanges(Consumer<PendingRankChangesResponse> onSuccess, Consumer<Exception> onError) {
+        getPrivate(ApiEndpoints.ADMIN_RANK_CHANGES_PENDING + "?limit=100",
             PendingRankChangesResponse.class, onSuccess, onError);
     }
 
-    public void actualizeRankChange(String memberCode, int rankChangeId,
+    public void actualizeRankChange(int rankChangeId,
                                     Consumer<ActualizeRankChangeResponse> onSuccess, Consumer<Exception> onError) {
-        postAdmin(ApiEndpoints.rankChangeActualize(rankChangeId), null, memberCode,
-            ActualizeRankChangeResponse.class, onSuccess, onError);
+        request(ApiEndpoints.url(ApiEndpoints.rankChangeActualize(rankChangeId)), "POST", null, Auth.REQUIRED,
+            null, ActualizeRankChangeResponse.class, onSuccess, onError);
     }
 
     // ==================== ANNOUNCEMENTS API ====================
@@ -287,53 +322,57 @@ public class RevalApiService {
         Map<String, Object> body = new HashMap<>();
         body.put("accountHash", String.valueOf(accountHash));
         body.put("notificationIds", notificationIds);
-        post(ApiEndpoints.NOTIFICATIONS_ACK, gson.toJson(body),
+        post(ApiEndpoints.NOTIFICATIONS_ACK, gson.toJson(body), accountHash,
             NotificationAckResponse.class, onSuccess, onError);
     }
 
     // ==================== CACHE MANAGEMENT ====================
 
     public void clearCache() {
-        points.clear(); account.clear(); teams.clear(); diaries.clear();
+        points.clear(); teams.clear(); diaries.clear();
     }
 
-    public void clearAccountCache() { account.clear(); }
 
     // ==================== HTTP HELPERS ====================
 
+    /**
+     * Read of the plugin API. A read that names an account (an {@code accountHash} query) needs the bearer,
+     * exactly as the backend requires, and can only be made for the logged-in account; any other read is
+     * public and goes out without one.
+     */
     private <T extends ApiResponse> void get(String endpoint, Class<T> responseClass,
                                              Consumer<T> onSuccess, Consumer<Exception> onError) {
-        request(ApiEndpoints.url(endpoint), "GET", null, null, responseClass, onSuccess, onError);
+        String url = ApiEndpoints.url(endpoint);
+        HttpUrl parsed = HttpUrl.parse(url);
+        Auth auth = parsed != null && parsed.queryParameterNames().contains("accountHash") ? Auth.REQUIRED : Auth.NONE;
+        request(url, "GET", null, auth, null, responseClass, onSuccess, onError);
     }
 
-    /** GET against the public API (full URL, {success, data} envelope). */
+    /** Read of private data: needs the logged-in account's link. */
+    private <T extends ApiResponse> void getPrivate(String endpoint, Class<T> responseClass,
+                                                    Consumer<T> onSuccess, Consumer<Exception> onError) {
+        request(ApiEndpoints.url(endpoint), "GET", null, Auth.REQUIRED, null, responseClass, onSuccess, onError);
+    }
+
+    /** GET against the public API (full URL, {success, data} envelope). Never carries a token. */
     private <T extends PublicApiResponse> void getPublic(String url, Class<T> responseClass,
                                                          Consumer<T> onSuccess, Consumer<Exception> onError) {
-        request(url, "GET", null, null, responseClass, onSuccess, onError);
+        request(url, "GET", null, Auth.NONE, null, responseClass, onSuccess, onError);
     }
 
-    private <T extends ApiResponse> void getAdmin(String endpoint, String memberCode, Class<T> responseClass,
-                                                  Consumer<T> onSuccess, Consumer<Exception> onError) {
-        request(ApiEndpoints.url(endpoint), "GET", null, memberCode, responseClass, onSuccess, onError);
-    }
-
-    private <T extends ApiResponse> void post(String endpoint, String body, Class<T> responseClass,
+    /** Change on behalf of {@code accountHash}, which must be the logged-in, linked account. */
+    private <T extends ApiResponse> void post(String endpoint, String body, long accountHash, Class<T> responseClass,
                                               Consumer<T> onSuccess, Consumer<Exception> onError) {
-        request(ApiEndpoints.url(endpoint), "POST", body, null, responseClass, onSuccess, onError);
+        request(ApiEndpoints.url(endpoint), "POST", body, Auth.REQUIRED, accountHash, responseClass, onSuccess, onError);
     }
 
-    private <T extends ApiResponse> void postAdmin(String endpoint, String body, String memberCode,
-                                                   Class<T> responseClass, Consumer<T> onSuccess, Consumer<Exception> onError) {
-        request(ApiEndpoints.url(endpoint), "POST", body, memberCode, responseClass, onSuccess, onError);
-    }
-
-    private <T extends ApiResponse> void delete(String endpoint, String body, Class<T> responseClass,
+    private <T extends ApiResponse> void delete(String endpoint, String body, long accountHash, Class<T> responseClass,
                                                 Consumer<T> onSuccess, Consumer<Exception> onError) {
-        request(ApiEndpoints.url(endpoint), "DELETE", body, null, responseClass, onSuccess, onError);
+        request(ApiEndpoints.url(endpoint), "DELETE", body, Auth.REQUIRED, accountHash, responseClass, onSuccess, onError);
     }
 
     private <T extends ApiResponse> CompletableFuture<T> getFuture(String endpoint, Class<T> type) {
-        return requestFuture(ApiEndpoints.url(endpoint), "GET", null, null, type);
+        return requestFuture(requests, ApiEndpoints.url(endpoint), "GET", null, Auth.NONE, null, type);
     }
 
     /** Exactly one success or error callback, including cancellation and a stopped plugin. */
@@ -347,36 +386,74 @@ public class RevalApiService {
         });
     }
 
-    private <T extends ApiEnvelope> void request(String url, String method, String body, String memberCode,
-                                                 Class<T> type, Consumer<T> success, Consumer<Exception> failure) {
-        observe(requestFuture(url, method, body, memberCode, type), success, failure);
-    }
-
-    private <T extends ApiEnvelope> CompletableFuture<T> requestFuture(String url, String method, String body,
-                                                                      String memberCode, Class<T> type) {
-        return requestFuture(requests, url, method, body, memberCode, type);
+    private <T extends ApiEnvelope> void request(String url, String method, String body, Auth auth,
+                                                 Long accountHash, Class<T> type,
+                                                 Consumer<T> success, Consumer<Exception> failure) {
+        observe(requestFuture(requests, url, method, body, auth, accountHash, type), success, failure);
     }
 
     private <T extends ApiEnvelope> CompletableFuture<T> requestFuture(RequestScope scope, String url, String method,
-                                                                      String body, String memberCode, Class<T> type) {
-        Request.Builder request = new Request.Builder().url(url)
-            .header("Accept", "application/json").header("User-Agent", PluginVersion.userAgent());
-        if (memberCode != null && !memberCode.isEmpty()) request.header("X-Member-Code", memberCode);
+                                                                      String body, Auth auth, Long accountHash, Class<T> type) {
+        HttpUrl parsed = HttpUrl.parse(url);
+        if (parsed == null) return CompletableFuture.failedFuture(new IOException("Invalid request URL"));
+        final LinkTokenManager.Grant grant;
+        try { grant = auth == Auth.REQUIRED ? tokens.grantForCurrentAccount(parsed, accountHash) : null; }
+        catch (LinkException error) { return CompletableFuture.failedFuture(error); }
+        LinkTokenManager.Login login = tokens.currentLogin();
+        BooleanSupplier current = () -> grant == null ? tokens.isCurrent(login) : tokens.isCurrent(grant);
+        Request.Builder request = new Request.Builder().url(parsed)
+            .header("Accept", "application/json").header("User-Agent", PluginVersion.userAgent())
+            .header("Content-Type", "application/json");
+        if (grant != null) grant.applyTo(request);
         RequestBody payload = body == null ? null : RequestBody.create(JSON, body.getBytes(StandardCharsets.UTF_8));
         if ("POST".equals(method)) request.post(payload != null ? payload : RequestBody.create(JSON, new byte[0]));
         else if ("DELETE".equals(method)) request.delete(payload);
-        return scope.request(httpClient, request.build(), response -> {
-            String json = response.body() == null ? null : response.body().string();
-            T parsed = null;
-            if (json != null && !json.isEmpty()) {
-                try { parsed = gson.fromJson(json, type); }
-                catch (RuntimeException error) { if (response.isSuccessful()) throw error; }
+        CompletableFuture<T> transport = scope.request(grant == null ? httpClient : credentialedClient(), request.build(), response -> {
+            tokens.observeServerTime(response);
+            if (!current.getAsBoolean()) throw new CancellationException();
+            if (response.isRedirect()) throw new IOException("Unexpected redirect from the Reval API");
+            if (!response.isSuccessful()) {
+                ServerError error = ServerError.read(response, gson);
+                if (grant != null && response.code() == 401) {
+                    if (error.is(ServerError.INVALID_PLUGIN_CREDENTIAL)) {
+                        tokens.rejected(grant);
+                        throw new LinkException(LinkException.Kind.EXPIRED);
+                    }
+                    throw new LinkException(LinkException.Kind.REFUSED);
+                }
+                throw new IOException(failureMessage(error, type, response.code()));
             }
-            if (!response.isSuccessful()) throw new IOException(parsed != null && parsed.getErrorMessage() != null
-                ? parsed.getErrorMessage() : "HTTP " + response.code());
-            if (parsed == null) throw new IOException("Empty or invalid response");
-            if (!parsed.isSuccess()) throw new IOException(parsed.getErrorMessage() != null ? parsed.getErrorMessage() : "Request failed");
-            return parsed;
+            if (response.body() == null) throw new IOException("Empty response body");
+            T value = gson.fromJson(response.body().string(), type);
+            if (!current.getAsBoolean()) throw new CancellationException();
+            if (value == null) throw new IOException("Empty or invalid response");
+            if (!value.isSuccess()) throw new IOException(value.getErrorMessage() != null ? value.getErrorMessage() : "Request failed");
+            return value;
         });
+        CompletableFuture<T> result = scope.track(new CompletableFuture<>());
+        result.whenComplete((value, error) -> { if (result.isCancelled()) transport.cancel(false); });
+        transport.whenComplete((value, error) -> {
+            // Cancellation still completes the caller, without exposing stale data or old errors.
+            // A terminal credential rejection keeps its explanation for the original login.
+            if (!current.getAsBoolean() && !(error instanceof LinkException && tokens.isCurrent(login)))
+                result.cancel(false);
+            else if (error != null) result.completeExceptionally(error);
+            else result.complete(value);
+        });
+        return result;
+    }
+
+    /** The server's reason from an already-read error body, in the shape of the envelope the caller expects, else the status. */
+    private <T extends ApiEnvelope> String failureMessage(ServerError error, Class<T> responseClass, int status) {
+        T envelope = null;
+        if (error.json() != null) {
+            try {
+                envelope = gson.fromJson(error.json(), responseClass);
+            } catch (RuntimeException ignored) {
+                // not the expected shape
+            }
+        }
+        String message = envelope != null ? ServerError.oneLine(envelope.getErrorMessage()) : null;
+        return message != null ? message : "HTTP " + status;
     }
 }

@@ -318,7 +318,7 @@ public class CompetitionsPanelTest {
         final List<String> detailIds = new ArrayList<>();
         final List<Consumer<CompetitionDetailsResponse>> pending = new ArrayList<>();
 
-        FakeApi() { super(null, null, null); }
+        FakeApi() { super(null, null, null, null); }
 
         @Override public void fetchFeaturedRace(Consumer<FeaturedRaceResponse> ok, Consumer<Exception> error) {
             FeaturedRaceResponse response = new FeaturedRaceResponse();

@@ -32,7 +32,7 @@ public class ClanBrowserPaintingTest {
             LookAndFeel previous = UIManager.getLookAndFeel();
             RuneLiteLAF.setup();
             ClanBrowserWindow window = new ClanBrowserWindow(null,
-                new BrowserApi(new OkHttpClient(), new Gson()), id -> null);
+                new BrowserApi(new OkHttpClient(), new Gson(), org.mockito.Mockito.mock(com.revalclan.auth.LinkTokenManager.class)), id -> null);
             try {
                 // Record the pixels presented by Swing, rather than sampling the desktop.
                 BufferedImage presented = new BufferedImage(1180, 820, BufferedImage.TYPE_INT_RGB);
