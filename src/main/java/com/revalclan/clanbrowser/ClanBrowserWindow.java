@@ -46,6 +46,7 @@ public final class ClanBrowserWindow extends JFrame {
     private final JPanel extra = panel(new BorderLayout());
     private final JPanel tools = panel(new BorderLayout(8, 0));
     private final JComboBox<String> tiers = new JComboBox<>(new String[]{"All tiers", "Beginner", "Easy", "Medium", "Hard", "Elite", "Master"});
+    private final JComboBox<String> dryModes = new JComboBox<>(new String[]{"Current", "Historical"});
     private final JTextField search = new JTextField();
     private final JButton findMe = BrowserTheme.button("Find me");
     private final JProgressBar loading = progressBar(10);
@@ -112,6 +113,11 @@ public final class ClanBrowserWindow extends JFrame {
         controls.add(modes); controls.add(javax.swing.Box.createVerticalStrut(9));
         choices.setBorder(BorderFactory.createEmptyBorder(0, 0, 9, 0));
         choices.add(selection, BorderLayout.CENTER);
+        choices.add(dryModes, BorderLayout.EAST);
+        dryModes.getAccessibleContext().setAccessibleName("Dryboard mode");
+        dryModes.setToolTipText("Current drought or longest recorded streak, including ended streaks");
+        dryModes.setFont(BrowserTheme.font(20, false)); dryModes.setForeground(BrowserTheme.TEXT); dryModes.setBackground(BrowserTheme.HEADER); dryModes.setFocusable(false);
+        dryModes.addActionListener(event -> { if (!adjusting) submitSelection(); });
         selection.onSubmit(value -> { if (!adjusting) { configureExtra(); submitSelection(); } });
         boss.onSubmit(value -> { if (!adjusting) submitSelection(); });
         tiers.addActionListener(event -> { if (!adjusting) submitSelection(); });
@@ -188,6 +194,7 @@ public final class ClanBrowserWindow extends JFrame {
         selection.choices(pages);
         selection.placeholder("Search a category, or type cox / tob / toa…");
         selection.value(lastCategory);
+        dryModes.setSelectedItem(command.mode.equals("historical") ? "Historical" : "Current");
         metricButtons.forEach((metric, button) -> highlight(button, metric.equals(lastMetric)));
         boss.choices(catalogue.bosses); boss.placeholder("All bosses, or search a boss…"); boss.value(command.boss == null ? "all" : command.boss);
         tiers.setSelectedItem(command.tier == null || command.tier.equals("all") ? "All tiers" : BrowserTheme.capitalize(command.tier));
@@ -234,6 +241,7 @@ public final class ClanBrowserWindow extends JFrame {
             "bosses".equals(metric) ? boss.value() : null,
             "clues".equals(metric) ? "All tiers".equals(tiers.getSelectedItem()) ? "all" : tiers.getSelectedItem().toString().toLowerCase(Locale.ROOT) : null,
             clog() ? search.getText() : null);
+        if (kind.equals("dryboard")) request = request.withMode("Historical".equals(dryModes.getSelectedItem()) ? "historical" : "current");
         if (request.category != null) lastCategory = request.category;
         if (request.metric != null) lastMetric = request.metric;
         configureExtra(); perform(refresh);
@@ -290,7 +298,9 @@ public final class ClanBrowserWindow extends JFrame {
             else body.removeAll();
             String page = data.page != null ? data.page.label : null;
             title.text = java.util.Arrays.asList("dryboard", "deserved", "luck").contains(data.kind) ? titleFor(data.kind) + " · " + page : data.title;
-            String left = "dryboard".equals(data.kind) ? "Kills since last recorded unique" : page != null ? page : "Full clan standings";
+            boolean historical = "dryboard".equals(data.kind) && "historical".equals(data.mode);
+            if (historical) title.text = "Historical Dryboard · " + page;
+            String left = "dryboard".equals(data.kind) ? historical ? "Longest recorded streak · ended or ongoing" : "Kills since last recorded unique" : page != null ? page : "Full clan standings";
             if ("luck".equals(data.kind) || "deserved".equals(data.kind)) {
                 boolean chasingOnly = !data.rows.isEmpty() && data.rows.stream().allMatch(row -> "progress".equals(row.status));
                 left = chasingOnly ? "Closest to greenlog · Most slots first" : data.metric != null && data.metric.isJsonObject()
@@ -302,6 +312,9 @@ public final class ClanBrowserWindow extends JFrame {
                 configure(new BrowserCommand("clog", data.page.value != null ? data.page.value : data.page.subcategory, null, null, null, name)); perform();
             });
             destination.add(standings, BorderLayout.CENTER);
+            if (historical && data.historyNote != null) {
+                JLabel note = label(data.historyNote, 17, BrowserTheme.MUTED); note.setToolTipText(data.historyNote); destination.add(note, BorderLayout.SOUTH);
+            }
             setTitle("Reval · " + title.text);
         }
         title.repaint(); filter(); body.revalidate(); body.repaint();

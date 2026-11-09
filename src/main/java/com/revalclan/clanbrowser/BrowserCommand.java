@@ -20,8 +20,14 @@ public final class BrowserCommand {
     public final String boss;
     public final String tier;
     public final String player;
+    public final String mode;
 
     public BrowserCommand(String kind, String category, String metric, String boss, String tier, String player) {
+        this(kind, category, metric, boss, tier, player, "current");
+    }
+
+    private BrowserCommand(String kind, String category, String metric, String boss, String tier, String player, String mode) {
+        this.mode = mode;
         this.kind = kind;
         this.category = clean(category);
         this.metric = clean(metric);
@@ -50,6 +56,10 @@ public final class BrowserCommand {
             if (!rest.isEmpty() && !metric.equals("clues") && !metric.equals("bosses")) throw new IllegalArgumentException("This statistic does not need a category.");
             return new BrowserCommand(kind, null, metric, metric.equals("bosses") ? rest : null, metric.equals("clues") ? rest.toLowerCase(Locale.ROOT) : null, null);
         }
+        String mode = "current";
+        if (kind.equals("dryboard") && !words.isEmpty() && Arrays.asList("current", "historical").contains(words.get(0).toLowerCase(Locale.ROOT))) {
+            mode = words.remove(0).toLowerCase(Locale.ROOT);
+        }
         String player = null;
         int playerAt = -1;
         for (int i = 0; i < words.size(); i++) {
@@ -64,7 +74,7 @@ public final class BrowserCommand {
             words = new ArrayList<>(words.subList(0, playerAt));
             if (!kind.equals("clog") || !validPlayer(player)) throw new IllegalArgumentException("Use a valid OSRS name after player: (up to 12 characters).");
         }
-        return new BrowserCommand(kind, words.isEmpty() ? "vorkath" : String.join(" ", words), null, null, null, player);
+        return new BrowserCommand(kind, words.isEmpty() ? "vorkath" : String.join(" ", words), null, null, null, player, mode);
     }
 
     /** Resolve request/cache identities independently of how a command spelled its category. */
@@ -72,7 +82,7 @@ public final class BrowserCommand {
         if (catalogue == null) return this;
         BrowserCommand resolved = resolvePlayerSuffix(catalogue.pages);
         BrowserModels.Choice matched = "bosses".equals(metric) ? match(boss, catalogue.bosses) : null;
-        return matched == null ? resolved : new BrowserCommand(kind, resolved.category, metric, matched.value, tier, resolved.player);
+        return matched == null ? resolved : new BrowserCommand(kind, resolved.category, metric, matched.value, tier, resolved.player, resolved.mode);
     }
 
     private static BrowserModels.Choice match(String value, List<? extends BrowserModels.Choice> choices) {
@@ -118,12 +128,16 @@ public final class BrowserCommand {
         return new BrowserCommand(kind, bestPage.value, metric, boss, tier, tail);
     }
 
-    public BrowserCommand withCategory(String value) { return new BrowserCommand(kind, value, metric, boss, tier, player); }
+    public BrowserCommand withCategory(String value) { return new BrowserCommand(kind, value, metric, boss, tier, player, mode); }
     public BrowserCommand resolveShared(List<BrowserModels.Page> pages, String sender) {
         BrowserCommand resolved = resolvePlayerSuffix(pages);
         return resolved.kind.equals("clog") && resolved.player == null && validPlayer(sender) ? resolved.withPlayer(sender) : resolved;
     }
-    public BrowserCommand withPlayer(String value) { return new BrowserCommand(kind, category, metric, boss, tier, value); }
+    public BrowserCommand withPlayer(String value) { return new BrowserCommand(kind, category, metric, boss, tier, value, mode); }
+    public BrowserCommand withMode(String value) {
+        if (!kind.equals("dryboard") || !Arrays.asList("current", "historical").contains(value)) throw new IllegalArgumentException("Choose Current or Historical for Dryboard.");
+        return new BrowserCommand(kind, category, metric, boss, tier, player, value);
+    }
     public static String normalize(String value) { return value == null ? "" : value.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", " ").trim(); }
     public static boolean validPlayer(String value) { return value != null && value.matches("[a-zA-Z0-9 _-]{1,12}"); }
     private static String clean(String value) { return value == null || value.trim().isEmpty() ? null : value.trim(); }
@@ -131,6 +145,7 @@ public final class BrowserCommand {
     public Map<String, String> parameters(long accountHash) {
         Map<String, String> values = new LinkedHashMap<>();
         values.put("command", kind);
+        if (kind.equals("dryboard") && mode.equals("historical")) values.put("mode", mode);
         if (!kind.equals("leaderboard") && category != null) values.put("category", category);
         if (kind.equals("leaderboard") && metric != null) values.put("metric", metric);
         if (kind.equals("leaderboard") && boss != null) values.put("boss", boss);

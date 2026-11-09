@@ -36,6 +36,9 @@ final class BrowserHelpView extends JPanel implements Scrollable {
         categories.add(text("Highest counter to finish a greenlog first.",18,BrowserTheme.MUTED,1)); gap(categories,7);
         categories.add(code("!reval dryboard vorkath",1));
         categories.add(text("Kills since the last recorded unique drop.\nDuplicate uniques reset the streak. Bosses and raids only.",18,BrowserTheme.MUTED,2));
+        gap(categories,7);
+        categories.add(code("!reval dryboard historical vorkath",1));
+        categories.add(text("Longest recorded streak, ended or ongoing.\nHistorical mode uses recorded history; missing drops may hide resets.",18,BrowserTheme.MUTED,2));
         add(row(logs,categories)); gap(12);
 
         JPanel boards=card("Clan leaderboards",BrowserTheme.GOLD);

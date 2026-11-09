@@ -241,7 +241,7 @@ final class BoardChatLinks {
             case "clog": return command.player + "'s collection log: " + title(command.category);
             case "luck": return title(command.category) + " luck board";
             case "deserved": return title(command.category) + " deserved board";
-            case "dryboard": return title(command.category) + " dryboard";
+            case "dryboard": return title(command.category) + (command.mode.equals("historical") ? " historical dryboard" : " dryboard");
             default:
                 String metric;
                 switch (command.metric) {
