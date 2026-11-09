@@ -1,5 +1,6 @@
 package com.revalclan;
 
+import com.revalclan.ui.constants.PanelTheme;
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
@@ -30,6 +31,17 @@ public interface RevalClanConfig extends Config {
 	)
 	default boolean hideCompletedItems() {
 		return false;
+	}
+
+	@ConfigItem(
+		keyName = "theme",
+		name = "Theme",
+		description = "Seasonal follows the holiday calendar; Regular always uses the standard theme. Changes apply immediately.",
+		section = panelSection,
+		position = 1
+	)
+	default PanelTheme theme() {
+		return PanelTheme.SEASONAL;
 	}
 
 	// ── Events ─────────────────────────────────────────────────────────

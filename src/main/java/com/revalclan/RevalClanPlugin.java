@@ -20,6 +20,7 @@ import com.revalclan.util.ClanMembership;
 import com.revalclan.ui.RevalPanel;
 import com.revalclan.ui.components.SeasonalDecoration;
 import com.revalclan.ui.constants.Season;
+import com.revalclan.ui.constants.PanelTheme;
 import com.revalclan.ui.constants.UIConstants;
 import com.revalclan.util.AnnouncementService;
 import com.revalclan.util.ClanRankIconResolver;
@@ -218,9 +219,9 @@ public class RevalClanPlugin extends Plugin {
 		}
 	}
 
-	/** Build the side panel in the season's appearance (see Season.on). */
+	/** Build the side panel using the configured appearance. */
 	private void buildSidepanel() {
-		UIConstants.setSeason(Season.current());
+		UIConstants.setSeason(configuredSeason());
 		revalPanel = new RevalPanel();
 		revalPanel.init(revalApiService, client, uiAssetLoader, itemManager, spriteManager, config,
 			rankIconResolver);
@@ -249,6 +250,22 @@ public class RevalClanPlugin extends Plugin {
 		if (client.getGameState() == GameState.LOGGED_IN && clanMembership.isMember()) {
 			revalPanel.onLoggedIn();
 		}
+	}
+
+	private Season configuredSeason() {
+		return config.theme() == PanelTheme.REGULAR ? Season.NONE : Season.current();
+	}
+
+	/** Recreate components whose colours and decorations are chosen at construction. */
+	private void rebuildSidepanel() {
+		if (revalPanel == null || UIConstants.season() == configuredSeason()) return;
+		String selectedTab = revalPanel.getSelectedTab();
+		boolean wasOpen = revalPanel.getWrappedPanel().isShowing();
+		revalPanel.shutDown();
+		clientToolbar.removeNavigation(navButton);
+		buildSidepanel();
+		revalPanel.showTab(selectedTab);
+		if (wasOpen) clientToolbar.openPanel(navButton);
 	}
 
 	@Override
@@ -533,7 +550,9 @@ public class RevalClanPlugin extends Plugin {
 	public void onConfigChanged(ConfigChanged event) {
 		if (!"revalclan".equals(event.getGroup())) return;
 
-		if ("hideCompletedItems".equals(event.getKey()) && revalPanel != null) {
+		if ("theme".equals(event.getKey())) {
+			SwingUtilities.invokeLater(lifecycle.guard(this::rebuildSidepanel));
+		} else if ("hideCompletedItems".equals(event.getKey()) && revalPanel != null) {
 			revalPanel.getProfilePanel().rebuild();
 		}
 	}

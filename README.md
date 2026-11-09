@@ -11,6 +11,10 @@ Christmas adds a cocoa
 palette, snowy gingerbread houses, peppermint tabs, icing on profile cards, and a
 gingerbread toolbar icon. Other months use the normal appearance.
 
+Choose **Panel Settings → Theme → Seasonal** (default) to follow this calendar,
+or **Regular** to always use the standard appearance. Switching themes updates
+the panel and toolbar icon immediately and keeps the selected sidebar tab.
+
 For a local preview, start the development client with the JVM property
 `-Dreval.season=christmas` or `none`.
 

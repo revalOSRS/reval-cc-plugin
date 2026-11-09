@@ -56,7 +56,7 @@ public class RevalPanel extends PluginPanel {
 
 	private JButton leaderboardTab;
 	private final Map<String, JButton> navTabs = new HashMap<>();
-	private String selectedTab = "PROFILE";
+	@Getter private String selectedTab = "PROFILE";
 	// Accessed only on the EDT. Public data survives validated login changes.
 	private final Map<String, Runnable> publicLoads = new HashMap<>();
 	private final Map<String, Runnable> memberLoads = new HashMap<>();
