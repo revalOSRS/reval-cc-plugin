@@ -44,7 +44,7 @@ public class LootNotifier extends BaseNotifier {
 	/** Ticks to hold a loot payload before sending (correlation window). */
 	private static final int LOOT_BUFFER_TICKS = 2;
 
-	/** How many ticks a clog announcement stays eligible for matching. */
+	/** Non-raid loot and its clog message arrive together; raid chests can be opened much later. */
 	private static final int CLOG_MESSAGE_TTL_TICKS = 10;
 
 	/** Ticks a self-dropped item stays suspect for ground-spawn loot attribution. */
@@ -53,7 +53,7 @@ public class LootNotifier extends BaseNotifier {
 	/** The swap is same-tick with the loot event; slack only absorbs event ordering. */
 	private static final int UNEQUIP_SUSPECT_TICKS = 2;
 
-	/** Lowercased item name → tick the clog announcement was seen on. */
+	/** Unmatched announcements, bounded by the game's clog slots and cleared at session reset. */
 	private final Map<String, Integer> recentClogItems = new HashMap<>();
 
 	/** Item id → observed self-drop by the local player. */
@@ -609,12 +609,15 @@ public class LootNotifier extends BaseNotifier {
 							String name = String.valueOf(item.get("name")).toLowerCase();
 							Integer seenTick = recentClogItems.get(name);
 							boolean isNewClogSlot = seenTick != null
-								&& tickCounter - seenTick <= CLOG_MESSAGE_TTL_TICKS;
+								&& (RaidPartyTracker.raidOf((String) pending.lootData.get("source")) != null
+									|| tickCounter - seenTick <= CLOG_MESSAGE_TTL_TICKS);
 							item.put("isNewCollectionLogItem", isNewClogSlot);
 
 							if (item.get("suspectReason") != null) {
 								suspectedItems.add(item);
 							} else {
+								// An announcement belongs to one obtain, including two buffered drops of the same item.
+								if (isNewClogSlot) recentClogItems.remove(name);
 								cleanItems.add(item);
 								Integer id = (Integer) item.get("id");
 								if (collectionLogManager.getAllCollectionLogItems().contains(id)) clogIds.add(id);
@@ -640,11 +643,6 @@ public class LootNotifier extends BaseNotifier {
 					}
 				}
 			}
-		}
-
-		// Expire stale clog announcements so the map can't grow unbounded
-		if (!recentClogItems.isEmpty()) {
-			recentClogItems.values().removeIf(tick -> tickCounter - tick > CLOG_MESSAGE_TTL_TICKS);
 		}
 
 		// Expire provenance entries once they can no longer match a buffered payload
