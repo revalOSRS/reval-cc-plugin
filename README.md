@@ -250,7 +250,7 @@ Created by **Lightroom** for the Reval clan community.
 
 ## Version
 
-Current Version: 2.25.0
+Current Version: 2.25.1
 
 ## Acknowledgments
 
