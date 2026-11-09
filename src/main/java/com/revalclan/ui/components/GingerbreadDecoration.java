@@ -266,17 +266,19 @@ final class GingerbreadDecoration {
     /** Royal icing band with rounded drips; used on the header, tabs and cards. */
     static void icing(Graphics2D g, double x, double w, double y, double band, long seed, double maxDrip, boolean sprinkles) {
         Random r = new Random(seed);
-        Area icing = new Area(new Rectangle2D.Double(x, y - 3, w, band + 3));
+        // Fill overlapping subpaths together; boolean unions of these curves stall UI repaints.
+        Path2D icing = new Path2D.Double(Path2D.WIND_NON_ZERO);
+        icing.append(new Rectangle2D.Double(x, y - 3, w, band + 3), false);
         double cx = x;
         while (cx < x + w) {
             double seg = 3.2 + r.nextDouble() * 3.2;
-            icing.add(new Area(new Ellipse2D.Double(cx, y + band - 1.4, seg, 2.6)));
+            icing.append(new Ellipse2D.Double(cx, y + band - 1.4, seg, 2.6), false);
             cx += seg;
         }
         for (double dx = x + 4 + r.nextDouble() * 4; dx < x + w - 4; dx += 5 + r.nextDouble() * 9) {
             double len = 1 + r.nextDouble() * maxDrip, dw = 1.7 + r.nextDouble() * .7;
-            icing.add(new Area(new RoundRectangle2D.Double(dx - dw / 2, y + band - .5, dw, len, dw, dw)));
-            icing.add(new Area(new Ellipse2D.Double(dx - dw * .62, y + band + len - dw * .9, dw * 1.24, dw * 1.24)));
+            icing.append(new RoundRectangle2D.Double(dx - dw / 2, y + band - .5, dw, len, dw, dw), false);
+            icing.append(new Ellipse2D.Double(dx - dw * .62, y + band + len - dw * .9, dw * 1.24, dw * 1.24), false);
         }
         g.setColor(Colors.withAlpha(SHADOW, 190));
         g.fill(AffineTransform.getTranslateInstance(0, .7).createTransformedShape(icing));
