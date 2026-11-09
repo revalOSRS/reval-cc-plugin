@@ -38,12 +38,12 @@ public class Badge extends JLabel {
 		super.paintComponent(g);
 	}
 
-	private static String capitalize(String s) {
+	public static String capitalize(String s) {
 		if (s == null || s.isEmpty()) return "Unknown";
 		return s.substring(0, 1).toUpperCase() + s.substring(1).toLowerCase();
 	}
 
-	private static Color getDifficultyColor(String difficulty) {
+	public static Color getDifficultyColor(String difficulty) {
 		if (difficulty == null) return UIConstants.TEXT_SECONDARY;
 		switch (difficulty.toLowerCase()) {
 			case "easy": return UIConstants.TIER_EASY;
@@ -56,7 +56,7 @@ public class Badge extends JLabel {
 		}
 	}
 
-	private static Color getRarityColor(String rarity) {
+	public static Color getRarityColor(String rarity) {
 		if (rarity == null) return UIConstants.RARITY_COMMON;
 		switch (rarity.toLowerCase()) {
 			case "common": return UIConstants.RARITY_COMMON;

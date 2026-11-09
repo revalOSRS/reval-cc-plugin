@@ -7,7 +7,6 @@ import java.util.Locale;
 /** Seasonal side-panel appearance, chosen from the date when the panel is built. */
 public enum Season {
 	NONE(null, "Reval Clan"),
-	HALLOWEEN("HALLOWEEN AT REVAL", "Reval Clan - Halloween"),
 	CHRISTMAS("CHRISTMAS AT REVAL", "Reval Clan - Christmas");
 
 	/** Line under the panel title; null without a season. */
@@ -19,14 +18,12 @@ public enum Season {
 		this.tooltip = tooltip;
 	}
 
-	/** Halloween from 1 August until 1 November, Christmas from 1 December until 1 January. */
+	/** Christmas from 1 December until 1 January. */
 	public static Season on(LocalDate date) {
-		Month month = date.getMonth();
-		if (month == Month.DECEMBER) return CHRISTMAS;
-		return month.compareTo(Month.AUGUST) >= 0 && month.compareTo(Month.OCTOBER) <= 0 ? HALLOWEEN : NONE;
+		return date.getMonth() == Month.DECEMBER ? CHRISTMAS : NONE;
 	}
 
-	/** Today's season. A dev client can preview one with -Dreval.season=christmas (or halloween, none). */
+	/** Today's season. A dev client can preview one with -Dreval.season=christmas (or none). */
 	public static Season current() {
 		String preview = System.getProperty("reval.season");
 		for (Season season : values()) {

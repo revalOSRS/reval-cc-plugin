@@ -275,20 +275,7 @@ public class CollectionLogManager {
 			.additionalKC("entry_mode", 3645)
 			.additionalKC("expert_mode", 3647);
 
-		// ===== CLUES =====
-		kc("beginner_treasure_trails").primaryKC(true, 11996);
-		kc("easy_treasure_trails").primaryKC(true, 11997);
-		kc("medium_treasure_trails").primaryKC(true, 11998);
-		kc("hard_treasure_trails").primaryKC(true, 11999);
-		kc("elite_treasure_trails").primaryKC(true, 12000);
-		kc("master_treasure_trails").primaryKC(true, 12001);
-		kc("hard_treasure_trails_rare").primaryKC(true, 11999);
-		kc("elite_treasure_trails_rare").primaryKC(true, 12000);
-		kc("master_treasure_trails_rare").primaryKC(true, 12001);
-
 		// ===== MINIGAMES =====
-		kc("barbarian_assault").primaryKC(1605);
-
 		kc("guardians_of_the_rift")
 			.primaryKC(3397)
 			.additionalKC("rifts_closed", 3397);
@@ -469,12 +456,6 @@ public class CollectionLogManager {
 			for (Map.Entry<String, Integer> page : categoryStructIdMap.entrySet()) {
 				Set<Integer> items = categoryItemMap.get(page.getValue());
 				if (items != null && !Collections.disjoint(items, itemIds)) pages.add(page.getKey());
-			}
-			// Shared clue pages need all six counters to retain a meaningful total.
-			if (pages.stream().anyMatch(page -> page.contains("treasure_trail") || page.equals("scroll_cases"))) {
-				for (String page : categoryKCMap.keySet()) {
-					if (page.contains("treasure_trail")) pages.add(page);
-				}
 			}
 		}
 		if (pages.contains("the_nightmare")) pages.add("phosanis_nightmare");

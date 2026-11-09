@@ -5,6 +5,7 @@ import com.revalclan.api.points.PointsResponse;
 import com.revalclan.ui.components.*;
 import com.revalclan.ui.constants.UIConstants;
 import com.revalclan.util.ClanRankIconResolver;
+import com.revalclan.util.RankNames;
 import com.revalclan.util.SpriteIcons;
 import net.runelite.api.SpriteID;
 import net.runelite.client.game.ItemManager;
@@ -51,7 +52,7 @@ public class RankingPanel extends JPanel {
 		loadingLabel = Labels.small("Loading...", UIConstants.TEXT_SECONDARY);
 		loadingLabel.setHorizontalAlignment(SwingConstants.CENTER);
 
-		showPlaceholder();
+		showLoading();
 		add(ScrollWrap.of(contentPanel), BorderLayout.CENTER);
 	}
 
@@ -81,35 +82,6 @@ public class RankingPanel extends JPanel {
 		gbc.insets = new Insets(height / 2, 0, height / 2, 0);
 		contentPanel.add(Box.createVerticalStrut(height), gbc);
 		gbc.insets = new Insets(1, 0, 1, 0);
-	}
-
-	private void showPlaceholder() {
-		contentPanel.removeAll();
-		gridY = 0;
-
-		JPanel panel = new JPanel();
-		panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
-		panel.setBackground(UIConstants.BACKGROUND);
-		panel.setBorder(new EmptyBorder(30, 10, 10, 10));
-
-		JLabel title = new PanelTitle("RANKING");
-		title.setAlignmentX(Component.CENTER_ALIGNMENT);
-
-		JLabel subtitle = Labels.small("Ranks & Points", UIConstants.TEXT_SECONDARY);
-		subtitle.setAlignmentX(Component.CENTER_ALIGNMENT);
-
-		JLabel hint = Labels.small("Loading data...", UIConstants.TEXT_SECONDARY);
-		hint.setAlignmentX(Component.CENTER_ALIGNMENT);
-
-		panel.add(title);
-		panel.add(Box.createRigidArea(new Dimension(0, 4)));
-		panel.add(subtitle);
-		panel.add(Box.createRigidArea(new Dimension(0, 10)));
-		panel.add(hint);
-
-		addComponent(panel);
-		contentPanel.revalidate();
-		contentPanel.repaint();
 	}
 
 	private void showLoading() {
@@ -280,15 +252,6 @@ public class RankingPanel extends JPanel {
 		if (name.equals("TFA_CAPES")) return "TFA Capes";
 		if (name.toLowerCase().equals("valuable_pvm_drops")) return "Valuable Drops";
 
-		// Default: capitalize words ("COLLECTION_LOG" -> "Collection Log")
-		StringBuilder result = new StringBuilder();
-		for (String word : name.split("[_\\s]+")) {
-			if (result.length() > 0) result.append(" ");
-			if (!word.isEmpty()) {
-				result.append(Character.toUpperCase(word.charAt(0)));
-				if (word.length() > 1) result.append(word.substring(1).toLowerCase());
-			}
-		}
-		return result.toString();
+		return name.isEmpty() ? name : RankNames.display(name); // "COLLECTION_LOG" -> "Collection Log"
 	}
 }

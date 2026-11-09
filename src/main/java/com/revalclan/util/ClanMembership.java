@@ -1,9 +1,13 @@
 package com.revalclan.util;
 
-import com.revalclan.util.ClanValidator.Probe;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
+import net.runelite.api.clan.ClanChannel;
+import net.runelite.api.clan.ClanChannelMember;
+import net.runelite.api.clan.ClanMember;
+import net.runelite.api.clan.ClanRank;
+import net.runelite.api.clan.ClanSettings;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -19,12 +23,20 @@ import javax.inject.Singleton;
  * screen so every login re-proves it (an alt that is not in Reval is simply
  * never proven).
  *
+ * Two sources, verified in-client (2026-09-10): the clan settings (the clan
+ * the account belongs to; loaded 2–5 ticks after login/hop, survives a left
+ * channel, relog and restart — authoritative) and the clan channel (null for
+ * ~4 ticks after every hop, null once the player leaves it, possibly stale at
+ * LOGGING_IN — only an accelerator).
+ *
  * The backend is the final authority (it knows the roster from Wise Old Man);
  * this gate only decides what the client bothers to send.
  */
 @Slf4j
 @Singleton
 public class ClanMembership {
+	public static final String CLAN_NAME = "Reval";
+
 	@Inject private Client client;
 
 	private volatile boolean member = false;
@@ -44,15 +56,34 @@ public class ClanMembership {
 		String name = client.getLocalPlayer().getName();
 		if (name == null) return false;
 
-		Probe settings = ClanValidator.probeSettings(client, name);
-		if (settings != Probe.MEMBER && ClanValidator.probeChannel(client, name) != Probe.MEMBER) return false;
+		boolean bySettings = inSettings(name);
+		if (!bySettings && !inChannel(name)) return false;
 		member = true;
-		log.info("Clan membership proven (settings={})", settings);
+		log.info("Clan membership proven (settings={})", bySettings);
 		return true;
 	}
 
 	/** New login must re-prove membership. */
 	public void reset() {
 		member = false;
+	}
+
+	private boolean inSettings(String name) {
+		ClanSettings settings = client.getClanSettings();
+		if (settings == null || !CLAN_NAME.equalsIgnoreCase(settings.getName())) return false;
+		ClanMember m = settings.findMember(name);
+		return m != null && rankOk(m.getRank());
+	}
+
+	private boolean inChannel(String name) {
+		ClanChannel channel = client.getClanChannel();
+		if (channel == null || !CLAN_NAME.equalsIgnoreCase(channel.getName())) return false;
+		ClanChannelMember m = channel.findMember(name);
+		return m != null && rankOk(m.getRank());
+	}
+
+	/** Guests in the clan channel carry a negative rank. */
+	private static boolean rankOk(ClanRank rank) {
+		return rank == null || rank.getRank() >= 0;
 	}
 }

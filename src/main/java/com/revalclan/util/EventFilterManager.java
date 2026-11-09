@@ -84,10 +84,7 @@ public class EventFilterManager{
 		private boolean collectionEnabled = true;
 		private boolean deathEnabled = true;
 		private boolean detailedKillEnabled = true;
-		private boolean emoteEnabled = true;
 		private boolean chatEnabled = true;
-		private boolean musicEnabled = true;
-		private boolean leaguesEnabled = false;
 	}
 	
 	@Inject
@@ -239,10 +236,7 @@ public class EventFilterManager{
 				newFilters.collectionEnabled = flag(enabled, "collection", newFilters.collectionEnabled);
 				newFilters.deathEnabled = flag(enabled, "death", newFilters.deathEnabled);
 				newFilters.detailedKillEnabled = flag(enabled, "detailedKill", newFilters.detailedKillEnabled);
-				newFilters.emoteEnabled = flag(enabled, "emote", newFilters.emoteEnabled);
 				newFilters.chatEnabled = flag(enabled, "chat", newFilters.chatEnabled);
-				newFilters.musicEnabled = flag(enabled, "music", newFilters.musicEnabled);
-				newFilters.leaguesEnabled = flag(enabled, "leagues", newFilters.leaguesEnabled);
 			}
 			
 			return newFilters;

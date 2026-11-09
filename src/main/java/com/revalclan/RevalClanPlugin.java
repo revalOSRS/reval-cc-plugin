@@ -27,7 +27,6 @@ import com.revalclan.util.EventFilterManager;
 import com.revalclan.util.RaidPartyTracker;
 import com.revalclan.util.SyncStateManager;
 import com.revalclan.util.UIAssetLoader;
-import com.revalclan.util.Worlds;
 import com.revalclan.util.WebhookService;
 import com.revalclan.util.RequestScope;
 import com.google.inject.Provides;
@@ -51,7 +50,6 @@ import net.runelite.api.gameval.VarClientID;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.HitsplatApplied;
 import net.runelite.api.events.InteractingChanged;
-import net.runelite.api.events.MenuOptionClicked;
 import net.runelite.api.events.NpcDespawned;
 import net.runelite.api.events.ActorDeath;
 import net.runelite.api.events.ChatMessage;
@@ -119,15 +117,7 @@ public class RevalClanPlugin extends Plugin {
 	@Inject	private KillTracker killTracker;
 	@Inject	private RaidPartyTracker raidPartyTracker;
 
-	@Inject	private EmoteNotifier emoteNotifier;
-
 	@Inject	private ChatNotifier chatNotifier;
-
-	@Inject	private MusicNotifier musicNotifier;
-
-	@Inject	private LeaguesNotifier leaguesNotifier;
-
-	@Inject	private LeaguesSyncNotifier leaguesSyncNotifier;
 
 	@Inject	private LoginNotifier loginNotifier;
 
@@ -379,12 +369,6 @@ public class RevalClanPlugin extends Plugin {
 	private void onClanValidated() {
 		eventFilterManager.setOnFiltersApplied(varbitNotifier::syncBaselines);
 
-		// Fetch leagues config if on a seasonal world
-		if (Worlds.isSeasonal(client)) {
-			leaguesNotifier.fetchConfig();
-			leaguesSyncNotifier.onLogin();
-		}
-
 		if (pendingLoginNotification) {
 			pendingLoginNotification = false;
 			loginNotifier.onLogin(this::onChanges);
@@ -433,8 +417,6 @@ public class RevalClanPlugin extends Plugin {
 		killCountNotifier.onTick();
 		diaryNotifier.onGameTick();
 		petNotifier.onGameTick();
-		leaguesNotifier.onGameTick();
-		leaguesSyncNotifier.onGameTick();
 
 		eventFilterManager.onGameTick();
 
@@ -491,7 +473,6 @@ public class RevalClanPlugin extends Plugin {
 			clueNotifier.onChatMessage(cleanMessage);
 			combatAchievementNotifier.onChatMessage(cleanMessage);
 			collectionNotifier.onChatMessage(cleanMessage);
-			leaguesNotifier.onChatMessage(cleanMessage);
 		} else if (type == ChatMessageType.CLAN_MESSAGE) {
 			petNotifier.onClanNotification(cleanMessage);
 		}
@@ -508,7 +489,6 @@ public class RevalClanPlugin extends Plugin {
 		if (!clanMembership.isMember()) return;
 		questNotifier.onWidgetLoaded(event);
 		clueNotifier.onWidgetLoaded(event);
-		leaguesSyncNotifier.onWidgetLoaded(event);
 	}
 
 	@Subscribe
@@ -534,13 +514,6 @@ public class RevalClanPlugin extends Plugin {
 		// Not gated on membership: must always evict the accumulator entry
 		// so damaged-but-never-died NPCs don't pin memory
 		killTracker.onNpcDespawned(event);
-	}
-
-	@Subscribe
-	public void onMenuOptionClicked(MenuOptionClicked event) {
-		if (!clanMembership.isMember()) return;
-		emoteNotifier.onMenuOptionClicked(event);
-		musicNotifier.onMenuOptionClicked(event);
 	}
 
 	@Subscribe

@@ -34,6 +34,6 @@ final class WebhookCapacity {
 		if (!(type instanceof String)) return false;
 		String event = (String) type;
 		return event.equals("LOGIN") || event.equals("LOGOUT") || event.equals("SYNC")
-			|| event.equals("LEAGUES_SYNC") || event.startsWith("SESSION_");
+			|| event.startsWith("SESSION_");
 	}
 }

@@ -61,17 +61,7 @@ public class AchievementDiaryManager {
 			for (Map.Entry<String, Integer> tierEntry : regionEntry.getValue().entrySet()) {
 				String tier = tierEntry.getKey();
 				int varbitId = tierEntry.getValue();
-				int value = client.getVarbitValue(varbitId);
-				
-				// Karamja Easy (3578), Medium (3599), Hard (3611) special case
-				// 0 = not started, 1 = started, 2 = completed
-				boolean isComplete;
-				if (varbitId == 3578 || varbitId == 3599 || varbitId == 3611) {
-					isComplete = value > 1;
-				} else {
-					isComplete = value > 0;
-				}
-				
+				boolean isComplete = isComplete(varbitId, client.getVarbitValue(varbitId));
 				tierProgress.put(tier, isComplete);
 				
 				if (isComplete) {
@@ -87,6 +77,12 @@ public class AchievementDiaryManager {
 		diaryData.put("totalDiaries", 48); // 12 regions * 4 tiers
 		
 		return diaryData;
+	}
+
+	/** Karamja Easy/Medium/Hard (3578, 3599, 3611) count 0 = not started, 1 = started, 2 = done; every other diary varbit is done when > 0. */
+	public static boolean isComplete(int varbitId, int value) {
+		boolean karamja = varbitId == 3578 || varbitId == 3599 || varbitId == 3611;
+		return value > (karamja ? 1 : 0);
 	}
 }
 

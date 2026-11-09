@@ -29,6 +29,7 @@ import java.awt.*;
 import java.text.DecimalFormat;
 import java.util.*;
 import java.util.List;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 public class ProfilePanel extends JPanel {
@@ -185,6 +186,15 @@ public class ProfilePanel extends JPanel {
 	}
 
 	public void loadAccount(long accountHash) {
+		load((ok, err) -> apiService.fetchAccount(accountHash, ok, err), true, "Failed to fetch account data");
+	}
+
+	public void loadAccountById(int osrsAccountId) {
+		load((ok, err) -> apiService.fetchAccountById(osrsAccountId, ok, err), false, "Player not found");
+	}
+
+	/** Shared load flow; only the logged-in player's own account notifies onAccountLoaded. */
+	private void load(BiConsumer<Consumer<AccountResponse>, Consumer<Exception>> fetch, boolean own, String fallbackError) {
 		if (!viewScope.isActive() || isLoading) return;
 		accountScope.cancel();
 		RequestScope owner = accountScope = new RequestScope();
@@ -192,7 +202,7 @@ public class ProfilePanel extends JPanel {
 		showLoading();
 		if (pointsData == null) fetchRanks();
 
-		apiService.fetchAccount(accountHash,
+		fetch.accept(
 			response -> {
 				SwingUtilities.invokeLater(() -> {
 					if (!viewScope.isActive() || !owner.isActive()) return;
@@ -200,7 +210,7 @@ public class ProfilePanel extends JPanel {
 					currentAccount = response.getData();
 					if (currentAccount != null) {
 						pointsLog = currentAccount.getPointsLog();
-						if (onAccountLoaded != null) onAccountLoaded.accept(currentAccount);
+						if (own && onAccountLoaded != null) onAccountLoaded.accept(currentAccount);
 					}
 					if (pointsData != null) buildProfile();
 				});
@@ -209,35 +219,7 @@ public class ProfilePanel extends JPanel {
 				SwingUtilities.invokeLater(() -> {
 					if (!viewScope.isActive() || !owner.isActive()) return;
 					isLoading = false;
-					showError(error.getMessage() != null ? error.getMessage() : "Failed to fetch account data");
-				});
-			}
-		);
-	}
-
-	public void loadAccountById(int osrsAccountId) {
-		if (!viewScope.isActive() || isLoading) return;
-		accountScope.cancel();
-		RequestScope owner = accountScope = new RequestScope();
-		isLoading = true;
-		showLoading();
-		if (pointsData == null) fetchRanks();
-
-		apiService.fetchAccountById(osrsAccountId,
-			response -> {
-				SwingUtilities.invokeLater(() -> {
-					if (!viewScope.isActive() || !owner.isActive()) return;
-					isLoading = false;
-					currentAccount = response.getData();
-					if (currentAccount != null) pointsLog = currentAccount.getPointsLog();
-					if (pointsData != null) buildProfile();
-				});
-			},
-			error -> {
-				SwingUtilities.invokeLater(() -> {
-					if (!viewScope.isActive() || !owner.isActive()) return;
-					isLoading = false;
-					showError(error.getMessage() != null ? error.getMessage() : "Player not found");
+					showError(error.getMessage() != null ? error.getMessage() : fallbackError);
 				});
 			}
 		);
@@ -260,10 +242,6 @@ public class ProfilePanel extends JPanel {
 		if (currentAccount != null && pointsData != null) {
 			SwingUtilities.invokeLater(viewScope.guard(this::buildProfile));
 		}
-	}
-
-	public boolean isAccountLoaded() {
-		return currentAccount != null && currentAccount.getOsrsAccount() != null;
 	}
 
 	private void showNotLoggedIn() {

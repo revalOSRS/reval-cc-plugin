@@ -327,12 +327,7 @@ public class EventsPanel extends JPanel {
 		eventsListPanel.repaint();
 	}
 
-	private void showNotLoggedIn() {
-		contentPanel.removeAll();
-		contentPanel.add(new LoginPrompt("Events"));
-		contentPanel.revalidate();
-		contentPanel.repaint();
-	}
+	private void showNotLoggedIn() { LoginPrompt.showIn(contentPanel, "Events"); }
 
 	private void showEmptyState() {
 		String message = currentTab.equals("upcoming") ? "No upcoming events"

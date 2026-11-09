@@ -35,9 +35,6 @@ public class ChatNotifier extends BaseNotifier {
 		ChatMessageType.NPC_EXAMINE
 	);
 
-	private static final Pattern HTML_BR = Pattern.compile("<br>");
-	private static final Pattern HTML_TAGS = Pattern.compile("<[^>]+>");
-
 	private List<String> cachedPatternStrings = Collections.emptyList();
 	private List<Pattern> cachedPatterns = Collections.emptyList();
 	
@@ -55,33 +52,22 @@ public class ChatNotifier extends BaseNotifier {
 	 * Handle a chat message event
 	 * @param messageType The type of chat message
 	 * @param source The source/sender of the message (can be null for system messages)
-	 * @param message The message content
+	 * @param message The message content, already tag-stripped and trimmed by the plugin
 	 */
 	public void onChatMessage(ChatMessageType messageType, String source, String message) {
 		if (!isEnabled()) return;
 
 		if (!SYSTEM_MESSAGE_TYPES.contains(messageType)) return;
 
-		String cleanMessage = cleanMessage(message);
-
 		List<String> patterns = filterManager.getFilters().getChatPatterns();
 
-		if (!patterns.isEmpty() && !hasMatch(cleanMessage, patterns)) {
+		if (!patterns.isEmpty() && !hasMatch(message, patterns)) {
 			return;
 		}
 		
-		handleNotify(messageType, source, cleanMessage);
+		handleNotify(messageType, source, message);
 	}
 	
-	/**
-	 * Clean HTML tags and formatting from a message
-	 */
-	private String cleanMessage(String message) {
-		if (message == null) return "";
-		String cleaned = HTML_BR.matcher(message).replaceAll(" ");
-		return HTML_TAGS.matcher(cleaned).replaceAll("").trim();
-	}
-
 	/**
 	 * Check if the message matches any configured patterns
 	 * @param message The message to check

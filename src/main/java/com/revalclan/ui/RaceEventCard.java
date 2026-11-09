@@ -13,7 +13,6 @@ import net.runelite.client.util.AsyncBufferedImage;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
-import java.awt.image.BufferedImage;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -22,21 +21,16 @@ import java.util.Collections;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 /** A native inventory-style race card, backed by the same verified results as the homepage. */
 public final class RaceEventCard extends JPanel {
     private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("d MMM", Locale.ENGLISH);
     private final FeaturedRaceResponse.Race race;
-    private BufferedImage artwork;
     private final ItemManager itemManager;
-    private final List<ObjectiveIcon> objectiveIcons = new ArrayList<>();
 
-    public RaceEventCard(FeaturedRaceResponse.Race race, BufferedImage artwork, ItemManager itemManager,
-                         Map<String, BufferedImage> objectiveArtwork, boolean details, Runnable open) {
+    public RaceEventCard(FeaturedRaceResponse.Race race, ItemManager itemManager, boolean details, Runnable open) {
         this.race = race;
-        this.artwork = artwork;
         this.itemManager = itemManager;
         setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
         setBackground(UIConstants.CARD_BG);
@@ -54,10 +48,10 @@ public final class RaceEventCard extends JPanel {
             body.add(Box.createVerticalStrut(5));
         }
         body.add(Box.createVerticalStrut(8));
-        body.add(section("Top 10 raid KC"));
+        body.add(section("Top 10 KC"));
         body.add(rewards());
         body.add(Box.createVerticalStrut(10));
-        body.add(section(details ? "KC leaderboard" : "Top 5 raid KC"));
+        body.add(section(details ? "KC leaderboard" : "Top 5 KC"));
         JPanel table = standings(details);
         body.add(table);
         if (!details) {
@@ -65,7 +59,6 @@ public final class RaceEventCard extends JPanel {
             body.add(Box.createVerticalStrut(10));
             body.add(button("Full KC leaderboard >", open));
         }
-        updateArtwork(artwork, objectiveArtwork);
     }
 
     @Override public Dimension getPreferredSize() { return new Dimension(1, super.getPreferredSize().height); }
@@ -81,9 +74,7 @@ public final class RaceEventCard extends JPanel {
         List<String> members = objective.getWinner() == null ? null : objective.getWinner().getMembers();
         row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 51));
         row.setPreferredSize(new Dimension(1, 51));
-        ObjectiveIcon slot = new ObjectiveIcon(objective);
-        objectiveIcons.add(slot);
-        row.add(slot, BorderLayout.WEST);
+        row.add(objectiveIcon(objective), BorderLayout.WEST);
         JPanel copy = column();
         copy.add(Labels.small(objective.getTitle(), UIConstants.TEXT_PRIMARY));
         String result = objective.getWinner() == null ? "Unclaimed" : partyObjective && members != null
@@ -98,43 +89,24 @@ public final class RaceEventCard extends JPanel {
         return row;
     }
 
-    /** Synchronous display update: artwork requests belong to CompetitionsPanel. */
-    void updateArtwork(BufferedImage banner, Map<String, BufferedImage> images) {
-        artwork = banner;
-        for (ObjectiveIcon slot : objectiveIcons) {
-            BufferedImage image = slot.imageUrl == null ? null : images.get(slot.imageUrl);
-            if (image != null && image != slot.customArtwork) {
-                slot.customArtwork = image;
-                slot.setIcon(SpriteIcons.fit(image, 32));
+    /** The objective's configured item, or a kind-based default. */
+    private JLabel objectiveIcon(FeaturedRaceResponse.Objective objective) {
+        JLabel icon = new JLabel();
+        icon.setBorder(BorderFactory.createLineBorder(UIConstants.BORDER_COLOR));
+        icon.setPreferredSize(new Dimension(34, 39));
+        int fallbackId = "completion".equals(objective.getKind()) ? ItemID.CA_BOOK
+            : "pet".equals(objective.getKind()) ? ItemID.CHAOSELEPET
+            : "purple".equals(objective.getKind()) ? ItemID.BIRTHDAY_CAKE : ItemID.COLLECTION_LOG;
+        int itemId = objective.getIconItemId() != null && objective.getIconItemId() > 0 ? objective.getIconItemId() : fallbackId;
+        if (itemManager != null) {
+            try {
+                AsyncBufferedImage image = itemManager.getImage(itemId);
+                image.onLoaded(() -> SwingUtilities.invokeLater(() -> icon.setIcon(SpriteIcons.fit(image, 32))));
+            } catch (RuntimeException ignored) {
+                // An unavailable cache item must not prevent the race from rendering.
             }
         }
-        repaint();
-    }
-
-    private final class ObjectiveIcon extends JLabel {
-        private final String imageUrl;
-        private BufferedImage customArtwork;
-
-        ObjectiveIcon(FeaturedRaceResponse.Objective objective) {
-            String url = objective.getImageUrl();
-            imageUrl = url == null || url.trim().isEmpty() ? null : url.trim();
-            setBorder(BorderFactory.createLineBorder(UIConstants.BORDER_COLOR));
-            setPreferredSize(new Dimension(34, 39));
-            int fallbackId = "completion".equals(objective.getKind()) ? ItemID.CA_BOOK
-                : "pet".equals(objective.getKind()) ? ItemID.CHAOSELEPET
-                : "purple".equals(objective.getKind()) ? ItemID.BIRTHDAY_CAKE : ItemID.COLLECTION_LOG;
-            int itemId = objective.getIconItemId() != null && objective.getIconItemId() > 0 ? objective.getIconItemId() : fallbackId;
-            if (itemManager != null) {
-                try {
-                    AsyncBufferedImage image = itemManager.getImage(itemId);
-                    image.onLoaded(() -> SwingUtilities.invokeLater(() -> {
-                        if (customArtwork == null) setIcon(SpriteIcons.fit(image, 32));
-                    }));
-                } catch (RuntimeException ignored) {
-                    // An unavailable cache item must not prevent the race from rendering.
-                }
-            }
-        }
+        return icon;
     }
 
     private JPanel rewards() {
@@ -163,7 +135,7 @@ public final class RaceEventCard extends JPanel {
         return new CompetitionStandings("KC", rows.stream().limit(details ? rows.size() : 5)
             .map(player -> new CompetitionStandings.Entry(player.getRank(), player.getName(), (long) player.getValue(), player.getPoints()))
             .collect(Collectors.toList()),
-            "upcoming".equals(race.getState()) ? "Standings begin at raid release" : "No completions recorded yet", null);
+            "upcoming".equals(race.getState()) ? "Standings begin when the race starts" : "No completions recorded yet", null);
     }
 
     private final class RaceHeader extends JPanel {
@@ -206,15 +178,6 @@ public final class RaceEventCard extends JPanel {
         @Override protected void paintComponent(Graphics graphics) {
             super.paintComponent(graphics);
             Graphics2D g = (Graphics2D) graphics.create();
-            if (artwork != null) {
-                g.setComposite(AlphaComposite.SrcOver.derive(.65f));
-                double scale = Math.max((double) getWidth() / artwork.getWidth(), (double) getHeight() / artwork.getHeight());
-                int width = (int) Math.ceil(artwork.getWidth() * scale);
-                int height = (int) Math.ceil(artwork.getHeight() * scale);
-                g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-                g.drawImage(artwork, (getWidth() - width) / 2, (getHeight() - height) / 2, width, height, null);
-                g.setComposite(AlphaComposite.SrcOver);
-            }
             g.setFont(smallFont(12f));
             g.setColor(UIConstants.ACCENT_GOLD);
             String phase = "active".equals(race.getState()) ? "RACE IN PROGRESS" : "completed".equals(race.getState()) ? "RACE RESULTS"
@@ -238,7 +201,7 @@ public final class RaceEventCard extends JPanel {
                 g.setFont(g.getFont().deriveFont(g.getFont().getSize2D() - .5f));
             g.drawString(period, 12, y);
             if ("upcoming".equals(race.getState()) && race.getStartDate() == null)
-                g.drawString("Starts at raid release - time TBC", 12, y + 17);
+                g.drawString("Start time TBC", 12, y + 17);
             g.dispose();
         }
     }
