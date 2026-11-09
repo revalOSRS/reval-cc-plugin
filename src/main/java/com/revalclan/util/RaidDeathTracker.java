@@ -44,30 +44,27 @@ public class RaidDeathTracker {
 	private int teamDeaths;
 	private String lastDeathMessage;
 	private int lastLocalDeathTick = -1;
-	private int outsideTicks;
 
-	/** @return true only for an explicit new-raid start. */
-	public boolean onChatMessage(String message) {
-		String started = startedRaid(message);
-		if (started != null) {
-			reset();
-			raid = started;
-			Player local = client.getLocalPlayer();
-			localName = local == null ? null : local.getName();
-			covered = localName != null;
-			return true;
-		}
-		if (raid == null || afterCompletionTick() || RaidPartyTracker.CHAMBERS_OF_XERIC.equals(raid)) return false;
+	void start(String source) {
+		reset();
+		raid = source;
+		Player local = client.getLocalPlayer();
+		localName = local == null ? null : local.getName();
+		covered = localName != null;
+	}
+
+	public void onChatMessage(String message) {
+		if (raid == null || afterCompletionTick() || RaidPartyTracker.CHAMBERS_OF_XERIC.equals(raid)) return;
 
 		Matcher match = DEATH.matcher(message);
-		if (!match.matches()) return false;
+		if (!match.matches()) return;
 		boolean theatre = RaidPartyTracker.THEATRE_OF_BLOOD.equals(raid);
-		if (theatre != "Death count".equals(match.group("label"))) return false;
+		if (theatre != "Death count".equals(match.group("label"))) return;
 		try {
 			int total = Integer.parseInt(match.group("total").replace(",", ""));
 			// The suffix is the TEAM total. It detects gaps/duplicate delivery; it
 			// must never be reported as this player's personal death count.
-			if (message.equals(lastDeathMessage)) return false;
+			if (message.equals(lastDeathMessage)) return;
 			if (total != teamDeaths + 1) covered = false;
 			teamDeaths = total;
 			lastDeathMessage = message;
@@ -80,14 +77,6 @@ public class RaidDeathTracker {
 		} catch (NumberFormatException e) {
 			covered = false;
 		}
-		return false;
-	}
-
-	static String startedRaid(String message) {
-		if ("The raid has begun!".equals(message)) return RaidPartyTracker.CHAMBERS_OF_XERIC;
-		if (message.startsWith("You enter the Theatre of Blood")) return RaidPartyTracker.THEATRE_OF_BLOOD;
-		if (message.startsWith("You enter the Tombs of Amascut")) return RaidPartyTracker.TOMBS_OF_AMASCUT;
-		return ARCHIVE_START_MESSAGE.equals(message) ? RaidPartyTracker.FRACTURED_ARCHIVE : null;
 	}
 
 	public void onActorDeath(ActorDeath event) {
@@ -97,13 +86,6 @@ public class RaidDeathTracker {
 		if (tick == lastLocalDeathTick) return;
 		lastLocalDeathTick = tick;
 		deaths.merge(RaidPartyTracker.nameKey(localName), 1, Integer::sum);
-	}
-
-	/** Stop a left/abandoned run without confusing room loads or dead spectating with a new run. */
-	public void onGameTick() {
-		if (raid == null) return;
-		outsideTicks = isInside(raid) ? 0 : outsideTicks + 1;
-		if (outsideTicks > 3) reset();
 	}
 
 	public void complete(String source) {
@@ -163,6 +145,5 @@ public class RaidDeathTracker {
 		teamDeaths = 0;
 		lastDeathMessage = null;
 		lastLocalDeathTick = -1;
-		outsideTicks = 0;
 	}
 }

@@ -28,6 +28,10 @@ the final server tick and retained for delayed reward claims during that login;
 logout, connection loss and hopping discard them. External Archive spectators
 are excluded; dead party members remain included.
 
+`RaidPartyTracker` owns the shared snapshot, completion parsing and reset/retention
+policy. Roster and numeric readers contribute observations to it; notifiers retain
+that single snapshot. Archive rewards keep their existing ten-minute retention.
+
 Deploy the platform's raid-completion migration and ingestion support before this
 client release. No historical sizes or invocation levels are fabricated.
 

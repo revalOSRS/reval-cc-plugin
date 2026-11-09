@@ -14,6 +14,7 @@ import net.runelite.api.clan.ClanMember;
 import net.runelite.api.clan.ClanSettings;
 import net.runelite.api.events.ActorDeath;
 import net.runelite.api.gameval.InterfaceID;
+import net.runelite.api.gameval.VarbitID;
 import net.runelite.api.widgets.Widget;
 import net.runelite.client.util.Text;
 
@@ -33,10 +34,10 @@ import java.util.regex.Pattern;
  * The party behind a raid's loot and completion count, with
  * each member marked as a Reval member or a guest.
  *
- * The party is read live and frozen, with known per-member deaths, at completion.
- * CoX/ToB/ToA use final-boss and completion snapshots. Their delayed rewards
- * retain those snapshots until an observation gap. ArchiveRoster owns native
- * Archive evidence, including its run boundaries and reward retention.
+ * Owns run boundaries, final-tick freezing and retention for roster and numeric
+ * evidence together. ArchiveRoster and RaidMetadata only read native evidence.
+ * Classic rewards survive until an observation gap; Archive rewards retain
+ * their existing ten-minute lifetime.
  * Call on the client thread.
  */
 @Singleton
@@ -67,134 +68,168 @@ public class RaidPartyTracker implements SessionScoped {
 	@Inject private Client client;
 	@Inject private RaidDeathTracker deathTracker;
 	@Inject private ArchiveRoster archiveRoster;
-	@Inject private RaidRunTracker runTracker;
-	private final Map<String, Party> completedParties = new LinkedHashMap<>();
-
+	private final Map<String, Snapshot> completedSnapshots = new LinkedHashMap<>();
+	private Snapshot active;
+	private Snapshot pendingCompletion;
+	private int startTick = -1;
+	private int outsideTicks;
 	private Party savedParty;
-	private Party pendingCompletion;
 	private long savedAtMs;
 
-	/** Save the party when a raid's final boss dies. Not gated on membership: it only records. */
 	public void onActorDeath(ActorDeath event) {
 		deathTracker.onActorDeath(event);
 		Actor actor = event.getActor();
 		if (!(actor instanceof NPC)) return;
 		String raid = raidForFinalBoss(actor.getName());
 		if (raid == null) return;
-
 		Party party = readParty(raid, Origin.FINAL_BOSS);
 		if (party != null) {
-			// An NPC name can be a Warden's earlier phase. Only the completion
-			// message freezes death counts; this fallback saves names alone.
+			// Warden names also occur in earlier phases; this fallback proves names only.
 			savedParty = party.withDeaths(Map.of());
 			savedAtMs = System.currentTimeMillis();
 		}
 	}
 
-	/**
-	 * The party for a raid loot or completion source, possibly with a mode suffix
-	 * ("Theatre of Blood: Hard Mode"). Null when the source is not a raid or no
-	 * party is known.
-	 */
-	public Party partyFor(String source) {
+	/** One snapshot supplies both roster and numeric evidence to buffered KC/loot. */
+	public Snapshot snapshotFor(String source) {
 		String raid = raidOf(source);
-		if (raid == null) return null;
-		if (FRACTURED_ARCHIVE.equals(raid)) {
-			Party party = archiveRoster.party(revalRoster());
-			return party != null && party.origin == Origin.LIVE
-				? party.withDeaths(deathTracker.countsFor(raid, party.names)) : party;
+		if (raid == null || externalSpectator(raid)) return null;
+		if (active != null && active.raid.equals(raid) && deathTracker.isInside(raid)) {
+			if (active.completedAtMs == 0) active.party = readParty(raid, Origin.LIVE);
+			return active;
 		}
-		Party completed = completedParties.get(raid);
-		if (completed != null && deathTracker.isCompleted(raid)) return completed;
-
-		boolean insideRaid = deathTracker.isInside(raid);
-		Party live = readParty(raid, Origin.LIVE);
-		// Keep each raid's completed reward across scene changes and long breaks
-		// in this login. An observation gap clears the cache: an offline raid
-		// could otherwise leave us annotating a new reward with an old count.
-		if (!insideRaid) {
-			if (completed != null) return completed;
-			if (live != null) live = live.withDeaths(Map.of());
+		Snapshot completed = completedSnapshots.get(raid);
+		if (completed != null) {
+			if (!FRACTURED_ARCHIVE.equals(raid)) return completed;
+			if (System.currentTimeMillis() - completed.completedAtMs <= SAVED_PARTY_TTL_MS) {
+				if (completed.party != null) completed.party = completed.party.withClanRoster(revalRoster());
+				return completed;
+			}
+			completedSnapshots.remove(raid);
 		}
-		return choose(raid, live, insideRaid, savedParty,
-			System.currentTimeMillis() - savedAtMs);
+		Party fallback = choose(raid, null, false, savedParty, System.currentTimeMillis() - savedAtMs);
+		return fallback == null ? null : new Snapshot(raid, fallback, null);
 	}
 
-	/** Observe game messages before notification settings or clan validation can filter them. */
+	/** Observe before notification settings or clan validation can filter messages. */
 	public void onChatMessage(ChatMessageType type, String rawMessage) {
 		if (type != ChatMessageType.GAMEMESSAGE && type != ChatMessageType.FRIENDSCHATNOTIFICATION
 			&& type != ChatMessageType.SPAM && type != ChatMessageType.ENGINE) return;
 		String message = sanitize(rawMessage);
-		runTracker.onChatMessage(message);
-		if (deathTracker.onChatMessage(message)) {
-			savedParty = null;
-			savedAtMs = 0;
-			if (RaidDeathTracker.ARCHIVE_START_MESSAGE.equals(message)) archiveRoster.reset();
-		}
-		String raid = null;
-		Matcher completed = COMPLETED.matcher(message);
-		if (completed.find()) raid = raidOf(completed.group(1));
-		if (FRACTURED_ARCHIVE.equals(raid)) {
-			try {
-				Party party = archiveRoster.complete(Integer.parseInt(completed.group(2).replace(",", "")));
-				deathTracker.complete(raid);
-				if (party != null) {
-					party.updateDeaths(deathTracker.countsFor(raid, party.names));
-					pendingCompletion = party;
-				}
-			} catch (NumberFormatException ignored) {}
+		String started = startedRaid(message);
+		if (started != null) {
+			begin(started, true);
 			return;
 		}
-		if (message.startsWith("Congratulations - your raid is complete!")) raid = CHAMBERS_OF_XERIC;
-		if (message.startsWith("Challenge complete: The Wardens.")) raid = TOMBS_OF_AMASCUT;
-		if (raid == null) return;
-		if (deathTracker.isCompleted(raid) && completedParties.containsKey(raid)) return;
-
-		Party party = readParty(raid, Origin.COMPLETION);
-		if (party == null && savedParty != null && savedParty.raid.equals(raid)
-			&& System.currentTimeMillis() - savedAtMs <= SAVED_PARTY_TTL_MS) {
-			party = new Party(raid, Origin.COMPLETION, savedParty.names, savedParty.revalMembers,
-				savedParty.deaths).withDeaths(deathTracker.countsFor(raid, savedParty.names));
+		deathTracker.onChatMessage(message);
+		Matcher completed = COMPLETED.matcher(message);
+		String raid = null;
+		String source = null;
+		Integer count = null;
+		if (completed.matches()) {
+			source = completed.group(1);
+			raid = raidOf(source);
+			try { count = Integer.parseInt(completed.group(2).replace(",", "")); }
+			catch (NumberFormatException e) { return; }
+		} else if (message.startsWith("Congratulations - your raid is complete!")) raid = CHAMBERS_OF_XERIC;
+		else if (message.startsWith("Challenge complete: The Wardens.")) raid = TOMBS_OF_AMASCUT;
+		if (raid == null || externalSpectator(raid)) return;
+		Snapshot previous = completedSnapshots.get(raid);
+		if (count != null && previous != null && previous.metadata.matchesCompletion(source, count)) return;
+		if (count == null && previous != null) return;
+		if (active == null || !active.raid.equals(raid) || active.metadata.completionCount != null) begin(raid, false);
+		if (count != null) active.metadata.complete(source, count);
+		observe();
+		if (active.party == null || active.completedAtMs == 0) {
+			active.party = readParty(raid, Origin.COMPLETION);
+			if (active.party == null && savedParty != null && savedParty.raid.equals(raid)
+				&& System.currentTimeMillis() - savedAtMs <= SAVED_PARTY_TTL_MS) {
+				active.party = new Party(raid, Origin.COMPLETION, savedParty.names, savedParty.revalMembers,
+					savedParty.deaths).withDeaths(deathTracker.countsFor(raid, savedParty.names));
+			}
 		}
 		deathTracker.complete(raid);
-		if (party == null) {
-			completedParties.remove(raid);
-			if (savedParty != null && savedParty.raid.equals(raid)) savedParty = null;
-		} else {
-			savedParty = party;
-			savedAtMs = System.currentTimeMillis();
-			completedParties.put(raid, party);
-			pendingCompletion = party;
-		}
+		active.completedAtMs = System.currentTimeMillis();
+		completedSnapshots.put(raid, active);
+		pendingCompletion = active;
+	}
+
+	private void begin(String raid, boolean observedStart) {
+		active = new Snapshot(raid, null, new RaidMetadata(raid));
+		completedSnapshots.remove(raid);
+		pendingCompletion = null;
+		startTick = observedStart ? client.getTickCount() : -1;
+		outsideTicks = 0;
+		savedParty = null;
+		savedAtMs = 0;
+		archiveRoster.reset();
+		if (observedStart) deathTracker.start(raid);
+		else deathTracker.reset();
 	}
 
 	public void onGameTick() {
-		runTracker.onGameTick();
-		archiveRoster.observe();
-		// Finish the server tick before freezing: a final death and completion
-		// can arrive in either order. Buffered loot/KC retain this same snapshot.
+		if (client.getGameState() != GameState.LOGGED_IN) return;
+		if (active == null) {
+			for (String raid : new String[] {CHAMBERS_OF_XERIC, THEATRE_OF_BLOOD, TOMBS_OF_AMASCUT, FRACTURED_ARCHIVE}) {
+				if (deathTracker.isInside(raid) && !externalSpectator(raid) && !completedSnapshots.containsKey(raid)) {
+					begin(raid, false);
+					break;
+				}
+			}
+		}
+		if (active != null) {
+			if (deathTracker.isInside(active.raid) && !externalSpectator(active.raid)) {
+				outsideTicks = 0;
+				if (active.metadata.completionCount == null || pendingCompletion == active) observe();
+			} else if (++outsideTicks > 3) {
+				active = null;
+				startTick = -1;
+				deathTracker.reset();
+				archiveRoster.reset();
+			}
+		}
+		// Final deaths and numeric updates can precede or follow the completion message.
 		if (pendingCompletion != null) {
-			if (deathTracker.isCompleted(pendingCompletion.raid)) {
-				pendingCompletion.updateDeaths(deathTracker.countsFor(pendingCompletion.raid, pendingCompletion.names));
+			Party party = pendingCompletion.party;
+			if (party != null && deathTracker.isCompleted(pendingCompletion.raid)) {
+				party.updateDeaths(deathTracker.countsFor(pendingCompletion.raid, party.names));
 			}
 			pendingCompletion = null;
 		}
-		deathTracker.onGameTick();
+	}
+
+	private void observe() {
+		if (!deathTracker.isInside(active.raid) || externalSpectator(active.raid)) return;
+		// Native entry fields settle over several ticks; a missed start stays unknown.
+		active.metadata.observe(client, startTick >= 0 && active.metadata.completionCount == null && client.getTickCount() - startTick <= 10);
+		if (FRACTURED_ARCHIVE.equals(active.raid) && (active.completedAtMs == 0 || pendingCompletion == active)) archiveRoster.observe();
+	}
+
+	private boolean externalSpectator(String raid) {
+		return FRACTURED_ARCHIVE.equals(raid) && client.getVarbitValue(VarbitID.TFA_CLIENT_SPECTATE_MODE) >= 2;
+	}
+
+	private static String startedRaid(String message) {
+		if ("The raid has begun!".equals(message)) return CHAMBERS_OF_XERIC;
+		if (message.startsWith("You enter the Theatre of Blood")) return THEATRE_OF_BLOOD;
+		if (message.startsWith("You enter the Tombs of Amascut")) return TOMBS_OF_AMASCUT;
+		return RaidDeathTracker.ARCHIVE_START_MESSAGE.equals(message) ? FRACTURED_ARCHIVE : null;
 	}
 
 	public void onGameStateChanged(GameState state) {
 		if (state == GameState.CONNECTION_LOST || state == GameState.HOPPING || state == GameState.LOGIN_SCREEN) reset();
 	}
 
-	/** Forget observation after logout/plugin stop; a later unmatched reward has unknown counts. */
 	public void reset() {
-		savedParty = null;
+		active = null;
 		pendingCompletion = null;
+		startTick = -1;
+		outsideTicks = 0;
+		savedParty = null;
 		savedAtMs = 0;
+		completedSnapshots.clear();
 		deathTracker.reset();
-		completedParties.clear();
 		archiveRoster.reset();
-		runTracker.reset();
 	}
 
 	/**
@@ -236,6 +271,7 @@ public class RaidPartyTracker implements SessionScoped {
 	}
 
 	private Party readParty(String raid, Origin origin) {
+		if (FRACTURED_ARCHIVE.equals(raid)) return archiveRoster.party(origin, revalRoster());
 		List<String> names;
 		if (CHAMBERS_OF_XERIC.equals(raid)) {
 			names = chambersNames();
@@ -318,6 +354,25 @@ public class RaidPartyTracker implements SessionScoped {
 	/** RuneScape treats space, underscore and hyphen in a name as the same character. */
 	static String nameKey(String name) {
 		return sanitize(name).toLowerCase(Locale.ROOT).replace('_', ' ').replace('-', ' ');
+	}
+
+	/** Shared by buffered events so the final tick reaches both metadata and deaths. */
+	public static final class Snapshot {
+		private final String raid;
+		private Party party;
+		private final RaidMetadata metadata;
+		private long completedAtMs;
+
+		private Snapshot(String raid, Party party, RaidMetadata metadata) {
+			this.raid = raid;
+			this.party = party;
+			this.metadata = metadata;
+		}
+
+		public void addTo(Map<String, Object> data) {
+			if (party != null) party.addTo(data);
+			if (metadata != null) metadata.addTo(data);
+		}
 	}
 
 	/** One raid party: its members in party order and whether each is in Reval. */

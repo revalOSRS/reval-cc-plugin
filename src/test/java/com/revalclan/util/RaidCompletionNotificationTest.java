@@ -22,26 +22,31 @@ public class RaidCompletionNotificationTest {
 	@Mock private Client client;
 	@Mock private RaidDeathTracker deaths;
 	@Mock private RaidPartyTracker parties;
-	@Mock private RaidRunTracker raidRuns;
-	@InjectMocks private RaidRunTracker runs;
+	private RaidPartyTracker tracker;
 	private final List<Map<String, Object>> sent = new ArrayList<>();
 	@InjectMocks private KillCountNotifier notifier = new KillCountNotifier() {
 		@Override public boolean isEnabled() { return true; }
 		@Override protected void sendNotification(Map<String, Object> data) { sent.add(data); }
 	};
 
+	private void chat(String message) { tracker.onChatMessage(net.runelite.api.ChatMessageType.GAMEMESSAGE, message); }
+
 	@Test public void completionWithoutLootOrNamesCarriesTheRunAndLogoutClearsItsBuffer() {
+		tracker = com.google.inject.Guice.createInjector(binder -> {
+			binder.bind(Client.class).toInstance(client);
+			binder.bind(RaidDeathTracker.class).toInstance(deaths);
+		}).getInstance(RaidPartyTracker.class);
 		when(client.getGameState()).thenReturn(GameState.LOGGED_IN);
 		when(deaths.isInside(RaidPartyTracker.CHAMBERS_OF_XERIC)).thenReturn(true);
 		when(client.getVarbitValue(VarbitID.RAIDS_CLIENT_PARTYSIZE)).thenReturn(3);
 		when(client.getVarbitValue(VarbitID.RAIDS_CLIENT_PARTYSIZE_SCALED)).thenReturn(5);
-		when(raidRuns.forSource(anyString())).thenAnswer(invocation -> runs.forSource(invocation.getArgument(0)));
-		runs.onChatMessage("The raid has begun!");
-		runs.onGameTick();
+		when(parties.snapshotFor(anyString())).thenAnswer(invocation -> tracker.snapshotFor(invocation.getArgument(0)));
+		chat("The raid has begun!");
+		tracker.onGameTick();
 		String completion = "Your completed Chambers of Xeric count is: 100.";
-		runs.onChatMessage(completion);
+		chat(completion);
 		notifier.onChatMessage(completion);
-		runs.onGameTick();
+		tracker.onGameTick();
 		notifier.onTick();
 		assertEquals(1, sent.size());
 		Map<?, ?> raid = (Map<?, ?>) sent.get(0).get("raid");
