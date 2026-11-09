@@ -44,7 +44,7 @@ public class ProfilePanelTest {
 		data.setOsrsAccount(new AccountResponse.OsrsAccount());
 		response.setData(data);
 		callback.getValue().accept(response);
-		SwingUtilities.invokeAndWait(() -> assertFalse(holder[0].isAccountLoaded()));
+		SwingUtilities.invokeAndWait(() -> {});
 		verifyNoInteractions(loaded);
 	}
 
@@ -75,10 +75,12 @@ public class ProfilePanelTest {
 		Client client = mock(Client.class);
 		when(client.getAccountHash()).thenReturn(123L);
 		ProfilePanel[] holder = new ProfilePanel[1];
+		Consumer<AccountResponse.AccountData> loaded = mock(Consumer.class);
 		SwingUtilities.invokeAndWait(() -> {
 			holder[0] = new ProfilePanel();
 			holder[0].init(api, client, mock(UIAssetLoader.class), mock(RevalClanConfig.class),
 				mock(ItemManager.class), mock(ClanRankIconResolver.class));
+			holder[0].setOnAccountLoaded(loaded);
 			holder[0].refresh();
 			holder[0].refresh();
 		});
@@ -90,7 +92,8 @@ public class ProfilePanelTest {
 			.request(new Request.Builder().url("https://example.invalid").build())
 			.protocol(Protocol.HTTP_1_1).code(200).message("OK")
 			.body(ResponseBody.create(null, "{\"status\":\"success\",\"data\":{\"osrsAccount\":{}}}")).build());
-		SwingUtilities.invokeAndWait(() -> assertTrue(holder[0].isAccountLoaded()));
+		SwingUtilities.invokeAndWait(() -> {});
+		verify(loaded).accept(any());
 		verify(http, times(2)).newCall(any(Request.class));
 		SwingUtilities.invokeAndWait(holder[0]::shutDown);
 		api.shutDown();

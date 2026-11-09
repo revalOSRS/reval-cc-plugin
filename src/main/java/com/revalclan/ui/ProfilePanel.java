@@ -262,10 +262,6 @@ public class ProfilePanel extends JPanel {
 		}
 	}
 
-	public boolean isAccountLoaded() {
-		return currentAccount != null && currentAccount.getOsrsAccount() != null;
-	}
-
 	private void showNotLoggedIn() {
 		contentPanel.removeAll();
 		gridY = 0;

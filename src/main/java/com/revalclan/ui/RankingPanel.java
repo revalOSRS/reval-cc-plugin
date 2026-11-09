@@ -51,7 +51,7 @@ public class RankingPanel extends JPanel {
 		loadingLabel = Labels.small("Loading...", UIConstants.TEXT_SECONDARY);
 		loadingLabel.setHorizontalAlignment(SwingConstants.CENTER);
 
-		showPlaceholder();
+		showLoading();
 		add(ScrollWrap.of(contentPanel), BorderLayout.CENTER);
 	}
 
@@ -81,35 +81,6 @@ public class RankingPanel extends JPanel {
 		gbc.insets = new Insets(height / 2, 0, height / 2, 0);
 		contentPanel.add(Box.createVerticalStrut(height), gbc);
 		gbc.insets = new Insets(1, 0, 1, 0);
-	}
-
-	private void showPlaceholder() {
-		contentPanel.removeAll();
-		gridY = 0;
-
-		JPanel panel = new JPanel();
-		panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
-		panel.setBackground(UIConstants.BACKGROUND);
-		panel.setBorder(new EmptyBorder(30, 10, 10, 10));
-
-		JLabel title = new PanelTitle("RANKING");
-		title.setAlignmentX(Component.CENTER_ALIGNMENT);
-
-		JLabel subtitle = Labels.small("Ranks & Points", UIConstants.TEXT_SECONDARY);
-		subtitle.setAlignmentX(Component.CENTER_ALIGNMENT);
-
-		JLabel hint = Labels.small("Loading data...", UIConstants.TEXT_SECONDARY);
-		hint.setAlignmentX(Component.CENTER_ALIGNMENT);
-
-		panel.add(title);
-		panel.add(Box.createRigidArea(new Dimension(0, 4)));
-		panel.add(subtitle);
-		panel.add(Box.createRigidArea(new Dimension(0, 10)));
-		panel.add(hint);
-
-		addComponent(panel);
-		contentPanel.revalidate();
-		contentPanel.repaint();
 	}
 
 	private void showLoading() {
