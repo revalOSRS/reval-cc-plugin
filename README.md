@@ -6,7 +6,7 @@ A comprehensive RuneLite plugin for the Reval clan in Old School RuneScape. Feat
 
 ### Seasonal side panel
 
-The side panel uses Gingerbread Village from 1 December through 31 December.
+The side panel uses Gingerbread Village from 7 November through 31 December.
 Christmas adds a cocoa
 palette, snowy gingerbread houses, peppermint tabs, icing on profile cards, and a
 gingerbread toolbar icon. Other months use the normal appearance.

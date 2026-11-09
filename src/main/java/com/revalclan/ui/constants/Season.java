@@ -18,9 +18,10 @@ public enum Season {
 		this.tooltip = tooltip;
 	}
 
-	/** Christmas from 1 December until 1 January. */
+	/** Christmas from 7 November until 1 January. */
 	public static Season on(LocalDate date) {
-		return date.getMonth() == Month.DECEMBER ? CHRISTMAS : NONE;
+		return date.getMonth() == Month.DECEMBER
+			|| (date.getMonth() == Month.NOVEMBER && date.getDayOfMonth() >= 7) ? CHRISTMAS : NONE;
 	}
 
 	/** Today's season. A dev client can preview one with -Dreval.season=christmas (or none). */
