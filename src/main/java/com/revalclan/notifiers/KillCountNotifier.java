@@ -47,7 +47,7 @@ public class KillCountNotifier extends BaseNotifier {
 	private Duration pendingTime = null;
 	private boolean pendingIsPb = false;
 	private String pendingTimeRaid = null;
-	private RaidPartyTracker.Party pendingParty = null;
+	private RaidPartyTracker.Snapshot pendingSnapshot = null;
 	private int badTicks = 0;
 	private static final int MAX_BAD_TICKS = 10;
 
@@ -106,6 +106,7 @@ public class KillCountNotifier extends BaseNotifier {
 					int count = Integer.parseInt(countStr);
 					pendingBoss = boss;
 					pendingCount = count;
+					pendingSnapshot = null;
 					badTicks = 0; // Reset bad tick counter
 				} catch (NumberFormatException e) {
 					log.debug("Failed to parse kill count: {}", countStr);
@@ -128,7 +129,7 @@ public class KillCountNotifier extends BaseNotifier {
 					pendingCount = count;
 					// Capture the raid party (CoX side panel, ToB/ToA varcs) while it is
 					// still populated; includes the local player
-					pendingParty = raidPartyTracker.partyFor(boss);
+					pendingSnapshot = raidPartyTracker.snapshotFor(boss);
 					badTicks = 0;
 				} catch (NumberFormatException e) {
 					log.debug("Failed to parse kill count: {}", countStr);
@@ -261,9 +262,7 @@ public class KillCountNotifier extends BaseNotifier {
 			kcData.put("personalBest", true);
 		}
 
-		if (pendingParty != null) {
-			pendingParty.addTo(kcData);
-		}
+		if (pendingSnapshot != null) pendingSnapshot.addTo(kcData);
 
 		sendNotification(kcData);
 	}
@@ -291,7 +290,7 @@ public class KillCountNotifier extends BaseNotifier {
 		pendingTime = null;
 		pendingIsPb = false;
 		pendingTimeRaid = null;
-		pendingParty = null;
+		pendingSnapshot = null;
 		badTicks = 0;
 	}
 }

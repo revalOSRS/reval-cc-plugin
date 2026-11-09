@@ -117,14 +117,14 @@ public class LootNotifier extends BaseNotifier {
 		final List<Map<String, Object>> items;
 		final int lootTick;
 		final int sendOnTick;
-		final RaidPartyTracker.Party party;
+		final RaidPartyTracker.Snapshot snapshot;
 
-		PendingLoot(Map<String, Object> lootData, List<Map<String, Object>> items, int lootTick, int sendOnTick, RaidPartyTracker.Party party) {
+		PendingLoot(Map<String, Object> lootData, List<Map<String, Object>> items, int lootTick, int sendOnTick, RaidPartyTracker.Snapshot snapshot) {
 			this.lootData = lootData;
 			this.items = items;
 			this.lootTick = lootTick;
 			this.sendOnTick = sendOnTick;
-			this.party = party;
+			this.snapshot = snapshot;
 		}
 	}
 
@@ -336,7 +336,7 @@ public class LootNotifier extends BaseNotifier {
 			if (!raidRewardLedger.record(source, event.getItems())) return;
 			// For raid chests (CoX / ToB / ToA) attach the party: read live inside the raid,
 			// or as saved at the final boss when the reward is claimed from the outside chest
-			handleLootDrop(event.getItems(), source, "EVENT", null, raidPartyTracker.partyFor(source), false);
+			handleLootDrop(event.getItems(), source, "EVENT", null, raidPartyTracker.snapshotFor(source), false);
 		}
 		// Handle special NPCs that fire LootReceived instead of NpcLootReceived
 		else if (event.getType() == LootRecordType.NPC && SPECIAL_LOOT_NPC_NAMES.contains(event.getName())) {
@@ -632,7 +632,7 @@ public class LootNotifier extends BaseNotifier {
 						}
 
 						if (!clogIds.isEmpty()) greenlogCounterSnapshot.attachTo(pending.lootData, clogIds);
-						if (pending.party != null) pending.party.addTo(pending.lootData);
+						if (pending.snapshot != null) pending.snapshot.addTo(pending.lootData);
 						sendNotification(pending.lootData);
 					} catch (Exception ignored) {
 						// Never let one payload break the tick dispatch for
@@ -677,11 +677,11 @@ public class LootNotifier extends BaseNotifier {
 	}
 
 	/**
-	 * @param party   the raid party behind a raid chest, or null
+	 * @param snapshot the raid evidence behind a raid chest, or null
 	 * @param keepAll send every item regardless of value: the backend asked to watch
 	 *                the container this came out of, so it wants the whole yield.
 	 */
-	private void handleLootDrop(Collection<ItemStack> items, String source, String sourceType, Integer sourceId, RaidPartyTracker.Party party, boolean keepAll) {
+	private void handleLootDrop(Collection<ItemStack> items, String source, String sourceType, Integer sourceId, RaidPartyTracker.Snapshot snapshot, boolean keepAll) {
 		// Get dynamic filters
 		long minLootValue = filterManager.getFilters().getLootMinValue();
 		Set<Integer> whitelistItemIds = filterManager.getFilters().getLootWhitelist();
@@ -745,6 +745,6 @@ public class LootNotifier extends BaseNotifier {
 
 		// Buffer for the clog correlation window instead of sending immediately;
 		// onGameTick stamps isNewCollectionLogItem on each item and sends
-		pendingLoot.add(new PendingLoot(lootData, itemsList, tickCounter, tickCounter + LOOT_BUFFER_TICKS, party));
+		pendingLoot.add(new PendingLoot(lootData, itemsList, tickCounter, tickCounter + LOOT_BUFFER_TICKS, snapshot));
 	}
 }
