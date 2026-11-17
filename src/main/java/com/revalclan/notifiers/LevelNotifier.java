@@ -1,5 +1,6 @@
 package com.revalclan.notifiers;
 
+import net.runelite.api.GameState;
 import net.runelite.api.Skill;
 import net.runelite.api.events.StatChanged;
 
@@ -13,6 +14,7 @@ import java.util.Map;
  */
 @Singleton
 public class LevelNotifier extends BaseNotifier {
+	private int world;
 	private final Map<Skill, Integer> previousLevels = new EnumMap<>(Skill.class);
 	private final Map<Skill, Integer> previousXp = new EnumMap<>(Skill.class);
 
@@ -27,6 +29,15 @@ public class LevelNotifier extends BaseNotifier {
 	}
 
 	public void onStatChanged(StatChanged event) {
+		if (client.getGameState() != GameState.LOGGED_IN) {
+			reset();
+			return;
+		}
+		// StatChanged also fires while another world's skill values are being loaded.
+		if (world != client.getWorld()) {
+			reset();
+			world = client.getWorld();
+		}
 		if (!isEnabled()) return;
 
 		Skill skill = event.getSkill();
@@ -60,6 +71,7 @@ public class LevelNotifier extends BaseNotifier {
 	}
 
 	public void reset() {
+		world = 0;
 		previousLevels.clear();
 		previousXp.clear();
 	}
