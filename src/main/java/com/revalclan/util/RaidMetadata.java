@@ -18,7 +18,7 @@ final class RaidMetadata {
 	RaidMetadata(String name) { this.name = name; }
 
 	void complete(String source, int count) {
-		mode = isPractice() ? "practice" : modeOf(source);
+		mode = modeOf(source);
 		completionCount = count;
 	}
 
@@ -46,7 +46,8 @@ final class RaidMetadata {
 			}
 		} else {
 			size = occupied(client, VarbitID.TFA_CLIENT_P0, 8);
-			if (client.getVarbitValue(VarbitID.TFA_CLIENT_SKIP_PHASE_MODE) > 0) mode = "practice";
+			// After completion the mode belongs to the sent label and must not change under it.
+			if (completionCount == null && client.getVarbitValue(VarbitID.TFA_CLIENT_SKIP_PHASE_MODE) > 0) mode = "practice";
 		}
 		if (size > 0) {
 			partySize = size;

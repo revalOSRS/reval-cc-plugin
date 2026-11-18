@@ -515,7 +515,7 @@ public class RevalClanPlugin extends Plugin {
 		raidPartyTracker.onActorDeath(event);
 		// Kills feed the session accumulator regardless of clan state
 		KillTracker.KillData kill = killTracker.onActorDeath(event);
-		if (kill != null) sessionTracker.addKill(kill.npcName);
+		if (kill != null && !raidPartyTracker.isArchivePractice()) sessionTracker.addKill(kill.npcName);
 		if (!clanMembership.isMember()) return;
 		deathNotifier.onActorDeath(event);
 		if (kill != null) detailedKillNotifier.onKill(kill);

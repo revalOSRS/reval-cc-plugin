@@ -29,7 +29,7 @@ public class DetailedKillNotifier extends BaseNotifier {
 	}
 
 	public void onKill(KillData data) {
-		if (raidPartyTracker.isArchivePractice() || !isEnabled() || !shouldNotifyKill(data.npcId, data.npcName)) {
+		if (!isEnabled() || raidPartyTracker.isArchivePractice() || !shouldNotifyKill(data.npcId, data.npcName)) {
 			return;
 		}
 

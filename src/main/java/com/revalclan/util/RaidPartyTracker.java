@@ -47,6 +47,7 @@ public class RaidPartyTracker implements SessionScoped {
 	static final String THEATRE_OF_BLOOD = "Theatre of Blood";
 	static final String TOMBS_OF_AMASCUT = "Tombs of Amascut";
 	public static final String FRACTURED_ARCHIVE = "The Fractured Archive";
+	public static final String FRACTURED_ARCHIVE_PRACTICE = FRACTURED_ARCHIVE + ": Practice Mode";
 
 	/** First VarClientStr holding a ToB party member name (5 consecutive slots). */
 	private static final int TOB_MEMBER_NAME_VARC = 330;
@@ -266,10 +267,16 @@ public class RaidPartyTracker implements SessionScoped {
 				|| (active != null && FRACTURED_ARCHIVE.equals(active.raid) && active.metadata.isPractice()));
 	}
 
+	/**
+	 * The one practice decision for an Archive completion. Its label also sets the snapshot's
+	 * mode, so a KC notification and its raid metadata always agree. Evidence kept for the
+	 * current run applies even when the completion lands after leaving the instance.
+	 */
 	public String completionSource(String source) {
 		if (!FRACTURED_ARCHIVE.equals(raidOf(source))) return source;
-		return isArchivePractice() || source.toLowerCase(Locale.ROOT).contains("practice")
-			? FRACTURED_ARCHIVE + ": Practice Mode" : FRACTURED_ARCHIVE;
+		boolean runEvidence = active != null && FRACTURED_ARCHIVE.equals(active.raid) && active.metadata.isPractice();
+		return runEvidence || isArchivePractice() || source.toLowerCase(Locale.ROOT).contains("practice")
+			? FRACTURED_ARCHIVE_PRACTICE : FRACTURED_ARCHIVE;
 	}
 
 	/** The raid whose last boss this NPC is, or null. */

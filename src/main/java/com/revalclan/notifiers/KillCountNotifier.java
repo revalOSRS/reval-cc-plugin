@@ -254,7 +254,7 @@ public class KillCountNotifier extends BaseNotifier {
 		kcData.put("killCount", pendingCount);
 		
 		String raid = RaidPartyTracker.raidOf(pendingBoss);
-		boolean timeApplies = !pendingBoss.contains(": Practice Mode") && Objects.equals(pendingTimeRaid,
+		boolean timeApplies = !RaidPartyTracker.FRACTURED_ARCHIVE_PRACTICE.equals(pendingBoss) && Objects.equals(pendingTimeRaid,
 			RaidPartyTracker.FRACTURED_ARCHIVE.equals(raid) ? raid : null);
 		if (pendingTime != null && timeApplies) {
 			kcData.put("time", formatDuration(pendingTime));
