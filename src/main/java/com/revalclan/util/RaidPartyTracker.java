@@ -47,6 +47,7 @@ public class RaidPartyTracker implements SessionScoped {
 	static final String THEATRE_OF_BLOOD = "Theatre of Blood";
 	static final String TOMBS_OF_AMASCUT = "Tombs of Amascut";
 	public static final String FRACTURED_ARCHIVE = "The Fractured Archive";
+	public static final String FRACTURED_ARCHIVE_PRACTICE = FRACTURED_ARCHIVE + ": Practice Mode";
 
 	/** First VarClientStr holding a ToB party member name (5 consecutive slots). */
 	private static final int TOB_MEMBER_NAME_VARC = 330;
@@ -64,6 +65,8 @@ public class RaidPartyTracker implements SessionScoped {
 
 	static final Pattern COMPLETED = Pattern.compile(
 		"^Your completed (.+?) count is: ([\\d,]+)\\.?$", Pattern.CASE_INSENSITIVE);
+	private static final Pattern COMPLETION_COUNT = Pattern.compile(
+		"^Your (.+?) completion count is: ([\\d,]+)\\.?$", Pattern.CASE_INSENSITIVE);
 
 	@Inject private Client client;
 	@Inject private RaidDeathTracker deathTracker;
@@ -71,6 +74,8 @@ public class RaidPartyTracker implements SessionScoped {
 	private final Map<String, Snapshot> completedSnapshots = new LinkedHashMap<>();
 	private Snapshot active;
 	private Snapshot pendingCompletion;
+	/** An unfinished practice run's evidence, kept after leaving for a late completion message. */
+	private boolean archivePracticeAfterExit;
 	private int startTick = -1;
 	private int outsideTicks;
 	private Party savedParty;
@@ -123,11 +128,12 @@ public class RaidPartyTracker implements SessionScoped {
 		}
 		deathTracker.onChatMessage(message);
 		Matcher completed = COMPLETED.matcher(message);
+		if (!completed.matches()) completed = COMPLETION_COUNT.matcher(message);
 		String raid = null;
 		String source = null;
 		Integer count = null;
 		if (completed.matches()) {
-			source = completed.group(1);
+			source = completionSource(completed.group(1));
 			raid = raidOf(source);
 			try { count = Integer.parseInt(completed.group(2).replace(",", "")); }
 			catch (NumberFormatException e) { return; }
@@ -151,6 +157,7 @@ public class RaidPartyTracker implements SessionScoped {
 		deathTracker.complete(raid);
 		active.completedAtMs = System.currentTimeMillis();
 		completedSnapshots.put(raid, active);
+		archivePracticeAfterExit = false;
 		pendingCompletion = active;
 	}
 
@@ -162,6 +169,7 @@ public class RaidPartyTracker implements SessionScoped {
 		outsideTicks = 0;
 		savedParty = null;
 		savedAtMs = 0;
+		archivePracticeAfterExit = false;
 		archiveRoster.reset();
 		if (observedStart) deathTracker.start(raid);
 		else deathTracker.reset();
@@ -182,6 +190,8 @@ public class RaidPartyTracker implements SessionScoped {
 				outsideTicks = 0;
 				if (active.metadata.completionCount == null || pendingCompletion == active) observe();
 			} else if (++outsideTicks > 3) {
+				archivePracticeAfterExit = FRACTURED_ARCHIVE.equals(active.raid) && active.metadata.isPractice()
+					&& active.metadata.completionCount == null;
 				active = null;
 				startTick = -1;
 				deathTracker.reset();
@@ -227,6 +237,7 @@ public class RaidPartyTracker implements SessionScoped {
 		outsideTicks = 0;
 		savedParty = null;
 		savedAtMs = 0;
+		archivePracticeAfterExit = false;
 		completedSnapshots.clear();
 		deathTracker.reset();
 		archiveRoster.reset();
@@ -248,11 +259,32 @@ public class RaidPartyTracker implements SessionScoped {
 	public static String raidOf(String source) {
 		if (source == null) return null;
 		String name = sanitize(source).toLowerCase(Locale.ROOT);
+		name = name.replaceFirst("(?::? practice(?: mode)?| \\(practice(?: mode)?\\))$", "");
 		if (name.startsWith(CHAMBERS_OF_XERIC.toLowerCase(Locale.ROOT))) return CHAMBERS_OF_XERIC;
 		if (name.startsWith(THEATRE_OF_BLOOD.toLowerCase(Locale.ROOT))) return THEATRE_OF_BLOOD;
 		if (name.startsWith(TOMBS_OF_AMASCUT.toLowerCase(Locale.ROOT))) return TOMBS_OF_AMASCUT;
 		if (name.equals(FRACTURED_ARCHIVE.toLowerCase(Locale.ROOT)) || name.equals("fractured archive")) return FRACTURED_ARCHIVE;
 		return null;
+	}
+
+	/** The skip-phase control is sent for practice encounters, not the lobby's preferred mode. */
+	public boolean isArchivePractice() {
+		return deathTracker.isInside(FRACTURED_ARCHIVE)
+			&& (client.getVarbitValue(VarbitID.TFA_CLIENT_SKIP_PHASE_MODE) > 0
+				|| (active != null && FRACTURED_ARCHIVE.equals(active.raid) && active.metadata.isPractice()));
+	}
+
+	/**
+	 * The one practice decision for an Archive completion. Its label also sets the snapshot's
+	 * mode, so a KC notification and its raid metadata always agree. Evidence kept for the
+	 * current run applies even when the completion lands after leaving the instance.
+	 */
+	public String completionSource(String source) {
+		if (!FRACTURED_ARCHIVE.equals(raidOf(source))) return source;
+		boolean runEvidence = archivePracticeAfterExit
+			|| (active != null && FRACTURED_ARCHIVE.equals(active.raid) && active.metadata.isPractice());
+		return runEvidence || isArchivePractice() || source.toLowerCase(Locale.ROOT).contains("practice")
+			? FRACTURED_ARCHIVE_PRACTICE : FRACTURED_ARCHIVE;
 	}
 
 	/** The raid whose last boss this NPC is, or null. */

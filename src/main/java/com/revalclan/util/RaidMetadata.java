@@ -46,6 +46,8 @@ final class RaidMetadata {
 			}
 		} else {
 			size = occupied(client, VarbitID.TFA_CLIENT_P0, 8);
+			// After completion the mode belongs to the sent label and must not change under it.
+			if (completionCount == null && client.getVarbitValue(VarbitID.TFA_CLIENT_SKIP_PHASE_MODE) > 0) mode = "practice";
 		}
 		if (size > 0) {
 			partySize = size;
@@ -59,8 +61,11 @@ final class RaidMetadata {
 		return count;
 	}
 
+	boolean isPractice() { return "practice".equals(mode); }
+
 	private static String modeOf(String source) {
 		String lower = source.toLowerCase(java.util.Locale.ROOT);
+		if (lower.contains("practice")) return "practice";
 		if (lower.contains("challenge mode")) return "challenge";
 		if (lower.contains("hard mode")) return "hard";
 		if (lower.contains("entry mode")) return "entry";

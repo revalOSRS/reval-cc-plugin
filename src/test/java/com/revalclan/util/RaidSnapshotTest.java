@@ -142,6 +142,81 @@ public class RaidSnapshotTest {
 		assertNull(tracker.snapshotFor(FRACTURED_ARCHIVE));
 	}
 
+	@Test public void archivePracticeUsesNativeEvidenceAndKeepsItWhenTheSkipButtonDisables() {
+		when(deaths.isInside(FRACTURED_ARCHIVE)).thenReturn(true);
+		when(client.getVarbitValue(VarbitID.TFA_CLIENT_SKIP_PHASE_MODE)).thenReturn(1);
+		chat(RaidDeathTracker.ARCHIVE_START_MESSAGE);
+		tick();
+		assertTrue(tracker.isArchivePractice());
+		when(client.getVarbitValue(VarbitID.TFA_CLIENT_SKIP_PHASE_MODE)).thenReturn(0);
+		chat("Your Fractured Archive completion count is: 3.");
+		assertEquals("practice", data(FRACTURED_ARCHIVE).get("mode"));
+		assertEquals(3, data(FRACTURED_ARCHIVE).get("completionCount"));
+		assertEquals(FRACTURED_ARCHIVE + ": Practice Mode", tracker.completionSource("Fractured Archive"));
+		chat(RaidDeathTracker.ARCHIVE_START_MESSAGE);
+		tick();
+		assertFalse(tracker.isArchivePractice());
+		complete(FRACTURED_ARCHIVE, 9);
+		assertEquals("normal", data(FRACTURED_ARCHIVE).get("mode"));
+	}
+
+	@Test public void archiveKillCountLabelAlwaysAgreesWithItsRaidMode() throws Exception {
+		java.util.List<Map<String, Object>> sent = new java.util.ArrayList<>();
+		com.revalclan.notifiers.KillCountNotifier notifier = new com.revalclan.notifiers.KillCountNotifier() {
+			@Override public boolean isEnabled() { return true; }
+			@Override protected void sendNotification(Map<String, Object> data) { sent.add(data); }
+		};
+		java.lang.reflect.Field field = com.revalclan.notifiers.KillCountNotifier.class.getDeclaredField("raidPartyTracker");
+		field.setAccessible(true);
+		field.set(notifier, tracker);
+		when(deaths.isInside(FRACTURED_ARCHIVE)).thenReturn(true);
+		when(client.getVarbitValue(VarbitID.TFA_CLIENT_SKIP_PHASE_MODE)).thenReturn(1);
+		chat(RaidDeathTracker.ARCHIVE_START_MESSAGE);
+		tick();
+		// The completion lands well after the instance ended and the run state was dropped.
+		when(deaths.isInside(FRACTURED_ARCHIVE)).thenReturn(false);
+		for (int i = 0; i < 5; i++) tick();
+		String message = "Your completed Fractured Archive count is: 5.";
+		chat(message);
+		notifier.onChatMessage(message);
+		tick();
+		notifier.onTick();
+		assertEquals(1, sent.size());
+		assertEquals(FRACTURED_ARCHIVE_PRACTICE, sent.get(0).get("boss"));
+		assertEquals("practice", ((Map<?, ?>) sent.get(0).get("raid")).get("mode"));
+		// The evidence was spent on that completion; the next normal run reports as normal.
+		when(client.getVarbitValue(VarbitID.TFA_CLIENT_SKIP_PHASE_MODE)).thenReturn(0);
+		when(deaths.isInside(FRACTURED_ARCHIVE)).thenReturn(true);
+		chat(RaidDeathTracker.ARCHIVE_START_MESSAGE);
+		tick();
+		message = "Your completed Fractured Archive count is: 6.";
+		chat(message);
+		notifier.onChatMessage(message);
+		notifier.onTick();
+		assertEquals(FRACTURED_ARCHIVE, sent.get(1).get("boss"));
+		assertEquals("normal", ((Map<?, ?>) sent.get(1).get("raid")).get("mode"));
+	}
+
+	@Test public void archivePracticeLabelsAreRecognizedWithoutInventingACounter() {
+		for (String label : new String[] {"Fractured Archive: Practice Mode", "The Fractured Archive (Practice)"}) {
+			assertEquals(FRACTURED_ARCHIVE, raidOf(label));
+			complete(label, 4);
+			assertEquals("practice", data(label).get("mode"));
+			assertEquals(4, data(label).get("completionCount"));
+			tracker.reset();
+		}
+	}
+
+	@Test public void archiveLobbyPreferenceDoesNotIdentifyAnActivePracticeRaid() {
+		when(deaths.isInside(FRACTURED_ARCHIVE)).thenReturn(true);
+		lenient().when(client.getVarbitValue(VarbitID.TFA_PREFERRED_MODE)).thenReturn(1);
+		chat(RaidDeathTracker.ARCHIVE_START_MESSAGE);
+		tick();
+		assertFalse(tracker.isArchivePractice());
+		complete(FRACTURED_ARCHIVE, 9);
+		assertEquals("normal", data(FRACTURED_ARCHIVE).get("mode"));
+	}
+
 	@Test public void resetForgetsAnOutsideChestAndAnAbandonedRun() {
 		when(deaths.isInside(THEATRE_OF_BLOOD)).thenReturn(true);
 		tick();

@@ -39,6 +39,19 @@ that single snapshot. Archive rewards keep their existing ten-minute retention.
 Deploy the platform's raid-completion migration and ingestion support before this
 client release. No historical sizes or invocation levels are fabricated.
 
+### Fractured Archive practice
+
+Practice completions are reported as `The Fractured Archive: Practice Mode` with
+`raid.mode = practice`, separate from normal Archive KC. A practice run is recognised
+from a practice completion label or from the native skip-phase control; that evidence
+lasts for the run, including a completion that arrives after leaving the instance.
+The lobby's preferred mode is not evidence.
+
+Only completion messages supply practice counts. Practice times, personal bests,
+detailed NPC kills and session kills are not reported, so practice cannot score as
+normal raids or boss kills. Collection log sync reads only the normal Archive counter,
+so missed practice completions are not backfilled.
+
 ### Raid party deaths
 
 Raid loot and completion events include known per-member death counts in
@@ -254,7 +267,7 @@ Created by **Lightroom** for the Reval clan community.
 
 ## Version
 
-Current Version: 2.25.1
+Current Version: 2.26.0
 
 ## Acknowledgments
 

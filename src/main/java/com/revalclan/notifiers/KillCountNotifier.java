@@ -106,7 +106,7 @@ public class KillCountNotifier extends BaseNotifier {
 					int count = Integer.parseInt(countStr);
 					pendingBoss = boss;
 					pendingCount = count;
-					pendingSnapshot = null;
+					pendingSnapshot = raidPartyTracker.snapshotFor(pendingBoss);
 					badTicks = 0; // Reset bad tick counter
 				} catch (NumberFormatException e) {
 					log.debug("Failed to parse kill count: {}", countStr);
@@ -129,7 +129,7 @@ public class KillCountNotifier extends BaseNotifier {
 					pendingCount = count;
 					// Capture the raid party (CoX side panel, ToB/ToA varcs) while it is
 					// still populated; includes the local player
-					pendingSnapshot = raidPartyTracker.snapshotFor(boss);
+					pendingSnapshot = raidPartyTracker.snapshotFor(pendingBoss);
 					badTicks = 0;
 				} catch (NumberFormatException e) {
 					log.debug("Failed to parse kill count: {}", countStr);
@@ -184,6 +184,8 @@ public class KillCountNotifier extends BaseNotifier {
 				return null;
 				
 			case "completion":
+				if (RaidPartyTracker.FRACTURED_ARCHIVE.equals(RaidPartyTracker.raidOf(boss)))
+					return raidPartyTracker.completionSource(boss);
 				if ("Gauntlet".equalsIgnoreCase(boss)) return "Crystalline Hunllef";
 				if ("Corrupted Gauntlet".equalsIgnoreCase(boss)) return "Corrupted Hunllef";
 				return null;
@@ -195,7 +197,8 @@ public class KillCountNotifier extends BaseNotifier {
 			case "kill":
 			case "success":
 			case "opened":
-				return boss;
+				return RaidPartyTracker.FRACTURED_ARCHIVE.equals(RaidPartyTracker.raidOf(boss))
+					? raidPartyTracker.completionSource(boss) : boss;
 				
 			default:
 				return null;
@@ -208,7 +211,7 @@ public class KillCountNotifier extends BaseNotifier {
 	private String normalizeRaidName(String raid) {
 		if ("Wintertodt".equalsIgnoreCase(raid)) return "Wintertodt";
 		String resolved = RaidPartyTracker.raidOf(raid);
-		if (RaidPartyTracker.FRACTURED_ARCHIVE.equals(resolved)) return resolved;
+		if (RaidPartyTracker.FRACTURED_ARCHIVE.equals(resolved)) return raidPartyTracker.completionSource(raid);
 		
 		// Handle raid modes (e.g., "Theatre of Blood: Entry Mode")
 		int modeSeparator = raid.lastIndexOf(':');
@@ -251,7 +254,7 @@ public class KillCountNotifier extends BaseNotifier {
 		kcData.put("killCount", pendingCount);
 		
 		String raid = RaidPartyTracker.raidOf(pendingBoss);
-		boolean timeApplies = Objects.equals(pendingTimeRaid,
+		boolean timeApplies = !RaidPartyTracker.FRACTURED_ARCHIVE_PRACTICE.equals(pendingBoss) && Objects.equals(pendingTimeRaid,
 			RaidPartyTracker.FRACTURED_ARCHIVE.equals(raid) ? raid : null);
 		if (pendingTime != null && timeApplies) {
 			kcData.put("time", formatDuration(pendingTime));
