@@ -112,6 +112,14 @@ public class SessionTracker {
 	private int playtimeMinutes = 0;
 	private Map<String, Integer> countersStart;
 	private Map<String, Integer> countersEnd;
+	/** World flags of the segment a hop just cut */
+	private List<String> hopFromFlags;
+	/**
+	 * After a hop between world types (e.g. out of the PvP Arena) the client can still hold
+	 * the previous world's stats at LOGGED_IN: the start is retaken once this world's arrive.
+	 */
+	private boolean startProvisional = false;
+	private boolean statsChanged = false;
 
 	/** Summaries sent and not yet answered — a login right after startup must not send them twice */
 	private final Set<String> inFlight = new HashSet<>();
@@ -141,6 +149,8 @@ public class SessionTracker {
 		accountHash = client.getAccountHash();
 		world = client.getWorld();
 		worldFlags = Worlds.flagNames(client);
+		startProvisional = hopFromFlags != null && !hopFromFlags.equals(worldFlags);
+		hopFromFlags = null;
 		startSnapshot = buildSnapshot();
 		endSnapshot = startSnapshot;
 		readPlaytime();
@@ -168,8 +178,10 @@ public class SessionTracker {
 	 */
 	public void cutForHop() {
 		if (!active) return;
+		List<String> cutFlags = worldFlags;
 		PersistedSession persisted = persist(buildSummary("hop", touch()));
 		reset();
+		hopFromFlags = cutFlags;
 		if (persisted.member) send(persisted);
 	}
 
@@ -177,6 +189,11 @@ public class SessionTracker {
 	public void reset() {
 		active = false;
 		resetState();
+	}
+
+	/** StatChanged, any clan state: the new world's own stats have started to arrive. */
+	public void onStatChanged() {
+		if (active && startProvisional) statsChanged = true;
 	}
 
 	// ------------------------------------------------------------------ ticking
@@ -192,6 +209,7 @@ public class SessionTracker {
 			endSnapshot = startSnapshot;
 			if (!snapshotEmpty(startSnapshot)) dirty = true;
 		}
+		settleStartSnapshot();
 		readCounters();
 
 		// Pure skilling fires no accumulator event — treat XP movement as dirtiness
@@ -357,8 +375,21 @@ public class SessionTracker {
 		playtimeMinutes = 0;
 		countersStart = null;
 		countersEnd = null;
+		startProvisional = false;
+		statsChanged = false;
 		dirty = false;
 		ticksSincePersist = 0;
+	}
+
+	/** GameTick follows the tick's StatChanged burst: the new world's stats become the start. */
+	private void settleStartSnapshot() {
+		if (!startProvisional || !statsChanged) return;
+		startProvisional = false;
+		Map<String, Object> snapshot = buildSnapshot();
+		if (snapshotEmpty(snapshot)) return;
+		startSnapshot = snapshot;
+		endSnapshot = snapshot;
+		dirty = true;
 	}
 
 	/** Refresh the end snapshot and the last-update time; returns the latter. */
