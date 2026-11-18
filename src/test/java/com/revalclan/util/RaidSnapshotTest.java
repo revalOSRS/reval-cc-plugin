@@ -173,8 +173,9 @@ public class RaidSnapshotTest {
 		when(client.getVarbitValue(VarbitID.TFA_CLIENT_SKIP_PHASE_MODE)).thenReturn(1);
 		chat(RaidDeathTracker.ARCHIVE_START_MESSAGE);
 		tick();
-		// The completion lands after the instance ended.
+		// The completion lands well after the instance ended and the run state was dropped.
 		when(deaths.isInside(FRACTURED_ARCHIVE)).thenReturn(false);
+		for (int i = 0; i < 5; i++) tick();
 		String message = "Your completed Fractured Archive count is: 5.";
 		chat(message);
 		notifier.onChatMessage(message);
@@ -183,6 +184,17 @@ public class RaidSnapshotTest {
 		assertEquals(1, sent.size());
 		assertEquals(FRACTURED_ARCHIVE_PRACTICE, sent.get(0).get("boss"));
 		assertEquals("practice", ((Map<?, ?>) sent.get(0).get("raid")).get("mode"));
+		// The evidence was spent on that completion; the next normal run reports as normal.
+		when(client.getVarbitValue(VarbitID.TFA_CLIENT_SKIP_PHASE_MODE)).thenReturn(0);
+		when(deaths.isInside(FRACTURED_ARCHIVE)).thenReturn(true);
+		chat(RaidDeathTracker.ARCHIVE_START_MESSAGE);
+		tick();
+		message = "Your completed Fractured Archive count is: 6.";
+		chat(message);
+		notifier.onChatMessage(message);
+		notifier.onTick();
+		assertEquals(FRACTURED_ARCHIVE, sent.get(1).get("boss"));
+		assertEquals("normal", ((Map<?, ?>) sent.get(1).get("raid")).get("mode"));
 	}
 
 	@Test public void archivePracticeLabelsAreRecognizedWithoutInventingACounter() {

@@ -39,6 +39,19 @@ that single snapshot. Archive rewards keep their existing ten-minute retention.
 Deploy the platform's raid-completion migration and ingestion support before this
 client release. No historical sizes or invocation levels are fabricated.
 
+### Fractured Archive practice
+
+Practice completions are reported as `The Fractured Archive: Practice Mode` with
+`raid.mode = practice`, separate from normal Archive KC. A practice run is recognised
+from a practice completion label or from the native skip-phase control; that evidence
+lasts for the run, including a completion that arrives after leaving the instance.
+The lobby's preferred mode is not evidence.
+
+Only completion messages supply practice counts. Practice times, personal bests,
+detailed NPC kills and session kills are not reported, so practice cannot score as
+normal raids or boss kills. Collection log sync reads only the normal Archive counter,
+so missed practice completions are not backfilled.
+
 ### Raid party deaths
 
 Raid loot and completion events include known per-member death counts in
@@ -254,7 +267,7 @@ Created by **Lightroom** for the Reval clan community.
 
 ## Version
 
-Current Version: 2.25.1
+Current Version: 2.26.0
 
 ## Acknowledgments
 
@@ -263,21 +276,3 @@ Portions of this plugin were inspired by or derived from:
 - [TempleOSRS](https://github.com/SMaloney2017/Temple-OSRS-Plugin) - Licensed under BSD 2-Clause License
 
 See the LICENSES directory for third-party license details.
-
-### Fractured Archive practice tracking
-
-Practice completions use `The Fractured Archive: Practice Mode` and `raid.mode = practice`.
-The native `TFA_CLIENT_SKIP_PHASE_MODE` control provides positive practice evidence;
-that evidence is retained for the current run even while the control is disabled.
-Explicit `: Practice Mode` and `(Practice)` completion labels are also recognized.
-The lobby's preferred mode is not evidence of the active raid's mode.
-
-Only completion messages supply practice KC. Boss deaths, phase skips and entering a
-practice room do not create completions. Practice times/PBs and detailed NPC kill
-notifications are excluded from ordinary raid progress. Normal KC sync continues to
-read `TOTAL_COMPLETED_THEFRACTUREDARCHIVE`; no unverified practice varp is read and
-missed practice completions cannot currently be recovered by sync.
-
-Native control semantics were checked against RuneLite's
-[18 November 2026 client scripts](https://github.com/runelite/cs2-scripts/blob/9c0c3f546a8aa5b01b2be04da4c048b4e1d6d75e/scripts/%5Bproc%2Cscript10034%5D.cs2).
-Live completion-message wording and counter behavior still need an in-game check.

@@ -74,6 +74,8 @@ public class RaidPartyTracker implements SessionScoped {
 	private final Map<String, Snapshot> completedSnapshots = new LinkedHashMap<>();
 	private Snapshot active;
 	private Snapshot pendingCompletion;
+	/** An unfinished practice run's evidence, kept after leaving for a late completion message. */
+	private boolean archivePracticeAfterExit;
 	private int startTick = -1;
 	private int outsideTicks;
 	private Party savedParty;
@@ -155,6 +157,7 @@ public class RaidPartyTracker implements SessionScoped {
 		deathTracker.complete(raid);
 		active.completedAtMs = System.currentTimeMillis();
 		completedSnapshots.put(raid, active);
+		archivePracticeAfterExit = false;
 		pendingCompletion = active;
 	}
 
@@ -166,6 +169,7 @@ public class RaidPartyTracker implements SessionScoped {
 		outsideTicks = 0;
 		savedParty = null;
 		savedAtMs = 0;
+		archivePracticeAfterExit = false;
 		archiveRoster.reset();
 		if (observedStart) deathTracker.start(raid);
 		else deathTracker.reset();
@@ -186,6 +190,8 @@ public class RaidPartyTracker implements SessionScoped {
 				outsideTicks = 0;
 				if (active.metadata.completionCount == null || pendingCompletion == active) observe();
 			} else if (++outsideTicks > 3) {
+				archivePracticeAfterExit = FRACTURED_ARCHIVE.equals(active.raid) && active.metadata.isPractice()
+					&& active.metadata.completionCount == null;
 				active = null;
 				startTick = -1;
 				deathTracker.reset();
@@ -231,6 +237,7 @@ public class RaidPartyTracker implements SessionScoped {
 		outsideTicks = 0;
 		savedParty = null;
 		savedAtMs = 0;
+		archivePracticeAfterExit = false;
 		completedSnapshots.clear();
 		deathTracker.reset();
 		archiveRoster.reset();
@@ -274,7 +281,8 @@ public class RaidPartyTracker implements SessionScoped {
 	 */
 	public String completionSource(String source) {
 		if (!FRACTURED_ARCHIVE.equals(raidOf(source))) return source;
-		boolean runEvidence = active != null && FRACTURED_ARCHIVE.equals(active.raid) && active.metadata.isPractice();
+		boolean runEvidence = archivePracticeAfterExit
+			|| (active != null && FRACTURED_ARCHIVE.equals(active.raid) && active.metadata.isPractice());
 		return runEvidence || isArchivePractice() || source.toLowerCase(Locale.ROOT).contains("practice")
 			? FRACTURED_ARCHIVE_PRACTICE : FRACTURED_ARCHIVE;
 	}
