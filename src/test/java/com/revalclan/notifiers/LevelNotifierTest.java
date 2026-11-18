@@ -45,4 +45,29 @@ public class LevelNotifierTest {
 		assertEquals(1, sent.size());
 		assertEquals(91, sent.get(0).get("level"));
 	}
+
+	@Test public void leavingArenaDoesNotReportReloadedCombatStatsAsLevelUps() {
+		notifier.client = mock(Client.class);
+		when(notifier.client.getGameState()).thenReturn(GameState.LOGGED_IN);
+		when(notifier.client.getWorld()).thenReturn(578);
+		stat(60, 273_742);
+		notifier.onStatChanged(new StatChanged(Skill.DEFENCE, 0, 1, 1));
+		when(notifier.client.getWorld()).thenReturn(625);
+		when(notifier.client.getTotalLevel()).thenReturn(2376);
+		stat(99, 14_252_713);
+		notifier.onStatChanged(new StatChanged(Skill.DEFENCE, 14_175_668, 99, 99));
+		assertTrue("Reloading real combat stats after the arena is not progression", sent.isEmpty());
+	}
+
+	@Test public void logoutCleanupResetsBaselinesEvenWithoutLoggedOutStatEvents() {
+		com.revalclan.session.SessionState session = new com.revalclan.session.SessionState();
+		notifier.registerSessionState(session);
+		notifier.client = mock(Client.class);
+		when(notifier.client.getGameState()).thenReturn(GameState.LOGGED_IN);
+		when(notifier.client.getWorld()).thenReturn(625);
+		stat(60, 273_742);
+		session.reset();
+		stat(99, 14_252_713);
+		assertTrue("A new account on the same world gets new baselines", sent.isEmpty());
+	}
 }
