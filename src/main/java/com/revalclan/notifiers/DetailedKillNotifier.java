@@ -1,7 +1,9 @@
 package com.revalclan.notifiers;
 
 import com.revalclan.combat.KillTracker.KillData;
+import com.revalclan.util.RaidPartyTracker;
 
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -14,6 +16,8 @@ import java.util.Set;
  */
 @Singleton
 public class DetailedKillNotifier extends BaseNotifier {
+	@Inject private RaidPartyTracker raidPartyTracker;
+
 	@Override
 	public boolean isEnabled() {
 		return filterManager.getFilters().isDetailedKillEnabled();
@@ -25,7 +29,7 @@ public class DetailedKillNotifier extends BaseNotifier {
 	}
 
 	public void onKill(KillData data) {
-		if (!isEnabled() || !shouldNotifyKill(data.npcId, data.npcName)) {
+		if (raidPartyTracker.isArchivePractice() || !isEnabled() || !shouldNotifyKill(data.npcId, data.npcName)) {
 			return;
 		}
 

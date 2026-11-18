@@ -64,6 +64,8 @@ public class RaidPartyTracker implements SessionScoped {
 
 	static final Pattern COMPLETED = Pattern.compile(
 		"^Your completed (.+?) count is: ([\\d,]+)\\.?$", Pattern.CASE_INSENSITIVE);
+	private static final Pattern COMPLETION_COUNT = Pattern.compile(
+		"^Your (.+?) completion count is: ([\\d,]+)\\.?$", Pattern.CASE_INSENSITIVE);
 
 	@Inject private Client client;
 	@Inject private RaidDeathTracker deathTracker;
@@ -123,11 +125,12 @@ public class RaidPartyTracker implements SessionScoped {
 		}
 		deathTracker.onChatMessage(message);
 		Matcher completed = COMPLETED.matcher(message);
+		if (!completed.matches()) completed = COMPLETION_COUNT.matcher(message);
 		String raid = null;
 		String source = null;
 		Integer count = null;
 		if (completed.matches()) {
-			source = completed.group(1);
+			source = completionSource(completed.group(1));
 			raid = raidOf(source);
 			try { count = Integer.parseInt(completed.group(2).replace(",", "")); }
 			catch (NumberFormatException e) { return; }
@@ -248,11 +251,25 @@ public class RaidPartyTracker implements SessionScoped {
 	public static String raidOf(String source) {
 		if (source == null) return null;
 		String name = sanitize(source).toLowerCase(Locale.ROOT);
+		name = name.replaceFirst("(?::? practice(?: mode)?| \\(practice(?: mode)?\\))$", "");
 		if (name.startsWith(CHAMBERS_OF_XERIC.toLowerCase(Locale.ROOT))) return CHAMBERS_OF_XERIC;
 		if (name.startsWith(THEATRE_OF_BLOOD.toLowerCase(Locale.ROOT))) return THEATRE_OF_BLOOD;
 		if (name.startsWith(TOMBS_OF_AMASCUT.toLowerCase(Locale.ROOT))) return TOMBS_OF_AMASCUT;
 		if (name.equals(FRACTURED_ARCHIVE.toLowerCase(Locale.ROOT)) || name.equals("fractured archive")) return FRACTURED_ARCHIVE;
 		return null;
+	}
+
+	/** The skip-phase control is sent for practice encounters, not the lobby's preferred mode. */
+	public boolean isArchivePractice() {
+		return deathTracker.isInside(FRACTURED_ARCHIVE)
+			&& (client.getVarbitValue(VarbitID.TFA_CLIENT_SKIP_PHASE_MODE) > 0
+				|| (active != null && FRACTURED_ARCHIVE.equals(active.raid) && active.metadata.isPractice()));
+	}
+
+	public String completionSource(String source) {
+		if (!FRACTURED_ARCHIVE.equals(raidOf(source))) return source;
+		return isArchivePractice() || source.toLowerCase(Locale.ROOT).contains("practice")
+			? FRACTURED_ARCHIVE + ": Practice Mode" : FRACTURED_ARCHIVE;
 	}
 
 	/** The raid whose last boss this NPC is, or null. */
