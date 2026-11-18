@@ -333,6 +333,7 @@ public class RevalClanPlugin extends Plugin {
 				break;
 
 			case HOPPING:
+				levelNotifier.reset();
 				// Each session is one world: close this segment now, the next LOGGED_IN opens the next
 				if (wasLoggedIn) sessionTracker.cutForHop();
 				break;
