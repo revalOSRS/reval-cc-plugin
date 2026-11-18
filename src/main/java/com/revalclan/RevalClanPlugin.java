@@ -497,6 +497,7 @@ public class RevalClanPlugin extends Plugin {
 
 	@Subscribe
 	public void onStatChanged(StatChanged event) {
+		sessionTracker.onStatChanged();
 		if (!clanMembership.isMember()) return;
 		levelNotifier.onStatChanged(event);
 	}

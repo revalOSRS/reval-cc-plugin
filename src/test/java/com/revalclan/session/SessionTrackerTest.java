@@ -12,7 +12,9 @@ import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import net.runelite.api.Client;
+import net.runelite.api.GameState;
 import net.runelite.api.Player;
+import net.runelite.api.Skill;
 import net.runelite.api.WorldType;
 import net.runelite.client.callback.ClientThread;
 import org.junit.Before;
@@ -123,6 +125,49 @@ public class SessionTrackerTest {
 
 		drain();
 		verifyNoInteractions(changes);
+	}
+
+	@Test public void leavingAnotherWorldTypeStartsFromTheNewWorldsStats() {
+		when(client.getWorldType()).thenReturn(EnumSet.of(WorldType.MEMBERS, WorldType.PVP_ARENA));
+		stats(273_742);
+		tracker.startSession();
+		tracker.cutForHop();
+
+		when(client.getWorldType()).thenReturn(EnumSet.of(WorldType.MEMBERS));
+		tracker.startSession(); // still holding the arena's stats
+		stats(14_252_713);
+		tracker.onStatChanged();
+		tracker.onGameTick();
+
+		assertEquals(14_252_713, startXp(tracker.finalizeSession()));
+	}
+
+	@Test public void aHopBetweenRegularWorldsKeepsTheLoginSnapshot() {
+		when(client.getWorldType()).thenReturn(EnumSet.of(WorldType.MEMBERS));
+		stats(1_000_000);
+		tracker.startSession();
+		tracker.cutForHop();
+
+		tracker.startSession();
+		stats(1_000_500);
+		tracker.onStatChanged();
+		tracker.onGameTick();
+
+		assertEquals(1_000_000, startXp(tracker.finalizeSession()));
+	}
+
+	private void stats(int attackXp) {
+		when(client.getGameState()).thenReturn(GameState.LOGGED_IN);
+		when(client.getSkillExperience(any(Skill.class))).thenReturn(0);
+		when(client.getSkillExperience(Skill.ATTACK)).thenReturn(attackXp);
+		when(client.getOverallExperience()).thenReturn((long) attackXp);
+	}
+
+	@SuppressWarnings("unchecked")
+	private static int startXp(java.util.Map<String, Object> summary) {
+		java.util.Map<String, Object> snapshot = (java.util.Map<String, Object>) summary.get("startSnapshot");
+		java.util.Map<String, java.util.Map<String, Object>> skills = (java.util.Map<String, java.util.Map<String, Object>>) snapshot.get("skills");
+		return (Integer) skills.get("attack").get("xp");
 	}
 
 	private SessionStore.PersistedSession previous() {
