@@ -515,9 +515,11 @@ public class RevalClanPlugin extends Plugin {
 		lootNotifier.onActorDeath(event);
 		// A raid's final boss saves the party for an outside-chest claim
 		raidPartyTracker.onActorDeath(event);
-		// Kills feed the session accumulator regardless of clan state
 		KillTracker.KillData kill = killTracker.onActorDeath(event);
-		if (kill != null && !raidPartyTracker.isArchivePractice()) sessionTracker.addKill(kill.npcName);
+		// Archive practice replays bosses on demand, so its kills never count as ordinary kills
+		if (kill != null && raidPartyTracker.isArchivePractice()) kill = null;
+		// Kills feed the session accumulator regardless of clan state
+		if (kill != null) sessionTracker.addKill(kill.npcName);
 		if (!clanMembership.isMember()) return;
 		deathNotifier.onActorDeath(event);
 		if (kill != null) detailedKillNotifier.onKill(kill);
