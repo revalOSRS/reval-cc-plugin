@@ -151,7 +151,7 @@ final class CollectionGrid extends JComponent implements Scrollable, javax.acces
     @Override public String getToolTipText(MouseEvent event) {
         layoutCells();
         for (Cell cell : cells) if (new Rectangle(cell.x, cell.y, cell.size, cell.size).contains(event.getPoint())) {
-            return cell.item.name + " — " + (cell.item.quantity == null ? "Not synced" : cell.item.quantity > 0 ? BrowserTheme.number(cell.item.quantity) + " received" : "Missing");
+            return cell.item.name + " - " + (cell.item.quantity == null ? "Not synced" : cell.item.quantity > 0 ? BrowserTheme.number(cell.item.quantity) + " received" : "Missing");
         }
         return null;
     }
