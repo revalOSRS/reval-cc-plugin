@@ -3,15 +3,14 @@ package com.revalclan.session;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import lombok.extern.slf4j.Slf4j;
-import net.runelite.client.RuneLite;
+import com.revalclan.RevalClanPlugin;
+import net.runelite.client.util.Filepath;
 
 import javax.inject.Inject;
+import javax.inject.Provider;
 import javax.inject.Singleton;
-import java.io.File;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.io.Reader;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -21,10 +20,12 @@ import java.util.concurrent.CompletableFuture;
 import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Crash-safe persistence for in-progress sessions: one JSON file per session
- * under {@code ~/.runelite/reval-clan/sessions/}. Disk operations run in order
+ * under {@code ~/.runelite/plugin-data/reval-clan/sessions/}. Disk operations run in order
  * on RuneLite's executor, never on the game or Swing thread.
  *
  * Why not the RuneLite config store: it buffers in memory and only reaches
@@ -36,27 +37,31 @@ import java.util.concurrent.ScheduledExecutorService;
 @Slf4j
 @Singleton
 public class SessionStore {
-	private static final String DIR_NAME = "reval-clan/sessions";
+	private static final String DIR_NAME = "sessions";
 	/** Undelivered files older than this are dropped at recovery */
 	private static final long MAX_AGE_MS = 14L * 24 * 60 * 60 * 1000;
 
 	private final Gson gson;
 	private final Executor executor;
-	private final File directory;
+	/** Resolved on the disk worker: the first resolve may migrate the legacy folder. */
+	interface Location { Filepath get() throws IOException; }
+
+	private final Location location;
+	private Filepath directory;
 	// One pending value per session; a delete tombstone supersedes queued snapshots.
 	private final Map<String, Optional<PersistedSession>> pending = new LinkedHashMap<>();
 	private boolean scheduled;
 	private CompletableFuture<Void> flushed = CompletableFuture.completedFuture(null);
 
 	@Inject
-	public SessionStore(Gson gson, ScheduledExecutorService executor) {
-		this(gson, executor, new File(RuneLite.RUNELITE_DIR, DIR_NAME));
+	public SessionStore(Gson gson, ScheduledExecutorService executor, Provider<RevalClanPlugin> plugin) {
+		this(gson, executor, () -> plugin.get().dataDirectory().joinSegment(DIR_NAME));
 	}
 
-	SessionStore(Gson gson, Executor executor, File directory) {
+	SessionStore(Gson gson, Executor executor, Location location) {
 		this.gson = gson;
 		this.executor = executor;
-		this.directory = directory;
+		this.location = location;
 	}
 
 	private void update(String id, Optional<PersistedSession> value) {
@@ -135,16 +140,18 @@ public class SessionStore {
 		}
 	}
 
-	private File dir() {
-		File d = directory;
-		if (!d.exists() && !d.mkdirs()) {
-			log.warn("Could not create session store directory {}", d);
+	private Filepath dir() throws IOException {
+		Filepath d;
+		synchronized (location) {
+			if (directory == null) directory = location.get();
+			d = directory;
 		}
+		d.createDirectories();
 		return d;
 	}
 
-	private File fileFor(String sessionId) {
-		return new File(dir(), sessionId + ".json");
+	private Filepath fileFor(String sessionId) throws IOException {
+		return dir().joinSegment(sessionId + ".json");
 	}
 
 	/** Atomic write: temp file then move, so a crash mid-write never leaves a torn file. */
@@ -155,16 +162,16 @@ public class SessionStore {
 	private void writeNow(PersistedSession session) throws IOException {
 		String id = session.sessionId();
 		if (id == null) return;
-		Path target = fileFor(id).toPath();
-		Path tmp = target.resolveSibling(id + ".tmp");
+		Filepath target = fileFor(id);
+		Filepath tmp = dir().joinSegment(id + ".tmp");
 		try {
-			Files.write(tmp, gson.toJson(session).getBytes(StandardCharsets.UTF_8));
+			tmp.write(gson.toJson(session));
 			try {
-				Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+				tmp.moveTo(target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
 			} catch (IOException atomicUnsupported) {
-				Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING);
+				tmp.moveTo(target, StandardCopyOption.REPLACE_EXISTING);
 			}
-		} finally { Files.deleteIfExists(tmp); }
+		} finally { tmp.deleteIfExists(); }
 	}
 
 	public void delete(String sessionId) {
@@ -173,7 +180,7 @@ public class SessionStore {
 	}
 
 	private void deleteNow(String sessionId) throws IOException {
-		Files.deleteIfExists(fileFor(sessionId).toPath());
+		fileFor(sessionId).deleteIfExists();
 	}
 
 	/** Reads after preceding writes were attempted; one failed write must not hide other saved sessions. */
@@ -194,17 +201,22 @@ public class SessionStore {
 	/** Every readable persisted session, newest first. Unreadable or expired files are removed. */
 	private List<PersistedSession> readAllNow() {
 		List<PersistedSession> out = new ArrayList<>();
-		File[] files = dir().listFiles((d, name) -> name.endsWith(".json"));
-		if (files == null) return out;
+		List<Filepath> files;
+		try (Stream<Filepath> listing = dir().walk(1)) {
+			files = listing.filter(f -> f.isFile() && f.getFileName().endsWith(".json")).collect(Collectors.toList());
+		} catch (IOException error) {
+			log.warn("Could not list saved sessions", error);
+			return out;
+		}
 		long now = System.currentTimeMillis();
-		for (File f : files) {
+		for (Filepath f : files) {
 			PersistedSession session = null;
-			try {
-				session = gson.fromJson(new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8), PersistedSession.class);
+			try (Reader reader = f.openReader()) {
+				session = gson.fromJson(reader, PersistedSession.class);
 			} catch (Exception ignored) {}
 			if (session == null || session.summary == null || session.sessionId() == null
 				|| now - session.startedAt() > MAX_AGE_MS) {
-				if (!f.delete()) log.warn("Could not remove stale session file {}", f);
+				try { f.deleteIfExists(); } catch (IOException error) { log.warn("Could not remove stale session file {}", f); }
 				continue;
 			}
 			out.add(session);
