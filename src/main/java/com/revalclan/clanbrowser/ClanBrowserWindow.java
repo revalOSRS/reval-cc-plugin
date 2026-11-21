@@ -173,7 +173,7 @@ public final class ClanBrowserWindow extends JFrame {
         if (command.kind.equals("help")) { showHelp(); return; }
         cancel();
         if (catalogue != null) { configure(command.resolveShared(catalogue.pages, sharedBy)); perform(); return; }
-        request = command; activeRead = null; data = null; busy(true); message("Loading clan categories…", null);
+        request = command; activeRead = null; data = null; busy(true); message("Loading clan categories...", null);
         final int ticket = ++generation;
         catalogueCall = api.catalogue(result -> {
             if (closed || ticket != generation) return;
@@ -192,14 +192,14 @@ public final class ClanBrowserWindow extends JFrame {
         if (catalogue != null) for (BrowserModels.Page page : catalogue.pages) if (!kind.equals("dryboard") || page.category.equals("Bosses") || page.category.equals("Raids")) pages.add(page);
         choices.setVisible(kind.equals("dryboard")); statistics.setVisible(kind.equals("leaderboard"));
         selection.choices(pages);
-        selection.placeholder("Search a category, or type cox / tob / toa…");
+        selection.placeholder("Search a category, or type cox / tob / toa...");
         selection.value(lastCategory);
         dryModes.setSelectedItem(command.mode.equals("historical") ? "Historical" : "Current");
         metricButtons.forEach((metric, button) -> highlight(button, metric.equals(lastMetric)));
-        boss.choices(catalogue.bosses); boss.placeholder("All bosses, or search a boss…"); boss.value(command.boss == null ? "all" : command.boss);
+        boss.choices(catalogue.bosses); boss.placeholder("All bosses, or search a boss..."); boss.value(command.boss == null ? "all" : command.boss);
         tiers.setSelectedItem(command.tier == null || command.tier.equals("all") ? "All tiers" : BrowserTheme.capitalize(command.tier));
         if (clog()) search.setText(command.player == null ? "" : command.player);
-        search.putClientProperty("JTextField.placeholderText", "Find a clan member…");
+        search.putClientProperty("JTextField.placeholderText", "Find a clan member...");
         search.setToolTipText(clog() ? "Enter an OSRS name and press Enter to view their collection log" : "Filter the displayed clan standings");
         configureExtra(); adjusting = false;
     }
@@ -270,7 +270,7 @@ public final class ClanBrowserWindow extends JFrame {
             if (categoryBrowser()) { busy(false); loadingDetails(); }
             else {
                 busy(true); title.text = titleFor(request.kind); title.repaint();
-                message("Loading clan standings…", null);
+                message("Loading clan standings...", null);
             }
         }
     }
@@ -414,7 +414,7 @@ public final class ClanBrowserWindow extends JFrame {
         JLabel category = label(name, 29, BrowserTheme.ORANGE); category.setHorizontalAlignment(SwingConstants.CENTER);
         category.setPreferredSize(new Dimension(100, 38)); summary.add(category, BorderLayout.NORTH);
         logDetail.removeAll(); logDetail.add(summary, BorderLayout.NORTH);
-        JPanel pending = messagePanel(clog() ? "Loading items…" : "Loading standings…", null);
+        JPanel pending = messagePanel(clog() ? "Loading items..." : "Loading standings...", null);
         pending.add(progressBar(100), BorderLayout.SOUTH);
         logDetail.add(pending, BorderLayout.CENTER);
         if (!clog()) title.text = titleFor(request.kind) + " · " + name;

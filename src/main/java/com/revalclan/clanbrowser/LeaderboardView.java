@@ -78,7 +78,7 @@ final class LeaderboardView extends JPanel {
                     BrowserModels.Row row = model.visible.get(index);
                     if ("section".equals(row.status)) return "Closest unfinished collection logs";
                     return row.player + (row.estimated ? " · Estimated counter" : "")
-                        + (dry ? " · " + (historical ? (row.ongoing ? "Ongoing · Last: " : "Ended · ") + row.item + " · KC: " + BrowserTheme.number(row.start) + " → " + BrowserTheme.number(row.end) : row.item + " · Last unique KC: " + BrowserTheme.number(row.last) + " · Current KC: " + BrowserTheme.number(row.current)) : "")
+                        + (dry ? " · " + (historical ? (row.ongoing ? "Ongoing · Last: " : "Ended · ") + row.item + " · KC: " + BrowserTheme.number(row.start) + " to " + BrowserTheme.number(row.end) : row.item + " · Last unique KC: " + BrowserTheme.number(row.last) + " · Current KC: " + BrowserTheme.number(row.current)) : "")
                         + (openLog != null ? " · Double-click to open their collection log" : "");
                 }
             };
@@ -160,7 +160,7 @@ final class LeaderboardView extends JPanel {
             g.setColor(selected ? new Color(0x596141) : progress ? BrowserTheme.MISSING : BrowserTheme.RECEIVED); g.fillRect(0, 0, getWidth(), getHeight());
             if (mine) { g.setColor(BrowserTheme.GOLD); g.fillRect(0, getHeight() - 2, getWidth(), 2); }
             int height = dry ? 34 : getHeight();
-            if (column == 0) BrowserTheme.text(g, row.rank == null ? "—" : "#" + row.rank, 9, 0, height, getWidth() - 15, 23, BrowserTheme.GOLD, true, false);
+            if (column == 0) BrowserTheme.text(g, row.rank == null ? "-" : "#" + row.rank, 9, 0, height, getWidth() - 15, 23, BrowserTheme.GOLD, true, false);
             else if (column == 1) {
                 BrowserTheme.text(g, row.player, 6, 0, height, getWidth() - 12, 24, BrowserTheme.TEXT, true, false);
                 if (dry) BrowserTheme.text(g, historical ? (row.ongoing ? "Ongoing · " : "Ended · ") + row.item : row.item, 6, 34, 30, getWidth() - 12, 17, BrowserTheme.MUTED, false, false);
@@ -168,7 +168,7 @@ final class LeaderboardView extends JPanel {
                 String value = progress ? BrowserTheme.number(row.obtained) + " / " + BrowserTheme.number(row.totalItems)
                     : row.value == null ? "Greenlogged" : (row.estimated ? "~" : "") + BrowserTheme.number(row.value);
                 BrowserTheme.text(g, value, getWidth() - 9, 0, height, getWidth() - 15, 25, progress ? BrowserTheme.GOLD : BrowserTheme.GREEN, true, true);
-                if (dry) BrowserTheme.text(g, historical ? BrowserTheme.number(row.start) + " → " + BrowserTheme.number(row.end) : BrowserTheme.number(row.last) + " / " + BrowserTheme.number(row.current), getWidth() - 9, 34, 30, getWidth() - 15, 17, BrowserTheme.MUTED, false, true);
+                if (dry) BrowserTheme.text(g, historical ? BrowserTheme.number(row.start) + " to " + BrowserTheme.number(row.end) : BrowserTheme.number(row.last) + " / " + BrowserTheme.number(row.current), getWidth() - 9, 34, 30, getWidth() - 15, 17, BrowserTheme.MUTED, false, true);
             }
             g.dispose();
         }
