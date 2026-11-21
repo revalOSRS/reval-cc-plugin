@@ -36,6 +36,7 @@ import okhttp3.OkHttpClient;
 import javax.inject.Named;
 import javax.inject.Singleton;
 import java.util.concurrent.TimeUnit;
+import java.io.IOException;
 
 import java.awt.image.BufferedImage;
 
@@ -70,13 +71,21 @@ import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.ClientToolbar;
 import net.runelite.client.ui.NavigationButton;
 import net.runelite.client.ui.overlay.OverlayManager;
+import net.runelite.client.util.Filepath;
 import net.runelite.client.util.Text;
 
 @Slf4j
 @PluginDescriptor(
-	name = "Reval Clan"
+	name = "Reval Clan",
+	internalName = "reval-clan",
+	legacyDataDirectory = "reval-clan"
 )
 public class RevalClanPlugin extends Plugin {
+	/** .runelite/plugin-data/reval-clan; the first call moves the legacy .runelite/reval-clan folder there. */
+	public Filepath dataDirectory() throws IOException {
+		return getPluginDirectory();
+	}
+
 	@Inject private Client client;
 	@Inject private ClanBrowserManager clanBrowserManager;
 

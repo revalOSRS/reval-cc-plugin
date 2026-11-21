@@ -3,6 +3,7 @@ package com.revalclan.session;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import java.io.File;
+import net.runelite.client.util.Filepath;
 import java.util.ArrayDeque;
 import java.util.Queue;
 import java.util.List;
@@ -18,7 +19,7 @@ public class SessionStoreTest {
 	@Test public void writingDoesNotTouchDiskOnTheCaller() throws Exception {
 		Queue<Runnable> tasks = new ArrayDeque<>();
 		File directory = temporary.newFolder();
-		SessionStore store = new SessionStore(new Gson(), tasks::add, directory);
+		SessionStore store = new SessionStore(new Gson(), tasks::add, at(directory));
 		SessionStore.PersistedSession session = session("test-session");
 		store.write(session);
 		assertFalse("Game ticks must not write session files", new File(directory, "test-session.json").exists());
@@ -29,7 +30,7 @@ public class SessionStoreTest {
 	@Test public void acknowledgementCannotOvertakeAQueuedWrite() throws Exception {
 		Queue<Runnable> tasks = new ArrayDeque<>();
 		File directory = temporary.newFolder();
-		SessionStore store = new SessionStore(new Gson(), tasks::add, directory);
+		SessionStore store = new SessionStore(new Gson(), tasks::add, at(directory));
 		AtomicReference<List<SessionStore.PersistedSession>> recovered = new AtomicReference<>();
 		store.write(session("acked"));
 		store.delete("acked");
@@ -43,7 +44,7 @@ public class SessionStoreTest {
 
 	@Test public void recoveryObservesTheLatestQueuedSnapshot() throws Exception {
 		Queue<Runnable> tasks = new ArrayDeque<>();
-		SessionStore store = new SessionStore(new Gson(), tasks::add, temporary.newFolder());
+		SessionStore store = new SessionStore(new Gson(), tasks::add, at(temporary.newFolder()));
 		SessionStore.PersistedSession first = session("current");
 		first.summary.addProperty("totalLootValue", 10);
 		SessionStore.PersistedSession last = session("current");
@@ -64,7 +65,7 @@ public class SessionStoreTest {
 				serializations.incrementAndGet();
 				return new Gson().toJsonTree(session);
 			}).create();
-		SessionStore store = new SessionStore(gson, tasks::add, temporary.newFolder());
+		SessionStore store = new SessionStore(gson, tasks::add, at(temporary.newFolder()));
 		for (int i = 0; i < 1000; i++) store.write(session("same"));
 		java.util.concurrent.CompletableFuture<Void> flushed = store.flush();
 		assertFalse(flushed.isDone());
@@ -77,7 +78,7 @@ public class SessionStoreTest {
 	@Test public void rejectedWorkerDoesNotThrowFromTicksAndCanBeRetried() throws Exception {
 		java.util.concurrent.Executor executor = org.mockito.Mockito.mock(java.util.concurrent.Executor.class);
 		org.mockito.Mockito.doThrow(new java.util.concurrent.RejectedExecutionException()).when(executor).execute(org.mockito.ArgumentMatchers.any());
-		SessionStore store = new SessionStore(new Gson(), executor, temporary.newFolder());
+		SessionStore store = new SessionStore(new Gson(), executor, at(temporary.newFolder()));
 		store.write(session("retry"));
 		assertTrue(store.flush().isCompletedExceptionally());
 		org.mockito.Mockito.doAnswer(call -> { call.<Runnable>getArgument(0).run(); return null; }).when(executor).execute(org.mockito.ArgumentMatchers.any());
@@ -87,7 +88,7 @@ public class SessionStoreTest {
 
 	@Test public void aFailedSnapshotDoesNotHideOtherRecoverableFiles() throws Exception {
 		File directory = temporary.newFolder();
-		SessionStore store = new SessionStore(new Gson(), Runnable::run, directory);
+		SessionStore store = new SessionStore(new Gson(), Runnable::run, at(directory));
 		store.write(session("saved"));
 		File blockedTemp = new File(directory, "broken.tmp");
 		assertTrue(blockedTemp.mkdir());
@@ -96,6 +97,11 @@ public class SessionStoreTest {
 		List<SessionStore.PersistedSession> recovered = store.readAll().join();
 		assertEquals(1, recovered.size());
 		assertEquals("saved", recovered.get(0).sessionId());
+	}
+
+	static SessionStore.Location at(File directory) {
+		Filepath path = Filepath.Unchecked.getRooted(directory.toPath());
+		return () -> path;
 	}
 
 	static SessionStore.PersistedSession session(String id) {
